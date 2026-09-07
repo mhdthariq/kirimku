@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { hashPassword } from "@/lib/auth";
-import { guard, ok, handle, fail, requireStr, str, bool } from "@/lib/api-helpers";
+import { guard, ok, handle, fail, requireStr, str, bool, ci } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
 
 export async function GET(req: NextRequest) {
@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
     const users = await db.user.findMany({
       where: {
         ...(includeInactive ? {} : { isActive: true }),
-        ...(search ? { OR: [{ name: { contains: search } }, { username: { contains: search } }] } : {}),
+        ...(search ? { OR: [{ name: ci(search) }, { username: ci(search) }] } : {}),
       },
       orderBy: { id: "asc" },
       include: { employee: true, roles: { include: { role: true } } },

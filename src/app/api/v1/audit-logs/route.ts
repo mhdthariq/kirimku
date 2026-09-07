@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { guard, ok, handle, str, num } from "@/lib/api-helpers";
+import { guard, ok, handle, str, num, ci } from "@/lib/api-helpers";
 
 /**
  * Audit timeline. Supports per-menu filtering via ?entityType=customer|shipment|...
@@ -24,9 +24,9 @@ export async function GET(req: NextRequest) {
       ...(search
         ? {
             OR: [
-              { entityLabel: { contains: search } },
-              { action: { contains: search } },
-              { actor: { name: { contains: search } } },
+              { entityLabel: ci(search) },
+              { action: ci(search) },
+              { actor: { name: ci(search) } },
             ],
           }
         : {}),

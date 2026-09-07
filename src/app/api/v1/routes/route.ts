@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { guard, ok, handle, requireStr, str, bool } from "@/lib/api-helpers";
+import { guard, ok, handle, requireStr, str, bool, ci } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
 
 export async function GET(req: NextRequest) {
@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
     const routes = await db.route.findMany({
       where: {
         ...(includeInactive ? {} : { isActive: true }),
-        ...(search ? { OR: [{ name: { contains: search } }, { origin: { contains: search } }, { destination: { contains: search } }] } : {}),
+        ...(search ? { OR: [{ name: ci(search) }, { origin: ci(search) }, { destination: ci(search) }] } : {}),
       },
       orderBy: { id: "desc" },
       include: { checkpoints: { orderBy: { sequence: "asc" } }, _count: { select: { transports: true } } },

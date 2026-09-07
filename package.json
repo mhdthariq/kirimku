@@ -6,7 +6,8 @@
     "seed": "bun prisma/seed.ts"
   },
   "scripts": {
-    "dev": "next dev -p 3000",
+    "dev": "prisma generate && next dev -p 3000",
+    "postinstall": "prisma generate",
     "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
     "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "eslint .",

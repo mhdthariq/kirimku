@@ -3,7 +3,7 @@
 This folder explains **everything that was built**: the architecture, the database, the API, the frontend, the business flows, the mock-up seeder, and how to run & deploy the app.
 
 > For a quick start (install → seed → run), read the root **`README.md`**.
-> To switch the database from SQLite to **Supabase Postgres**, see **`docs/02-database.md`** and **`.env.example`**.
+> To switch the database from SQLite to **Supabase Postgres**, follow the tested guide in **`docs/08-supabase-setup.md`** (templates in **`.env.example`**).
 
 ---
 
@@ -41,17 +41,26 @@ Database and API were fully rebuilt and corrected in the process — details in 
 | R5 | **Transport tab not showing** — fixed | `TransportShipment` relation renamed to `master` to match the API's `include`; plus `driver`/`kenek` relations on `Transport` |
 | R6 | Docs aligned with the new flows | This update — `03` (endpoints), `04` (QR dialog), `05` (flows), `06` (demo tasks) |
 
+## Revision round 3 — PostgreSQL / Supabase support verified
+
+| Item | Result |
+|---|---|
+| Runtime verification | The full stack (push → seed → API → QR flow → CRUD → audit) tested against a real **PostgreSQL 18** server — the same `postgresql` provider Supabase uses |
+| Case-insensitive search parity | New `ci()` helper (`src/lib/api-helpers.ts`) applied to **all 33 search filters** — SQLite and Postgres now behave identically (Postgres gets `mode: "insensitive"`)
+| Setup guide | New **`docs/08-supabase-setup.md`** — connection-string decision table, 4-step switch, verification, serverless notes, 8-row troubleshooting table |
+
 ## Document index
 
 | File | Contents |
 |---|---|
 | [`01-architecture.md`](01-architecture.md) | Stack, folder structure, server-side libraries, design decisions |
-| [`02-database.md`](02-database.md) | All 21 models explained + relationships + **step-by-step Supabase Postgres switch** |
+| [`02-database.md`](02-database.md) | All 29 models explained + relationships + **step-by-step Supabase Postgres switch** |
 | [`03-api-reference.md`](03-api-reference.md) | Every endpoint, auth model, request/response shapes, error codes |
 | [`04-frontend.md`](04-frontend.md) | Pages, navigation & RBAC gating, responsive behavior, dark mode, modal CRUD, Leaflet editor |
 | [`05-business-flows.md`](05-business-flows.md) | Shipment lifecycle state machine, **QR handover scan flows (pickup & delivery)**, pricing & invoicing, RBAC editing |
 | [`06-seeding-and-demo-accounts.md`](06-seeding-and-demo-accounts.md) | What the seeder creates, demo accounts, how to reset / customize |
 | [`07-deployment.md`](07-deployment.md) | Dev, production build, Docker with migrate-on-boot, hosting notes |
+| [`08-supabase-setup.md`](08-supabase-setup.md) | **Tested** Supabase/PostgreSQL setup: connection strings, switch steps, parity notes, troubleshooting |
 
 ## Where the code lives (map)
 
@@ -74,7 +83,7 @@ src/
     ├── seed.ts         # idempotent mock-up seeder
     ├── code-generator.ts, api-helpers.ts, client-api.ts, utils.ts
 prisma/
-├── schema.prisma       # 21 models
+├── schema.prisma       # 29 models (SQLite default / PostgreSQL-ready)
 └── seed.ts             # CLI entry for the seeder
 ```
 

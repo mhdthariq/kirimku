@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { guard, ok, handle, fail, str, num } from "@/lib/api-helpers";
+import { guard, ok, handle, fail, str, num, ci } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
 import { nextCode } from "@/lib/code-generator";
 
@@ -17,9 +17,9 @@ export async function GET(req: NextRequest) {
         ...(search
           ? {
               OR: [
-                { transportCode: { contains: search } },
-                { route: { name: { contains: search } } },
-                { vehicle: { vehicleNumber: { contains: search } } },
+                { transportCode: ci(search) },
+                { route: { name: ci(search) } },
+                { vehicle: { vehicleNumber: ci(search) } },
               ],
             }
           : {}),

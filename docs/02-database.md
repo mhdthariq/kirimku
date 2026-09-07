@@ -4,8 +4,8 @@
 
 - **ORM:** Prisma 6 — schema at `prisma/schema.prisma` (single source of truth)
 - **Default engine:** SQLite file at `db/custom.db` (created by `bun run db:push`)
-- **Models:** 21
-- **PostgreSQL-ready:** the schema uses only `String`, `Int`, `Float`, `Boolean`, `DateTime` — no SQLite-only features, no DB enums, no `Json` — so it runs on **Supabase Postgres unchanged**. See the switch guide at the bottom.
+- **Models:** 29
+- **PostgreSQL-ready (verified):** the schema uses only `String`, `Int`, `Float`, `Boolean`, `DateTime` — no SQLite-only features, no DB enums, no `Json` — so it runs on **Supabase Postgres unchanged**. The stack was tested end-to-end against a real PostgreSQL 18 server (push, seed, all endpoints, QR flow, CRUD, audit). Full switch guide: **[08-supabase-setup.md](08-supabase-setup.md)** (also summarized below).
 
 ## Model catalog
 
@@ -113,7 +113,7 @@ User 1—* AuditLog   (actor)
 
 ## Switching to Supabase Postgres (step-by-step)
 
-The app ships with SQLite for zero-config local development. To move the database to **Supabase** (or any PostgreSQL), follow these steps — no code rewrite is needed.
+The app ships with SQLite for zero-config local development. To move the database to **Supabase** (or any PostgreSQL), follow these steps — no code rewrite is needed. The complete, tested guide with troubleshooting lives in **[08-supabase-setup.md](08-supabase-setup.md)**; this is the condensed version.
 
 ### 1. Create the Supabase project
 
@@ -161,12 +161,17 @@ DATABASE_URL="postgresql://postgres.YOUR-REF:YOUR-PASSWORD@aws-0-YOUR-REGION.poo
 
 ```bash
 bun install                 # regenerate Prisma client for postgres
-bun run db:push             # creates all 21 tables in Supabase
+bun run db:push             # creates all 29 tables in Supabase
 bun run db:seed             # loads the mock-up dataset (idempotent)
 bun run dev
 ```
 
-`db push` handles the full schema — 21 tables, unique indexes, FK cascades. No manual SQL is required.
+`db push` handles the full schema — 29 tables, unique indexes, FK cascades. No manual SQL is required.
+
+> **Search behaviour is kept identical on both databases.** SQLite `LIKE` is case-insensitive
+> while PostgreSQL `LIKE` is case-sensitive; all 33 search filters in the API use the `ci()`
+> helper (`src/lib/api-helpers.ts`) which adds `mode: "insensitive"` automatically when
+> `DATABASE_URL` points at Postgres — see [08-supabase-setup.md](08-supabase-setup.md#6-behaviour-parity-what-we-fixed-for-postgres).
 
 ### 6. Optional: the official two-URL setup
 

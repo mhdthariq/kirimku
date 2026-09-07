@@ -42,7 +42,7 @@ The application is a **single Next.js 16 project** that contains both the fronte
 ```
 ├── db/                        # SQLite database file lives here (db/custom.db)
 ├── prisma/
-│   ├── schema.prisma          # 21 models — the single source of truth
+│   ├── schema.prisma          # 29 models — the single source of truth
 │   └── seed.ts                # CLI seeder (bun run db:seed)
 ├── public/
 │   └── logo.svg               # mock-up brand logo

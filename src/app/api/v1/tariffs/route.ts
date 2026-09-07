@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { guard, ok, handle, fail, requireStr, str, requireNum, num, bool, dateOrNull } from "@/lib/api-helpers";
+import { guard, ok, handle, fail, requireStr, str, requireNum, num, bool, dateOrNull, ci } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
 
 export async function GET(req: NextRequest) {
@@ -15,8 +15,8 @@ export async function GET(req: NextRequest) {
         ...(search
           ? {
               OR: [
-                { origin: { contains: search } },
-                { destination: { contains: search } },
+                { origin: ci(search) },
+                { destination: ci(search) },
               ],
             }
           : {}),

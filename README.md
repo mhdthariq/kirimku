@@ -2,9 +2,9 @@
 
 Aplikasi manajemen logistik pengiriman (shipment management) yang dibangun ulang dengan standar UI/UX modern: responsif penuh (desktop / tablet / ponsel), mode terang & gelap, CRUD berbasis modal, peta Leaflet untuk checkpoint, RBAC, audit trail, dan **database seeder mock-up lengkap**.
 
-Dibangun dengan **Next.js 16 + TypeScript + Tailwind CSS 4 + shadcn/ui + Prisma (SQLite)** — siap dialihkan ke **Supabase Postgres** (lihat `.env.example` dan `docs/02-database.md`).
+Dibangun dengan **Next.js 16 + TypeScript + Tailwind CSS 4 + shadcn/ui + Prisma (SQLite)** — dan **terverifikasi berjalan di Supabase Postgres** (diuji end-to-end pada server PostgreSQL 18 asli: schema push, seeder, seluruh API, alur QR, CRUD, audit). Panduan setup lengkap: **[docs/08-supabase-setup.md](docs/08-supabase-setup.md)** dan `.env.example`.
 
-> 📚 **Dokumentasi lengkap ada di folder [`docs/`](docs/)** — arsitektur, skema database, referensi API, frontend, alur bisnis, seeder, dan deployment.
+> 📚 **Dokumentasi lengkap ada di folder [`docs/`](docs/)** — arsitektur, skema database, referensi API, frontend, alur bisnis, seeder, deployment, dan setup Supabase teruji.
 
 ---
 
@@ -26,6 +26,8 @@ bun run dev
 
 > **Catatan:** langkah 3 opsional — aplikasi **menyimpan data otomatis pada request API pertama** setelah database dibuat (perilaku *migrate + seed on boot*). `db:seed` tersedia jika ingin menjalankan seeder secara manual/CI.
 
+> 🛡️ **Prisma Client selalu segar:** script `dev` dan `postinstall` otomatis menjalankan `prisma generate` — client Prisma selalu dibuat ulang dari `prisma/schema.prisma` terbaru, sehingga error seperti `Unknown field "driver" for include statement` (client Prisma basi dari versi lama) **tidak akan terjadi lagi**.
+
 ### Konfigurasi environment
 
 Salin `.env.example` → `.env` bila ingin mengubah database:
@@ -34,7 +36,7 @@ Salin `.env.example` → `.env` bila ingin mengubah database:
 cp .env.example .env
 ```
 
-Default: SQLite lokal (`db/custom.db`, zero-config). Ingin memakai **Supabase Postgres**? Semua varian connection string (direct / session pooler / transaction pooler) sudah disiapkan di `.env.example` — panduan langkah-demi-langkah ada di **[docs/02-database.md](docs/02-database.md)**.
+Default: SQLite lokal (`db/custom.db`, zero-config). Ingin memakai **Supabase Postgres**? Semua varian connection string (direct / session pooler / transaction pooler) sudah disiapkan di `.env.example` — panduan teruji langkah-demi-langkah ada di **[docs/08-supabase-setup.md](docs/08-supabase-setup.md)** (ringkasan juga di [docs/02-database.md](docs/02-database.md)).
 
 Buka http://localhost:3000 lalu login dengan salah satu akun demo di bawah.
 
@@ -43,9 +45,36 @@ Buka http://localhost:3000 lalu login dengan salah satu akun demo di bawah.
 ```bash
 npm install
 npx prisma db push --accept-data-loss
-npx tsx prisma/seed.ts        # butuh: npm i -D tsx
+npx tsx prisma/seed.ts        # butuh: npm i -D tsx (opsional — auto-seed berjalan otomatis)
 npm run dev
 ```
+
+---
+
+## 🔄 Upgrade dari Versi Sebelumnya (WAJIB BACA)
+
+Pernah menjalankan versi lama project ini di folder yang sama? Error seperti **`Unknown field 'driver' for include statement on model 'VehicleAssignment'`** atau **`Unknown field 'master' ... on model 'TransportShipment'`** berarti Prisma Client dan database Anda masih memakai schema lama. Schema terbaru menambahkan relasi `driver`/`kenek` (Employee) pada `VehicleAssignment` & `Transport`, mengganti nama relasi `TransportShipment.shipment` → `master`, dan menambah tabel `HandoverScan` untuk alur QR.
+
+Lakukan urutan ini di folder project Anda:
+
+```bash
+# 1. Matikan dev server, lalu bersihkan hasil build & client lama
+#    (Windows PowerShell: Remove-Item -Recurse -Force .next, node_modules\.prisma)
+rm -rf .next
+rm -rf node_modules/.prisma
+
+# 2. Install ulang + regenerasi client (postinstall menjalankan prisma generate)
+bun install            # atau: npm install
+
+# 3. Sinkronkan schema baru ke database + seed ulang (idempoten)
+bun run db:push        # atau: npx prisma db push --accept-data-loss
+bun run db:seed        # atau: npx tsx prisma/seed.ts
+
+# 4. Jalankan ulang
+bun run dev
+```
+
+> Alternatif paling bersih: **ekstrak zip terbaru ke folder baru** dan ikuti Quick Start dari awal — database lama tidak dibawa serta (zip tidak menyertakan `db/custom.db`), sehingga tidak ada sisa schema lama.
 
 ---
 
@@ -123,9 +152,9 @@ Semua password staff menggunakan `Demo#Pass2026`.
 
 ```
 ├── db/                     # Database SQLite (dibuat oleh db:push)
-├── docs/                   # 📚 Dokumentasi lengkap (7 dokumen)
+├── docs/                   # 📚 Dokumentasi lengkap (8 dokumen, termasuk panduan Supabase teruji)
 ├── prisma/
-│   ├── schema.prisma       # 21 model — domain logistik lengkap
+│   ├── schema.prisma       # 29 model — domain logistik lengkap
 │   └── seed.ts             # Seeder CLI (mock-up data)
 ├── public/
 │   └── logo.svg            # Logo mock-up
