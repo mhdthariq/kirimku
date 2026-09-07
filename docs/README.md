@@ -1,0 +1,80 @@
+# Project Documentation — Shipment & Logistics Management System
+
+This folder explains **everything that was built**: the architecture, the database, the API, the frontend, the business flows, the mock-up seeder, and how to run & deploy the app.
+
+> For a quick start (install → seed → run), read the root **`README.md`**.
+> To switch the database from SQLite to **Supabase Postgres**, see **`docs/02-database.md`** and **`.env.example`**.
+
+---
+
+## What is this system?
+
+A complete rebuild of a legacy Laravel + separate-frontend shipment management app into **one modern fullstack Next.js application**. It manages the full logistics chain: customers request shipments → kurir picks them up → goods are consolidated in a gudang (warehouse) → linehaul transports move them along routes with geo-checkpoints → last-mile deliveries complete the journey → payments, invoices, and audit logs close the loop.
+
+**Stack:** Next.js 16 (App Router) · TypeScript · Tailwind CSS 4 · shadcn/ui · Prisma ORM (SQLite default, PostgreSQL-ready) · API Routes (`/api/v1`) · Leaflet maps · Recharts.
+
+## The 10 original requirements → where they live
+
+| # | Requirement | Where it is implemented |
+|---|---|---|
+| 1 | Responsive on laptop / desktop / tablet / phone | `src/components/app-shell.tsx` + per-page card layouts (see `04-frontend.md`) |
+| 2 | Light & dark mode | `next-themes` + emerald design tokens in `src/app/globals.css` |
+| 3 | Logo top-left (mock-up) | `public/logo.svg`, rendered in sidebar & login page |
+| 4 | Missing CRUD buttons (Pickups, Deliveries, Tariffs, Invoices) | All four pages have full Dialog-based CRUD (`src/components/pages/`) |
+| 5 | Modern, high-standard UI/UX | Design system + AppShell + shadcn/ui components throughout |
+| 6 | "Add" button opens a modal form (no inline table forms) | Every module uses `Dialog` forms + `AlertDialog` delete confirms |
+| 7 | Per-menu audit logs (in addition to global timeline) | Every page has a "Log Aktivitas" tab; API: `GET /api/v1/audit-logs?entityType=…` |
+| 8 | Redesigned login page | `src/components/pages/login.tsx` — split-screen brand panel + demo quick-fill |
+| 9 | Gudang: remove "Gateway" wording + `type` field; table exists & migrates | `model Warehouse` in `prisma/schema.prisma` (no `type` column); `db:push` on boot |
+| 10 | Checkpoint mapping with Leaflet (min 3, unlimited) | `src/components/pages/routes.tsx` + `MIN_CHECKPOINTS = 3` in `src/lib/shipment-flow.ts` |
+
+Database and API were fully rebuilt and corrected in the process — details in `02-database.md` and `03-api-reference.md`.
+
+## Document index
+
+| File | Contents |
+|---|---|
+| [`01-architecture.md`](01-architecture.md) | Stack, folder structure, server-side libraries, design decisions |
+| [`02-database.md`](02-database.md) | All 21 models explained + relationships + **step-by-step Supabase Postgres switch** |
+| [`03-api-reference.md`](03-api-reference.md) | Every endpoint, auth model, request/response shapes, error codes |
+| [`04-frontend.md`](04-frontend.md) | Pages, navigation & RBAC gating, responsive behavior, dark mode, modal CRUD, Leaflet editor |
+| [`05-business-flows.md`](05-business-flows.md) | Shipment lifecycle state machine, pickup/delivery/transport flows, pricing & invoicing |
+| [`06-seeding-and-demo-accounts.md`](06-seeding-and-demo-accounts.md) | What the seeder creates, demo accounts, how to reset / customize |
+| [`07-deployment.md`](07-deployment.md) | Dev, production build, Docker with migrate-on-boot, hosting notes |
+
+## Where the code lives (map)
+
+```
+src/
+├── app/
+│   ├── api/v1/…        # REST API (see 03-api-reference.md)
+│   ├── globals.css     # design tokens (light/dark)
+│   ├── layout.tsx      # root layout (fonts, theme provider)
+│   └── page.tsx        # SPA entry — hash-routed app
+├── components/
+│   ├── ui/             # shadcn/ui primitives
+│   ├── app-shell.tsx   # sidebar / drawer / bottom-nav / header
+│   └── pages/          # one file per feature page
+└── lib/
+    ├── auth.ts         # scrypt hashing + bearer sessions
+    ├── rbac.ts         # permission catalog + 6 system roles
+    ├── audit.ts        # append-only audit logger
+    ├── shipment-flow.ts# lifecycle state machine (single source of truth)
+    ├── seed.ts         # idempotent mock-up seeder
+    ├── code-generator.ts, api-helpers.ts, client-api.ts, utils.ts
+prisma/
+├── schema.prisma       # 21 models
+└── seed.ts             # CLI entry for the seeder
+```
+
+## Demo accounts (quick reference)
+
+| Username | Password | Role |
+|---|---|---|
+| `owner` | `ChangeMeOwner#2026` | Owner — full access (`*` permissions) |
+| `siti` | `Demo#Pass2026` | Admin Kantor |
+| `budi` | `Demo#Pass2026` | Marketing |
+| `agus` | `Demo#Pass2026` | Admin Gudang |
+| `dewi`, `rizky` | `Demo#Pass2026` | Kurir |
+| `joko` | `Demo#Pass2026` | Driver |
+| `andi` | `Demo#Pass2026` | Kenek |

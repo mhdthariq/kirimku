@@ -1,0 +1,443 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  // Default: SQLite for zero-config local development.
+  // To use Supabase / PostgreSQL: change provider to "postgresql" and set
+  // DATABASE_URL in .env (see .env.example and docs/02-database.md).
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Access control: employees, users, roles, permissions, sessions
+// ---------------------------------------------------------------------------
+
+model Employee {
+  id             Int      @id @default(autoincrement())
+  employeeNumber String   @unique
+  name           String
+  phone          String?
+  position       String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User?
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  username     String    @unique
+  name         String
+  passwordHash String
+  isOwner      Boolean   @default(false)
+  isActive     Boolean   @default(true)
+  employeeId   Int?      @unique
+  employee     Employee? @relation(fields: [employeeId], references: [id])
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  roles        UserRole[]
+  sessions     SessionToken[]
+  trackingEvents TrackingEvent[]   @relation("TrackingActor")
+  auditLogs    AuditLog[]
+  payments     Payment[]          @relation("PaymentRecorder")
+  paymentsVerified Payment[]      @relation("PaymentVerifier")
+  handoverScans HandoverScan[]
+  checkpointRecords CheckpointRecord[]
+}
+
+model Role {
+  id          Int     @id @default(autoincrement())
+  slug        String  @unique
+  name        String
+  description String?
+  isSystem    Boolean @default(false)
+
+  users       UserRole[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id          Int    @id @default(autoincrement())
+  slug        String @unique
+  module      String
+  description String
+
+  roles RolePermission[]
+}
+
+model UserRole {
+  userId Int
+  roleId Int
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+}
+
+model RolePermission {
+  roleId       Int
+  permissionId Int
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model SessionToken {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Customers & shipments
+// ---------------------------------------------------------------------------
+
+model Customer {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique
+  type        String   @default("b2c") // b2b | b2c
+  name        String
+  companyName String?
+  phone       String?
+  email       String?
+  address     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  shipments MasterShipment[]
+  invoices  Invoice[]
+}
+
+model MasterShipment {
+  id                     Int      @id @default(autoincrement())
+  masterCode             String   @unique
+  resi                   String?  @unique
+  customerId             Int
+  customer               Customer @relation(fields: [customerId], references: [id])
+  status                 String   @default("CREATED")
+  origin                 String
+  destination            String
+  originWarehouseId      Int?
+  destinationWarehouseId Int?
+  chargeableWeightKg     Float?
+  ratePerKg              Float?
+  priceAmount            Float?
+  pricedAt               DateTime?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  details       DetailShipment[]
+  trackingEvents TrackingEvent[]
+  pickups       Pickup[]
+  deliveries    Delivery[]
+  payments      Payment[]
+  transportItems TransportShipment[]
+}
+
+model DetailShipment {
+  id             Int      @id @default(autoincrement())
+  detailCode     String   @unique
+  masterId       Int
+  master         MasterShipment @relation(fields: [masterId], references: [id], onDelete: Cascade)
+  description    String
+  quantity       Int      @default(1)
+  lengthCm       Float?
+  widthCm        Float?
+  heightCm       Float?
+  actualWeightKg Float    @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model TrackingEvent {
+  id          Int      @id @default(autoincrement())
+  masterId    Int
+  master      MasterShipment @relation(fields: [masterId], references: [id], onDelete: Cascade)
+  event       String
+  description String?
+  actorId     Int?
+  actor       User?    @relation("TrackingActor", fields: [actorId], references: [id])
+  occurredAt  DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Gudang (warehouses) — single physical-node table (no gateway/type split)
+// ---------------------------------------------------------------------------
+
+model Warehouse {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique
+  name      String
+  city      String?
+  address   String?
+  latitude  Float?
+  longitude Float?
+  isActive  Boolean  @default(true)
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Fleet: vehicles, routes, checkpoints, transports
+// ---------------------------------------------------------------------------
+
+model Vehicle {
+  id            Int     @id @default(autoincrement())
+  vehicleNumber String  @unique
+  name          String?
+  status        String  @default("ACTIVE") // ACTIVE | MAINTENANCE | INACTIVE
+  maxWeightKg   Float
+  maxVolumeM3   Float
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  assignments VehicleAssignment[]
+  transports  Transport[]
+}
+
+model VehicleAssignment {
+  id        Int       @id @default(autoincrement())
+  vehicleId Int
+  vehicle   Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  driverId  Int?
+  kenekId   Int?
+  validFrom DateTime  @default(now())
+  validTo   DateTime?
+
+  @@unique([vehicleId, driverId, kenekId, validFrom])
+}
+
+model Route {
+  id          Int     @id @default(autoincrement())
+  name        String
+  origin      String?
+  destination String?
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  checkpoints Checkpoint[]
+  transports  Transport[]
+}
+
+model Checkpoint {
+  id           Int      @id @default(autoincrement())
+  routeId      Int
+  route        Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  name         String
+  sequence     Int
+  latitude     Float
+  longitude    Float
+  radiusMeters Int      @default(100)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  records CheckpointRecord[]
+
+  @@unique([routeId, sequence])
+}
+
+model Transport {
+  id            Int      @id @default(autoincrement())
+  transportCode String   @unique
+  routeId       Int?
+  route         Route?   @relation(fields: [routeId], references: [id])
+  vehicleId     Int
+  vehicle       Vehicle  @relation(fields: [vehicleId], references: [id])
+  driverId      Int?
+  kenekId       Int?
+  status        String   @default("PLANNED") // PLANNED | DEPARTED | ARRIVED | CANCELLED
+  departedAt    DateTime?
+  arrivedAt     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  shipments        TransportShipment[]
+  checkpointRecords CheckpointRecord[]
+}
+
+model TransportShipment {
+  transportId Int
+  shipmentId  Int
+  transport   Transport      @relation(fields: [transportId], references: [id], onDelete: Cascade)
+  shipment    MasterShipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@id([transportId, shipmentId])
+}
+
+model CheckpointRecord {
+  id           Int      @id @default(autoincrement())
+  transportId  Int
+  transport    Transport @relation(fields: [transportId], references: [id], onDelete: Cascade)
+  checkpointId Int
+  checkpoint   Checkpoint @relation(fields: [checkpointId], references: [id], onDelete: Cascade)
+  latitude     Float
+  longitude    Float
+  withinRadius Boolean
+  recordedById Int?
+  recordedBy   User?    @relation(fields: [recordedById], references: [id])
+  recordedAt   DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Pickup & handover
+// ---------------------------------------------------------------------------
+
+model Pickup {
+  id          Int      @id @default(autoincrement())
+  pickupCode  String   @unique
+  masterId    Int
+  master      MasterShipment @relation(fields: [masterId], references: [id], onDelete: Cascade)
+  kurirId     Int?
+  status      String   @default("ASSIGNED") // ASSIGNED | IN_PROGRESS | COMPLETED | CANCELLED
+  notes       String?
+  createdAt   DateTime @default(now())
+  completedAt DateTime?
+  updatedAt   DateTime @updatedAt
+
+  scans HandoverScan[]
+}
+
+model HandoverScan {
+  id          Int      @id @default(autoincrement())
+  pickupId    Int
+  pickup      Pickup   @relation(fields: [pickupId], references: [id], onDelete: Cascade)
+  scanLevel   String   // master | detail
+  payload     String
+  result      String   // ok | missing | unexpected
+  scannedById Int?
+  scannedBy   User?    @relation(fields: [scannedById], references: [id])
+  scannedAt   DateTime @default(now())
+}
+
+model Discrepancy {
+  id          Int      @id @default(autoincrement())
+  masterId    Int
+  pickupId    Int?
+  type        String   // MISSING_DETAIL | UNEXPECTED_PAYLOAD
+  description String
+  resolvedById Int?
+  resolvedAt  DateTime?
+  resolution  String?
+  createdAt   DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Delivery
+// ---------------------------------------------------------------------------
+
+model Delivery {
+  id             Int      @id @default(autoincrement())
+  deliveryCode   String   @unique
+  masterId       Int
+  master         MasterShipment @relation(fields: [masterId], references: [id], onDelete: Cascade)
+  kurirId        Int?
+  status         String   @default("ASSIGNED") // ASSIGNED | COMPLETED | FAILED
+  proofOfDelivery String?
+  notes          String?
+  createdAt      DateTime @default(now())
+  completedAt    DateTime?
+  updatedAt      DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Pricing: tariffs, payments, invoices
+// ---------------------------------------------------------------------------
+
+model Tariff {
+  id               Int       @id @default(autoincrement())
+  origin           String
+  destination      String
+  customerType     String?   // b2b | b2c | null = all
+  ratePerKg        Float
+  minChargeableKg  Float     @default(1)
+  volumetricDivisor Float    @default(6000)
+  roundingMode     String    @default("UP") // UP | NEAREST
+  roundingUnitKg   Float     @default(0.5)
+  effectiveFrom    DateTime
+  effectiveTo      DateTime?
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+model Payment {
+  id           Int      @id @default(autoincrement())
+  masterId     Int
+  master       MasterShipment @relation(fields: [masterId], references: [id], onDelete: Cascade)
+  method       String   // CASH | TRANSFER
+  amount       Float
+  status       String   @default("RECORDED") // RECORDED | VERIFIED | REJECTED
+  reference    String?
+  recordedById Int?
+  recordedBy   User?    @relation("PaymentRecorder", fields: [recordedById], references: [id])
+  verifiedById Int?
+  verifiedBy   User?    @relation("PaymentVerifier", fields: [verifiedById], references: [id])
+  createdAt    DateTime @default(now())
+  verifiedAt   DateTime?
+}
+
+model Invoice {
+  id            Int       @id @default(autoincrement())
+  invoiceNumber String    @unique
+  customerId    Int
+  customer      Customer  @relation(fields: [customerId], references: [id])
+  status        String    @default("DRAFT") // DRAFT | SENT | PARTIALLY_SETTLED | SETTLED | CANCELLED
+  issueDate     DateTime?
+  dueDate       DateTime?
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  lines       InvoiceLine[]
+  settlements InvoiceSettlement[]
+}
+
+model InvoiceLine {
+  id          Int     @id @default(autoincrement())
+  invoiceId   Int
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Float   @default(1)
+  unitPrice   Float
+}
+
+model InvoiceSettlement {
+  id           Int      @id @default(autoincrement())
+  invoiceId    Int
+  invoice      Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount       Float
+  method       String
+  reference    String?
+  recordedById Int?
+  settledAt    DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Audit (append-only trail, per-entity viewable)
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  action     String   // created | updated | deleted | login | logout | status_change | ...
+  entityType String   // customer | shipment | warehouse | vehicle | route | checkpoint | ...
+  entityId   Int?
+  entityLabel String?
+  actorId    Int?
+  actor      User?    @relation(fields: [actorId], references: [id])
+  beforeData String?
+  afterData  String?
+  createdAt  DateTime @default(now())
+}
