@@ -9,7 +9,7 @@ import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
 import { StatusBadge } from "@/components/app/status-badge";
-import { Field, FormSelect, Input, NumberInput, SubmitButton, formatDate, formatRupiah } from "@/components/app/form-parts";
+import { Field, FormSelect, Input, NumberInput, SubmitButton, formatDate, formatNumber, formatRupiah } from "@/components/app/form-parts";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -425,11 +425,11 @@ export function InvoicesPage() {
                 </div>
               </div>
 
-              {(detailWithLines as Invoice & { settlements?: { id: number; amount: number; method: string; settledAt: string }[] }).settlements?.length > 0 && (
+              {((detailWithLines as Invoice & { settlements?: { id: number; amount: number; method: string; settledAt: string }[] }).settlements?.length ?? 0) > 0 && (
                 <div>
                   <p className="mb-1.5 text-xs font-semibold text-foreground">Riwayat Settlement</p>
                   <ul className="space-y-1 text-sm">
-                    {(detailWithLines as Invoice & { settlements: { id: number; amount: number; method: string; settledAt: string }[] }).settlements.map((s) => (
+                    {((detailWithLines as Invoice & { settlements?: { id: number; amount: number; method: string; settledAt: string }[] }).settlements ?? []).map((s) => (
                       <li key={s.id} className="flex justify-between rounded-lg bg-muted/50 px-3 py-1.5">
                         <span className="text-muted-foreground">
                           {formatDate(s.settledAt, true)} · {s.method}

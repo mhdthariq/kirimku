@@ -47,6 +47,15 @@ Each staff user is linked 1:1 to an `Employee` row (`EMP-000001`…`EMP-000008`)
 
 Plus: 8 detail items, tracking events matching each lifecycle position, 4 pickups (completed), 1 completed delivery with proof, 1 `DEPARTED` transport carrying MKT-000004, 4 payments in various states (`RECORDED`/`VERIFIED`), 1 `SENT` invoice (PT Maju Bersama, 2 lines), and 12–16 audit log entries across modules.
 
+**QR-scan demo tasks (open, assigned to kurir `rizky`):**
+
+| Task | Shipment | Status | Purpose |
+|---|---|---|---|
+| `PICK-2026-000001` | `MKT-000001` (READY_FOR_PICKUP) | `ASSIGNED` | Login as **rizky** → Pickups shows only this task → "Proses / Scan QR" → scan `DTL-000001-01`, `DTL-000001-02` → confirm → tracking shows **"Picked-up by Rizky Hidayat"** |
+| `DLV-2026-000002` | `MKT-000003` (RECEIVED_AT_GUDANG) | `ASSIGNED` | Deliveries as rizky → "Antar / Scan QR" → scan `DTL-000003-01`, `DTL-000003-02` → PoD → DELIVERED |
+
+The kurir role template ships with `pickup.scan` / `delivery.scan` / `pickup.confirm` / `delivery.confirm` — and the owner can adjust any role's capabilities in Access Control → Roles without creating a new role.
+
 The dataset is deliberately **cross-linked**: e.g. the transport references the seeded route/vehicle/crew, the invoice lines reference real shipment codes — so every page has something meaningful to show the moment you log in.
 
 ## Reset & customize

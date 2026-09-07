@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { KeyRound, Pencil, Plus, ShieldCheck, Trash2, UserPlus, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
-import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type Employee, type UserAccount, type Role, type Permission } from "@/lib/client-api";
+import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type Employee, type UserAccount, type Role, type Permission, type Options } from "@/lib/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
@@ -389,7 +389,10 @@ function UsersTab({ can }: { can: { userCreate: boolean; userUpdate: boolean } }
 // ---------------------------------------------------------------------------
 
 function RolesTab({ can }: { can: { roleCreate: boolean; roleUpdate: boolean } }) {
+  const { user } = useAuth();
+  const isOwner = !!user?.isOwner;
   const { data, loading, reload } = useApiData<Role[]>(() => apiGet<Role[]>("/roles"), []);
+  const { data: options } = useApiData<Options>(() => apiGet<Options>("/options"), []);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Role | null>(null);
   const [form, setForm] = useState({ name: "", slug: "", description: "", permissionIds: [] as string[] });
@@ -398,15 +401,12 @@ function RolesTab({ can }: { can: { roleCreate: boolean; roleUpdate: boolean } }
 
   const modules = useMemo(() => {
     const map = new Map<string, Permission[]>();
-    for (const role of data ?? []) {
-      for (const rp of role.permissions) {
-        const p = rp.permission;
-        if (!map.has(p.module)) map.set(p.module, []);
-        if (!map.get(p.module)!.find((x) => x.id === p.id)) map.get(p.module)!.push(p);
-      }
+    for (const p of options?.permissions ?? []) {
+      if (!map.has(p.module)) map.set(p.module, []);
+      map.get(p.module)!.push({ id: p.id, slug: p.slug, module: p.module, description: p.description ?? "" });
     }
     return Array.from(map.entries());
-  }, [data]);
+  }, [options]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -458,7 +458,7 @@ function RolesTab({ can }: { can: { roleCreate: boolean; roleUpdate: boolean } }
                 <Button variant="outline" size="sm" className="h-7" onClick={() => setExpanded(expanded === r.id ? null : r.id)}>
                   <KeyRound className="h-3.5 w-3.5" /> Permissions
                 </Button>
-                {can.roleUpdate && !r.isSystem && (
+                {can.roleUpdate && (!r.isSystem || isOwner) && (
                   <Button
                     variant="ghost"
                     size="icon"
@@ -500,15 +500,19 @@ function RolesTab({ can }: { can: { roleCreate: boolean; roleUpdate: boolean } }
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{editing ? `Edit Role — ${editing.name}` : "Tambah Role Custom"}</DialogTitle>
-            <DialogDescription>Role sistem tidak bisa diubah. Buat role custom untuk kombinasi permission sendiri.</DialogDescription>
+            <DialogDescription>
+              {editing?.isSystem
+                ? "Role sistem: nama & slug terkunci, tapi owner bisa mengubah permission yang dimiliki role ini."
+                : "Pilih permission yang dimiliki role. Perubahan berlaku untuk semua user dengan role ini."}
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={onSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <Field label="Nama Role" htmlFor="r-name">
-                <Input id="r-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required disabled={busy} />
+                <Input id="r-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required disabled={busy || !!editing?.isSystem} />
               </Field>
               <Field label="Slug" htmlFor="r-slug" hint="huruf kecil + tanda hubung">
-                <Input id="r-slug" value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} required disabled={busy} placeholder="supervisor-gudang" />
+                <Input id="r-slug" value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} required disabled={busy || !!editing?.isSystem} placeholder="supervisor-gudang" />
               </Field>
             </div>
             <Field label="Deskripsi" htmlFor="r-desc">

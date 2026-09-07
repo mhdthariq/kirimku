@@ -6,14 +6,17 @@ import { nextCode } from "@/lib/code-generator";
 
 export async function GET(req: NextRequest) {
   return handle(async () => {
-    await guard(req, "pickup.view");
+    const user = await guard(req, "pickup.view");
     const params = req.nextUrl.searchParams;
     const search = str(params.get("search"))?.toLowerCase();
     const status = str(params.get("status"));
+    // ?mine=true — kurir executor view: only pickups assigned to me.
+    const mine = params.get("mine") === "true";
 
     const pickups = await db.pickup.findMany({
       where: {
         ...(status ? { status } : {}),
+        ...(mine && user.employeeId != null ? { kurirId: user.employeeId } : {}),
         ...(search
           ? {
               OR: [
@@ -27,6 +30,7 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: "desc" },
       include: {
         master: { include: { customer: true, _count: { select: { details: true } } } },
+        scans: { select: { detailId: true, result: true } },
       },
     });
     return ok(
@@ -45,6 +49,7 @@ export async function GET(req: NextRequest) {
         customerName: p.master.customer.name,
         customerType: p.master.customer.type,
         detailsCount: p.master._count.details,
+        scannedCount: new Set(p.scans.filter((s) => s.detailId != null && s.result !== "unexpected").map((s) => s.detailId)).size,
       })),
     );
   });

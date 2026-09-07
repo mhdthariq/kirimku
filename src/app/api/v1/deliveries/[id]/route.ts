@@ -2,8 +2,26 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { guard, ok, handle, fail, str, num } from "@/lib/api-helpers";
 import { audit, diffFields } from "@/lib/audit";
+import { scanProgress } from "@/lib/scan-flow";
 
 type Params = { params: Promise<{ id: string }> };
+
+export async function GET(req: NextRequest, { params }: Params) {
+  return handle(async () => {
+    await guard(req, "delivery.view");
+    const { id } = await params;
+    const delivery = await db.delivery.findUnique({
+      where: { id: Number(id) },
+      include: {
+        master: { include: { customer: true, details: { orderBy: { id: "asc" } } } },
+        scans: { include: { scannedBy: true }, orderBy: { scannedAt: "desc" } },
+      },
+    });
+    if (!delivery) return fail(404, "Delivery tidak ditemukan.");
+    const progress = await scanProgress({ deliveryId: delivery.id });
+    return ok({ ...delivery, progress });
+  });
+}
 
 export async function PUT(req: NextRequest, { params }: Params) {
   return handle(async () => {

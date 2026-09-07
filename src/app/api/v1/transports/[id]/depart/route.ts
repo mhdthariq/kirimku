@@ -17,10 +17,10 @@ export async function POST(req: NextRequest, { params }: Params) {
     const updated = await db.transport.update({ where: { id: transport.id }, data: { status: "DEPARTED", departedAt: new Date() } });
     for (const s of transport.shipments) {
       if (s.master.status === "RECEIVED_AT_GUDANG") {
-        await db.masterShipment.update({ where: { id: s.masterId }, data: { status: "IN_TRANSPORT" } });
+        await db.masterShipment.update({ where: { id: s.shipmentId }, data: { status: "IN_TRANSPORT" } });
       }
       await db.trackingEvent.create({
-        data: { masterId: s.masterId, event: "IN_TRANSPORT", description: `Transport ${transport.transportCode} berangkat (rute ${transport.route?.name ?? "-"})`, actorId: user.id },
+        data: { masterId: s.shipmentId, event: "IN_TRANSPORT", description: `Transport ${transport.transportCode} berangkat (rute ${transport.route?.name ?? "-"})`, actorId: user.id },
       });
     }
     await audit({ action: "status_change", entityType: "transport", entityId: transport.id, entityLabel: `${transport.transportCode} → DEPARTED`, actor: user });

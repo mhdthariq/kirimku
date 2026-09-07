@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { guard, ok, handle, fail, str, num } from "@/lib/api-helpers";
 import { audit, diffFields } from "@/lib/audit";
+import { scanProgress } from "@/lib/scan-flow";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -11,10 +12,11 @@ export async function GET(req: NextRequest, { params }: Params) {
     const { id } = await params;
     const pickup = await db.pickup.findUnique({
       where: { id: Number(id) },
-      include: { master: { include: { customer: true, details: true } }, scans: { include: { scannedBy: true }, orderBy: { scannedAt: "desc" } } },
+      include: { master: { include: { customer: true, details: { orderBy: { id: "asc" } } } }, scans: { include: { scannedBy: true }, orderBy: { scannedAt: "desc" } } },
     });
     if (!pickup) return fail(404, "Pickup tidak ditemukan.");
-    return ok(pickup);
+    const progress = await scanProgress({ pickupId: pickup.id });
+    return ok({ ...pickup, progress });
   });
 }
 

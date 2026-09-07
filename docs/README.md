@@ -30,6 +30,17 @@ A complete rebuild of a legacy Laravel + separate-frontend shipment management a
 
 Database and API were fully rebuilt and corrected in the process — details in `02-database.md` and `03-api-reference.md`.
 
+## Revision round 2 — role editing, QR handover scanning, bug fixes
+
+| # | Revision | Where it is implemented |
+|---|---|---|
+| R1 | **Owner can edit existing role permissions** (no need to create new roles) | `PUT /roles/{id}` + Access Control → Roles (system roles: owner-only, name/slug locked, permissions editable) — see `03-api-reference.md` & `05-business-flows.md` |
+| R2 | **Kurir sees only their own pickups** + "Complete" action with **QR scanning of every detail barang**; all scanned → confirm → tracking shows **"Picked-up by [Kurir Name]"** | `?mine=true` executor mode, `POST /pickups/{id}/scans`, scan-gated `POST /pickups/{id}/confirm`, `src/components/app/qr-scan-dialog.tsx` |
+| R3 | **Delivery shows detail barang** (handed over or not) + same QR scan flow → all packages scanned + PoD → DELIVERED | `GET /deliveries` embeds `details[]` + `allScanned`; `POST /deliveries/{id}/scans`; scan-gated complete |
+| R4 | **Kendaraan (Vehicles) tab not showing** — fixed | Missing `driver`/`kenek` relations on `VehicleAssignment` were added to the Prisma schema (the API include referenced them) |
+| R5 | **Transport tab not showing** — fixed | `TransportShipment` relation renamed to `master` to match the API's `include`; plus `driver`/`kenek` relations on `Transport` |
+| R6 | Docs aligned with the new flows | This update — `03` (endpoints), `04` (QR dialog), `05` (flows), `06` (demo tasks) |
+
 ## Document index
 
 | File | Contents |
@@ -38,7 +49,7 @@ Database and API were fully rebuilt and corrected in the process — details in 
 | [`02-database.md`](02-database.md) | All 21 models explained + relationships + **step-by-step Supabase Postgres switch** |
 | [`03-api-reference.md`](03-api-reference.md) | Every endpoint, auth model, request/response shapes, error codes |
 | [`04-frontend.md`](04-frontend.md) | Pages, navigation & RBAC gating, responsive behavior, dark mode, modal CRUD, Leaflet editor |
-| [`05-business-flows.md`](05-business-flows.md) | Shipment lifecycle state machine, pickup/delivery/transport flows, pricing & invoicing |
+| [`05-business-flows.md`](05-business-flows.md) | Shipment lifecycle state machine, **QR handover scan flows (pickup & delivery)**, pricing & invoicing, RBAC editing |
 | [`06-seeding-and-demo-accounts.md`](06-seeding-and-demo-accounts.md) | What the seeder creates, demo accounts, how to reset / customize |
 | [`07-deployment.md`](07-deployment.md) | Dev, production build, Docker with migrate-on-boot, hosting notes |
 

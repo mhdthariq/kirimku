@@ -36,17 +36,17 @@ Behaviors:
 | `/` (pre-login) | **Login** | Split-screen: brand panel (logo, tagline, feature bullets) + form; demo-account quick-fill chips; error states |
 | `#/dashboard` | Dashboard | Stat cards (status funnel, revenue, unpaid), 14-day creation chart (Recharts), recent activity feed |
 | `#/shipments` | Shipments | Filterable table (status chips, search) → detail drawer/page: pricing panel, tracking timeline, item CRUD, payments, actions (ready/cancel/price) |
-| `#/pickups` | Pickups | Table + create dialog (choose shipment, kurir), confirm flow with proof notes |
-| `#/deliveries` | Deliveries | Table + assign dialog, complete with proof-of-delivery |
+| `#/pickups` | Pickups | Table + create dialog (choose shipment, kurir). **Kurir executor view** (`?mine=true` — sees only own tasks). "Proses / Scan QR" opens the **QR scan dialog**: package checklist, per-item QR image, progress bar, all-scanned → confirm → tracking "Picked-up by [Kurir]" |
+| `#/deliveries` | Deliveries | Table + assign dialog. **Detail barang per task** ("Paket" column → checklist dialog). Same **QR scan dialog** for the last mile → all packages scanned + PoD → DELIVERED |
 | `#/transports` | Transports | Create dialog (route/vehicle/crew/shipments multi-select), depart/arrive actions |
-| `#/vehicles` | Vehicles | CRUD dialogs, status badges, current crew display |
+| `#/vehicles` | Vehicles | CRUD dialogs, status badges, current crew display (driver/kenek via `VehicleAssignment` relations) |
 | `#/gudang` | **Gudang** | CRUD dialogs; **no "type" field and zero "Gateway" wording**; optional map location picker (Leaflet) |
 | `#/routes` | **Routes & Checkpoints** | Route list + **Leaflet checkpoint editor** (below) |
 | `#/customers` | Customers | CRUD dialogs, b2b/b2c type switch |
 | `#/tariffs` | Tariffs | CRUD dialogs, b2b/b2c + city pair, volumetric settings |
 | `#/invoices` | Invoices | Draft editor with line items, send, settlements; status lifecycle badges |
 | `#/unpaid` | Unpaid B2C | Outstanding COD list + record payment |
-| `#/access` | Access Control | Tabs: Users / Roles (permission matrix) / Employees |
+| `#/access` | Access Control | Tabs: Users / **Roles (edit permission set of any role — system roles owner-only, name/slug locked)** / Employees |
 | `#/audit` | Audit Timeline | Global timeline, filters (entity, actor, action, date range), CSV export |
 
 **Every data page** also has a **"Log Aktivitas"** tab showing the audit history *for that module only* (`GET /audit-logs?entityType=<module>`) — requirement #7.
@@ -66,9 +66,28 @@ The old UX let users type directly into the table; the rebuilt pattern is:
 ```
 
 - Create and Edit both use `Dialog`; destructive actions use `AlertDialog` confirmations.
-- Form selects are fed by `GET /options` (gudang, vehicles, routes, customers, kurir, tariffs).
+- Form selects are fed by `GET /options` (gudang, vehicles, routes, customers, kurir, tariffs, permissions).
 - Client-side validation mirrors server rules; the server remains the authority (Zod).
 - No page ever renders an inline editable table row.
+
+## QR handover scan dialog (`src/components/app/qr-scan-dialog.tsx`)
+
+Shared by Pickups and Deliveries (props: `mode`, `task`, `onDone`). One dialog, the whole handover flow:
+
+```
+┌─ Scan QR — Pickup PICK-2026-000006 ──────────────────┐
+│ Paket ter-scan: 2/2              SEMUA PAKET LENGKAP │  ← Progress bar + counter
+│ [ ▯ Tempel/scan QR code di sini…      ] [ Scan ]      │  ← auto-focus; Enter submits
+│ ✓ DTL-000001-01  Paket pakaian · oleh Rizky          │  ← green = scanned
+│ ▣ [QR] DTL-000001-02  Buku tulis                     │  ← QR image per unscanned pkg
+│ ── all scanned ──► [Catatan] [Konfirmasi Pickup …]   │  ← confirm gate unlocks
+└──────────────────────────────────────────────────────┘
+```
+
+- **Scan input** — USB QR readers and phone-camera keyboards type the `detailCode` and press Enter; each submit calls `POST /{pickups|deliveries}/{id}/scans` and repaints the checklist.
+- **QR rendering** — the `qrcode` package renders a small QR per unscanned package, so the flow is demonstrable with a real phone camera (scan the on-screen QR, paste the code).
+- **Feedback chips** — `ok` (green), `duplicate` (blue), `unexpected` (amber warning with the unknown payload).
+- **Confirm gate** — the confirm section only appears at `allScanned`; delivery mode also requires the PoD receiver name. Completed tasks reopen the dialog read-only as "Riwayat Scan".
 
 ## Leaflet checkpoint editor (requirement #10)
 

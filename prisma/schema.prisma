@@ -25,6 +25,10 @@ model Employee {
   updatedAt      DateTime @updatedAt
 
   user User?
+  driverAssignments VehicleAssignment[] @relation("VehicleAssignmentDriver")
+  kenekAssignments  VehicleAssignment[] @relation("VehicleAssignmentKenek")
+  drivenTransports  Transport[]         @relation("TransportDriver")
+  kenekTransports   Transport[]         @relation("TransportKenek")
 }
 
 model User {
@@ -211,7 +215,9 @@ model VehicleAssignment {
   vehicleId Int
   vehicle   Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   driverId  Int?
+  driver    Employee? @relation("VehicleAssignmentDriver", fields: [driverId], references: [id])
   kenekId   Int?
+  kenek     Employee? @relation("VehicleAssignmentKenek", fields: [kenekId], references: [id])
   validFrom DateTime  @default(now())
   validTo   DateTime?
 
@@ -257,7 +263,9 @@ model Transport {
   vehicleId     Int
   vehicle       Vehicle  @relation(fields: [vehicleId], references: [id])
   driverId      Int?
+  driver        Employee? @relation("TransportDriver", fields: [driverId], references: [id])
   kenekId       Int?
+  kenek         Employee? @relation("TransportKenek", fields: [kenekId], references: [id])
   status        String   @default("PLANNED") // PLANNED | DEPARTED | ARRIVED | CANCELLED
   departedAt    DateTime?
   arrivedAt     DateTime?
@@ -272,7 +280,7 @@ model TransportShipment {
   transportId Int
   shipmentId  Int
   transport   Transport      @relation(fields: [transportId], references: [id], onDelete: Cascade)
-  shipment    MasterShipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  master      MasterShipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
 
   @@id([transportId, shipmentId])
 }
@@ -310,13 +318,19 @@ model Pickup {
   scans HandoverScan[]
 }
 
+// QR handover scan log — each physical package (detail barang) carries a QR
+// label encoding its detailCode. Kurir scans every package at pickup and at
+// delivery; a task can only be confirmed once all details scanned "ok".
 model HandoverScan {
   id          Int      @id @default(autoincrement())
-  pickupId    Int
-  pickup      Pickup   @relation(fields: [pickupId], references: [id], onDelete: Cascade)
+  pickupId    Int?
+  pickup      Pickup?  @relation(fields: [pickupId], references: [id], onDelete: Cascade)
+  deliveryId  Int?
+  delivery    Delivery? @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
   scanLevel   String   // master | detail
+  detailId    Int?     // set when the payload matched a detail barang
   payload     String
-  result      String   // ok | missing | unexpected
+  result      String   // ok | duplicate | unexpected
   scannedById Int?
   scannedBy   User?    @relation(fields: [scannedById], references: [id])
   scannedAt   DateTime @default(now())
@@ -350,6 +364,8 @@ model Delivery {
   createdAt      DateTime @default(now())
   completedAt    DateTime?
   updatedAt      DateTime @updatedAt
+
+  scans HandoverScan[]
 }
 
 // ---------------------------------------------------------------------------

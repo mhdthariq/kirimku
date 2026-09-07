@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Clock, History, Loader2, Package, RefreshCw } from "lucide-react";
-import { apiGet, type AuditEntry, type AuditResponse } from "@/lib/client-api";
+import { apiGetWithMeta, type AuditEntry, type AuditResponse } from "@/lib/client-api";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/components/app/form-parts";
 import { cn } from "@/lib/utils";
@@ -46,11 +46,11 @@ export function ActivityLogPanel({
     setError(null);
     try {
       const query = entityTypes.map((t) => `entityType=${t}`).join("&");
-      const res = await apiGet<AuditResponse["data"] & { meta: AuditResponse["meta"] }>(
+      const res = await apiGetWithMeta<AuditResponse["data"]>(
         `/audit-logs?${query}&limit=${limit}`,
       );
-      setEntries(res.data ?? (res as unknown as AuditEntry[]));
-      setTotal(res.meta?.total ?? (res as unknown as AuditEntry[]).length ?? 0);
+      setEntries(res.data ?? []);
+      setTotal(typeof res.meta?.total === "number" ? res.meta.total : (res.data ?? []).length);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal memuat log aktivitas.");
     } finally {

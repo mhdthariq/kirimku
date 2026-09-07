@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { guard, ok, handle, requireStr, str, num, requireNum } from "@/lib/api-helpers";
+import { guard, ok, handle, fail, requireStr, str, num, requireNum } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
 
 const VEHICLE_STATUSES = ["ACTIVE", "MAINTENANCE", "INACTIVE"];

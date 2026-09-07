@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ClipboardList, PackageCheck, Pencil, Plus, XCircle } from "lucide-react";
+import { ClipboardList, PackageCheck, Pencil, Plus, QrCode, XCircle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type DeliveryTask, type Options, type Shipment } from "@/lib/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
@@ -9,10 +9,12 @@ import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
 import { StatusBadge } from "@/components/app/status-badge";
 import { Field, FormSelect, SubmitButton, Textarea, formatDate, formatRupiah } from "@/components/app/form-parts";
+import { QrScanDialog, type ScanTaskInfo } from "@/components/app/qr-scan-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 
 interface DeliveryForm {
   masterId: string;
@@ -27,10 +29,13 @@ export function DeliveriesPage() {
   const can = {
     view: hasPermission(user, "delivery.view"),
     assign: hasPermission(user, "delivery.assign_kurir"),
+    scan: hasPermission(user, "delivery.scan"),
     confirm: hasPermission(user, "delivery.confirm"),
   };
+  // Kurir executor view: without assign capability, only show my own tasks.
+  const isExecutor = !can.assign && !user?.isOwner;
 
-  const { data, loading, reload } = useApiData<DeliveryTask[]>(() => apiGet<DeliveryTask[]>("/deliveries"), []);
+  const { data, loading, reload } = useApiData<DeliveryTask[]>(() => apiGet<DeliveryTask[]>(`/deliveries${isExecutor ? "?mine=true" : ""}`), [isExecutor]);
   const { data: options } = useApiData<Options>(() => apiGet<Options>("/options"), []);
   const [readyShipments, setReadyShipments] = useState<Shipment[]>([]);
 
@@ -48,9 +53,9 @@ export function DeliveriesPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<DeliveryTask | null>(null);
-  const [completeTarget, setCompleteTarget] = useState<DeliveryTask | null>(null);
+  const [detailTarget, setDetailTarget] = useState<DeliveryTask | null>(null);
+  const [scanTask, setScanTask] = useState<ScanTaskInfo | null>(null);
   const [form, setForm] = useState<DeliveryForm>(EMPTY);
-  const [proof, setProof] = useState("");
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<DeliveryTask | null>(null);
 
@@ -83,20 +88,16 @@ export function DeliveriesPage() {
     }
   }
 
-  async function onComplete(e: React.FormEvent) {
-    e.preventDefault();
-    if (!completeTarget) return;
-    setBusy(true);
-    const ok = await runAction(
-      () => apiPost(`/deliveries/${completeTarget.id}/complete`, { proofOfDelivery: proof }),
-      { success: `Delivery ${completeTarget.deliveryCode} selesai — shipment DELIVERED.` },
-    );
-    setBusy(false);
-    if (ok) {
-      setCompleteTarget(null);
-      setProof("");
-      reload();
-    }
+  function openScan(d: DeliveryTask) {
+    setScanTask({
+      id: d.id,
+      code: d.deliveryCode,
+      masterCode: d.masterCode,
+      customerName: d.customerName,
+      route: d.address ?? d.destination,
+      status: d.status,
+      completedAt: d.completedAt,
+    });
   }
 
   async function onDelete() {
@@ -121,7 +122,7 @@ export function DeliveriesPage() {
     <div className="space-y-4">
       <PageHeader
         title="Deliveries"
-        subtitle="Pengiriman akhir ke penerima setelah shipment tiba di gudang tujuan."
+        subtitle="Pengiriman akhir ke penerima — kurir scan QR semua paket customer sebelum konfirmasi."
         icon={<ClipboardList className="h-5 w-5" />}
         actions={
           can.assign && (
@@ -190,6 +191,23 @@ export function DeliveriesPage() {
                   return <span className="text-sm text-muted-foreground">{kurir?.name ?? "—"}</span>;
                 },
               },
+              {
+                key: "packages",
+                header: "Paket (Detail Barang)",
+                render: (d) => (
+                  <button
+                    type="button"
+                    className="group flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left hover:bg-accent"
+                    onClick={() => setDetailTarget(d)}
+                    aria-label={`Lihat detail barang ${d.deliveryCode}`}
+                  >
+                    <span className={cn("font-mono text-xs", d.detailsCount > 0 && d.scannedCount >= d.detailsCount ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground")}>
+                      {d.scannedCount ?? 0}/{d.detailsCount ?? 0}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground group-hover:text-foreground">lihat detail</span>
+                  </button>
+                ),
+              },
               { key: "price", header: "Nilai", hideOnMobile: true, render: (d) => <span className="text-sm">{formatRupiah(d.priceAmount)}</span> },
               { key: "completedAt", header: "Selesai", hideOnMobile: true, render: (d) => formatDate(d.completedAt, true) },
               { key: "status", header: "Status", render: (d) => <StatusBadge status={d.status} /> },
@@ -198,12 +216,17 @@ export function DeliveriesPage() {
                 header: "Aksi",
                 render: (d) => (
                   <div className="flex flex-wrap gap-1.5">
-                    {d.status === "ASSIGNED" && can.confirm && (
-                      <Button size="sm" className="h-7" onClick={() => setCompleteTarget(d)}>
-                        <PackageCheck className="h-3.5 w-3.5" /> Selesaikan
+                    {d.status !== "COMPLETED" && d.status !== "FAILED" && (can.confirm || can.scan) && (
+                      <Button size="sm" className="h-7" onClick={() => openScan(d)}>
+                        <QrCode className="h-3.5 w-3.5" /> {isExecutor ? "Antar / Scan QR" : "Selesaikan (Scan QR)"}
                       </Button>
                     )}
-                    {d.status === "ASSIGNED" && can.assign && (
+                    {d.status === "COMPLETED" && (can.confirm || can.scan) && (
+                      <Button variant="outline" size="sm" className="h-7" onClick={() => openScan(d)}>
+                        <QrCode className="h-3.5 w-3.5" /> Riwayat Scan
+                      </Button>
+                    )}
+                    {d.status !== "COMPLETED" && d.status !== "FAILED" && can.assign && (
                       <>
                         <Button
                           variant="ghost"
@@ -271,34 +294,43 @@ export function DeliveriesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Complete dialog */}
-      <Dialog open={!!completeTarget} onOpenChange={(open) => !open && setCompleteTarget(null)}>
+      {/* Detail barang dialog — packages of this delivery + handover state */}
+      <Dialog open={!!detailTarget} onOpenChange={(open) => !open && setDetailTarget(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Selesaikan delivery {completeTarget?.deliveryCode}?</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <PackageCheck className="h-5 w-5 text-primary" />
+              Detail Barang — {detailTarget?.deliveryCode}
+            </DialogTitle>
             <DialogDescription>
-              Shipment {completeTarget?.masterCode} akan berubah menjadi DELIVERED. Isi bukti serah terima (nama penerima / catatan).
+              Shipment {detailTarget?.masterCode} · {detailTarget?.customerName}. Paket bertanda hijau sudah ter-scan saat serah terima.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={onComplete} className="space-y-4">
-            <Field label="Bukti Serah Terima (PoD)" htmlFor="d-proof">
-              <Textarea
-                id="d-proof"
-                value={proof}
-                onChange={(e) => setProof(e.target.value)}
-                rows={2}
-                placeholder="mis. Diterima oleh Rina — tanpa eksepsi"
-                required
-                disabled={busy}
-              />
-            </Field>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setCompleteTarget(null)} disabled={busy}>
-                Batal
-              </Button>
-              <SubmitButton busy={busy}>Selesaikan Delivery</SubmitButton>
-            </DialogFooter>
-          </form>
+          <div className="max-h-72 space-y-1.5 overflow-y-auto rounded-lg border p-2">
+            {detailTarget?.details.map((x) => (
+              <div key={x.id} className={cn("flex items-center gap-3 rounded-md px-2 py-1.5", x.scanned ? "bg-emerald-50/60 dark:bg-emerald-950/40" : "bg-card")}>
+                {x.scanned ? (
+                  <PackageCheck className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                ) : (
+                  <div className="h-4 w-4 shrink-0 rounded-full border-2 border-dashed border-muted-foreground/40" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-mono text-xs font-semibold text-foreground">{x.detailCode}</p>
+                  <p className="truncate text-[11px] text-muted-foreground">
+                    {x.description} · qty {x.quantity}
+                  </p>
+                </div>
+              </div>
+            ))}
+            {detailTarget && detailTarget.details.length === 0 && (
+              <p className="px-2 py-4 text-center text-sm text-muted-foreground">Shipment ini belum punya detail barang.</p>
+            )}
+          </div>
+          {detailTarget?.status === "COMPLETED" && (
+            <p className="rounded-lg border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+              Delivery selesai {detailTarget.completedAt ? formatDate(detailTarget.completedAt) : ""} — PoD: {detailTarget.proofOfDelivery ?? "—"}
+            </p>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -316,6 +348,14 @@ export function DeliveriesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <QrScanDialog
+        open={!!scanTask}
+        onOpenChange={(open) => !open && setScanTask(null)}
+        mode="delivery"
+        task={scanTask}
+        onDone={reload}
+      />
     </div>
   );
 }

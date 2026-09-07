@@ -6,14 +6,17 @@ import { nextCode } from "@/lib/code-generator";
 
 export async function GET(req: NextRequest) {
   return handle(async () => {
-    await guard(req, "delivery.view");
+    const user = await guard(req, "delivery.view");
     const params = req.nextUrl.searchParams;
     const search = str(params.get("search"))?.toLowerCase();
     const status = str(params.get("status"));
+    // ?mine=true — kurir executor view: only deliveries assigned to me.
+    const mine = params.get("mine") === "true";
 
     const deliveries = await db.delivery.findMany({
       where: {
         ...(status ? { status } : {}),
+        ...(mine && user.employeeId != null ? { kurirId: user.employeeId } : {}),
         ...(search
           ? {
               OR: [
@@ -25,26 +28,42 @@ export async function GET(req: NextRequest) {
           : {}),
       },
       orderBy: { createdAt: "desc" },
-      include: { master: { include: { customer: true } } },
+      include: {
+        master: { include: { customer: true, details: { orderBy: { id: "asc" } } } },
+        scans: { where: { result: { in: ["ok", "duplicate"] } }, select: { detailId: true } },
+      },
     });
     return ok(
-      deliveries.map((d) => ({
-        id: d.id,
-        deliveryCode: d.deliveryCode,
-        status: d.status,
-        kurirId: d.kurirId,
-        notes: d.notes,
-        proofOfDelivery: d.proofOfDelivery,
-        createdAt: d.createdAt,
-        completedAt: d.completedAt,
-        masterCode: d.master.masterCode,
-        masterStatus: d.master.status,
-        destination: d.master.destination,
-        address: d.master.customer.address,
-        customerName: d.master.customer.name,
-        customerPhone: d.master.customer.phone,
-        priceAmount: d.master.priceAmount,
-      })),
+      deliveries.map((d) => {
+        const scannedIds = new Set(d.scans.filter((s) => s.detailId != null).map((s) => s.detailId));
+        return {
+          id: d.id,
+          deliveryCode: d.deliveryCode,
+          status: d.status,
+          kurirId: d.kurirId,
+          notes: d.notes,
+          proofOfDelivery: d.proofOfDelivery,
+          createdAt: d.createdAt,
+          completedAt: d.completedAt,
+          masterCode: d.master.masterCode,
+          masterStatus: d.master.status,
+          destination: d.master.destination,
+          address: d.master.customer.address,
+          customerName: d.master.customer.name,
+          customerPhone: d.master.customer.phone,
+          priceAmount: d.master.priceAmount,
+          detailsCount: d.master.details.length,
+          scannedCount: scannedIds.size,
+          allScanned: d.master.details.length > 0 && d.master.details.every((x) => scannedIds.has(x.id)),
+          details: d.master.details.map((x) => ({
+            id: x.id,
+            detailCode: x.detailCode,
+            description: x.description,
+            quantity: x.quantity,
+            scanned: scannedIds.has(x.id),
+          })),
+        };
+      }),
     );
   });
 }

@@ -16,10 +16,10 @@ export async function POST(req: NextRequest, { params }: Params) {
     const updated = await db.transport.update({ where: { id: transport.id }, data: { status: "ARRIVED", arrivedAt: new Date() } });
     for (const s of transport.shipments) {
       if (s.master.status === "IN_TRANSPORT") {
-        await db.masterShipment.update({ where: { id: s.masterId }, data: { status: "ARRIVED_AT_GUDANG" } });
+        await db.masterShipment.update({ where: { id: s.shipmentId }, data: { status: "ARRIVED_AT_GUDANG" } });
       }
       await db.trackingEvent.create({
-        data: { masterId: s.masterId, event: "ARRIVED_AT_GUDANG", description: `Transport ${transport.transportCode} tiba di gudang tujuan`, actorId: user.id },
+        data: { masterId: s.shipmentId, event: "ARRIVED_AT_GUDANG", description: `Transport ${transport.transportCode} tiba di gudang tujuan`, actorId: user.id },
       });
     }
     await audit({ action: "status_change", entityType: "transport", entityId: transport.id, entityLabel: `${transport.transportCode} → ARRIVED`, actor: user });

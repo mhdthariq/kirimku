@@ -30,12 +30,12 @@ Every transition appends a `TrackingEvent` (with the acting user) and an `AuditL
 ```
 1. CREATE        Marketing creates shipment + items (detail shipments)
 2. READY         Mark READY_FOR_PICKUP
-3. PICKUP        Assign kurir → kurir confirms pickup (proof + optional COD payment)
+3. PICKUP        Assign kurir → kurir QR-scans every package → confirm pickup (tracking: "Picked-up by [Kurir]")
 4. GUDANG IN     Received at origin gudang; price computed from tariff
 5. TRANSPORT     Admin gudang builds transport (route + vehicle + crew + shipments) → depart
 6. CHECKPOINTS   (future: geo check-ins recorded as CheckpointRecord, withinRadius flag)
 7. GUDANG OUT    Transport arrives at destination gudang → ARRIVED_AT_GUDANG
-8. DELIVERY      Assign kurir → complete with proof of delivery
+8. DELIVERY      Assign kurir → kurir QR-scans all packages → complete with proof of delivery
 9. SETTLE        Payment verified (b2c) or invoice settled (b2b)
 ```
 
@@ -90,16 +90,51 @@ PLANNED ──depart──► DEPARTED ──arrive──► ARRIVED      (CANCE
 - Each checkpoint: name, sequence (order along the route), latitude/longitude (map placement), radius in meters (geofence circle).
 - `CheckpointRecord` (transport check-in evidence) stores the actual scanned position and a `withinRadius` boolean, ready for future GPS integrations.
 
-## Pickup & handover integrity
+## Pickup & handover integrity (QR scan flow)
 
-- `Pickup` links a shipment to a kurir; confirm requires the shipment to be in `READY_FOR_PICKUP`.
-- `HandoverScan` logs master/detail barcode scans with results `ok | missing | unexpected`; mismatches create `Discrepancy` rows for resolution — the data model is in place for scanner hardware later, while the current UI uses manual confirmation.
+Every physical package carries a QR label encoding its **`detailCode`**. The handover flow:
+
+```
+ASSIGNED ──scan all packages──► (IN_PROGRESS) ──confirm──► COMPLETED
+   │                                │                        │
+   │ kurir sees ONLY tasks          │ each POST /scans        │ shipment → PICKED_UP
+   │ assigned to them               │ validates payload       │ tracking: "Picked-up by [Kurir]"
+   │ (?mine=true)                   │ = detailCode            │
+```
+
+1. **Kurir view** — users without `pickup.assign_kurir` automatically get `?mine=true`: only their own tasks appear.
+2. **Scan** — the "Proses / Scan QR" action opens the scan dialog. Each scan (`POST /pickups/{id}/scans`, permission `pickup.scan`) is matched against the shipment's detail codes:
+   - `ok` — the package is marked scanned (green check in the checklist);
+   - `duplicate` — the same package scanned again (recorded, no progress change);
+   - `unexpected` — unknown QR (recorded + warning; a `Discrepancy` candidate).
+   Only the **assigned kurir**, a supervisor with `pickup.assign_kurir`, or the owner may scan.
+3. **Confirm gate** — `POST /pickups/{id}/confirm` **fails with 422** while any package is unscanned, listing the remaining `detailCode`s. With all packages scanned it completes the pickup, moves the shipment to `PICKED_UP`, and writes tracking: **`Picked-up by [Kurir Name]`** (plus an audit entry with the scan count).
+
+The dialog also renders a QR image per unscanned package so the flow can be exercised with a phone camera during demos; USB QR readers act as keyboards (input auto-focus, Enter submits).
+
+## Delivery flow (QR scan + proof of delivery)
+
+Same QR pattern for the last mile — kurir must scan **all packages for that customer** before confirming handover:
+
+```
+ASSIGNED ──scan all customer packages──► (all scanned) ──complete + PoD──► COMPLETED
+   │                                                                              │
+   │ ?mine=true executor view                          POST /deliveries/{id}/scans  │ shipment → DELIVERED
+   │ detail barang visible per task                    (permission delivery.scan)   │ tracking: "Delivered to [Customer] by [Kurir]
+   │ ("Paket (Detail Barang)" column)                                             │         — received by: [PoD]"
+```
+
+- **Detail barang visibility** — every delivery row embeds its `details[]` (package code, description, quantity, `scanned` state). The "lihat detail" cell opens a checklist dialog showing exactly which packages belong to that customer and whether they were handed over (green) or not.
+- **Scan gate** — `POST /deliveries/{id}/complete` requires every package scanned **and** a `proofOfDelivery` (receiver name). The UI unlocks the confirm button only when `allScanned`, then asks "Diterima oleh (PoD)".
+- **Tracking** — on completion: `Delivered to [Customer] by [Kurir Name] — received by: [PoD]`, and the shipment lands in `DELIVERED` (terminal state).
+- Completed tasks keep their scan history — the "Riwayat Scan" action reopens the dialog in read-only mode.
 
 ## RBAC flows
 
 - **Owner** bypasses all permission checks (`permissions: ["*"]`) and can manage Access Control.
-- Six system roles cover the org (see `rbac.ts`): `admin-kantor` (office/finance), `marketing` (acquisition), `admin-gudang` (warehouse/fleet), `kurir` (first/last mile), `driver`, `kenek` (linehaul).
-- Custom roles can be composed in the UI from the 79-permission catalog; endpoints check **permission slugs**, never role names.
+- Six system roles cover the org (see `rbac.ts`): `admin-kantor` (office/finance), `marketing` (acquisition), `admin-gudang` (warehouse/fleet), `kurir` (first/last mile + QR scanning), `driver`, `kenek` (linehaul).
+- **Editing system role capabilities (owner-only)**: the owner can edit the permission set of any existing system role directly in Access Control → Roles (name/slug stay locked). No need to create a custom role just to change what Kurir can do. `ensureRbac()` re-applies templates only when the permission catalog itself changes (app update); ordinary restarts keep owner edits.
+- Custom roles can be composed in the UI from the 62-permission catalog; endpoints check **permission slugs**, never role names.
 - Nav items and action buttons are hidden when the user lacks the permission; the API independently re-checks (defense in depth).
 
 ## Audit trail (requirement #7)

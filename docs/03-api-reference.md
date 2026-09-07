@@ -44,7 +44,7 @@ curl -s -X POST http://localhost:3000/api/v1/auth/login \
 
 Attach it to every request: `Authorization: Bearer <token>`.
 
-The **owner** user short-circuits RBAC (`permissions: ["*"]`). All other users get the union of their roles' permission slugs (79 slugs — see `src/lib/rbac.ts`).
+The **owner** user short-circuits RBAC (`permissions: ["*"]`). All other users get the union of their roles' permission slugs (62 slugs — see `src/lib/rbac.ts`).
 
 ### Query conventions
 
@@ -76,7 +76,7 @@ The first request after a fresh `db:push` triggers `ensureSeed()` (RBAC + demo d
 
 | Method | Endpoint | Permission | Description |
 |---|---|---|---|
-| GET | `/options` | any authenticated | Lookup lists: gudang, vehicles, routes, customers, tariffs, kurir/drivers/kenek (employees), roles — powers all form selects |
+| GET | `/options` | any authenticated | Lookup lists: gudang, vehicles, routes, customers, tariffs, kurir/drivers/kenek (employees), **permissions catalog** (full 62-slug list, powers the role editor) |
 
 ## Customers
 
@@ -114,22 +114,30 @@ The first request after a fresh `db:push` triggers `ensureSeed()` (RBAC + demo d
 
 ## Pickups
 
+Kurir executor mode: `GET /pickups?mine=true` returns only tasks assigned to the logged-in kurir — the Pickups page applies this automatically for users without `pickup.assign_kurir`.
+
 | Method | Endpoint | Permission | Description |
 |---|---|---|---|
-| GET | `/pickups` | `pickup.view` | List + `?status`, `?kurirId`, `?q` |
+| GET | `/pickups` | `pickup.view` | List + `?status`, `?mine=true`, `?search`; rows include `detailsCount` + `scannedCount` |
+| GET | `/pickups/{id}` | `pickup.view` | Pickup + master details + scan log + `progress {total, scanned, allScanned, details[]}` |
 | POST | `/pickups` | `pickup.create` | `{masterId, kurirId?, notes?}` → code `PICK-YYYY-…`; shipment must be `READY_FOR_PICKUP` |
 | PUT | `/pickups/{id}` | `pickup.assign_kurir` | Reassign kurir / update notes |
-| POST | `/pickups/{id}/confirm` | `pickup.confirm` | Completes pickup: `PICKED_UP` on shipment, tracking event, payment may be recorded at handover |
+| POST | `/pickups/{id}/scans` | `pickup.scan` | `{payload}` — QR handover scan. Matches payload against detail codes: `ok` marks the package scanned, `duplicate` re-scan, `unexpected` unknown QR. Only the assigned kurir (or assigner/owner) may scan. Returns `{scan, message, progress}` |
+| POST | `/pickups/{id}/confirm` | `pickup.confirm` | **Requires every package scanned** (`progress.allScanned`); `{notes?}` → pickup `COMPLETED`, shipment `PICKED_UP`, tracking shows `Picked-up by [Kurir Name]` |
 | DELETE | `/pickups/{id}` | `pickup.view` (owner/assigner) | Cancel pickup while `ASSIGNED` |
 
 ## Deliveries
 
+Same executor mode: `GET /deliveries?mine=true` filters to the logged-in kurir. Every row embeds its `details[]` (detail barang) with per-package `scanned` state, plus `allScanned`.
+
 | Method | Endpoint | Permission | Description |
 |---|---|---|---|
-| GET | `/deliveries` | `delivery.view` | List + `?status`, `?kurirId`, `?q` |
-| POST | `/deliveries` | `delivery.view` (assign) | `{masterId, kurirId?, notes?}` → code `DLV-YYYY-…`; shipment must be `ARRIVED_AT_GUDANG` |
+| GET | `/deliveries` | `delivery.view` | List + `?status`, `?mine=true`, `?search`; rows include `details[]`, `scannedCount`, `allScanned` |
+| GET | `/deliveries/{id}` | `delivery.view` | Delivery + master details + scan log + `progress` (same shape as pickups) |
+| POST | `/deliveries` | `delivery.assign_kurir` | `{masterId, kurirId?, notes?}` → code `DLV-YYYY-…`; shipment must be `ARRIVED_AT_GUDANG`/`RECEIVED_AT_GUDANG` |
 | PUT | `/deliveries/{id}` | `delivery.assign_kurir` | Reassign kurir |
-| POST | `/deliveries/{id}/complete` | `delivery.confirm` | `{proofOfDelivery}` → `DELIVERED` + tracking event |
+| POST | `/deliveries/{id}/scans` | `delivery.scan` | `{payload}` — QR scan at handover to customer. Same matching rules as pickups; only assigned kurir (or assigner/owner) |
+| POST | `/deliveries/{id}/complete` | `delivery.confirm` | **Requires every package scanned** + `{proofOfDelivery}` (receiver name); → delivery `COMPLETED`, shipment `DELIVERED`, tracking `Delivered to [Customer] by [Kurir Name] — received by: [PoD]` |
 | DELETE | `/deliveries/{id}` | — | Cancel while `ASSIGNED` |
 
 ## Transports (linehaul)
@@ -220,7 +228,8 @@ The first request after a fresh `db:push` triggers `ensureSeed()` (RBAC + demo d
 | PUT | `/users/{id}` | `user.update` | Update profile / roles / active |
 | GET | `/roles` | `role.view` | Roles + permission counts |
 | POST | `/roles` | `role.create` | `{slug?, name, description?, permissionSlugs[]}` |
-| PUT | `/roles/{id}` | `role.update` | Update name/description/permissions |
+| PUT | `/roles/{id}` | `role.update` | Update name/description/permissions. **System roles: owner-only, permissions editable, name/slug locked** — no need to create a new role just to change capabilities |
+| PUT | `/roles/{id}/permissions` | `role.update` | Replace the full permission set (same owner-only rule for system roles) |
 | DELETE | `/roles/{id}` | `role.delete` | Delete non-system roles |
 | GET | `/roles/{id}/permissions` | `role.view` | Full permission slugs of a role |
 

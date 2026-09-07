@@ -12,7 +12,10 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const { id } = await params;
     const role = await db.role.findUnique({ where: { id: Number(id) } });
     if (!role) return fail(404, "Role tidak ditemukan.");
-    if (role.isSystem) return fail(422, "Permission role sistem tidak bisa diubah dari UI. Buat role baru untuk kustomisasi.");
+    // System roles: only the owner may replace the permission set.
+    if (role.isSystem && !user.isOwner) {
+      return fail(422, "Permission role sistem hanya bisa diubah oleh owner.");
+    }
 
     const body = await req.json().catch(() => ({}));
     if (!Array.isArray(body.permissionIds)) return fail(422, "permissionIds wajib berupa array.");

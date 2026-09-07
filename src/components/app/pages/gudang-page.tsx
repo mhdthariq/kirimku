@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-import { MapPin, Pencil, Plus, Trash2, Warehouse } from "lucide-react";
+import { MapPin, Pencil, Plus, Trash2, Warehouse as WarehouseIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type Warehouse } from "@/lib/client-api";
@@ -121,7 +121,7 @@ export function GudangPage() {
       <PageHeader
         title="Gudang"
         subtitle="Titik fisik jaringan pengiriman — asal, transit, dan tujuan kiriman."
-        icon={<Warehouse className="h-5 w-5" />}
+        icon={<WarehouseIcon className="h-5 w-5" />}
         actions={
           can.create && (
             <Button onClick={openCreate}>

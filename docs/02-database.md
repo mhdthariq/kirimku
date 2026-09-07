@@ -16,7 +16,7 @@
 | `Employee` | Staff master data | `employeeNumber @unique`, `position`, 1:1 optional `User` |
 | `User` | Login accounts | `username @unique`, `passwordHash` (scrypt), `isOwner` (owner bypasses RBAC = `*`), `isActive` |
 | `Role` | Permission bundles | `slug @unique`, `isSystem` (seeded roles can't be deleted via UI) |
-| `Permission` | 79 permission slugs | `slug @unique`, grouped by `module` |
+| `Permission` | 62 permission slugs | `slug @unique`, grouped by `module` |
 | `UserRole` | M:N user ↔ role | composite PK, `onDelete: Cascade` |
 | `RolePermission` | M:N role ↔ permission | composite PK, cascade |
 | `SessionToken` | Bearer sessions | `token @unique`, `expiresAt` (12 h) |
@@ -55,7 +55,7 @@
 | Model | Purpose | Notable fields / rules |
 |---|---|---|
 | `Pickup` | Kurir pickup task | `pickupCode @unique` (`PICK-YYYY-…`), FK `masterId`, `kurirId` (→ Employee), `status` = `ASSIGNED \| IN_PROGRESS \| COMPLETED \| CANCELLED` |
-| `HandoverScan` | Scan log during handover | `scanLevel` = `master \| detail`, `payload`, `result` = `ok \| missing \| unexpected` |
+| `HandoverScan` | QR scan log at pickup & delivery handover | `pickupId?` / `deliveryId?` (one set), `scanLevel` = `master \| detail`, `detailId?` matched package, `payload`, `result` = `ok \| duplicate \| unexpected`, `scannedById` |
 | `Discrepancy` | Missing/unexpected items | `type` = `MISSING_DETAIL \| UNEXPECTED_PAYLOAD`, `resolvedById/At`, `resolution` |
 | `Delivery` | Last-mile delivery task | `deliveryCode @unique` (`DLV-YYYY-…`), `kurirId`, `status` = `ASSIGNED \| COMPLETED \| FAILED`, `proofOfDelivery` text |
 
@@ -85,13 +85,14 @@ Customer 1—* MasterShipment *—1 Warehouse (origin)
                                   *—1 Warehouse (destination)
 MasterShipment 1—* DetailShipment
 MasterShipment 1—* TrackingEvent
-MasterShipment 1—* Pickup 1—* HandoverScan
-MasterShipment 1—* Delivery
+MasterShipment 1—* Pickup 1—* HandoverScan   (QR detail scans)
+MasterShipment 1—* Delivery 1—* HandoverScan  (QR detail scans)
 MasterShipment 1—* Payment
 MasterShipment *—* Transport   (via TransportShipment)
 
 Route 1—* Checkpoint
 Route 1—* Transport *—1 Vehicle
+Transport *—1 Employee (driver) *—1 Employee (kenek)
 Transport 1—* CheckpointRecord *—1 Checkpoint
 Vehicle 1—* VehicleAssignment (driver/kenek → Employee)
 

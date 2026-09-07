@@ -11,11 +11,20 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const { id } = await params;
     const existing = await db.role.findUnique({ where: { id: Number(id) } });
     if (!existing) return fail(404, "Role tidak ditemukan.");
-    if (existing.isSystem) return fail(422, "Role sistem tidak bisa diubah. Buat role baru untuk kustomisasi.");
+    // System roles: only the owner may edit, and only their permission set.
+    // Name/slug stay locked so seeded templates & code references remain stable.
+    const editingSystem = existing.isSystem;
+    if (editingSystem && !user.isOwner) {
+      return fail(422, "Role sistem hanya bisa diubah oleh owner, dan hanya permission-nya.");
+    }
     const body = await req.json().catch(() => ({}));
     const data: Record<string, unknown> = {};
-    if (body.name !== undefined) data.name = str(body.name) ?? existing.name;
-    if (body.description !== undefined) data.description = str(body.description);
+    if (!editingSystem) {
+      if (body.name !== undefined) data.name = str(body.name) ?? existing.name;
+      if (body.description !== undefined) data.description = str(body.description);
+    } else if (body.description !== undefined) {
+      data.description = str(body.description);
+    }
     const role = await db.role.update({ where: { id: existing.id }, data });
 
     if (Array.isArray(body.permissionIds)) {
@@ -25,8 +34,17 @@ export async function PUT(req: NextRequest, { params }: Params) {
         await db.rolePermission.createMany({ data: permissionIds.map((permissionId) => ({ roleId: role.id, permissionId })) });
       }
     }
-    await audit({ action: "updated", entityType: "role", entityId: role.id, entityLabel: role.name, actor: user, before: diffFields(existing, role as unknown as Record<string, unknown>) });
-    return ok(role);
+    await audit({
+      action: "updated",
+      entityType: "role",
+      entityId: role.id,
+      entityLabel: role.name,
+      actor: user,
+      before: diffFields(existing, role as unknown as Record<string, unknown>),
+      after: { permissionsUpdated: Array.isArray(body.permissionIds) },
+    });
+    const full = await db.role.findUnique({ where: { id: role.id }, include: { permissions: { include: { permission: true } }, _count: { select: { users: true } } } });
+    return ok(full);
   });
 }
 

@@ -54,7 +54,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 
     for (const s of existing.shipments) {
       if (s.master.status === "IN_TRANSPORT") {
-        await db.masterShipment.update({ where: { id: s.masterId }, data: { status: "RECEIVED_AT_GUDANG" } });
+        await db.masterShipment.update({ where: { id: s.shipmentId }, data: { status: "RECEIVED_AT_GUDANG" } });
       }
     }
     await db.transport.delete({ where: { id: existing.id } });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, ClipboardCheck, Pencil, Plus, Truck, XCircle } from "lucide-react";
+import { Pencil, Plus, QrCode, Truck, XCircle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type PickupTask, type Options, type Shipment } from "@/lib/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
@@ -9,6 +9,7 @@ import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
 import { StatusBadge } from "@/components/app/status-badge";
 import { Field, FormSelect, SubmitButton, Textarea, formatDate } from "@/components/app/form-parts";
+import { QrScanDialog, type ScanTaskInfo } from "@/components/app/qr-scan-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -28,10 +29,13 @@ export function PickupsPage() {
     view: hasPermission(user, "pickup.view"),
     create: hasPermission(user, "pickup.create"),
     assign: hasPermission(user, "pickup.assign_kurir"),
+    scan: hasPermission(user, "pickup.scan"),
     confirm: hasPermission(user, "pickup.confirm"),
   };
+  // Kurir executor view: without assign capability, only show my own tasks.
+  const isExecutor = !can.assign && !user?.isOwner;
 
-  const { data, loading, reload } = useApiData<PickupTask[]>(() => apiGet<PickupTask[]>("/pickups"), []);
+  const { data, loading, reload } = useApiData<PickupTask[]>(() => apiGet<PickupTask[]>(`/pickups${isExecutor ? "?mine=true" : ""}`), [isExecutor]);
   const { data: options } = useApiData<Options>(() => apiGet<Options>("/options"), []);
   const [readyShipments, setReadyShipments] = useState<Shipment[]>([]);
 
@@ -49,6 +53,7 @@ export function PickupsPage() {
   const [form, setForm] = useState<PickupForm>(EMPTY);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<PickupTask | null>(null);
+  const [scanTask, setScanTask] = useState<ScanTaskInfo | null>(null);
 
   const rows = useMemo(() => {
     if (!data) return [];
@@ -92,9 +97,16 @@ export function PickupsPage() {
     }
   }
 
-  async function onConfirm(p: PickupTask) {
-    const ok = await runAction(() => apiPost(`/pickups/${p.id}/confirm`, {}), { success: `Pickup ${p.pickupCode} selesai.` });
-    if (ok) reload();
+  function openScan(p: PickupTask) {
+    setScanTask({
+      id: p.id,
+      code: p.pickupCode,
+      masterCode: p.masterCode,
+      customerName: p.customerName,
+      route: `${p.origin} → ${p.destination}`,
+      status: p.status,
+      completedAt: p.completedAt,
+    });
   }
 
   async function onDelete() {
@@ -185,15 +197,30 @@ export function PickupsPage() {
                 },
               },
               { key: "createdAt", header: "Dibuat", hideOnMobile: true, render: (p) => formatDate(p.createdAt, true) },
+              {
+                key: "scan",
+                header: "Paket Ter-scan",
+                hideOnMobile: true,
+                render: (p) => (
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {p.scannedCount ?? 0}/{p.detailsCount}
+                  </span>
+                ),
+              },
               { key: "status", header: "Status", render: (p) => <StatusBadge status={p.status} /> },
               {
                 key: "actions",
                 header: "Aksi",
                 render: (p) => (
                   <div className="flex flex-wrap gap-1.5">
-                    {p.status !== "COMPLETED" && p.status !== "CANCELLED" && can.confirm && (
-                      <Button size="sm" className="h-7" onClick={() => onConfirm(p)}>
-                        <CheckCircle2 className="h-3.5 w-3.5" /> Selesaikan
+                    {p.status !== "COMPLETED" && p.status !== "CANCELLED" && (can.confirm || can.scan) && (
+                      <Button size="sm" className="h-7" onClick={() => openScan(p)}>
+                        <QrCode className="h-3.5 w-3.5" /> {isExecutor ? "Proses / Scan QR" : "Selesaikan (Scan QR)"}
+                      </Button>
+                    )}
+                    {p.status === "COMPLETED" && (can.confirm || can.scan) && (
+                      <Button variant="outline" size="sm" className="h-7" onClick={() => openScan(p)}>
+                        <QrCode className="h-3.5 w-3.5" /> Riwayat Scan
                       </Button>
                     )}
                     {p.status !== "COMPLETED" && p.status !== "CANCELLED" && can.assign && (
@@ -269,6 +296,14 @@ export function PickupsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <QrScanDialog
+        open={!!scanTask}
+        onOpenChange={(open) => !open && setScanTask(null)}
+        mode="pickup"
+        task={scanTask}
+        onDone={reload}
+      />
     </div>
   );
 }

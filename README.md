@@ -113,8 +113,9 @@ Semua password staff menggunakan `Demo#Pass2026`.
 6. **Audit log per menu** — timeline global + tab "Log Aktivitas" di setiap modul.
 7. **Gudang tanpa istilah "Gateway" / field `type`** — schema database bersih.
 8. **Login page modern** — panel brand + quick-fill akun demo.
-9. **RBAC** — 6 role sistem dengan permission granular.
+9. **RBAC** — 6 role sistem dengan permission granular; **owner bisa mengedit permission role sistem apa pun langsung dari UI** (Access Control → Roles) tanpa perlu membuat role baru.
 10. **Lifecycle shipment lengkap** — CREATED → READY_FOR_PICKUP → PICKED_UP → RECEIVED_AT_GUDANG → IN_TRANSPORT → ARRIVED_AT_GUDANG → DELIVERED, plus pricing, pembayaran, tracking timeline.
+11. **Alur QR scan handover** — kurir hanya melihat task yang ditugaskan padanya (`?mine=true`); tombol aksi membuka dialog **scan QR per detail barang** (paket) — semua paket harus ter-scan sebelum konfirmasi; tracking otomatis menampilkan **"Picked-up by [Nama Kurir]"** dan **"Delivered to [Customer] by [Kurir] — received by: [PoD]"**. Dialog juga me-render QR per paket sehingga bisa dites dengan kamera ponsel.
 
 ---
 

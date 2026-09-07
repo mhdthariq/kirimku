@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Clock, Download, History, Search } from "lucide-react";
-import { apiGet, type AuditResponse, type AuditEntry } from "@/lib/client-api";
+import { apiGetWithMeta, type AuditResponse, type AuditEntry } from "@/lib/client-api";
 import { useAuth } from "@/hooks/use-auth";
 import { hasPermission } from "@/lib/client-api";
 import { PageHeader } from "@/components/app/data-table";
@@ -72,11 +72,11 @@ export function AuditPage() {
       if (entityFilter !== "all") params.set("entityType", entityFilter);
       if (actionFilter !== "all") params.set("action", actionFilter);
       if (search.trim()) params.set("search", search.trim());
-      const res = await apiGet<AuditResponse["data"] & { meta: AuditResponse["meta"] }>(`/audit-logs?${params}`);
-      setEntries(res.data ?? (res as unknown as AuditEntry[]));
-      setEntityTypes(res.meta?.entityTypes ?? []);
-      setActions(res.meta?.actions ?? []);
-      setTotal(res.meta?.total ?? 0);
+      const res = await apiGetWithMeta<AuditResponse["data"]>(`/audit-logs?${params}`);
+      setEntries(res.data ?? []);
+      setEntityTypes((res.meta?.entityTypes as string[] | undefined) ?? []);
+      setActions((res.meta?.actions as string[] | undefined) ?? []);
+      setTotal(typeof res.meta?.total === "number" ? res.meta.total : 0);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal memuat audit log.");
     } finally {

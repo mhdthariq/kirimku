@@ -58,7 +58,7 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
   }
 
   const payload = (await response.json().catch(() => null)) as
-    | { data?: T; message?: string; errors?: Record<string, string[]> }
+    | { data?: T; meta?: Record<string, unknown>; message?: string; errors?: Record<string, string[]> }
     | null;
 
   if (!response.ok) {
@@ -69,6 +69,25 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
     );
   }
   return (payload?.data ?? undefined) as T;
+}
+
+/** Like apiGet but also exposes the envelope `meta` (pagination / filter options). */
+export async function apiGetWithMeta<T>(path: string): Promise<{ data: T; meta: Record<string, unknown> | undefined }> {
+  const headers: Record<string, string> = { Accept: "application/json" };
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const response = await fetch(`/api/v1${path}`, { headers, cache: "no-store" });
+  if (response.status === 401 && typeof window !== "undefined" && getToken()) {
+    setToken(null);
+    window.location.reload();
+  }
+  const payload = (await response.json().catch(() => null)) as
+    | { data?: T; meta?: Record<string, unknown>; message?: string }
+    | null;
+  if (!response.ok) {
+    throw new ApiError(response.status, payload?.message ?? `Permintaan gagal (${response.status}).`);
+  }
+  return { data: payload?.data as T, meta: payload?.meta };
 }
 
 export const apiGet = <T>(path: string) => apiFetch<T>(path);
@@ -142,7 +161,7 @@ export interface Shipment {
   createdAt: string;
   details?: DetailShipment[];
   _count?: { details: number; pickups: number; deliveries: number; payments: number };
-  trackingEvents?: { event: string; occurredAt: string }[];
+  trackingEvents?: { id: number; event: string; description: string | null; occurredAt: string; actor?: { name: string } | null }[];
 }
 
 export interface TrackingEvent {
@@ -166,6 +185,29 @@ export interface Payment {
   verifiedBy?: { name: string } | null;
 }
 
+export interface ScanDetailState {
+  id: number;
+  detailCode: string;
+  description: string;
+  quantity: number;
+  scanned: boolean;
+  scannedAt: string | null;
+  scannedByName: string | null;
+}
+
+export interface ScanProgress {
+  total: number;
+  scanned: number;
+  allScanned: boolean;
+  details: ScanDetailState[];
+}
+
+export interface ScanResponse {
+  scan: { id: number; payload: string; result: string; scanLevel: string; detailId: number | null; scannedAt: string };
+  message: string;
+  progress: ScanProgress;
+}
+
 export interface PickupTask {
   id: number;
   pickupCode: string;
@@ -181,6 +223,7 @@ export interface PickupTask {
   customerName: string;
   customerType: string;
   detailsCount: number;
+  scannedCount: number;
 }
 
 export interface DeliveryTask {
@@ -199,6 +242,10 @@ export interface DeliveryTask {
   customerName: string;
   customerPhone: string | null;
   priceAmount: number | null;
+  detailsCount: number;
+  scannedCount: number;
+  allScanned: boolean;
+  details: { id: number; detailCode: string; description: string; quantity: number; scanned: boolean }[];
 }
 
 export interface Vehicle {
@@ -381,6 +428,7 @@ export interface Options {
   warehouses: { id: number; code: string; name: string; city: string | null }[];
   customers: { id: number; code: string; name: string; type: string }[];
   tariffs: { id: number; origin: string; destination: string; customerType: string | null; ratePerKg: number }[];
+  permissions: { id: number; slug: string; module: string; description: string | null }[];
 }
 
 export interface UnpaidShipment {

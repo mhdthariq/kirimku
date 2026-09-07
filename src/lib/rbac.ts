@@ -24,11 +24,13 @@ export const PERMISSIONS: { slug: string; module: string; description: string }[
   { slug: "pickup.view", module: "Pickups", description: "View pickup tasks" },
   { slug: "pickup.create", module: "Pickups", description: "Create pickup requests" },
   { slug: "pickup.assign_kurir", module: "Pickups", description: "Assign kurir to pickups" },
-  { slug: "pickup.confirm", module: "Pickups", description: "Confirm pickup completion" },
+  { slug: "pickup.scan", module: "Pickups", description: "Scan QR detail barang at pickup" },
+  { slug: "pickup.confirm", module: "Pickups", description: "Confirm pickup completion (all details scanned)" },
   // Delivery
   { slug: "delivery.view", module: "Deliveries", description: "View delivery tasks" },
   { slug: "delivery.assign_kurir", module: "Deliveries", description: "Assign kurir to deliveries" },
-  { slug: "delivery.confirm", module: "Deliveries", description: "Complete deliveries" },
+  { slug: "delivery.scan", module: "Deliveries", description: "Scan QR detail barang at delivery" },
+  { slug: "delivery.confirm", module: "Deliveries", description: "Complete deliveries (all packages scanned + POD)" },
   // Transport
   { slug: "transport.view", module: "Transports", description: "View transports" },
   { slug: "transport.create", module: "Transports", description: "Create transports" },
@@ -125,10 +127,10 @@ export const ROLE_TEMPLATES: { slug: string; name: string; description: string; 
   {
     slug: "kurir",
     name: "Kurir",
-    description: "First/last mile: pickup & delivery execution",
+    description: "First/last mile: pickup & delivery execution with QR scanning",
     permissions: [
-      "pickup.view", "pickup.create",
-      "delivery.view", "delivery.confirm",
+      "pickup.view", "pickup.create", "pickup.scan", "pickup.confirm",
+      "delivery.view", "delivery.scan", "delivery.confirm",
       "payment.view", "payment.record",
     ],
   },
@@ -159,7 +161,12 @@ let rbacReady = false;
 export async function ensureRbac(): Promise<void> {
   if (rbacReady) return;
   const existingCount = await db.permission.count();
-  if (existingCount !== PERMISSIONS.length) {
+  // Re-apply system role templates whenever the permission catalog changes
+  // (e.g. new scan permissions shipped with an app update) so seeded roles
+  // stay aligned with code. Owner edits made in between persist across
+  // ordinary restarts — only a catalog change re-applies templates.
+  const catalogChanged = existingCount !== PERMISSIONS.length;
+  if (catalogChanged) {
     for (const p of PERMISSIONS) {
       await db.permission.upsert({
         where: { slug: p.slug },
@@ -169,7 +176,7 @@ export async function ensureRbac(): Promise<void> {
     }
   }
   const roleCount = await db.role.count();
-  if (roleCount < ROLE_TEMPLATES.length) {
+  if (roleCount < ROLE_TEMPLATES.length || catalogChanged) {
     const allPermissions = await db.permission.findMany();
     const bySlug = new Map(allPermissions.map((p) => [p.slug, p.id]));
     for (const template of ROLE_TEMPLATES) {

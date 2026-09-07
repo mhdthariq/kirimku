@@ -221,9 +221,9 @@ async function runSeed(): Promise<void> {
           origin: s.origin, destination: s.destination,
           originWarehouseId: gudang["Jakarta Pusat"],
           destinationWarehouseId: gudang[s.destination],
-          chargeableWeightKg: s.priced ? s.cw : null,
-          ratePerKg: s.priced ? s.ratePerKg : null,
-          priceAmount: s.priced ? Math.round(s.cw * s.ratePerKg) : null,
+          chargeableWeightKg: s.priced ? (s.cw ?? 0) : null,
+          ratePerKg: s.priced ? (s.ratePerKg ?? 0) : null,
+          priceAmount: s.priced ? Math.round((s.cw ?? 0) * (s.ratePerKg ?? 0)) : null,
           pricedAt: s.priced ? createdAt : null,
           createdAt, updatedAt: createdAt,
         },
@@ -244,7 +244,7 @@ async function runSeed(): Promise<void> {
       ];
       if (["PICKED_UP", "RECEIVED_AT_GUDANG", "IN_TRANSPORT", "DELIVERED"].includes(s.status)) {
         events.push({ event: "READY_FOR_PICKUP", description: "Menunggu penjemputan kurir", daysAgo: s.createdDaysAgo - 0.2, actor: "budi" });
-        events.push({ event: "PICKED_UP", description: "Diambil kurir Dewi Lestari", daysAgo: s.createdDaysAgo - 0.4, actor: "dewi" });
+        events.push({ event: "PICKED_UP", description: "Picked-up by Dewi Lestari", daysAgo: s.createdDaysAgo - 0.4, actor: "dewi" });
       }
       if (["RECEIVED_AT_GUDANG", "IN_TRANSPORT", "DELIVERED"].includes(s.status)) {
         events.push({ event: "RECEIVED_AT_GUDANG", description: "Diterima di Gudang Jakarta Pusat", daysAgo: s.createdDaysAgo - 0.6, actor: "agus" });
@@ -281,7 +281,7 @@ async function runSeed(): Promise<void> {
         await db.payment.create({
           data: {
             masterId: shipment.id, method: s.status === "DELIVERED" ? "CASH" : "TRANSFER",
-            amount: Math.round(s.cw * s.ratePerKg), status: s.status === "IN_TRANSPORT" ? "VERIFIED" : "RECORDED",
+            amount: Math.round((s.cw ?? 0) * (s.ratePerKg ?? 0)), status: s.status === "IN_TRANSPORT" ? "VERIFIED" : "RECORDED",
             reference: `PAY-${s.masterCode.slice(-6)}`,
             recordedById: usersByHandle.dewi.id, createdAt,
             verifiedById: s.status === "IN_TRANSPORT" ? usersByHandle.siti.id : null,
@@ -302,6 +302,31 @@ async function runSeed(): Promise<void> {
       },
     });
     await db.transportShipment.create({ data: { transportId: transport.id, shipmentId: mkt4.id } });
+
+    // Open pickup task assigned to kurir Rizky (MKT-000001 — READY_FOR_PICKUP).
+    // Demo path for the QR handover scan flow: login as rizky, scan every
+    // detail barang QR, then confirm → tracking shows "Picked-up by Rizky Hidayat".
+    const mkt1 = await db.masterShipment.findUniqueOrThrow({ where: { masterCode: "MKT-000001" } });
+    await db.pickup.create({
+      data: {
+        pickupCode: "PICK-2026-000001", masterId: mkt1.id,
+        kurirId: usersByHandle.rizky.employeeId,
+        status: "ASSIGNED", notes: "Ambil di reception kantor customer",
+        createdAt: daysAgo(0.2), updatedAt: daysAgo(0.2),
+      },
+    });
+
+    // Open delivery task assigned to kurir Rizky (MKT-000003 — RECEIVED_AT_GUDANG).
+    // Demo path for delivery QR scan: scan all packages, confirm with POD.
+    const mkt3 = await db.masterShipment.findUniqueOrThrow({ where: { masterCode: "MKT-000003" } });
+    await db.delivery.create({
+      data: {
+        deliveryCode: "DLV-2026-000002", masterId: mkt3.id,
+        kurirId: usersByHandle.rizky.employeeId,
+        status: "ASSIGNED", notes: "Hubungi bagian gudang CV Sinar Jaya",
+        createdAt: daysAgo(0.3), updatedAt: daysAgo(0.3),
+      },
+    });
 
     // Completed delivery for MKT-000005
     const mkt5 = await db.masterShipment.findUniqueOrThrow({ where: { masterCode: "MKT-000005" } });
