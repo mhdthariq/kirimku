@@ -49,6 +49,15 @@ Database and API were fully rebuilt and corrected in the process — details in 
 | Case-insensitive search parity | New `ci()` helper (`src/lib/api-helpers.ts`) applied to **all 33 search filters** — SQLite and Postgres now behave identically (Postgres gets `mode: "insensitive"`)
 | Setup guide | New **`docs/08-supabase-setup.md`** — connection-string decision table, 4-step switch, verification, serverless notes, 8-row troubleshooting table |
 
+## Revision round 4 — transport detail with live vehicle position
+
+| Item | Result |
+|---|---|
+| Position tracking | New endpoint **`POST /transports/{id}/checkpoints`** (`transport.record_checkpoint`, permission #63) records where the vehicle is — checkpoint check-in or GPS ping (haversine vs. radius geofence); `depart`/`arrive` auto-record origin/destination |
+| Transport detail page | **`#/transports/{id}`** — read-only Leaflet journey map (numbered passed/upcoming checkpoints, dashed route, pulsing truck pin, GPS breadcrumbs), stat cards (shipments, koli, actual/volumetric/chargeable kg, value), vehicle capacity bar, position history timeline, shipments table deep-linking to the existing shipment detail page |
+| Tracking integration | Each check-in writes a `CHECKPOINT_REACHED` tracking event to every carried shipment + `checkpoint_record` audit entry |
+| Docs | `03` (endpoint + position rules), `04` (journey map component + page), `05` (check-in flow), README feature #12 |
+
 ## Document index
 
 | File | Contents |

@@ -77,11 +77,28 @@ DRAFT ──send──► SENT ──settlements──► PARTIALLY_SETTLED ─�
 
 ```
 PLANNED ──depart──► DEPARTED ──arrive──► ARRIVED      (CANCELLED only from PLANNED)
+                        │
+                        └─ position records (checkpoint check-ins / GPS pings)
 ```
 
 - A transport bundles: **route** (with its checkpoints), **vehicle** (must be `ACTIVE`), **crew** (driver + optional kenek, from employees), and **shipments** (M:N).
-- `depart` stamps `departedAt` and flips every carried shipment to `IN_TRANSPORT`.
-- `arrive` stamps `arrivedAt` and flips shipments to `ARRIVED_AT_GUDANG` — which unlocks delivery assignment.
+- `depart` stamps `departedAt`, flips every carried shipment to `IN_TRANSPORT`, and **auto-records the origin checkpoint** as the first position record.
+- `arrive` stamps `arrivedAt`, flips shipments to `ARRIVED_AT_GUDANG` (unlocking delivery assignment), and **auto-records the destination checkpoint** (unless already passed mid-route).
+
+### Where the vehicle is (checkpoint check-ins)
+
+While `DEPARTED`, anyone holding `transport.record_checkpoint` (admin-gudang, driver templates; owner bypasses) records where the vehicle is:
+
+```
+POST /transports/{id}/checkpoints   {checkpointId}               → check-in at a route checkpoint
+POST /transports/{id}/checkpoints   {latitude, longitude}        → GPS ping, snapped to nearest checkpoint
+```
+
+- `withinRadius` is computed with the haversine distance vs. the checkpoint's radius (geofence); a ping inside the radius of a **new** checkpoint marks it **passed**.
+- A checkpoint already recorded as passed cannot be re-recorded (`422`); out-of-radius GPS pings are always allowed and become position breadcrumbs.
+- `nextCheckpoint` = first checkpoint with `sequence > max(passed sequences)` — the truck's heading.
+- Every check-in writes a `CHECKPOINT_REACHED` tracking event on **each carried shipment**, so the customer-facing tracking timeline reflects linehaul progress, plus a `checkpoint_record` audit entry.
+- The transport detail page (`#/transports/{id}`) visualizes all of this: truck pin at `currentPosition`, passed/upcoming checkpoints, load totals (shipments, koli, kg) and capacity utilization.
 
 ## Checkpoint rule (requirement #10)
 
@@ -134,7 +151,7 @@ ASSIGNED ──scan all customer packages──► (all scanned) ──complete 
 - **Owner** bypasses all permission checks (`permissions: ["*"]`) and can manage Access Control.
 - Six system roles cover the org (see `rbac.ts`): `admin-kantor` (office/finance), `marketing` (acquisition), `admin-gudang` (warehouse/fleet), `kurir` (first/last mile + QR scanning), `driver`, `kenek` (linehaul).
 - **Editing system role capabilities (owner-only)**: the owner can edit the permission set of any existing system role directly in Access Control → Roles (name/slug stay locked). No need to create a custom role just to change what Kurir can do. `ensureRbac()` re-applies templates only when the permission catalog itself changes (app update); ordinary restarts keep owner edits.
-- Custom roles can be composed in the UI from the 62-permission catalog; endpoints check **permission slugs**, never role names.
+- Custom roles can be composed in the UI from the 63-permission catalog; endpoints check **permission slugs**, never role names.
 - Nav items and action buttons are hidden when the user lacks the permission; the API independently re-checks (defense in depth).
 
 ## Audit trail (requirement #7)

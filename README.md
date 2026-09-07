@@ -145,6 +145,7 @@ Semua password staff menggunakan `Demo#Pass2026`.
 9. **RBAC** — 6 role sistem dengan permission granular; **owner bisa mengedit permission role sistem apa pun langsung dari UI** (Access Control → Roles) tanpa perlu membuat role baru.
 10. **Lifecycle shipment lengkap** — CREATED → READY_FOR_PICKUP → PICKED_UP → RECEIVED_AT_GUDANG → IN_TRANSPORT → ARRIVED_AT_GUDANG → DELIVERED, plus pricing, pembayaran, tracking timeline.
 11. **Alur QR scan handover** — kurir hanya melihat task yang ditugaskan padanya (`?mine=true`); tombol aksi membuka dialog **scan QR per detail barang** (paket) — semua paket harus ter-scan sebelum konfirmasi; tracking otomatis menampilkan **"Picked-up by [Nama Kurir]"** dan **"Delivered to [Customer] by [Kurir] — received by: [PoD]"**. Dialog juga me-render QR per paket sehingga bisa dites dengan kamera ponsel.
+12. **Detail transport + posisi kendaraan** — klik kode transport (atau tombol Detail) membuka halaman detail: **peta Leaflet perjalanan** (marker checkpoint bernomor, garis rute, pin truk berdenyut di posisi terakhir), statistik muatan (**jumlah shipment, koli, total kg aktual/volumetrik/chargeable, nilai**), bar utilisasi kapasitas kendaraan, riwayat posisi, dan daftar shipment yang dimuat — tiap resi deep-link ke halaman detail shipment yang sama. Posisi dicatat via tombol **"Catat Posisi"** per checkpoint atau GPS (`POST /transports/{id}/checkpoints`); depart/arrive otomatis mencatat titik awal/tujuan; tiap check-in menambah event tracking `CHECKPOINT_REACHED` ke semua shipment di transport itu.
 
 ---
 

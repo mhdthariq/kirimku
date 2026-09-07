@@ -19,10 +19,14 @@ async function runSeed(): Promise<void> {
 
   const ownerExists = await db.user.findFirst({ where: { username: "owner" } });
   const shipmentCount = await db.masterShipment.count();
-  if (ownerExists && shipmentCount >= 6) return; // already seeded
 
   const now = new Date();
   const daysAgo = (d: number) => new Date(now.getTime() - d * 24 * 60 * 60 * 1000);
+
+  // Already-seeded databases still get the demo transport position applied.
+  await seedDemoTransportPosition(daysAgo);
+
+  if (ownerExists && shipmentCount >= 6) return; // already seeded
 
   // ----- Employees + users -------------------------------------------------
   const staffPassword = hashPassword("Demo#Pass2026");
@@ -378,6 +382,76 @@ async function runSeed(): Promise<void> {
           action: e.action, entityType: e.entityType, entityLabel: e.entityLabel,
           actorId: usersByHandle[e.actor]?.id ?? null,
           createdAt: daysAgo(2 - i * 0.1),
+        },
+      });
+    }
+  }
+
+  // Fresh databases: the demo transport was just created above — apply the
+  // demo position records now.
+  await seedDemoTransportPosition(daysAgo);
+}
+
+/**
+ * Demo transport position (idempotent, independent of the full seed):
+ * gives the departed demo transport checkpoint records (origin @ depart +
+ * checkpoint #2 mid-route) so the transport detail map shows a live position
+ * out of the box. Only runs when the transport has ZERO position records —
+ * user-recorded check-ins are never overwritten.
+ */
+async function seedDemoTransportPosition(daysAgo: (d: number) => Date): Promise<void> {
+  const trp = await db.transport.findUnique({ where: { transportCode: "TRP-2026-000001" } });
+  if (!trp || trp.status !== "DEPARTED" || trp.routeId == null) return;
+  const existingRecords = await db.checkpointRecord.count({ where: { transportId: trp.id } });
+  if (existingRecords > 0) return;
+
+  const joko = await db.user.findUnique({ where: { username: "joko" } });
+  const routeCheckpoints = await db.checkpoint.findMany({ where: { routeId: trp.routeId }, orderBy: { sequence: "asc" } });
+
+  // Origin — recorded when the transport departed.
+  const origin = routeCheckpoints[0];
+  if (origin) {
+    await db.checkpointRecord.create({
+      data: {
+        transportId: trp.id,
+        checkpointId: origin.id,
+        latitude: origin.latitude,
+        longitude: origin.longitude,
+        withinRadius: true,
+        recordedById: joko?.id ?? null,
+        recordedAt: trp.departedAt ?? daysAgo(1),
+      },
+    });
+  }
+
+  // Mid-route — vehicle passed checkpoint #2 (e.g. Rest Area KM 207 Brebes).
+  const cp = routeCheckpoints[1];
+  if (!cp) return;
+  await db.checkpointRecord.create({
+    data: {
+      transportId: trp.id,
+      checkpointId: cp.id,
+      latitude: cp.latitude,
+      longitude: cp.longitude,
+      withinRadius: true,
+      recordedById: joko?.id ?? null,
+      recordedAt: daysAgo(0.5),
+    },
+  });
+
+  const loaded = await db.transportShipment.findMany({ where: { transportId: trp.id } });
+  for (const ts of loaded) {
+    const hasEvent = await db.trackingEvent.findFirst({
+      where: { masterId: ts.shipmentId, event: "CHECKPOINT_REACHED", description: { contains: cp.name } },
+    });
+    if (!hasEvent) {
+      await db.trackingEvent.create({
+        data: {
+          masterId: ts.shipmentId,
+          event: "CHECKPOINT_REACHED",
+          description: `Transport TRP-2026-000001 melewati checkpoint ${cp.name} (${cp.sequence}/${routeCheckpoints.length})`,
+          actorId: joko?.id ?? null,
+          occurredAt: daysAgo(0.5),
         },
       });
     }

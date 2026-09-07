@@ -38,7 +38,7 @@ Behaviors:
 | `#/shipments` | Shipments | Filterable table (status chips, search) → detail drawer/page: pricing panel, tracking timeline, item CRUD, payments, actions (ready/cancel/price) |
 | `#/pickups` | Pickups | Table + create dialog (choose shipment, kurir). **Kurir executor view** (`?mine=true` — sees only own tasks). "Proses / Scan QR" opens the **QR scan dialog**: package checklist, per-item QR image, progress bar, all-scanned → confirm → tracking "Picked-up by [Kurir]" |
 | `#/deliveries` | Deliveries | Table + assign dialog. **Detail barang per task** ("Paket" column → checklist dialog). Same **QR scan dialog** for the last mile → all packages scanned + PoD → DELIVERED |
-| `#/transports` | Transports | Create dialog (route/vehicle/crew/shipments multi-select), depart/arrive actions |
+| `#/transports` | Transports | List (load totals: shipment · kg · koli; position progress column) + create dialog. **`#/transports/{id}` detail**: stat cards (shipments, koli, actual/volumetric/chargeable kg, checkpoint progress), **read-only Leaflet journey map** (numbered checkpoints — emerald passed / slate upcoming, dashed route, pulsing truck pin at `currentPosition`, GPS breadcrumbs), checkpoint progress list with **“Catat Posisi”** check-in buttons, load summary + vehicle capacity bar, position history timeline, and a shipments table that deep-links into the **existing shipment detail page** |
 | `#/vehicles` | Vehicles | CRUD dialogs, status badges, current crew display (driver/kenek via `VehicleAssignment` relations) |
 | `#/gudang` | **Gudang** | CRUD dialogs; **no "type" field and zero "Gateway" wording**; optional map location picker (Leaflet) |
 | `#/routes` | **Routes & Checkpoints** | Route list + **Leaflet checkpoint editor** (below) |
@@ -101,6 +101,17 @@ On `#/routes`, selecting a route opens a full editor:
 - Map tiles: OpenStreetMap with a dark-tile CSS layer for dark mode; Leaflet is dynamically imported (`ssr: false`) to keep SSR safe.
 
 The Gudang form reuses a smaller map picker for optional warehouse coordinates.
+
+## Transport journey map (`src/components/app/transport-map.tsx`)
+
+On `#/transports/{id}`, a read-only Leaflet map renders where the vehicle is:
+
+- **Numbered checkpoint markers** — emerald = already passed (with tooltip showing pass time), slate = upcoming — mirroring the editor's visual language.
+- **Dashed route polyline** + subtle radius circles per checkpoint.
+- **Pulsing truck pin** at `progress.currentPosition` (popup: vehicle number, position label, last update time); `transport-ping` keyframe in `globals.css`.
+- **GPS breadcrumbs** — manual out-of-radius position records render as small slate dots.
+- Map auto-fits the route + current position; overlays show vehicle label, legend (passed / next / vehicle) and record count. Dynamically imported (`ssr: false`) like the editor.
+- Check-ins are recorded from the adjacent checkpoint list ("Catat Posisi" → `POST /transports/{id}/checkpoints`); departing/arriving auto-record origin/destination.
 
 ## State & data fetching
 

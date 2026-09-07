@@ -16,7 +16,7 @@
 | `Employee` | Staff master data | `employeeNumber @unique`, `position`, 1:1 optional `User` |
 | `User` | Login accounts | `username @unique`, `passwordHash` (scrypt), `isOwner` (owner bypasses RBAC = `*`), `isActive` |
 | `Role` | Permission bundles | `slug @unique`, `isSystem` (seeded roles can't be deleted via UI) |
-| `Permission` | 62 permission slugs | `slug @unique`, grouped by `module` |
+| `Permission` | 63 permission slugs | `slug @unique`, grouped by `module` |
 | `UserRole` | M:N user ↔ role | composite PK, `onDelete: Cascade` |
 | `RolePermission` | M:N role ↔ permission | composite PK, cascade |
 | `SessionToken` | Bearer sessions | `token @unique`, `expiresAt` (12 h) |

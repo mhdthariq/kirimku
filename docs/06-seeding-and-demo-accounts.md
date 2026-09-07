@@ -47,6 +47,8 @@ Each staff user is linked 1:1 to an `Employee` row (`EMP-000001`…`EMP-000008`)
 
 Plus: 8 detail items, tracking events matching each lifecycle position, 4 pickups (completed), 1 completed delivery with proof, 1 `DEPARTED` transport carrying MKT-000004, 4 payments in various states (`RECORDED`/`VERIFIED`), 1 `SENT` invoice (PT Maju Bersama, 2 lines), and 12–16 audit log entries across modules.
 
+**Transport position demo (idempotent, re-applied on existing databases):** the departed transport `TRP-2026-000001` gets two `CheckpointRecord`s — the route origin (timestamped at `departedAt`) and checkpoint #2 "Rest Area KM 207 Brebes" (mid-route) — so the `#/transports/1` detail page shows a live truck position ("Melewati Rest Area KM 207 Brebes — menuju Gudang Surabaya (End)") out of the box, plus a `CHECKPOINT_REACHED` tracking event on MKT-000004. The seed block only runs when the transport has **zero** position records, so your own check-ins are never overwritten.
+
 **QR-scan demo tasks (open, assigned to kurir `rizky`):**
 
 | Task | Shipment | Status | Purpose |
@@ -88,4 +90,4 @@ After editing, reset the database (above) so the new dataset is created.
 
 ## RBAC bootstrap note
 
-Before accounts, `ensureSeed()` calls `ensureRbac()`: it upserts the **79 permissions** and **6 system roles** and re-links role→permission rows if the catalog in code has changed. This runs even outside the demo seed (it's also called on API boot), so a production database gets the RBAC catalog without demo data.
+Before accounts, `ensureSeed()` calls `ensureRbac()`: it upserts the **63 permissions** and **6 system roles** and re-links role→permission rows if the catalog in code has changed. This runs even outside the demo seed (it's also called on API boot), so a production database gets the RBAC catalog without demo data.

@@ -44,7 +44,7 @@ curl -s -X POST http://localhost:3000/api/v1/auth/login \
 
 Attach it to every request: `Authorization: Bearer <token>`.
 
-The **owner** user short-circuits RBAC (`permissions: ["*"]`). All other users get the union of their roles' permission slugs (62 slugs — see `src/lib/rbac.ts`).
+The **owner** user short-circuits RBAC (`permissions: ["*"]`). All other users get the union of their roles' permission slugs (63 slugs — see `src/lib/rbac.ts`).
 
 ### Query conventions
 
@@ -76,7 +76,7 @@ The first request after a fresh `db:push` triggers `ensureSeed()` (RBAC + demo d
 
 | Method | Endpoint | Permission | Description |
 |---|---|---|---|
-| GET | `/options` | any authenticated | Lookup lists: gudang, vehicles, routes, customers, tariffs, kurir/drivers/kenek (employees), **permissions catalog** (full 62-slug list, powers the role editor) |
+| GET | `/options` | any authenticated | Lookup lists: gudang, vehicles, routes, customers, tariffs, kurir/drivers/kenek (employees), **permissions catalog** (full 63-slug list, powers the role editor) |
 
 ## Customers
 
@@ -144,12 +144,23 @@ Same executor mode: `GET /deliveries?mine=true` filters to the logged-in kurir. 
 
 | Method | Endpoint | Permission | Description |
 |---|---|---|---|
-| GET | `/transports` | `transport.view` | List + `?status`, `?vehicleId`, `?q` (includes shipments per transport) |
+| GET | `/transports` | `transport.view` | List + `?status`, `?search` — each row embeds `shipments[]` (code, customer, destination, chargeable kg), `summary` (shipmentCount, totalPieces, totalActualWeightKg, totalChargeableWeightKg) and `progress` (passed/total checkpoints, last position record time) |
 | POST | `/transports` | `transport.create` | `{routeId, vehicleId, driverId?, kenekId?, shipmentIds[]}` → code `TRP-YYYY-…`; vehicle must be `ACTIVE` |
+| GET | `/transports/{id}` | `transport.view` | **Detail**: route + checkpoints (with `passed` flags & times), vehicle (incl. capacity), kru, per-shipment load (pieces, actual/volumetric/chargeable kg, price), `summary` (incl. totalValueRp, totalVolumeM3), `progress` (`passedCheckpoints`, `nextCheckpoint`, `currentPosition` {lat,lng,label,kind,recordedAt}), `checkpointRecords[]` (position history) |
 | PUT | `/transports/{id}` | `transport.create` | Update while `PLANNED` (reassign vehicle/route/shipments) |
-| POST | `/transports/{id}/depart` | `transport.depart` | `PLANNED → DEPARTED`: marks carried shipments `IN_TRANSPORT`, records `departedAt` |
-| POST | `/transports/{id}/arrive` | `transport.arrive` | `DEPARTED → ARRIVED`: shipments → `ARRIVED_AT_GUDANG`, records `arrivedAt` |
+| POST | `/transports/{id}/depart` | `transport.depart` | `PLANNED → DEPARTED`: marks carried shipments `IN_TRANSPORT`, records `departedAt`, and auto-records the **origin checkpoint** as passed (position tracking starts from a known point) |
+| POST | `/transports/{id}/arrive` | `transport.arrive` | `DEPARTED → ARRIVED`: shipments → `ARRIVED_AT_GUDANG`, records `arrivedAt`, and auto-records the **destination checkpoint** (unless already recorded) |
+| POST | `/transports/{id}/checkpoints` | `transport.record_checkpoint` | **Record where the vehicle is** (only while `DEPARTED`). Body: `{checkpointId}` (check-in at a route checkpoint) or `{latitude, longitude}` (manual/GPS — snapped to the nearest checkpoint, `withinRadius` computed via haversine vs. checkpoint radius). Duplicate passed-checkpoint → 422; out-of-radius GPS pings are always allowed (breadcrumbs). Every carried shipment gets a `CHECKPOINT_REACHED` tracking event; audit action `checkpoint_record` |
 | DELETE | `/transports/{id}` | `transport.create` | Cancel while `PLANNED` (detaches shipments) |
+
+Transport position rules (`currentPosition`):
+
+| Transport status | Position shown |
+|---|---|
+| `PLANNED` | Origin checkpoint — "Belum berangkat" |
+| `DEPARTED` + records | Latest `CheckpointRecord` ("Melewati X — menuju Y" / GPS breadcrumb) |
+| `DEPARTED` no records | Origin checkpoint — fallback |
+| `ARRIVED` | Destination checkpoint — "Tiba di tujuan" |
 
 ## Vehicles
 

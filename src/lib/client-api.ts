@@ -293,6 +293,15 @@ export interface Route {
   _count?: { transports: number };
 }
 
+export interface TransportShipmentSummary {
+  id: number;
+  masterCode: string;
+  status: string;
+  customerName: string | null;
+  destination: string | null;
+  chargeableWeightKg: number | null;
+}
+
 export interface Transport {
   id: number;
   transportCode: string;
@@ -303,13 +312,119 @@ export interface Transport {
   vehicleId: number;
   vehicleNumber: string;
   vehicleName: string | null;
+  vehicleMaxWeightKg?: number | null;
   driverName: string | null;
   kenekName: string | null;
   departedAt: string | null;
   arrivedAt: string | null;
   createdAt: string;
-  shipments: { id: number; masterCode: string; status: string }[];
-  checkpointRecordsCount: number;
+  shipments: TransportShipmentSummary[];
+  checkpointRecordsCount?: number;
+  summary?: {
+    shipmentCount: number;
+    totalPieces: number;
+    totalActualWeightKg: number;
+    totalChargeableWeightKg: number;
+  };
+  progress?: {
+    totalCheckpoints: number;
+    passedCheckpoints: number;
+    checkpointRecordsCount: number;
+    lastRecordAt: string | null;
+  };
+}
+
+export interface TransportCheckpoint {
+  id: number;
+  name: string;
+  sequence: number;
+  latitude: number;
+  longitude: number;
+  radiusMeters: number;
+  passed: boolean;
+  lastRecordAt: string | null;
+}
+
+export interface TransportCheckpointRecord {
+  id: number;
+  checkpointId: number;
+  checkpointName: string;
+  sequence: number;
+  latitude: number;
+  longitude: number;
+  withinRadius: boolean;
+  recordedAt: string;
+  recordedByName: string | null;
+}
+
+export interface TransportShipmentDetail {
+  id: number;
+  masterCode: string;
+  status: string;
+  customerName: string | null;
+  origin: string;
+  destination: string;
+  pieces: number;
+  actualWeightKg: number;
+  volumetricWeightKg: number;
+  chargeableWeightKg: number | null;
+  ratePerKg: number | null;
+  priceAmount: number | null;
+  detailsCount: number;
+}
+
+export interface TransportDetail {
+  id: number;
+  transportCode: string;
+  status: string;
+  createdAt: string;
+  departedAt: string | null;
+  arrivedAt: string | null;
+  route: { id: number; name: string; origin: string | null; destination: string | null } | null;
+  checkpoints: TransportCheckpoint[];
+  vehicle: {
+    id: number;
+    vehicleNumber: string;
+    name: string | null;
+    maxWeightKg: number;
+    maxVolumeM3: number;
+  };
+  driverName: string | null;
+  kenekName: string | null;
+  shipments: TransportShipmentDetail[];
+  summary: {
+    shipmentCount: number;
+    totalPieces: number;
+    totalActualWeightKg: number;
+    totalVolumetricWeightKg: number;
+    totalChargeableWeightKg: number;
+    totalValueRp: number;
+    totalVolumeM3: number;
+  };
+  progress: {
+    totalCheckpoints: number;
+    passedCheckpoints: number;
+    recordsCount: number;
+    lastRecord: {
+      checkpointId: number;
+      checkpointName: string;
+      sequence: number;
+      latitude: number;
+      longitude: number;
+      withinRadius: boolean;
+      recordedAt: string;
+      recordedByName: string | null;
+    } | null;
+    nextCheckpoint: { id: number; name: string; sequence: number } | null;
+    currentPosition: {
+      latitude: number;
+      longitude: number;
+      label: string;
+      kind: string;
+      recordedAt: string | null;
+    };
+  };
+  checkpointRecords: TransportCheckpointRecord[];
 }
 
 export interface Tariff {
