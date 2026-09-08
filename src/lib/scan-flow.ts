@@ -5,7 +5,6 @@ export interface ScanDetailState {
   id: number;
   detailCode: string;
   description: string;
-  quantity: number;
   scanned: boolean;
   scannedAt: string | null;
   scannedByName: string | null;
@@ -45,7 +44,6 @@ export async function scanProgress(options: { pickupId?: number; deliveryId?: nu
       id: d.id,
       detailCode: d.detailCode,
       description: d.description,
-      quantity: d.quantity,
       scanned: !!hit,
       scannedAt: hit ? hit.scannedAt.toISOString() : null,
       scannedByName: hit?.by ?? null,

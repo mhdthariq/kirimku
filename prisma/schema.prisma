@@ -127,6 +127,8 @@ model MasterShipment {
   resi                   String?  @unique
   customerId             Int
   customer               Customer @relation(fields: [customerId], references: [id])
+  tariffId               Int?     // tariff selected at creation (route dropdown)
+  tariff                 Tariff?  @relation(fields: [tariffId], references: [id])
   status                 String   @default("CREATED")
   origin                 String
   destination            String
@@ -147,13 +149,15 @@ model MasterShipment {
   transportItems TransportShipment[]
 }
 
+// One row = ONE physical package with its own unique detailCode (QR label).
+// A "quantity" of N at input time expands into N rows; the grouped view in
+// the UI is purely a presentation-layer aggregation (no quantity column in DB).
 model DetailShipment {
   id             Int      @id @default(autoincrement())
   detailCode     String   @unique
   masterId       Int
   master         MasterShipment @relation(fields: [masterId], references: [id], onDelete: Cascade)
   description    String
-  quantity       Int      @default(1)
   lengthCm       Float?
   widthCm        Float?
   heightCm       Float?
@@ -373,20 +377,22 @@ model Delivery {
 // ---------------------------------------------------------------------------
 
 model Tariff {
-  id               Int       @id @default(autoincrement())
-  origin           String
-  destination      String
-  customerType     String?   // b2b | b2c | null = all
-  ratePerKg        Float
-  minChargeableKg  Float     @default(1)
-  volumetricDivisor Float    @default(6000)
-  roundingMode     String    @default("UP") // UP | NEAREST
-  roundingUnitKg   Float     @default(0.5)
-  effectiveFrom    DateTime
-  effectiveTo      DateTime?
-  isActive         Boolean   @default(true)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  id                  Int       @id @default(autoincrement())
+  origin              String
+  destination         String
+  customerType        String?   // b2b | b2c | null = all
+  ratePerKg           Float
+  minChargeableKg     Float     @default(1)
+  volumetricMultiplier Float    @default(250) // kg per m³: volumetric kg = (L×W×H cm / 1.000.000) × multiplier
+  roundingMode        String    @default("UP") // UP | NEAREST
+  roundingUnitKg      Float     @default(0.5)
+  effectiveFrom       DateTime
+  effectiveTo         DateTime?
+  isActive            Boolean   @default(true)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  shipments MasterShipment[]
 }
 
 model Payment {

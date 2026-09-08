@@ -31,7 +31,7 @@ Each staff user is linked 1:1 to an `Employee` row (`EMP-000001`…`EMP-000008`)
 - **3 Gudang** — Jakarta Pusat, Bandung, Surabaya (with real coordinates for the map).
 - **3 Vehicles** — Engkel Box, CDD 6 Ban, Fuso (one `MAINTENANCE`); CDD has a seeded crew assignment (driver Joko + kenek Andi).
 - **2 Routes** — JKT–BDG (Tol Cipularang) and JKT–SBY (Pantura), each with **3 checkpoints** (start gudang, rest area, end gudang) with radii.
-- **4 Tariffs** — JKT→BDG and JKT→SBY, each in b2b/b2c variants, with volumetric defaults.
+- **4 Tariffs** — JKT→BDG and JKT→SBY, each in b2b/b2c variants, with configurable volumetric multipliers (250 kg/m³ Bandung, 300 kg/m³ Surabaya) and prices computed by the real formula (e.g. MKT-000002 "Karton Tulis" ×10 → 25 kg → Rp112.500).
 - **5 Customers** — mix of b2b (PT Maju Bersama, CV Sinar Jaya) and b2c.
 
 ### Transactional data (6 shipments across the whole lifecycle)
@@ -46,8 +46,6 @@ Each staff user is linked 1:1 to an `Employee` row (`EMP-000001`…`EMP-000008`)
 | `MKT-000006` | Sari Indah (b2c) | `CREATED` | — |
 
 Plus: 8 detail items, tracking events matching each lifecycle position, 4 pickups (completed), 1 completed delivery with proof, 1 `DEPARTED` transport carrying MKT-000004, 4 payments in various states (`RECORDED`/`VERIFIED`), 1 `SENT` invoice (PT Maju Bersama, 2 lines), and 12–16 audit log entries across modules.
-
-**Transport position demo (idempotent, re-applied on existing databases):** the departed transport `TRP-2026-000001` gets two `CheckpointRecord`s — the route origin (timestamped at `departedAt`) and checkpoint #2 "Rest Area KM 207 Brebes" (mid-route) — so the `#/transports/1` detail page shows a live truck position ("Melewati Rest Area KM 207 Brebes — menuju Gudang Surabaya (End)") out of the box, plus a `CHECKPOINT_REACHED` tracking event on MKT-000004. The seed block only runs when the transport has **zero** position records, so your own check-ins are never overwritten.
 
 **QR-scan demo tasks (open, assigned to kurir `rizky`):**
 
@@ -90,4 +88,4 @@ After editing, reset the database (above) so the new dataset is created.
 
 ## RBAC bootstrap note
 
-Before accounts, `ensureSeed()` calls `ensureRbac()`: it upserts the **63 permissions** and **6 system roles** and re-links role→permission rows if the catalog in code has changed. This runs even outside the demo seed (it's also called on API boot), so a production database gets the RBAC catalog without demo data.
+Before accounts, `ensureSeed()` calls `ensureRbac()`: it upserts the **79 permissions** and **6 system roles** and re-links role→permission rows if the catalog in code has changed. This runs even outside the demo seed (it's also called on API boot), so a production database gets the RBAC catalog without demo data.

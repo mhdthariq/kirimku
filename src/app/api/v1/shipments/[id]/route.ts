@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { guard, ok, handle, fail, str } from "@/lib/api-helpers";
 import { audit, diffFields } from "@/lib/audit";
+import { pricingPreview } from "@/lib/pricing";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -13,7 +14,8 @@ export async function GET(req: NextRequest, { params }: Params) {
       where: { id: Number(id) },
       include: {
         customer: true,
-        details: true,
+        tariff: true,
+        details: { orderBy: { id: "asc" } },
         trackingEvents: { orderBy: { occurredAt: "desc" }, include: { actor: true } },
         pickups: { include: { scans: true } },
         deliveries: true,
@@ -22,7 +24,10 @@ export async function GET(req: NextRequest, { params }: Params) {
       },
     });
     if (!shipment) return fail(404, "Shipment tidak ditemukan.");
-    return ok(shipment);
+    // Server-computed pricing preview (actual / volumetric / chargeable) so the
+    // client never re-implements (or hardcodes) the volumetric formula.
+    const preview = await pricingPreview(shipment);
+    return ok({ ...shipment, pricingPreview: preview });
   });
 }
 
@@ -38,8 +43,20 @@ export async function PUT(req: NextRequest, { params }: Params) {
     }
 
     const data: Record<string, unknown> = {};
-    if (body.origin !== undefined) data.origin = str(body.origin) ?? existing.origin;
-    if (body.destination !== undefined) data.destination = str(body.destination) ?? existing.destination;
+    if (body.tariffId !== undefined) {
+      const tariffId = body.tariffId ? Number(body.tariffId) : null;
+      if (tariffId) {
+        const tariff = await db.tariff.findUnique({ where: { id: tariffId } });
+        if (!tariff || !tariff.isActive) return fail(422, "Tarif tidak ditemukan / tidak aktif.");
+        data.tariffId = tariff.id;
+        data.origin = tariff.origin;
+        data.destination = tariff.destination;
+      } else {
+        data.tariffId = null;
+      }
+    }
+    if (body.origin !== undefined && data.origin === undefined) data.origin = str(body.origin) ?? existing.origin;
+    if (body.destination !== undefined && data.destination === undefined) data.destination = str(body.destination) ?? existing.destination;
     if (body.originWarehouseId !== undefined) data.originWarehouseId = body.originWarehouseId ? Number(body.originWarehouseId) : null;
     if (body.destinationWarehouseId !== undefined) data.destinationWarehouseId = body.destinationWarehouseId ? Number(body.destinationWarehouseId) : null;
 

@@ -228,7 +228,7 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
                   {d.detailCode}
                 </p>
                 <p className="truncate text-[11px] text-muted-foreground">
-                  {d.description} · qty {d.quantity}
+                  {d.description}
                   {d.scanned && d.scannedByName ? ` · oleh ${d.scannedByName}` : ""}
                 </p>
               </div>

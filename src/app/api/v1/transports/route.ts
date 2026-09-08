@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { guard, ok, handle, fail, str, num, ci } from "@/lib/api-helpers";
+import { guard, ok, handle, fail, str, num } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
 import { nextCode } from "@/lib/code-generator";
 
@@ -17,9 +17,9 @@ export async function GET(req: NextRequest) {
         ...(search
           ? {
               OR: [
-                { transportCode: ci(search) },
-                { route: { name: ci(search) } },
-                { vehicle: { vehicleNumber: ci(search) } },
+                { transportCode: { contains: search } },
+                { route: { name: { contains: search } } },
+                { vehicle: { vehicleNumber: { contains: search } } },
               ],
             }
           : {}),
@@ -28,74 +28,32 @@ export async function GET(req: NextRequest) {
       include: {
         route: { include: { checkpoints: { orderBy: { sequence: "asc" } } } },
         vehicle: true,
-        shipments: {
-          include: {
-            master: {
-              include: {
-                customer: { select: { name: true } },
-                details: { select: { quantity: true, actualWeightKg: true } },
-              },
-            },
-          },
-        },
-        checkpointRecords: { select: { checkpointId: true, withinRadius: true, recordedAt: true } },
+        shipments: { include: { master: true } },
+        _count: { select: { checkpointRecords: true } },
       },
     });
     const employees = await db.employee.findMany({ where: { isActive: true } });
     const employeeName = (id: number | null) => (id == null ? null : employees.find((e) => e.id === id)?.name ?? null);
 
     return ok(
-      transports.map((t) => {
-        const passedIds = new Set(t.checkpointRecords.filter((r) => r.withinRadius).map((r) => r.checkpointId));
-        const totalCheckpoints = t.route?.checkpoints.length ?? 0;
-        const pieces = t.shipments.reduce((sum, s) => sum + s.master.details.reduce((a, d) => a + d.quantity, 0), 0);
-        const actualKg = t.shipments.reduce(
-          (sum, s) => sum + s.master.details.reduce((a, d) => a + d.actualWeightKg * d.quantity, 0),
-          0,
-        );
-        const chargeableKg = t.shipments.reduce((sum, s) => sum + (s.master.chargeableWeightKg ?? 0), 0);
-        const lastRecordAt = t.checkpointRecords.reduce<string | null>(
-          (latest, r) => (!latest || r.recordedAt.toISOString() > latest ? r.recordedAt.toISOString() : latest),
-          null,
-        );
-        return {
-          id: t.id,
-          transportCode: t.transportCode,
-          status: t.status,
-          routeId: t.routeId,
-          routeName: t.route?.name ?? null,
-          routeCheckpoints: t.route?.checkpoints ?? [],
-          vehicleId: t.vehicleId,
-          vehicleNumber: t.vehicle.vehicleNumber,
-          vehicleName: t.vehicle.name,
-          vehicleMaxWeightKg: t.vehicle.maxWeightKg,
-          driverName: employeeName(t.driverId),
-          kenekName: employeeName(t.kenekId),
-          departedAt: t.departedAt,
-          arrivedAt: t.arrivedAt,
-          createdAt: t.createdAt,
-          shipments: t.shipments.map((s) => ({
-            id: s.master.id,
-            masterCode: s.master.masterCode,
-            status: s.master.status,
-            customerName: s.master.customer?.name ?? null,
-            destination: s.master.destination,
-            chargeableWeightKg: s.master.chargeableWeightKg,
-          })),
-          summary: {
-            shipmentCount: t.shipments.length,
-            totalPieces: pieces,
-            totalActualWeightKg: Math.round(actualKg * 10) / 10,
-            totalChargeableWeightKg: Math.round(chargeableKg * 10) / 10,
-          },
-          progress: {
-            totalCheckpoints,
-            passedCheckpoints: t.route?.checkpoints.filter((c) => passedIds.has(c.id)).length ?? 0,
-            checkpointRecordsCount: t.checkpointRecords.length,
-            lastRecordAt,
-          },
-        };
-      }),
+      transports.map((t) => ({
+        id: t.id,
+        transportCode: t.transportCode,
+        status: t.status,
+        routeId: t.routeId,
+        routeName: t.route?.name ?? null,
+        routeCheckpoints: t.route?.checkpoints ?? [],
+        vehicleId: t.vehicleId,
+        vehicleNumber: t.vehicle.vehicleNumber,
+        vehicleName: t.vehicle.name,
+        driverName: employeeName(t.driverId),
+        kenekName: employeeName(t.kenekId),
+        departedAt: t.departedAt,
+        arrivedAt: t.arrivedAt,
+        createdAt: t.createdAt,
+        shipments: t.shipments.map((s) => ({ id: s.master.id, masterCode: s.master.masterCode, status: s.master.status })),
+        checkpointRecordsCount: t._count.checkpointRecords,
+      })),
     );
   });
 }

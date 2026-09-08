@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { guard, ok, handle, fail, requireStr, str, num, requireNum, ci } from "@/lib/api-helpers";
+import { guard, ok, handle, fail, requireStr, str, num, requireNum } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
 
 const VEHICLE_STATUSES = ["ACTIVE", "MAINTENANCE", "INACTIVE"];
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     const vehicles = await db.vehicle.findMany({
       where: {
         ...(status ? { status } : {}),
-        ...(search ? { OR: [{ vehicleNumber: ci(search) }, { name: ci(search) }] } : {}),
+        ...(search ? { OR: [{ vehicleNumber: { contains: search } }, { name: { contains: search } }] } : {}),
       },
       orderBy: { id: "desc" },
       include: {

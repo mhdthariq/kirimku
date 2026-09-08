@@ -182,13 +182,3 @@
 .pulse-dot {
   animation: pulse-dot 2s ease-in-out infinite;
 }
-
-/* Transport live-position truck pin */
-@keyframes transport-ping {
-  0% { box-shadow: 0 0 0 0 oklch(0.696 0.17 162.98 / 55%), 0 4px 14px rgba(0, 0, 0, .45); }
-  70% { box-shadow: 0 0 0 14px oklch(0.696 0.17 162.98 / 0%), 0 4px 14px rgba(0, 0, 0, .45); }
-  100% { box-shadow: 0 0 0 0 oklch(0.696 0.17 162.98 / 0%), 0 4px 14px rgba(0, 0, 0, .45); }
-}
-.transport-truck-pin {
-  animation: transport-ping 2.2s cubic-bezier(0, 0, 0.2, 1) infinite;
-}

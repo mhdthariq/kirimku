@@ -27,6 +27,13 @@ export async function nextCode(
 
 /** Next detail code within a shipment: DTL-xxxxxx-nn */
 export async function nextDetailCode(masterId: number, masterCode: string): Promise<string> {
+  const codes = await nextDetailCodes(masterId, masterCode, 1);
+  return codes[0];
+}
+
+/** Bulk next detail codes for one shipment: DTL-xxxxxx-nn .. DTL-xxxxxx-(nn+count-1).
+ *  Used when a detail input with quantity N expands into N package rows. */
+export async function nextDetailCodes(masterId: number, masterCode: string, count: number): Promise<string[]> {
   const details = await db.detailShipment.findMany({ where: { masterId }, select: { detailCode: true } });
   const base = masterCode.replace("MKT", "DTL");
   let max = 0;
@@ -34,5 +41,6 @@ export async function nextDetailCode(masterId: number, masterCode: string): Prom
     const match = d.detailCode.match(/-(\d+)$/);
     if (match) max = Math.max(max, Number(match[1]));
   }
-  return `${base}-${String(max + 1).padStart(2, "0")}`;
+  const n = Math.max(1, Math.min(count, 500));
+  return Array.from({ length: n }, (_, i) => `${base}-${String(max + 1 + i).padStart(2, "0")}`);
 }

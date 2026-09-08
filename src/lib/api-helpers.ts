@@ -91,23 +91,3 @@ export function dateOrNull(value: unknown): Date | null {
   const d = new Date(String(value));
   return Number.isNaN(d.getTime()) ? null : d;
 }
-
-/**
- * Case-insensitive `contains` filter that works on BOTH SQLite and PostgreSQL.
- *
- * Why: SQLite's LIKE is case-insensitive by default, but PostgreSQL's LIKE is
- * case-sensitive. On Postgres we must add `mode: "insensitive"` to keep the
- * same search behaviour (e.g. searching "b 9455" still matches "B 9455 KTB").
- * `mode` is not supported by the SQLite connector, so it is only included
- * when DATABASE_URL points at a Postgres family database.
- *
- * Usage: `{ vehicleNumber: ci(search) }` instead of `{ vehicleNumber: { contains: search } }`.
- */
-export function ci(value: string): { contains: string; mode?: "insensitive" } {
-  const url = process.env.DATABASE_URL ?? "";
-  const isPostgres =
-    url.startsWith("postgres://") ||
-    url.startsWith("postgresql://") ||
-    url.startsWith("postgis://");
-  return isPostgres ? { contains: value, mode: "insensitive" } : { contains: value };
-}

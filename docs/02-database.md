@@ -4,8 +4,8 @@
 
 - **ORM:** Prisma 6 — schema at `prisma/schema.prisma` (single source of truth)
 - **Default engine:** SQLite file at `db/custom.db` (created by `bun run db:push`)
-- **Models:** 29
-- **PostgreSQL-ready (verified):** the schema uses only `String`, `Int`, `Float`, `Boolean`, `DateTime` — no SQLite-only features, no DB enums, no `Json` — so it runs on **Supabase Postgres unchanged**. The stack was tested end-to-end against a real PostgreSQL 18 server (push, seed, all endpoints, QR flow, CRUD, audit). Full switch guide: **[08-supabase-setup.md](08-supabase-setup.md)** (also summarized below).
+- **Models:** 21
+- **PostgreSQL-ready:** the schema uses only `String`, `Int`, `Float`, `Boolean`, `DateTime` — no SQLite-only features, no DB enums, no `Json` — so it runs on **Supabase Postgres unchanged**. See the switch guide at the bottom.
 
 ## Model catalog
 
@@ -16,7 +16,7 @@
 | `Employee` | Staff master data | `employeeNumber @unique`, `position`, 1:1 optional `User` |
 | `User` | Login accounts | `username @unique`, `passwordHash` (scrypt), `isOwner` (owner bypasses RBAC = `*`), `isActive` |
 | `Role` | Permission bundles | `slug @unique`, `isSystem` (seeded roles can't be deleted via UI) |
-| `Permission` | 63 permission slugs | `slug @unique`, grouped by `module` |
+| `Permission` | 62 permission slugs | `slug @unique`, grouped by `module` |
 | `UserRole` | M:N user ↔ role | composite PK, `onDelete: Cascade` |
 | `RolePermission` | M:N role ↔ permission | composite PK, cascade |
 | `SessionToken` | Bearer sessions | `token @unique`, `expiresAt` (12 h) |
@@ -26,8 +26,8 @@
 | Model | Purpose | Notable fields / rules |
 |---|---|---|
 | `Customer` | Shipper master | `code @unique`, `type` = `"b2b" \| "b2c"` (drives tariff selection + invoice eligibility) |
-| `MasterShipment` | The shipment/booking | `masterCode @unique` (`MKT-000NNN`), `resi @unique`, `status` (lifecycle — see `05-business-flows.md`), `origin`/`destination` city names, FKs to origin/destination `Warehouse`, pricing snapshot: `chargeableWeightKg`, `ratePerKg`, `priceAmount`, `pricedAt` |
-| `DetailShipment` | Items inside a shipment | `detailCode @unique` (`DTL-…`), `description`, `quantity`, dims `lengthCm/widthCm/heightCm`, `actualWeightKg` — cascade delete with master |
+| `MasterShipment` | The shipment/booking | `masterCode @unique` (`MKT-000NNN`), `resi @unique`, `status` (lifecycle — see `05-business-flows.md`), `origin`/`destination` city names, `tariffId` (tariff selected from the route dropdown — Revision 3), FKs to origin/destination `Warehouse`, pricing snapshot: `chargeableWeightKg`, `ratePerKg`, `priceAmount`, `pricedAt` |
+| `DetailShipment` | **One row = one physical package** (Revision 3) | `detailCode @unique` (`DTL-…`), `description`, dims `lengthCm/widthCm/heightCm`, `actualWeightKg` — cascade delete with master. No `quantity` column: an input of N packages expands into N rows, each carrying its own QR label |
 | `TrackingEvent` | Immutable tracking timeline | `event`, `description`, optional `actorId` (User), `occurredAt` — cascade with master |
 
 ### Gudang (warehouses)
@@ -63,7 +63,7 @@
 
 | Model | Purpose | Notable fields / rules |
 |---|---|---|
-| `Tariff` | Rate table | `origin` + `destination` + `customerType` (`b2b`/`b2c`, null = all), `ratePerKg`, `minChargeableKg`, `volumetricDivisor` (default 6000), `roundingMode` (`UP`/`NEAREST`), `roundingUnitKg`, `effectiveFrom/To` |
+| `Tariff` | Rate table | `origin` + `destination` + `customerType` (`b2b`/`b2c`, null = all), `ratePerKg`, `minChargeableKg`, `volumetricMultiplier` (kg per m³, default 250 — Revision 3 replaced `volumetricDivisor`), `roundingMode` (`UP`/`NEAREST`), `roundingUnitKg`, `effectiveFrom/To` |
 | `Payment` | Shipment payment | `method` = `CASH \| TRANSFER`, `amount`, `status` = `RECORDED \| VERIFIED \| REJECTED`, recorder + verifier users |
 | `Invoice` | B2B consolidated bill | `invoiceNumber @unique` (`INV-YYYY-000NNN`), `status` = `DRAFT \| SENT \| PARTIALLY_SETTLED \| SETTLED \| CANCELLED`, `issueDate`, `dueDate` |
 | `InvoiceLine` | Line items of an invoice | `description`, `quantity`, `unitPrice` — cascade with invoice |
@@ -113,7 +113,7 @@ User 1—* AuditLog   (actor)
 
 ## Switching to Supabase Postgres (step-by-step)
 
-The app ships with SQLite for zero-config local development. To move the database to **Supabase** (or any PostgreSQL), follow these steps — no code rewrite is needed. The complete, tested guide with troubleshooting lives in **[08-supabase-setup.md](08-supabase-setup.md)**; this is the condensed version.
+The app ships with SQLite for zero-config local development. To move the database to **Supabase** (or any PostgreSQL), follow these steps — no code rewrite is needed.
 
 ### 1. Create the Supabase project
 
@@ -161,17 +161,12 @@ DATABASE_URL="postgresql://postgres.YOUR-REF:YOUR-PASSWORD@aws-0-YOUR-REGION.poo
 
 ```bash
 bun install                 # regenerate Prisma client for postgres
-bun run db:push             # creates all 29 tables in Supabase
+bun run db:push             # creates all 21 tables in Supabase
 bun run db:seed             # loads the mock-up dataset (idempotent)
 bun run dev
 ```
 
-`db push` handles the full schema — 29 tables, unique indexes, FK cascades. No manual SQL is required.
-
-> **Search behaviour is kept identical on both databases.** SQLite `LIKE` is case-insensitive
-> while PostgreSQL `LIKE` is case-sensitive; all 33 search filters in the API use the `ci()`
-> helper (`src/lib/api-helpers.ts`) which adds `mode: "insensitive"` automatically when
-> `DATABASE_URL` points at Postgres — see [08-supabase-setup.md](08-supabase-setup.md#6-behaviour-parity-what-we-fixed-for-postgres).
+`db push` handles the full schema — 21 tables, unique indexes, FK cascades. No manual SQL is required.
 
 ### 6. Optional: the official two-URL setup
 

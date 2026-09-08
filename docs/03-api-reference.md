@@ -44,7 +44,7 @@ curl -s -X POST http://localhost:3000/api/v1/auth/login \
 
 Attach it to every request: `Authorization: Bearer <token>`.
 
-The **owner** user short-circuits RBAC (`permissions: ["*"]`). All other users get the union of their roles' permission slugs (63 slugs — see `src/lib/rbac.ts`).
+The **owner** user short-circuits RBAC (`permissions: ["*"]`). All other users get the union of their roles' permission slugs (62 slugs — see `src/lib/rbac.ts`).
 
 ### Query conventions
 
@@ -76,7 +76,7 @@ The first request after a fresh `db:push` triggers `ensureSeed()` (RBAC + demo d
 
 | Method | Endpoint | Permission | Description |
 |---|---|---|---|
-| GET | `/options` | any authenticated | Lookup lists: gudang, vehicles, routes, customers, tariffs, kurir/drivers/kenek (employees), **permissions catalog** (full 63-slug list, powers the role editor) |
+| GET | `/options` | any authenticated | Lookup lists: gudang, vehicles, routes, customers, tariffs, kurir/drivers/kenek (employees), **permissions catalog** (full 62-slug list, powers the role editor) |
 
 ## Customers
 
@@ -93,24 +93,26 @@ The first request after a fresh `db:push` triggers `ensureSeed()` (RBAC + demo d
 | Method | Endpoint | Permission | Description |
 |---|---|---|---|
 | GET | `/shipments` | `shipment.view` | List + `?status`, `?q`, `?customerId`, `?unpaid` |
-| POST | `/shipments` | `shipment.create` | `{customerId, origin, destination, originWarehouseId?, destinationWarehouseId?, notes?}` → code `MKT-000NNN` + resi + tracking `CREATED` |
-| GET | `/shipments/{id}` | `shipment.view` | Full detail (customer, gudang, pricing, counts, latest payment) |
-| PUT | `/shipments/{id}` | `shipment.update` | Update master fields (while editable) |
+| POST | `/shipments` | `shipment.create` | `{customerId, tariffId, originWarehouseId?, destinationWarehouseId?}` — **tariffId** from the route dropdown (filtered by customer B2B/B2C); origin/destination auto-filled from the tariff and `tariffId` stored on the shipment. Legacy `{origin, destination}` still accepted. → code `MKT-000NNN` + resi + tracking `CREATED` |
+| GET | `/shipments/{id}` | `shipment.view` | Full detail (customer, gudang, tariff, pricing, counts, latest payment) **+ `pricingPreview`** (server-computed actual/volumetric/chargeable kg, multiplier, estimation) |
+| PUT | `/shipments/{id}` | `shipment.update` | Update master fields (while editable) — accepts `tariffId` to change the route |
 | DELETE | `/shipments/{id}` | `shipment.delete` | Delete (cascades details/tracking) |
 | POST | `/shipments/{id}/ready` | `shipment.update` | `CREATED → READY_FOR_PICKUP` |
 | POST | `/shipments/{id}/cancel` | `shipment.cancel` | Any non-terminal → `CANCELLED` (blocked if priced & paid) |
 | GET | `/shipments/{id}/tracking` | `shipment.view_tracking` | Tracking timeline (events + actors, newest first) |
-| GET | `/shipments/{id}/details` | `shipment_detail.view` | Detail items |
-| POST | `/shipments/{id}/price` | `shipment.update` | Compute pricing from tariff + details → sets CW, rate, amount, `pricedAt` |
+| GET | `/shipments/{id}/details` | `shipment_detail.view` | Package rows (one row per package) |
+| POST | `/shipments/{id}/price` | `shipment.update` | Compute pricing from tariff + packages → sets CW, rate, amount, `pricedAt`. **Recomputable** while `CREATED/READY_FOR_PICKUP/PICKED_UP` (fixes previously wrong numbers) |
 
-**Pricing logic** (also exposed in `05-business-flows.md`): volumetric weight per detail = `L×W×H / volumetricDivisor`; chargeable weight = max(actual, volumetric) summed, floored at `minChargeableKg`, rounded per tariff (`UP`/`NEAREST` by `roundingUnitKg`); rate matched by origin/destination/customerType; `priceAmount = CW × ratePerKg`.
+**Pricing logic** (also exposed in `05-business-flows.md`): volumetric weight per package = `L×W×H / 1.000.000 × volumetricMultiplier` (kg/m³, configurable per tariff — Revision 3); chargeable weight = max(actual, volumetric) summed, floored at `minChargeableKg`, rounded per tariff (`UP`/`NEAREST` by `roundingUnitKg`); tariff resolved from `MasterShipment.tariffId` (route dropdown) or matched by origin/destination/customerType; `priceAmount = CW × ratePerKg`.
 
-## Shipment details (items)
+## Shipment details (packages)
+
+**Revision 3 — one row per package:** `POST /shipments/{id}/details` accepts `{description, quantity (1–500), lengthCm?, widthCm?, heightCm?, actualWeightKg}` and expands `quantity N` into **N package rows**, each with a unique `detailCode` (`DTL-…-01 … -NN`). Response: `{created: N, details: [...]}`. There is no per-row quantity — the grouped ("Ringkas") view in the UI is pure aggregation.
 
 | Method | Endpoint | Permission | Description |
 |---|---|---|---|
-| PUT | `/shipment-details/{id}` | `shipment_detail.update` | Update description/qty/dims/weight |
-| DELETE | `/shipment-details/{id}` | `shipment_detail.delete` | Remove item (new detail rows are created via `POST /shipments/{id}/details` — see shipments table above; line items live with their shipment) |
+| PUT | `/shipment-details/{id}` | `shipment_detail.update` | Update one package row (description/dims/weight) |
+| DELETE | `/shipment-details/{id}` | `shipment_detail.delete` | Remove one package (rows are created via `POST /shipments/{id}/details`) |
 
 ## Pickups
 
@@ -144,23 +146,12 @@ Same executor mode: `GET /deliveries?mine=true` filters to the logged-in kurir. 
 
 | Method | Endpoint | Permission | Description |
 |---|---|---|---|
-| GET | `/transports` | `transport.view` | List + `?status`, `?search` — each row embeds `shipments[]` (code, customer, destination, chargeable kg), `summary` (shipmentCount, totalPieces, totalActualWeightKg, totalChargeableWeightKg) and `progress` (passed/total checkpoints, last position record time) |
+| GET | `/transports` | `transport.view` | List + `?status`, `?vehicleId`, `?q` (includes shipments per transport) |
 | POST | `/transports` | `transport.create` | `{routeId, vehicleId, driverId?, kenekId?, shipmentIds[]}` → code `TRP-YYYY-…`; vehicle must be `ACTIVE` |
-| GET | `/transports/{id}` | `transport.view` | **Detail**: route + checkpoints (with `passed` flags & times), vehicle (incl. capacity), kru, per-shipment load (pieces, actual/volumetric/chargeable kg, price), `summary` (incl. totalValueRp, totalVolumeM3), `progress` (`passedCheckpoints`, `nextCheckpoint`, `currentPosition` {lat,lng,label,kind,recordedAt}), `checkpointRecords[]` (position history) |
 | PUT | `/transports/{id}` | `transport.create` | Update while `PLANNED` (reassign vehicle/route/shipments) |
-| POST | `/transports/{id}/depart` | `transport.depart` | `PLANNED → DEPARTED`: marks carried shipments `IN_TRANSPORT`, records `departedAt`, and auto-records the **origin checkpoint** as passed (position tracking starts from a known point) |
-| POST | `/transports/{id}/arrive` | `transport.arrive` | `DEPARTED → ARRIVED`: shipments → `ARRIVED_AT_GUDANG`, records `arrivedAt`, and auto-records the **destination checkpoint** (unless already recorded) |
-| POST | `/transports/{id}/checkpoints` | `transport.record_checkpoint` | **Record where the vehicle is** (only while `DEPARTED`). Body: `{checkpointId}` (check-in at a route checkpoint) or `{latitude, longitude}` (manual/GPS — snapped to the nearest checkpoint, `withinRadius` computed via haversine vs. checkpoint radius). Duplicate passed-checkpoint → 422; out-of-radius GPS pings are always allowed (breadcrumbs). Every carried shipment gets a `CHECKPOINT_REACHED` tracking event; audit action `checkpoint_record` |
+| POST | `/transports/{id}/depart` | `transport.depart` | `PLANNED → DEPARTED`: marks carried shipments `IN_TRANSPORT`, records `departedAt` |
+| POST | `/transports/{id}/arrive` | `transport.arrive` | `DEPARTED → ARRIVED`: shipments → `ARRIVED_AT_GUDANG`, records `arrivedAt` |
 | DELETE | `/transports/{id}` | `transport.create` | Cancel while `PLANNED` (detaches shipments) |
-
-Transport position rules (`currentPosition`):
-
-| Transport status | Position shown |
-|---|---|
-| `PLANNED` | Origin checkpoint — "Belum berangkat" |
-| `DEPARTED` + records | Latest `CheckpointRecord` ("Melewati X — menuju Y" / GPS breadcrumb) |
-| `DEPARTED` no records | Origin checkpoint — fallback |
-| `ARRIVED` | Destination checkpoint — "Tiba di tujuan" |
 
 ## Vehicles
 
@@ -200,7 +191,7 @@ Transport position rules (`currentPosition`):
 | Method | Endpoint | Permission | Description |
 |---|---|---|---|
 | GET | `/tariffs` | `tariff.view` | List + `?origin`, `?destination`, `?customerType`, `?active` |
-| POST | `/tariffs` | `tariff.create` | `{origin, destination, customerType?, ratePerKg, minChargeableKg?, volumetricDivisor?, roundingMode?, roundingUnitKg?, effectiveFrom}` |
+| POST | `/tariffs` | `tariff.create` | `{origin, destination, customerType?, ratePerKg, minChargeableKg?, volumetricMultiplier?, roundingMode?, roundingUnitKg?, effectiveFrom}` |
 | PUT | `/tariffs/{id}` | `tariff.update` | Update / deactivate (`effectiveTo`) |
 
 ## Payments

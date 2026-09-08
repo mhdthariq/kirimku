@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { guard, ok, handle, requireStr, str, bool, ci } from "@/lib/api-helpers";
+import { guard, ok, handle, requireStr, str, bool } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
 import { nextCode } from "@/lib/code-generator";
 
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
       where: {
         ...(includeInactive ? {} : { isActive: true }),
         ...(search
-          ? { OR: [{ name: ci(search) }, { employeeNumber: ci(search) }, { position: ci(search) }] }
+          ? { OR: [{ name: { contains: search } }, { employeeNumber: { contains: search } }, { position: { contains: search } }] }
           : {}),
       },
       orderBy: { id: "asc" },

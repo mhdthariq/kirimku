@@ -18,7 +18,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (body.customerType !== undefined) data.customerType = body.customerType === "b2b" || body.customerType === "b2c" ? body.customerType : null;
     if (body.ratePerKg !== undefined) data.ratePerKg = requireNum(body.ratePerKg, "ratePerKg", 1);
     if (body.minChargeableKg !== undefined) data.minChargeableKg = num(body.minChargeableKg) ?? existing.minChargeableKg;
-    if (body.volumetricDivisor !== undefined) data.volumetricDivisor = num(body.volumetricDivisor) ?? existing.volumetricDivisor;
+    if (body.volumetricMultiplier !== undefined) data.volumetricMultiplier = num(body.volumetricMultiplier) ?? existing.volumetricMultiplier;
     if (body.roundingMode !== undefined) data.roundingMode = body.roundingMode === "NEAREST" ? "NEAREST" : "UP";
     if (body.roundingUnitKg !== undefined) data.roundingUnitKg = num(body.roundingUnitKg) ?? existing.roundingUnitKg;
     if (body.effectiveFrom !== undefined) data.effectiveFrom = dateOrNull(body.effectiveFrom) ?? existing.effectiveFrom;

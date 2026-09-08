@@ -2,9 +2,9 @@
 
 Aplikasi manajemen logistik pengiriman (shipment management) yang dibangun ulang dengan standar UI/UX modern: responsif penuh (desktop / tablet / ponsel), mode terang & gelap, CRUD berbasis modal, peta Leaflet untuk checkpoint, RBAC, audit trail, dan **database seeder mock-up lengkap**.
 
-Dibangun dengan **Next.js 16 + TypeScript + Tailwind CSS 4 + shadcn/ui + Prisma (SQLite)** — dan **terverifikasi berjalan di Supabase Postgres** (diuji end-to-end pada server PostgreSQL 18 asli: schema push, seeder, seluruh API, alur QR, CRUD, audit). Panduan setup lengkap: **[docs/08-supabase-setup.md](docs/08-supabase-setup.md)** dan `.env.example`.
+Dibangun dengan **Next.js 16 + TypeScript + Tailwind CSS 4 + shadcn/ui + Prisma (SQLite)** — siap dialihkan ke **Supabase Postgres** (lihat `.env.example` dan `docs/02-database.md`).
 
-> 📚 **Dokumentasi lengkap ada di folder [`docs/`](docs/)** — arsitektur, skema database, referensi API, frontend, alur bisnis, seeder, deployment, dan setup Supabase teruji.
+> 📚 **Dokumentasi lengkap ada di folder [`docs/`](docs/)** — arsitektur, skema database, referensi API, frontend, alur bisnis, seeder, dan deployment.
 
 ---
 
@@ -36,7 +36,7 @@ Salin `.env.example` → `.env` bila ingin mengubah database:
 cp .env.example .env
 ```
 
-Default: SQLite lokal (`db/custom.db`, zero-config). Ingin memakai **Supabase Postgres**? Semua varian connection string (direct / session pooler / transaction pooler) sudah disiapkan di `.env.example` — panduan teruji langkah-demi-langkah ada di **[docs/08-supabase-setup.md](docs/08-supabase-setup.md)** (ringkasan juga di [docs/02-database.md](docs/02-database.md)).
+Default: SQLite lokal (`db/custom.db`, zero-config). Ingin memakai **Supabase Postgres**? Semua varian connection string (direct / session pooler / transaction pooler) sudah disiapkan di `.env.example` — panduan langkah-demi-langkah ada di **[docs/02-database.md](docs/02-database.md)**.
 
 Buka http://localhost:3000 lalu login dengan salah satu akun demo di bawah.
 
@@ -145,7 +145,9 @@ Semua password staff menggunakan `Demo#Pass2026`.
 9. **RBAC** — 6 role sistem dengan permission granular; **owner bisa mengedit permission role sistem apa pun langsung dari UI** (Access Control → Roles) tanpa perlu membuat role baru.
 10. **Lifecycle shipment lengkap** — CREATED → READY_FOR_PICKUP → PICKED_UP → RECEIVED_AT_GUDANG → IN_TRANSPORT → ARRIVED_AT_GUDANG → DELIVERED, plus pricing, pembayaran, tracking timeline.
 11. **Alur QR scan handover** — kurir hanya melihat task yang ditugaskan padanya (`?mine=true`); tombol aksi membuka dialog **scan QR per detail barang** (paket) — semua paket harus ter-scan sebelum konfirmasi; tracking otomatis menampilkan **"Picked-up by [Nama Kurir]"** dan **"Delivered to [Customer] by [Kurir] — received by: [PoD]"**. Dialog juga me-render QR per paket sehingga bisa dites dengan kamera ponsel.
-12. **Detail transport + posisi kendaraan** — klik kode transport (atau tombol Detail) membuka halaman detail: **peta Leaflet perjalanan** (marker checkpoint bernomor, garis rute, pin truk berdenyut di posisi terakhir), statistik muatan (**jumlah shipment, koli, total kg aktual/volumetrik/chargeable, nilai**), bar utilisasi kapasitas kendaraan, riwayat posisi, dan daftar shipment yang dimuat — tiap resi deep-link ke halaman detail shipment yang sama. Posisi dicatat via tombol **"Catat Posisi"** per checkpoint atau GPS (`POST /transports/{id}/checkpoints`); depart/arrive otomatis mencatat titik awal/tujuan; tiap check-in menambah event tracking `CHECKPOINT_REACHED` ke semua shipment di transport itu.
+12. **Perhitungan harga dengan multiplier configurable (Rev. 3)** — formula volumetrik `L × W × H / 1.000.000 × multiplier` (kg/m³, diatur per tarif di menu Tariffs); UI memakai **pratinjau harga terhitung server** (tidak ada angka hardcode lagi); tombol **"Hitung Ulang Harga"** tersedia untuk memperbaiki snapshot lama.
+13. **Rute dari dropdown tarif (Rev. 3)** — membuat shipment tidak lagi mengetik Kota Asal/Tujuan; pilih rute dari daftar tarif aktif yang **otomatis difilter sesuai tipe customer (B2B hanya melihat rute B2B, B2C hanya B2C)**; kota asal/tujuan + aturan tarif terisi otomatis.
+14. **1 baris = 1 paket dengan kode unik (Rev. 3)** — input "Karton Tulis" jumlah 10 → dibuat 10 baris dengan 10 kode unik (`DTL-…-01` s/d `-10`); halaman detail punya tab **Semua** (semua paket) dan **Ringkas** (digabung per deskripsi & dimensi — murni tampilan, database tetap 1 baris per paket).
 
 ---
 
@@ -153,9 +155,9 @@ Semua password staff menggunakan `Demo#Pass2026`.
 
 ```
 ├── db/                     # Database SQLite (dibuat oleh db:push)
-├── docs/                   # 📚 Dokumentasi lengkap (8 dokumen, termasuk panduan Supabase teruji)
+├── docs/                   # 📚 Dokumentasi lengkap (7 dokumen)
 ├── prisma/
-│   ├── schema.prisma       # 29 model — domain logistik lengkap
+│   ├── schema.prisma       # 21 model — domain logistik lengkap
 │   └── seed.ts             # Seeder CLI (mock-up data)
 ├── public/
 │   └── logo.svg            # Logo mock-up

@@ -50,7 +50,7 @@ function Router() {
       case "deliveries":
         return <DeliveriesPage />;
       case "transports":
-        return <TransportsPage transportId={segments[1] ? Number(segments[1]) : null} />;
+        return <TransportsPage />;
       case "vehicles":
         return <VehiclesPage />;
       case "gudang":

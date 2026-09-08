@@ -12,7 +12,11 @@ export async function GET(req: NextRequest) {
       db.route.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true, origin: true, destination: true } }),
       db.warehouse.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, code: true, name: true, city: true } }),
       db.customer.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, code: true, name: true, type: true } }),
-      db.tariff.findMany({ where: { isActive: true }, orderBy: { origin: "asc" }, select: { id: true, origin: true, destination: true, customerType: true, ratePerKg: true } }),
+      db.tariff.findMany({
+        where: { isActive: true },
+        orderBy: [{ origin: "asc" }, { destination: "asc" }, { customerType: "asc" }],
+        select: { id: true, origin: true, destination: true, customerType: true, ratePerKg: true, minChargeableKg: true, volumetricMultiplier: true, roundingMode: true, roundingUnitKg: true },
+      }),
       db.permission.findMany({ orderBy: [{ module: "asc" }, { slug: "asc" }], select: { id: true, slug: true, module: true, description: true } }),
     ]);
     return ok({ employees, vehicles, routes, warehouses, customers, tariffs, permissions });

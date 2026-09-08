@@ -3,7 +3,7 @@
 This folder explains **everything that was built**: the architecture, the database, the API, the frontend, the business flows, the mock-up seeder, and how to run & deploy the app.
 
 > For a quick start (install → seed → run), read the root **`README.md`**.
-> To switch the database from SQLite to **Supabase Postgres**, follow the tested guide in **`docs/08-supabase-setup.md`** (templates in **`.env.example`**).
+> To switch the database from SQLite to **Supabase Postgres**, see **`docs/02-database.md`** and **`.env.example`**.
 
 ---
 
@@ -41,35 +41,28 @@ Database and API were fully rebuilt and corrected in the process — details in 
 | R5 | **Transport tab not showing** — fixed | `TransportShipment` relation renamed to `master` to match the API's `include`; plus `driver`/`kenek` relations on `Transport` |
 | R6 | Docs aligned with the new flows | This update — `03` (endpoints), `04` (QR dialog), `05` (flows), `06` (demo tasks) |
 
-## Revision round 3 — PostgreSQL / Supabase support verified
+## Revision round 3 — pricing formula, route dropdown, package-per-row detail barang
 
-| Item | Result |
-|---|---|
-| Runtime verification | The full stack (push → seed → API → QR flow → CRUD → audit) tested against a real **PostgreSQL 18** server — the same `postgresql` provider Supabase uses |
-| Case-insensitive search parity | New `ci()` helper (`src/lib/api-helpers.ts`) applied to **all 33 search filters** — SQLite and Postgres now behave identically (Postgres gets `mode: "insensitive"`)
-| Setup guide | New **`docs/08-supabase-setup.md`** — connection-string decision table, 4-step switch, verification, serverless notes, 8-row troubleshooting table |
-
-## Revision round 4 — transport detail with live vehicle position
-
-| Item | Result |
-|---|---|
-| Position tracking | New endpoint **`POST /transports/{id}/checkpoints`** (`transport.record_checkpoint`, permission #63) records where the vehicle is — checkpoint check-in or GPS ping (haversine vs. radius geofence); `depart`/`arrive` auto-record origin/destination |
-| Transport detail page | **`#/transports/{id}`** — read-only Leaflet journey map (numbered passed/upcoming checkpoints, dashed route, pulsing truck pin, GPS breadcrumbs), stat cards (shipments, koli, actual/volumetric/chargeable kg, value), vehicle capacity bar, position history timeline, shipments table deep-linking to the existing shipment detail page |
-| Tracking integration | Each check-in writes a `CHECKPOINT_REACHED` tracking event to every carried shipment + `checkpoint_record` audit entry |
-| Docs | `03` (endpoint + position rules), `04` (journey map component + page), `05` (check-in flow), README feature #12 |
+| # | Revision | Where it is implemented |
+|---|---|---|
+| R1 | **Shipment calculation fixed** — no more hardcoded `÷6000` in the UI; formula is now `L×W×H / 1.000.000 × volumetricMultiplier` with the **multiplier configurable per tariff** (kg/m³) | `src/lib/pricing.ts` (shared engine), `POST /shipments/{id}/price`, `pricingPreview` in `GET /shipments/{id}` — see `05-business-flows.md` |
+| R2 | **No more typing Kota Asal/Tujuan** — shipment creation uses a **route dropdown fed by active tariffs**, filtered by the customer's **B2B/B2C label** (a B2B customer only sees B2B routes) | Create dialog in `shipments-page.tsx`; `POST /shipments` accepts `tariffId` and stores it on `MasterShipment.tariffId` |
+| R3 | **Detail barang: quantity → unique codes** — inputting e.g. "Karton Tulis" qty 10 creates **10 rows with 10 unique codes**; DB structure = the "All" view (no quantity column) | `POST /shipments/{id}/details` expands N; `nextDetailCodes()` bulk generator |
+| R4 | **Detail Barang tabs** — `Semua` (Kode \| Deskripsi \| Dimensi \| Berat, one row per package) and `Ringkas` (Deskripsi \| Dimensi \| Jumlah \| Berat — grouped, UX-only aggregation) | `shipments-page.tsx` detail view |
+| R5 | **Price recompute** — "Hitung Ulang Harga" available while `CREATED/READY_FOR_PICKUP/PICKED_UP` so previously wrong snapshots can be corrected | `shipments-page.tsx` + price route guard |
+| R6 | Seed data rewritten to match: tariffs with multipliers (250/300), N-package rows, prices computed by the real engine (payments & invoice lines stay coherent) | `src/lib/seed.ts` |
 
 ## Document index
 
 | File | Contents |
 |---|---|
 | [`01-architecture.md`](01-architecture.md) | Stack, folder structure, server-side libraries, design decisions |
-| [`02-database.md`](02-database.md) | All 29 models explained + relationships + **step-by-step Supabase Postgres switch** |
+| [`02-database.md`](02-database.md) | All 21 models explained + relationships + **step-by-step Supabase Postgres switch** |
 | [`03-api-reference.md`](03-api-reference.md) | Every endpoint, auth model, request/response shapes, error codes |
 | [`04-frontend.md`](04-frontend.md) | Pages, navigation & RBAC gating, responsive behavior, dark mode, modal CRUD, Leaflet editor |
 | [`05-business-flows.md`](05-business-flows.md) | Shipment lifecycle state machine, **QR handover scan flows (pickup & delivery)**, pricing & invoicing, RBAC editing |
 | [`06-seeding-and-demo-accounts.md`](06-seeding-and-demo-accounts.md) | What the seeder creates, demo accounts, how to reset / customize |
 | [`07-deployment.md`](07-deployment.md) | Dev, production build, Docker with migrate-on-boot, hosting notes |
-| [`08-supabase-setup.md`](08-supabase-setup.md) | **Tested** Supabase/PostgreSQL setup: connection strings, switch steps, parity notes, troubleshooting |
 
 ## Where the code lives (map)
 
@@ -92,7 +85,7 @@ src/
     ├── seed.ts         # idempotent mock-up seeder
     ├── code-generator.ts, api-helpers.ts, client-api.ts, utils.ts
 prisma/
-├── schema.prisma       # 29 models (SQLite default / PostgreSQL-ready)
+├── schema.prisma       # 21 models
 └── seed.ts             # CLI entry for the seeder
 ```
 

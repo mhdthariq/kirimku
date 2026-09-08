@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { guard, ok, handle, fail, requireStr, str, requireNum, num, bool, dateOrNull, ci } from "@/lib/api-helpers";
+import { guard, ok, handle, fail, requireStr, str, requireNum, num, bool, dateOrNull } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
 
 export async function GET(req: NextRequest) {
@@ -15,8 +15,8 @@ export async function GET(req: NextRequest) {
         ...(search
           ? {
               OR: [
-                { origin: ci(search) },
-                { destination: ci(search) },
+                { origin: { contains: search } },
+                { destination: { contains: search } },
               ],
             }
           : {}),
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
         customerType,
         ratePerKg: requireNum(body.ratePerKg, "ratePerKg", 1),
         minChargeableKg: num(body.minChargeableKg) ?? 1,
-        volumetricDivisor: num(body.volumetricDivisor) ?? 6000,
+        volumetricMultiplier: num(body.volumetricMultiplier) ?? 250,
         roundingMode: body.roundingMode === "NEAREST" ? "NEAREST" : "UP",
         roundingUnitKg: num(body.roundingUnitKg) ?? 0.5,
         effectiveFrom: dateOrNull(body.effectiveFrom) ?? new Date(),

@@ -20,7 +20,7 @@ interface TariffForm {
   customerType: string;
   ratePerKg: string;
   minChargeableKg: string;
-  volumetricDivisor: string;
+  volumetricMultiplier: string;
   roundingMode: string;
   roundingUnitKg: string;
   effectiveFrom: string;
@@ -33,7 +33,7 @@ const EMPTY: TariffForm = {
   customerType: "",
   ratePerKg: "",
   minChargeableKg: "1",
-  volumetricDivisor: "6000",
+  volumetricMultiplier: "250",
   roundingMode: "UP",
   roundingUnitKg: "0.5",
   effectiveFrom: new Date().toISOString().slice(0, 10),
@@ -78,7 +78,7 @@ export function TariffsPage() {
       customerType: t.customerType ?? "",
       ratePerKg: String(t.ratePerKg),
       minChargeableKg: String(t.minChargeableKg),
-      volumetricDivisor: String(t.volumetricDivisor),
+      volumetricMultiplier: String(t.volumetricMultiplier),
       roundingMode: t.roundingMode,
       roundingUnitKg: String(t.roundingUnitKg),
       effectiveFrom: t.effectiveFrom.slice(0, 10),
@@ -96,7 +96,7 @@ export function TariffsPage() {
       customerType: form.customerType === "" ? null : form.customerType,
       ratePerKg: Number(form.ratePerKg),
       minChargeableKg: Number(form.minChargeableKg),
-      volumetricDivisor: Number(form.volumetricDivisor),
+      volumetricMultiplier: Number(form.volumetricMultiplier),
       roundingMode: form.roundingMode,
       roundingUnitKg: Number(form.roundingUnitKg),
       effectiveFrom: form.effectiveFrom,
@@ -181,7 +181,7 @@ export function TariffsPage() {
                 hideOnMobile: true,
                 render: (t) => (
                   <span className="text-xs text-muted-foreground">
-                    min {formatNumber(t.minChargeableKg)} kg · divisor {formatNumber(t.volumetricDivisor, 0)} ·{" "}
+                    min {formatNumber(t.minChargeableKg)} kg · multiplier {formatNumber(t.volumetricMultiplier, 0)} kg/m³ ·{" "}
                     {t.roundingMode === "UP" ? "round up" : "nearest"} {formatNumber(t.roundingUnitKg)} kg
                   </span>
                 ),
@@ -248,8 +248,8 @@ export function TariffsPage() {
                 <Field label="Min. kg" htmlFor="tf-min">
                   <NumberInput id="tf-min" value={form.minChargeableKg} onChange={(e) => setForm({ ...form, minChargeableKg: e.target.value })} disabled={busy} />
                 </Field>
-                <Field label="Divisor" htmlFor="tf-divisor">
-                  <NumberInput id="tf-divisor" value={form.volumetricDivisor} onChange={(e) => setForm({ ...form, volumetricDivisor: e.target.value })} disabled={busy} />
+                <Field label="Multiplier (kg/m³)" htmlFor="tf-multiplier" hint="volumetrik = L×W×H/1.000.000 × ini">
+                  <NumberInput id="tf-multiplier" value={form.volumetricMultiplier} onChange={(e) => setForm({ ...form, volumetricMultiplier: e.target.value })} placeholder="250" disabled={busy} />
                 </Field>
               </div>
               <div className="grid grid-cols-2 gap-3">

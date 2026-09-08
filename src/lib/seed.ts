@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { hashPassword } from "@/lib/auth";
 import { ensureRbac } from "@/lib/rbac";
+import { computePricing } from "@/lib/pricing";
 
 let seedPromise: Promise<void> | null = null;
 
@@ -19,14 +20,10 @@ async function runSeed(): Promise<void> {
 
   const ownerExists = await db.user.findFirst({ where: { username: "owner" } });
   const shipmentCount = await db.masterShipment.count();
+  if (ownerExists && shipmentCount >= 6) return; // already seeded
 
   const now = new Date();
   const daysAgo = (d: number) => new Date(now.getTime() - d * 24 * 60 * 60 * 1000);
-
-  // Already-seeded databases still get the demo transport position applied.
-  await seedDemoTransportPosition(daysAgo);
-
-  if (ownerExists && shipmentCount >= 6) return; // already seeded
 
   // ----- Employees + users -------------------------------------------------
   const staffPassword = hashPassword("Demo#Pass2026");
@@ -153,17 +150,19 @@ async function runSeed(): Promise<void> {
   }
 
   // ----- Tariffs -------------------------------------------------------------
+  // volumetricMultiplier (kg per m³) is configurable per tariff — pricing formula:
+  // volumetric kg = (L×W×H cm / 1.000.000) × multiplier
   const tariffDefs = [
-    { origin: "Jakarta Pusat", destination: "Bandung", customerType: "b2b", ratePerKg: 4500 },
-    { origin: "Jakarta Pusat", destination: "Bandung", customerType: "b2c", ratePerKg: 5500 },
-    { origin: "Jakarta Pusat", destination: "Surabaya", customerType: "b2b", ratePerKg: 7500 },
-    { origin: "Jakarta Pusat", destination: "Surabaya", customerType: "b2c", ratePerKg: 8500 },
+    { origin: "Jakarta Pusat", destination: "Bandung", customerType: "b2b", ratePerKg: 4500, volumetricMultiplier: 250 },
+    { origin: "Jakarta Pusat", destination: "Bandung", customerType: "b2c", ratePerKg: 5500, volumetricMultiplier: 250 },
+    { origin: "Jakarta Pusat", destination: "Surabaya", customerType: "b2b", ratePerKg: 7500, volumetricMultiplier: 300 },
+    { origin: "Jakarta Pusat", destination: "Surabaya", customerType: "b2c", ratePerKg: 8500, volumetricMultiplier: 300 },
   ];
+  const tariffByRoute: Record<string, { id: number; ratePerKg: number; minChargeableKg: number; volumetricMultiplier: number; roundingMode: string; roundingUnitKg: number }> = {};
   for (const t of tariffDefs) {
-    const existing = await db.tariff.findFirst({ where: t });
-    if (!existing) {
-      await db.tariff.create({ data: { ...t, minChargeableKg: 1, volumetricDivisor: 6000, roundingMode: "UP", roundingUnitKg: 0.5, effectiveFrom: daysAgo(90) } });
-    }
+    const existing = await db.tariff.findFirst({ where: { origin: t.origin, destination: t.destination, customerType: t.customerType } });
+    const tariff = existing ?? (await db.tariff.create({ data: { ...t, minChargeableKg: 1, roundingMode: "UP", roundingUnitKg: 0.5, effectiveFrom: daysAgo(90) } }));
+    tariffByRoute[`${t.origin}|${t.destination}|${t.customerType}`] = tariff;
   }
 
   // ----- Customers -------------------------------------------------------------
@@ -174,74 +173,103 @@ async function runSeed(): Promise<void> {
     { code: "CUS-000004", type: "b2c", name: "Tono Susilo", phone: "081234000004", address: "Jl. Kenanga No. 9, Surabaya" },
     { code: "CUS-000005", type: "b2c", name: "Sari Indah", phone: "081234000005", address: "Jl. Anggrek No. 3, Bandung" },
   ];
-  const customers: Record<string, number> = {};
+  const customers: Record<string, { id: number; type: string }> = {};
   for (const c of customerDefs) {
     const customer = await db.customer.upsert({ where: { code: c.code }, create: c, update: {} });
-    customers[c.name] = customer.id;
+    customers[c.name] = { id: customer.id, type: c.type };
   }
 
   // ----- Shipments lifecycle -----------------------------------------------------
   if ((await db.masterShipment.count()) === 0) {
-    const shipmentDefs = [
+    const shipmentDefs: {
+      masterCode: string;
+      customer: string;
+      status: string;
+      origin: string;
+      destination: string;
+      priced: boolean;
+      createdDaysAgo: number;
+      details: { description: string; quantity: number; weightKg: number; l: number; w: number; h: number }[];
+    }[] = [
       {
         masterCode: "MKT-000001", customer: "Rina Amelia", status: "READY_FOR_PICKUP",
         origin: "Jakarta Pusat", destination: "Bandung", priced: false, createdDaysAgo: 1,
-        details: [{ description: "Paket pakaian", quantity: 1, weightKg: 2 }, { description: "Buku tulis", quantity: 3, weightKg: 1.5 }],
+        details: [
+          { description: "Paket pakaian", quantity: 1, weightKg: 2, l: 35, w: 25, h: 12 },
+          { description: "Buku tulis", quantity: 3, weightKg: 1.5, l: 25, w: 20, h: 10 },
+        ],
       },
       {
         masterCode: "MKT-000002", customer: "PT Maju Bersama", status: "PICKED_UP",
-        origin: "Jakarta Pusat", destination: "Bandung", priced: true, ratePerKg: 4500, cw: 25, createdDaysAgo: 2,
-        details: [{ description: "Karton alat tulis", quantity: 5, weightKg: 25 }],
+        origin: "Jakarta Pusat", destination: "Bandung", priced: true, createdDaysAgo: 2,
+        details: [{ description: "Karton Tulis", quantity: 10, weightKg: 2.5, l: 25, w: 20, h: 20 }],
       },
       {
         masterCode: "MKT-000003", customer: "CV Sinar Jaya", status: "RECEIVED_AT_GUDANG",
-        origin: "Jakarta Pusat", destination: "Surabaya", priced: true, ratePerKg: 7500, cw: 60, createdDaysAgo: 4,
-        details: [{ description: "Mesin bubut mini", quantity: 1, weightKg: 55 }, { description: "Spare part", quantity: 4, weightKg: 5 }],
+        origin: "Jakarta Pusat", destination: "Surabaya", priced: true, createdDaysAgo: 4,
+        details: [
+          { description: "Mesin bubut mini", quantity: 1, weightKg: 40, l: 60, w: 45, h: 40 },
+          { description: "Spare part", quantity: 4, weightKg: 5, l: 25, w: 20, h: 15 },
+        ],
       },
       {
         masterCode: "MKT-000004", customer: "Tono Susilo", status: "IN_TRANSPORT",
-        origin: "Jakarta Pusat", destination: "Surabaya", priced: true, ratePerKg: 8500, cw: 3, createdDaysAgo: 3,
-        details: [{ description: "Kipas angin", quantity: 1, weightKg: 3 }],
+        origin: "Jakarta Pusat", destination: "Surabaya", priced: true, createdDaysAgo: 3,
+        details: [{ description: "Kipas angin", quantity: 1, weightKg: 3, l: 30, w: 25, h: 12 }],
       },
       {
         masterCode: "MKT-000005", customer: "PT Maju Bersama", status: "DELIVERED",
-        origin: "Jakarta Pusat", destination: "Bandung", priced: true, ratePerKg: 4500, cw: 40, createdDaysAgo: 6,
-        details: [{ description: "Paket promosi", quantity: 8, weightKg: 40 }],
+        origin: "Jakarta Pusat", destination: "Bandung", priced: true, createdDaysAgo: 6,
+        details: [{ description: "Paket promosi", quantity: 8, weightKg: 5, l: 30, w: 20, h: 15 }],
       },
       {
         masterCode: "MKT-000006", customer: "Sari Indah", status: "CREATED",
         origin: "Jakarta Pusat", destination: "Bandung", priced: false, createdDaysAgo: 0,
-        details: [{ description: "Kosmetik", quantity: 2, weightKg: 1 }],
+        details: [{ description: "Kosmetik", quantity: 2, weightKg: 1, l: 20, w: 15, h: 10 }],
       },
     ];
+    const priceByCode: Record<string, number> = {};
 
     for (const s of shipmentDefs) {
       const createdAt = daysAgo(s.createdDaysAgo);
+      const cust = customers[s.customer];
+      const tariff = tariffByRoute[`${s.origin}|${s.destination}|${cust.type}`] ?? null;
       const shipment = await db.masterShipment.create({
         data: {
           masterCode: s.masterCode, resi: s.masterCode,
-          customerId: customers[s.customer],
+          customerId: cust.id,
+          tariffId: tariff?.id ?? null,
           status: s.status,
           origin: s.origin, destination: s.destination,
           originWarehouseId: gudang["Jakarta Pusat"],
           destinationWarehouseId: gudang[s.destination],
-          chargeableWeightKg: s.priced ? (s.cw ?? 0) : null,
-          ratePerKg: s.priced ? (s.ratePerKg ?? 0) : null,
-          priceAmount: s.priced ? Math.round((s.cw ?? 0) * (s.ratePerKg ?? 0)) : null,
-          pricedAt: s.priced ? createdAt : null,
           createdAt, updatedAt: createdAt,
         },
       });
+      // quantity N expands into N package rows — each with a unique detailCode (QR label)
+      const pricedRows: { lengthCm: number | null; widthCm: number | null; heightCm: number | null; actualWeightKg: number }[] = [];
       let detailSeq = 1;
       for (const d of s.details) {
-        await db.detailShipment.create({
-          data: {
-            detailCode: `DTL-${s.masterCode.slice(-6)}-${String(detailSeq++).padStart(2, "0")}`,
-            masterId: shipment.id, description: d.description, quantity: d.quantity,
-            actualWeightKg: d.weightKg, lengthCm: d.description.length % 2 === 0 ? 30 : 20, widthCm: 20, heightCm: 15,
-            createdAt,
-          },
+        for (let i = 0; i < d.quantity; i++) {
+          const row = await db.detailShipment.create({
+            data: {
+              detailCode: `DTL-${s.masterCode.slice(-6)}-${String(detailSeq++).padStart(2, "0")}`,
+              masterId: shipment.id, description: d.description,
+              actualWeightKg: d.weightKg, lengthCm: d.l, widthCm: d.w, heightCm: d.h,
+              createdAt,
+            },
+          });
+          pricedRows.push({ lengthCm: row.lengthCm, widthCm: row.widthCm, heightCm: row.heightCm, actualWeightKg: row.actualWeightKg });
+        }
+      }
+      // Pricing snapshot computed with the shared engine (L×W×H/1.000.000 × multiplier)
+      if (s.priced && tariff) {
+        const r = computePricing(pricedRows, tariff);
+        await db.masterShipment.update({
+          where: { id: shipment.id },
+          data: { chargeableWeightKg: r.chargeableKg, ratePerKg: tariff.ratePerKg, priceAmount: r.price, pricedAt: createdAt },
         });
+        priceByCode[s.masterCode] = r.price;
       }
       const events: { event: string; description: string; daysAgo: number; actor?: string }[] = [
         { event: "CREATED", description: `Shipment ${s.masterCode} dibuat`, daysAgo: s.createdDaysAgo, actor: "budi" },
@@ -280,12 +308,13 @@ async function runSeed(): Promise<void> {
           },
         });
       }
-      // Payment for priced shipments
-      if (s.priced) {
+      // Payment for priced shipments (amount = computed price, keeps demo coherent)
+      const priceAmount = priceByCode[s.masterCode];
+      if (s.priced && priceAmount != null) {
         await db.payment.create({
           data: {
             masterId: shipment.id, method: s.status === "DELIVERED" ? "CASH" : "TRANSFER",
-            amount: Math.round((s.cw ?? 0) * (s.ratePerKg ?? 0)), status: s.status === "IN_TRANSPORT" ? "VERIFIED" : "RECORDED",
+            amount: priceAmount, status: s.status === "IN_TRANSPORT" ? "VERIFIED" : "RECORDED",
             reference: `PAY-${s.masterCode.slice(-6)}`,
             recordedById: usersByHandle.dewi.id, createdAt,
             verifiedById: s.status === "IN_TRANSPORT" ? usersByHandle.siti.id : null,
@@ -353,8 +382,8 @@ async function runSeed(): Promise<void> {
     });
     await db.invoiceLine.createMany({
       data: [
-        { invoiceId: invoice.id, description: "MKT-000002 — pengiriman Jakarta → Bandung", quantity: 1, unitPrice: 112500 },
-        { invoiceId: invoice.id, description: "MKT-000005 — pengiriman Jakarta → Bandung", quantity: 1, unitPrice: 180000 },
+        { invoiceId: invoice.id, description: "MKT-000002 — pengiriman Jakarta → Bandung (25 kg × Rp4.500)", quantity: 1, unitPrice: priceByCode["MKT-000002"] ?? 112500 },
+        { invoiceId: invoice.id, description: "MKT-000005 — pengiriman Jakarta → Bandung (40 kg × Rp4.500)", quantity: 1, unitPrice: priceByCode["MKT-000005"] ?? 180000 },
       ],
     });
   }
@@ -382,76 +411,6 @@ async function runSeed(): Promise<void> {
           action: e.action, entityType: e.entityType, entityLabel: e.entityLabel,
           actorId: usersByHandle[e.actor]?.id ?? null,
           createdAt: daysAgo(2 - i * 0.1),
-        },
-      });
-    }
-  }
-
-  // Fresh databases: the demo transport was just created above — apply the
-  // demo position records now.
-  await seedDemoTransportPosition(daysAgo);
-}
-
-/**
- * Demo transport position (idempotent, independent of the full seed):
- * gives the departed demo transport checkpoint records (origin @ depart +
- * checkpoint #2 mid-route) so the transport detail map shows a live position
- * out of the box. Only runs when the transport has ZERO position records —
- * user-recorded check-ins are never overwritten.
- */
-async function seedDemoTransportPosition(daysAgo: (d: number) => Date): Promise<void> {
-  const trp = await db.transport.findUnique({ where: { transportCode: "TRP-2026-000001" } });
-  if (!trp || trp.status !== "DEPARTED" || trp.routeId == null) return;
-  const existingRecords = await db.checkpointRecord.count({ where: { transportId: trp.id } });
-  if (existingRecords > 0) return;
-
-  const joko = await db.user.findUnique({ where: { username: "joko" } });
-  const routeCheckpoints = await db.checkpoint.findMany({ where: { routeId: trp.routeId }, orderBy: { sequence: "asc" } });
-
-  // Origin — recorded when the transport departed.
-  const origin = routeCheckpoints[0];
-  if (origin) {
-    await db.checkpointRecord.create({
-      data: {
-        transportId: trp.id,
-        checkpointId: origin.id,
-        latitude: origin.latitude,
-        longitude: origin.longitude,
-        withinRadius: true,
-        recordedById: joko?.id ?? null,
-        recordedAt: trp.departedAt ?? daysAgo(1),
-      },
-    });
-  }
-
-  // Mid-route — vehicle passed checkpoint #2 (e.g. Rest Area KM 207 Brebes).
-  const cp = routeCheckpoints[1];
-  if (!cp) return;
-  await db.checkpointRecord.create({
-    data: {
-      transportId: trp.id,
-      checkpointId: cp.id,
-      latitude: cp.latitude,
-      longitude: cp.longitude,
-      withinRadius: true,
-      recordedById: joko?.id ?? null,
-      recordedAt: daysAgo(0.5),
-    },
-  });
-
-  const loaded = await db.transportShipment.findMany({ where: { transportId: trp.id } });
-  for (const ts of loaded) {
-    const hasEvent = await db.trackingEvent.findFirst({
-      where: { masterId: ts.shipmentId, event: "CHECKPOINT_REACHED", description: { contains: cp.name } },
-    });
-    if (!hasEvent) {
-      await db.trackingEvent.create({
-        data: {
-          masterId: ts.shipmentId,
-          event: "CHECKPOINT_REACHED",
-          description: `Transport TRP-2026-000001 melewati checkpoint ${cp.name} (${cp.sequence}/${routeCheckpoints.length})`,
-          actorId: joko?.id ?? null,
-          occurredAt: daysAgo(0.5),
         },
       });
     }

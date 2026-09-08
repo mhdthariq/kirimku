@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { guard, ok, handle, fail, requireStr, str, num, ci } from "@/lib/api-helpers";
+import { guard, ok, handle, fail, str, num } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
-import { nextCode, nextDetailCode } from "@/lib/code-generator";
+import { nextCode, nextDetailCodes } from "@/lib/code-generator";
 import { hasPermission } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
@@ -20,10 +20,10 @@ export async function GET(req: NextRequest) {
         ...(search
           ? {
               OR: [
-                { masterCode: ci(search) },
-                { origin: ci(search) },
-                { destination: ci(search) },
-                { customer: { name: ci(search) } },
+                { masterCode: { contains: search } },
+                { origin: { contains: search } },
+                { destination: { contains: search } },
+                { customer: { name: { contains: search } } },
               ],
             }
           : {}),
@@ -48,8 +48,38 @@ export async function POST(req: NextRequest) {
     const customer = await db.customer.findUnique({ where: { id: customerId } });
     if (!customer) return fail(422, "Customer tidak ditemukan.", { customerId: ["Customer tidak ditemukan."] });
 
-    const origin = requireStr(body.origin, "origin");
-    const destination = requireStr(body.destination, "destination");
+    // Route comes from the tariff dropdown (Kota Asal/Tujuan no longer typed by hand).
+    // Legacy clients may still send origin/destination directly.
+    const tariffId = num(body.tariffId);
+    let origin: string | null = null;
+    let destination: string | null = null;
+    let tariff: { id: number; origin: string; destination: string; customerType: string | null } | null = null;
+
+    if (tariffId) {
+      const now = new Date();
+      tariff = await db.tariff.findFirst({
+        where: {
+          id: tariffId,
+          isActive: true,
+          effectiveFrom: { lte: now },
+          OR: [{ effectiveTo: null }, { effectiveTo: { gte: now } }],
+        },
+      });
+      if (!tariff) return fail(422, "Tarif tidak ditemukan / tidak aktif.", { tariffId: ["Tarif tidak ditemukan / tidak aktif."] });
+      if (tariff.customerType && tariff.customerType !== customer.type) {
+        return fail(422, `Tarif ini hanya untuk customer ${tariff.customerType.toUpperCase()} — customer terpilih bertipe ${customer.type.toUpperCase()}.`, {
+          tariffId: [`Tarif ${tariff.customerType.toUpperCase()} tidak cocok untuk customer ${customer.type.toUpperCase()}.`],
+        });
+      }
+      origin = tariff.origin;
+      destination = tariff.destination;
+    } else {
+      origin = typeof body.origin === "string" && body.origin.trim() ? body.origin.trim() : null;
+      destination = typeof body.destination === "string" && body.destination.trim() ? body.destination.trim() : null;
+    }
+    if (!origin || !destination) {
+      return fail(422, "Rute wajib dipilih dari daftar tarif.", { tariffId: ["Rute wajib dipilih dari daftar tarif."] });
+    }
 
     const masterCode = await nextCode("masterShipment", "MKT-", "masterCode", 7);
 
@@ -61,6 +91,7 @@ export async function POST(req: NextRequest) {
         masterCode,
         resi: masterCode,
         customerId,
+        tariffId: tariff?.id ?? null,
         status: "CREATED",
         origin,
         destination,
@@ -69,22 +100,23 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Optional inline details
+    // Optional inline details — quantity N expands into N package rows with unique codes
     const details = Array.isArray(body.details) ? body.details : [];
     for (const d of details) {
       const description = str(d.description);
       if (!description) continue;
-      await db.detailShipment.create({
-        data: {
-          detailCode: await nextDetailCode(shipment.id, masterCode),
+      const qty = Math.max(1, Math.round(num(d.quantity) ?? 1));
+      const codes = await nextDetailCodes(shipment.id, masterCode, qty);
+      await db.detailShipment.createMany({
+        data: codes.map((detailCode) => ({
+          detailCode,
           masterId: shipment.id,
           description,
-          quantity: Math.max(1, Math.round(num(d.quantity) ?? 1)),
           lengthCm: num(d.lengthCm),
           widthCm: num(d.widthCm),
           heightCm: num(d.heightCm),
           actualWeightKg: num(d.actualWeightKg) ?? 0,
-        },
+        })),
       });
     }
 

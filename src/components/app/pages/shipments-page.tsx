@@ -41,8 +41,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface ShipmentForm {
   customerId: string;
-  origin: string;
-  destination: string;
+  tariffId: string;
   originWarehouseId: string;
   destinationWarehouseId: string;
 }
@@ -56,8 +55,18 @@ interface DetailForm {
   actualWeightKg: string;
 }
 
-const EMPTY_SHIPMENT: ShipmentForm = { customerId: "", origin: "", destination: "", originWarehouseId: "", destinationWarehouseId: "" };
+const EMPTY_SHIPMENT: ShipmentForm = { customerId: "", tariffId: "", originWarehouseId: "", destinationWarehouseId: "" };
 const EMPTY_DETAIL: DetailForm = { description: "", quantity: "1", lengthCm: "", widthCm: "", heightCm: "", actualWeightKg: "" };
+
+/** Row type for the "Ringkas" (grouped) detail view — pure UI aggregation. */
+interface DetailGroupRow {
+  id: string;
+  description: string;
+  dims: string;
+  quantity: number;
+  weightKg: number;
+  totalKg: number;
+}
 
 export function ShipmentsPage({ shipmentId }: { shipmentId: number | null }) {
   return shipmentId != null ? <ShipmentDetail id={shipmentId} /> : <ShipmentList />;
@@ -101,11 +110,18 @@ function ShipmentList() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!form.customerId) {
+      toast.error("Pilih customer terlebih dahulu.");
+      return;
+    }
+    if (!form.tariffId) {
+      toast.error("Pilih rute (tarif) untuk shipment ini.");
+      return;
+    }
     setBusy(true);
     const payload = {
       customerId: Number(form.customerId),
-      origin: form.origin,
-      destination: form.destination,
+      tariffId: Number(form.tariffId),
       originWarehouseId: form.originWarehouseId ? Number(form.originWarehouseId) : null,
       destinationWarehouseId: form.destinationWarehouseId ? Number(form.destinationWarehouseId) : null,
     };
@@ -128,6 +144,16 @@ function ShipmentList() {
   if (!can.view) {
     return <PageHeader title="Shipments" subtitle="Anda tidak memiliki izin melihat shipment." />;
   }
+
+  // Route dropdown — only tariffs matching the selected customer's B2B/B2C label
+  const selectedCustomer = (options?.customers ?? []).find((c) => String(c.id) === form.customerId) ?? null;
+  const routeOptions = (options?.tariffs ?? [])
+    .filter((t) => !selectedCustomer || !t.customerType || t.customerType === selectedCustomer.type)
+    .map((t) => ({
+      value: String(t.id),
+      label: `${t.origin} → ${t.destination} · ${t.customerType ? t.customerType.toUpperCase() : "SEMUA"} · Rp${formatNumber(t.ratePerKg, 0)}/kg`,
+    }));
+  const selectedTariff = (options?.tariffs ?? []).find((t) => String(t.id) === form.tariffId) ?? null;
 
   return (
     <div className="space-y-4">
@@ -231,25 +257,54 @@ function ShipmentList() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Buat Shipment</DialogTitle>
-            <DialogDescription>Resi (MKT-xxxxxx) dibuat otomatis. Detail barang ditambahkan setelah shipment dibuat.</DialogDescription>
+            <DialogDescription>
+              Resi (MKT-xxxxxx) dibuat otomatis. Kota asal & tujuan tidak lagi diketik manual — rute dipilih dari daftar tarif aktif sesuai tipe customer (B2B/B2C).
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={onSubmit} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Customer" htmlFor="s-customer" className="sm:col-span-2">
                 <FormSelect
                   value={form.customerId}
-                  onValueChange={(v) => setForm({ ...form, customerId: v })}
+                  onValueChange={(v) => {
+                    const cust = (options?.customers ?? []).find((c) => String(c.id) === v) ?? null;
+                    const stillValid = (options?.tariffs ?? []).some(
+                      (t) => String(t.id) === form.tariffId && (!cust || !t.customerType || t.customerType === cust.type),
+                    );
+                    setForm({ ...form, customerId: v, ...(stillValid ? {} : { tariffId: "" }) });
+                  }}
                   placeholder="Pilih customer…"
                   options={(options?.customers ?? []).map((c) => ({ value: String(c.id), label: `${c.name} (${c.type.toUpperCase()} · ${c.code})` }))}
                   disabled={busy}
                 />
               </Field>
-              <Field label="Kota Asal" htmlFor="s-origin">
-                <Input id="s-origin" value={form.origin} onChange={(e) => setForm({ ...form, origin: e.target.value })} placeholder="Jakarta Pusat" required disabled={busy} />
+              <Field
+                label="Rute (dari daftar tarif)"
+                htmlFor="s-tariff"
+                className="sm:col-span-2"
+                hint={selectedCustomer ? `Khusus customer ${selectedCustomer.type.toUpperCase()}` : "Pilih customer dulu"}
+              >
+                <FormSelect
+                  value={form.tariffId}
+                  onValueChange={(v) => setForm({ ...form, tariffId: v })}
+                  placeholder={selectedCustomer ? `Pilih rute ${selectedCustomer.type.toUpperCase()}…` : "Pilih customer untuk melihat rute…"}
+                  options={routeOptions}
+                  disabled={busy || !selectedCustomer}
+                />
               </Field>
-              <Field label="Kota Tujuan" htmlFor="s-destination">
-                <Input id="s-destination" value={form.destination} onChange={(e) => setForm({ ...form, destination: e.target.value })} placeholder="Bandung" required disabled={busy} />
-              </Field>
+              {selectedTariff && (
+                <div className="sm:col-span-2 space-y-1 rounded-lg border bg-muted/40 px-3 py-2.5 text-xs text-muted-foreground">
+                  <p>
+                    <span className="font-medium text-foreground">Kota Asal:</span> {selectedTariff.origin} ·{" "}
+                    <span className="font-medium text-foreground">Kota Tujuan:</span> {selectedTariff.destination}
+                  </p>
+                  <p>
+                    Tarif Rp{formatNumber(selectedTariff.ratePerKg, 0)}/kg · min {formatNumber(selectedTariff.minChargeableKg)} kg · volumetrik = L×W×H/1.000.000 ×{" "}
+                    {formatNumber(selectedTariff.volumetricMultiplier, 0)} (kg/m³) · pembulatan{" "}
+                    {selectedTariff.roundingMode === "NEAREST" ? "terdekat" : "ke atas"} {selectedTariff.roundingUnitKg} kg
+                  </p>
+                </div>
+              )}
               <Field label="Gudang Asal" htmlFor="s-warehouse-from" hint="Opsional">
                 <FormSelect
                   value={form.originWarehouseId}
@@ -400,7 +455,7 @@ function ShipmentDetail({ id }: { id: number }) {
     setEditingDetail(d);
     setDetailForm({
       description: d.description,
-      quantity: String(d.quantity),
+      quantity: "1",
       lengthCm: d.lengthCm != null ? String(d.lengthCm) : "",
       widthCm: d.widthCm != null ? String(d.widthCm) : "",
       heightCm: d.heightCm != null ? String(d.heightCm) : "",
@@ -411,21 +466,32 @@ function ShipmentDetail({ id }: { id: number }) {
 
   async function onDetailSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!editingDetail) {
+      const qty = Math.round(Number(detailForm.quantity) || 0);
+      if (qty < 1 || qty > 500) {
+        toast.error("Jumlah paket harus antara 1–500.");
+        return;
+      }
+    }
     setBusy(true);
-    const payload = {
+    const base = {
       description: detailForm.description,
-      quantity: Number(detailForm.quantity) || 1,
       lengthCm: detailForm.lengthCm === "" ? null : Number(detailForm.lengthCm),
       widthCm: detailForm.widthCm === "" ? null : Number(detailForm.widthCm),
       heightCm: detailForm.heightCm === "" ? null : Number(detailForm.heightCm),
       actualWeightKg: Number(detailForm.actualWeightKg) || 0,
     };
+    const payload = editingDetail ? base : { ...base, quantity: Math.round(Number(detailForm.quantity) || 1) };
     const ok = await runAction(
       () =>
         editingDetail
           ? apiPut(`/shipment-details/${editingDetail.id}`, payload)
           : apiPost(`/shipments/${shipment!.id}/details`, payload),
-      { success: editingDetail ? "Detail diperbarui." : "Detail ditambahkan." },
+      {
+        success: editingDetail
+          ? "Detail diperbarui."
+          : `${Math.round(Number(detailForm.quantity) || 1)} paket dibuat — setiap paket punya kode unik.`,
+      },
     );
     setBusy(false);
     if (ok) {
@@ -467,8 +533,34 @@ function ShipmentDetail({ id }: { id: number }) {
     if (ok) refresh();
   }
 
-  const volumetric = shipment.details.reduce((sum, d) => sum + (d.lengthCm ?? 0) * (d.widthCm ?? 0) * (d.heightCm ?? 0) * d.quantity, 0) / 6000;
-  const actualWeight = shipment.details.reduce((sum, d) => sum + d.actualWeightKg * d.quantity, 0);
+  // Server-computed pricing preview — the client never hardcodes the volumetric formula anymore.
+  const pricing = shipment.pricingPreview ?? null;
+  const actualWeight = pricing?.actualKg ?? shipment.details.reduce((sum, d) => sum + d.actualWeightKg, 0);
+  const volumetric = pricing?.volumetricKg ?? 0;
+
+  // "Ringkas" grouping: packages sharing description + dimensions + weight collapse into one row.
+  // Presentation only — the database keeps 1 row per package (exactly like the "Semua" tab).
+  const groupedDetails: DetailGroupRow[] = Object.values(
+    shipment.details.reduce<Record<string, DetailGroupRow>>((acc, d) => {
+      const l = d.lengthCm ?? 0;
+      const w = d.widthCm ?? 0;
+      const h = d.heightCm ?? 0;
+      const key = `${d.description}|${l}|${w}|${h}|${d.actualWeightKg}`;
+      if (!acc[key]) {
+        acc[key] = {
+          id: key,
+          description: d.description,
+          dims: l || w || h ? `${formatNumber(l, 0)}×${formatNumber(w, 0)}×${formatNumber(h, 0)}` : "—",
+          quantity: 0,
+          weightKg: d.actualWeightKg,
+          totalKg: 0,
+        };
+      }
+      acc[key].quantity += 1;
+      acc[key].totalKg += d.actualWeightKg;
+      return acc;
+    }, {}),
+  );
 
   return (
     <div className="space-y-4">
@@ -487,9 +579,9 @@ function ShipmentDetail({ id }: { id: number }) {
                 <Send className="h-4 w-4" /> Submit for Pickup
               </Button>
             )}
-            {can.update && !shipment.priceAmount && shipment.details.length > 0 && ["CREATED", "READY_FOR_PICKUP", "PICKED_UP"].includes(shipment.status) && (
+            {can.update && shipment.details.length > 0 && ["CREATED", "READY_FOR_PICKUP", "PICKED_UP"].includes(shipment.status) && (
               <Button variant="secondary" onClick={computePrice}>
-                <Calculator className="h-4 w-4" /> Hitung Harga
+                <Calculator className="h-4 w-4" /> {shipment.priceAmount != null ? "Hitung Ulang Harga" : "Hitung Harga"}
               </Button>
             )}
             {can.cancel && shipment.status !== "CANCELLED" && shipment.status !== "DELIVERED" && (
@@ -510,15 +602,39 @@ function ShipmentDetail({ id }: { id: number }) {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2.5">
-            <Row label="Total detail" value={`${shipment.details.length} item`} />
+            <Row label="Total paket" value={`${shipment.details.length} paket`} />
             <Row label="Berat aktual" value={`${formatNumber(actualWeight)} kg`} />
-            <Row label="Berat volumetrik (÷6000)" value={`${formatNumber(volumetric)} kg`} />
-            <Row label="Chargeable weight" value={shipment.chargeableWeightKg != null ? `${formatNumber(shipment.chargeableWeightKg)} kg` : "—"} />
-            <Row label="Tarif" value={shipment.ratePerKg != null ? `${formatRupiah(shipment.ratePerKg)}/kg` : "—"} />
+            <Row
+              label={`Berat volumetrik (L×W×H/1.000.000 × ${pricing ? formatNumber(pricing.volumetricMultiplier, 0) : "?"})`}
+              value={`${formatNumber(volumetric)} kg`}
+            />
+            <Row
+              label="Chargeable weight"
+              value={
+                shipment.chargeableWeightKg != null
+                  ? `${formatNumber(shipment.chargeableWeightKg)} kg`
+                  : pricing
+                    ? `${formatNumber(pricing.chargeableKg)} kg (estimasi)`
+                    : "—"
+              }
+            />
+            <Row
+              label="Tarif"
+              value={
+                shipment.ratePerKg != null || pricing?.ratePerKg != null
+                  ? `${formatRupiah(shipment.ratePerKg ?? pricing?.ratePerKg ?? 0)}/kg`
+                  : "—"
+              }
+            />
             <div className="flex items-center justify-between rounded-lg bg-primary/10 px-3 py-2.5">
-              <span className="text-xs font-semibold text-primary">TOTAL HARGA</span>
-              <span className="text-base font-bold text-primary">{formatRupiah(shipment.priceAmount)}</span>
+              <span className="text-xs font-semibold text-primary">{shipment.priceAmount != null ? "TOTAL HARGA" : "ESTIMASI HARGA"}</span>
+              <span className="text-base font-bold text-primary">{formatRupiah(shipment.priceAmount ?? pricing?.estimatedPrice ?? null)}</span>
             </div>
+            {!pricing && (
+              <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
+                Tidak ada tarif aktif untuk rute {shipment.origin} → {shipment.destination} — buat tarif di menu Tariffs agar harga bisa dihitung.
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -551,7 +667,7 @@ function ShipmentDetail({ id }: { id: number }) {
         </Card>
       </div>
 
-      {/* Details table */}
+      {/* Detail Barang — tabs: Semua (1 baris per paket) / Ringkas (digabung) */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -569,49 +685,80 @@ function ShipmentDetail({ id }: { id: number }) {
               Belum ada detail barang. {isEditable ? "Klik “Tambah Detail” untuk menambah." : "Detail hanya bisa ditambah saat status CREATED / READY_FOR_PICKUP."}
             </p>
           ) : (
-            <DataTable
-              rows={shipment.details}
-              emptyMessage="—"
-              columns={[
-                {
-                  key: "code",
-                  header: "Kode",
-                  primary: true,
-                  render: (d) => <span className="font-mono text-xs">{d.detailCode}</span>,
-                },
-                { key: "desc", header: "Deskripsi", render: (d) => <span className="font-medium">{d.description}</span> },
-                { key: "qty", header: "Qty", render: (d) => d.quantity },
-                {
-                  key: "dims",
-                  header: "Dimensi (cm)",
-                  hideOnMobile: true,
-                  render: (d) => (d.lengthCm ? `${formatNumber(d.lengthCm, 0)}×${formatNumber(d.widthCm, 0)}×${formatNumber(d.heightCm, 0)}` : "—"),
-                },
-                { key: "weight", header: "Berat", render: (d) => `${formatNumber(d.actualWeightKg)} kg` },
-                ...(isEditable && (can.detailUpdate || can.detailDelete)
-                  ? [
-                      {
-                        key: "actions",
-                        header: "Aksi",
-                        render: (d: DetailShipment) => (
-                          <div className="flex gap-1.5">
-                            {can.detailUpdate && (
-                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openDetailEdit(d)} aria-label="Edit detail">
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                            )}
-                            {can.detailDelete && (
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setConfirmDeleteDetail(d)} aria-label="Hapus detail">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                        ),
-                      },
-                    ]
-                  : []),
-              ]}
-            />
+            <Tabs defaultValue="all">
+              <TabsList>
+                <TabsTrigger value="all">Semua ({shipment.details.length})</TabsTrigger>
+                <TabsTrigger value="grouped">Ringkas ({groupedDetails.length})</TabsTrigger>
+              </TabsList>
+              <TabsContent value="all" className="mt-3">
+                <DataTable
+                  rows={shipment.details}
+                  emptyMessage="—"
+                  columns={[
+                    {
+                      key: "code",
+                      header: "Kode",
+                      primary: true,
+                      render: (d) => <span className="font-mono text-xs">{d.detailCode}</span>,
+                    },
+                    { key: "desc", header: "Deskripsi", render: (d) => <span className="font-medium">{d.description}</span> },
+                    {
+                      key: "dims",
+                      header: "Dimensi (cm)",
+                      hideOnMobile: true,
+                      render: (d) => (d.lengthCm ? `${formatNumber(d.lengthCm, 0)}×${formatNumber(d.widthCm, 0)}×${formatNumber(d.heightCm, 0)}` : "—"),
+                    },
+                    { key: "weight", header: "Berat", render: (d) => `${formatNumber(d.actualWeightKg)} kg` },
+                    ...(isEditable && (can.detailUpdate || can.detailDelete)
+                      ? [
+                          {
+                            key: "actions",
+                            header: "Aksi",
+                            render: (d: DetailShipment) => (
+                              <div className="flex gap-1.5">
+                                {can.detailUpdate && (
+                                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openDetailEdit(d)} aria-label="Edit detail">
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {can.detailDelete && (
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setConfirmDeleteDetail(d)} aria-label="Hapus detail">
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            ),
+                          },
+                        ]
+                      : []),
+                  ]}
+                />
+              </TabsContent>
+              <TabsContent value="grouped" className="mt-3">
+                <DataTable
+                  rows={groupedDetails}
+                  emptyMessage="—"
+                  columns={[
+                    { key: "desc", header: "Deskripsi", primary: true, render: (g) => <span className="font-medium">{g.description}</span> },
+                    { key: "dims", header: "Dimensi (cm)", render: (g) => g.dims },
+                    { key: "qty", header: "Jumlah", render: (g) => <span className="font-semibold">{g.quantity} paket</span> },
+                    {
+                      key: "weight",
+                      header: "Berat",
+                      render: (g) => (
+                        <span>
+                          {formatNumber(g.weightKg)} kg <span className="text-muted-foreground">/paket</span>
+                        </span>
+                      ),
+                    },
+                    { key: "total", header: "Total Berat", render: (g) => <span className="font-semibold">{formatNumber(g.totalKg)} kg</span> },
+                  ]}
+                />
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Tab “Ringkas” hanya tampilan — paket dengan deskripsi & dimensi sama digabung. Database tetap menyimpan 1 baris per paket dengan kode unik (seperti tab “Semua”).
+                </p>
+              </TabsContent>
+            </Tabs>
           )}
         </CardContent>
       </Card>
@@ -676,17 +823,23 @@ function ShipmentDetail({ id }: { id: number }) {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{editingDetail ? `Edit Detail — ${editingDetail.detailCode}` : "Tambah Detail Barang"}</DialogTitle>
-            <DialogDescription>Isi dimensi untuk perhitungan berat volumetrik (÷6000).</DialogDescription>
+            <DialogDescription>
+              {editingDetail
+                ? "1 baris = 1 paket. Volumetrik: L×W×H cm / 1.000.000 × multiplier tarif."
+                : "Isi jumlah paket — sistem membuat N baris, masing-masing dengan kode unik (mis. 10 → DTL-…-01 s/d DTL-…-10)."}
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={onDetailSubmit} className="space-y-4">
             <Field label="Deskripsi" htmlFor="d-desc">
-              <Input id="d-desc" value={detailForm.description} onChange={(e) => setDetailForm({ ...detailForm, description: e.target.value })} placeholder="mis. Karton alat tulis" required disabled={busy} />
+              <Input id="d-desc" value={detailForm.description} onChange={(e) => setDetailForm({ ...detailForm, description: e.target.value })} placeholder="mis. Karton Tulis" required disabled={busy} />
             </Field>
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Jumlah" htmlFor="d-qty">
-                <NumberInput id="d-qty" value={detailForm.quantity} onChange={(e) => setDetailForm({ ...detailForm, quantity: e.target.value })} required disabled={busy} />
-              </Field>
-              <Field label="Berat aktual (kg)" htmlFor="d-weight">
+              {!editingDetail && (
+                <Field label="Jumlah paket" htmlFor="d-qty" hint="dibuat 1 kode unik per paket">
+                  <NumberInput id="d-qty" value={detailForm.quantity} onChange={(e) => setDetailForm({ ...detailForm, quantity: e.target.value })} required disabled={busy} min={1} max={500} />
+                </Field>
+              )}
+              <Field label="Berat aktual (kg)" htmlFor="d-weight" hint={editingDetail ? undefined : "per paket"}>
                 <NumberInput id="d-weight" value={detailForm.actualWeightKg} onChange={(e) => setDetailForm({ ...detailForm, actualWeightKg: e.target.value })} placeholder="0" required disabled={busy} />
               </Field>
               <div className="col-span-2 grid grid-cols-3 gap-3">
@@ -705,7 +858,7 @@ function ShipmentDetail({ id }: { id: number }) {
               <Button type="button" variant="outline" onClick={() => setDetailOpen(false)} disabled={busy}>
                 Batal
               </Button>
-              <SubmitButton busy={busy}>{editingDetail ? "Simpan Perubahan" : "Tambah Detail"}</SubmitButton>
+              <SubmitButton busy={busy}>{editingDetail ? "Simpan Perubahan" : "Buat Paket"}</SubmitButton>
             </DialogFooter>
           </form>
         </DialogContent>

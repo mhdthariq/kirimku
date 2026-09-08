@@ -17,7 +17,6 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const body = await req.json().catch(() => ({}));
     const data: Record<string, unknown> = {};
     if (body.description !== undefined) data.description = requireStr(body.description, "description");
-    if (body.quantity !== undefined) data.quantity = Math.max(1, Math.round(num(body.quantity) ?? 1));
     if (body.lengthCm !== undefined) data.lengthCm = num(body.lengthCm);
     if (body.widthCm !== undefined) data.widthCm = num(body.widthCm);
     if (body.heightCm !== undefined) data.heightCm = num(body.heightCm);

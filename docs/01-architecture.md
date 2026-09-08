@@ -42,7 +42,7 @@ The application is a **single Next.js 16 project** that contains both the fronte
 ```
 ├── db/                        # SQLite database file lives here (db/custom.db)
 ├── prisma/
-│   ├── schema.prisma          # 29 models — the single source of truth
+│   ├── schema.prisma          # 21 models — the single source of truth
 │   └── seed.ts                # CLI seeder (bun run db:seed)
 ├── public/
 │   └── logo.svg               # mock-up brand logo
@@ -69,7 +69,7 @@ The application is a **single Next.js 16 project** that contains both the fronte
 |---|---|
 | `db.ts` | Prisma client singleton (reuses one connection across hot reloads) |
 | `auth.ts` | `hashPassword`/`verifyPassword` (Node scrypt), `createSession`, `getUserFromAuthHeader`, 12h bearer tokens |
-| `rbac.ts` | `PERMISSIONS` catalog (63 slugs incl. pickup.scan, delivery.scan & transport.record_checkpoint), `ROLE_TEMPLATES` (6 system roles), `ensureRbac()` idempotent bootstrap, `can(user, permission)` check |
+| `rbac.ts` | `PERMISSIONS` catalog (62 slugs incl. pickup.scan / delivery.scan), `ROLE_TEMPLATES` (6 system roles), `ensureRbac()` idempotent bootstrap, `can(user, permission)` check |
 | `audit.ts` | `logAudit({action, entityType, entityId, entityLabel, before, after, actor})` — append-only, used by every mutating endpoint |
 | `shipment-flow.ts` | `SHIPMENT_STATUSES`, `VALID_TRANSITIONS`, `canTransition()`, `MIN_CHECKPOINTS = 3` — single source of truth shared by API **and** UI |
 | `scan-flow.ts` | QR handover scan domain logic: `scanProgress()` (per-package scan state for pickups & deliveries), `assertKurirAssignment()` (assigned kurir / supervisor / owner rule) |
