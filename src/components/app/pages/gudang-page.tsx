@@ -2,20 +2,22 @@
 
 import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-import { MapPin, Pencil, Plus, Trash2, Warehouse as WarehouseIcon } from "lucide-react";
-import { toast } from "sonner";
+import { Bell, ChevronDown, MapPin, Package, Pencil, Plus, Trash2, Warehouse as WarehouseIcon } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type Warehouse } from "@/lib/client-api";
+import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type GudangWorkspace, type Warehouse } from "@/lib/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
 import { ActiveBadge } from "@/components/app/status-badge";
-import { Field, Input, SubmitButton, Textarea, formatNumber } from "@/components/app/form-parts";
+import { NotifyMarketingDialog } from "@/components/app/gudang-actions";
+import { Field, Input, SubmitButton, Textarea, formatNumber, formatRupiah } from "@/components/app/form-parts";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 const LeafletPicker = dynamic(() => import("@/components/app/leaflet-picker").then((m) => m.LeafletPicker), {
   ssr: false,
@@ -41,6 +43,7 @@ export function GudangPage() {
     create: hasPermission(user, "warehouse.create"),
     update: hasPermission(user, "warehouse.update"),
     delete: hasPermission(user, "warehouse.delete"),
+    viewContents: hasPermission(user, "shipment.view"),
   };
 
   const { data, loading, reload } = useApiData<Warehouse[]>(() => apiGet<Warehouse[]>("/warehouses?include_inactive=true"), []);
@@ -135,8 +138,13 @@ export function GudangPage() {
       />
 
       <Tabs defaultValue="list">
-        <TabsList>
+        <TabsList className="flex w-full max-w-full overflow-x-auto sm:inline-flex sm:w-auto">
           <TabsTrigger value="list">Daftar</TabsTrigger>
+          {can.viewContents && (
+            <TabsTrigger value="contents" className="gap-1.5">
+              <Package className="h-3.5 w-3.5" /> Isi Gudang
+            </TabsTrigger>
+          )}
           <TabsTrigger value="activity">Log Aktivitas</TabsTrigger>
         </TabsList>
         <TabsContent value="list" className="mt-3">
@@ -211,6 +219,11 @@ export function GudangPage() {
             ]}
           />
         </TabsContent>
+        {can.viewContents && (
+          <TabsContent value="contents" className="mt-3">
+            <GudangContentsTab />
+          </TabsContent>
+        )}
         <TabsContent value="activity" className="mt-3">
           <ActivityLogPanel entityTypes={["warehouse"]} />
         </TabsContent>
@@ -292,6 +305,132 @@ export function GudangPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Isi Gudang — per-gudang contents (packages currently held at each gudang)
+// ---------------------------------------------------------------------------
+
+function GudangContentsTab() {
+  const { user } = useAuth();
+  const canNotifyMarketing = hasPermission(user, "shipment.notify_marketing");
+  const { data, loading, reload } = useApiData<GudangWorkspace>(() => apiGet<GudangWorkspace>("/gudang"), []);
+  const [expandedWarehouse, setExpandedWarehouse] = useState<number | null>(null);
+  const [notifyTask, setNotifyTask] = useState<{ id: number; masterCode: string; remaining: number } | null>(null);
+
+  const warehouses = data?.warehouses ?? [];
+
+  if (loading) {
+    return (
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {[0, 1, 2].map((i) => (
+          <Skeleton key={i} className="h-48 w-full rounded-xl" />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {data?.scope?.scoped && (
+        <p className="rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-2 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300">
+          Akses terbatas ke {data.scope.warehouseName ?? "gudang Anda"} — Anda hanya melihat isi gudang tersebut.
+        </p>
+      )}
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {warehouses.map((w) => (
+          <Card key={w.id} className="gap-3">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center justify-between gap-2 text-base">
+                <span className="flex min-w-0 items-center gap-2">
+                  <WarehouseIcon className="h-4 w-4 shrink-0 text-primary" /> <span className="truncate">{w.name}</span>
+                </span>
+                <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">{w.city ?? "—"}</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-lg bg-muted/60 px-2 py-2">
+                  <p className="text-lg font-bold text-foreground">{w.heldPackages}</p>
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Paket</p>
+                </div>
+                <div className="rounded-lg bg-muted/60 px-2 py-2">
+                  <p className="text-lg font-bold text-foreground">{w.heldShipments}</p>
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Shipment</p>
+                </div>
+                <div className="rounded-lg bg-muted/60 px-2 py-2">
+                  <p className="text-lg font-bold text-foreground">{formatNumber(w.heldWeightKg, 1)}</p>
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">kg</p>
+                </div>
+              </div>
+              {w.customerSupportContact && <p className="text-[11px] text-muted-foreground">CS Gudang: {w.customerSupportContact}</p>}
+              {w.unpaidCount > 0 && (
+                <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400">{w.unpaidCount} shipment masih ada sisa pembayaran</p>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => setExpandedWarehouse(expandedWarehouse === w.id ? null : w.id)}
+              >
+                <ChevronDown className={cn("h-4 w-4 transition-transform", expandedWarehouse === w.id && "rotate-180")} />
+                {expandedWarehouse === w.id ? "Sembunyikan detail" : "Lihat detail kiriman"}
+              </Button>
+              {expandedWarehouse === w.id && (
+                <div className="space-y-1.5">
+                  {w.shipments.length === 0 && <p className="text-center text-xs text-muted-foreground">Gudang kosong.</p>}
+                  {w.shipments.map((s) => (
+                    <div key={s.id} className="rounded-lg border bg-card px-2.5 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <a href={`#/shipments/${s.id}`} className="font-mono text-xs font-semibold text-primary hover:underline">
+                          {s.masterCode}
+                        </a>
+                        <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                          {s.stage === "origin" ? "gudang asal" : "gudang tujuan"}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {s.customerName} · {s.packages} paket · {formatNumber(s.weightKg)} kg · {s.volumeM3.toFixed(3)} m³
+                      </p>
+                      <div className="mt-1 flex items-center justify-between gap-2">
+                        {s.remainingAmount != null && s.remainingAmount > 0 ? (
+                          <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">sisa {formatRupiah(s.remainingAmount)}</span>
+                        ) : (
+                          <span className="text-[11px] text-emerald-600 dark:text-emerald-400">lunas</span>
+                        )}
+                        {canNotifyMarketing && s.remainingAmount != null && s.remainingAmount > 0 && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 px-2 text-[11px]"
+                            onClick={() => setNotifyTask({ id: s.id, masterCode: s.masterCode, remaining: s.remainingAmount ?? 0 })}
+                          >
+                            <Bell className="h-3 w-3" /> Notify Marketing
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+      {warehouses.length === 0 && !loading && (
+        <p className="rounded-xl border border-dashed bg-card px-6 py-10 text-center text-sm text-muted-foreground">
+          Tidak ada gudang aktif — buat gudang di tab Daftar.
+        </p>
+      )}
+
+      <NotifyMarketingDialog
+        key={notifyTask ? `notify-${notifyTask.id}` : "notify-none"}
+        task={notifyTask}
+        onClose={() => setNotifyTask(null)}
+        onDone={reload}
+      />
     </div>
   );
 }
