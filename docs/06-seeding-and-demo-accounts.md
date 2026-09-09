@@ -89,3 +89,11 @@ After editing, reset the database (above) so the new dataset is created.
 ## RBAC bootstrap note
 
 Before accounts, `ensureSeed()` calls `ensureRbac()`: it upserts the **79 permissions** and **6 system roles** and re-links role→permission rows if the catalog in code has changed. This runs even outside the demo seed (it's also called on API boot), so a production database gets the RBAC catalog without demo data.
+
+## Revision 4 — seeder additions
+
+- **New demo account `wawan` / `Demo#Pass2026`** — Staff Gudang, assigned (`Employee.warehouseId`) to Gudang Jakarta Pusat; role `staff-gudang` with `warehouse.scope_own` (sees only his gudang).
+- Every seeded shipment now carries a **Penerima** (name/address/contact) and gudangs carry **customer support contacts** (printed on resi).
+- Demo states for the new flows: **MKT-000002** (PICKED_UP, 10 Karton Tulis, DP 60,000 of 112,500) sits in the gudang arrival queue; **MKT-000001** (READY_FOR_PICKUP, priced, DP ≥ 50%) has the open pickup task for kurir `rizky` (scan 4 packages + collect balance on confirm); **MKT-000006** (CREATED, unpriced) is the walk-in candidate.
+- Completed pickups/deliveries include seeded scans with mixed methods (mostly SCANNED, some TYPED) so Riwayat Scan demonstrates the differentiation.
+- `scripts/reset-demo-db.ts` truncates all tables **in place** (never delete `db/custom.db` while a dev server is holding it open — that causes "readonly database" errors). Re-seed afterwards with `bun run db:seed`.

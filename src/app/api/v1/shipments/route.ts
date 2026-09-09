@@ -4,6 +4,7 @@ import { guard, ok, handle, fail, str, num } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
 import { nextCode, nextDetailCodes } from "@/lib/code-generator";
 import { hasPermission } from "@/lib/auth";
+import { totalsByMaster } from "@/lib/shipment-totals";
 
 export async function GET(req: NextRequest) {
   return handle(async () => {
@@ -35,7 +36,14 @@ export async function GET(req: NextRequest) {
         ...(hasPermission(user, "shipment.view_tracking") ? { trackingEvents: { orderBy: { occurredAt: "desc" as const }, take: 1 } } : {}),
       },
     });
-    return ok(shipments);
+    // Physical totals (volume m³ + weight kg) for the list columns
+    const totals = await totalsByMaster(shipments.map((s) => s.id));
+    return ok(
+      shipments.map((s) => ({
+        ...s,
+        totals: totals.get(s.id) ?? { totalPackages: 0, totalActualKg: 0, totalVolumeM3: 0 },
+      })),
+    );
   });
 }
 
@@ -97,6 +105,9 @@ export async function POST(req: NextRequest) {
         destination,
         originWarehouseId: originWarehouseId ?? null,
         destinationWarehouseId: destinationWarehouseId ?? null,
+        penerimaName: str(body.penerimaName),
+        penerimaAddress: str(body.penerimaAddress),
+        penerimaContact: str(body.penerimaContact),
       },
     });
 

@@ -1,16 +1,22 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { guard, ok, handle, fail, str } from "@/lib/api-helpers";
+import { guard, ok, handle, fail, str, num } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
-import { assertKurirAssignment, scanProgress } from "@/lib/scan-flow";
+import { assertKurirAssignment, scanProgress, paymentSummary } from "@/lib/scan-flow";
 
 type Params = { params: Promise<{ id: string }> };
 
 /**
  * Confirm pickup completion.
- * Requirement: every detail barang (package) must have been QR-scanned "ok"
- * before the kurir can confirm. On success the shipment moves to PICKED_UP
- * and tracking shows "Picked-up by [Kurir Name]".
+ * Requirements:
+ * - every detail barang (package) must have been QR-scanned "ok" before the
+ *   kurir can confirm;
+ * - DP rule: at least 50% of the price must be paid before the packages can
+ *   be picked up. The kurir may record the remaining balance at pickup time
+ *   via body.payment = { method, amount, reference } (recorded as CASH/TRANSFER
+ *   payment by the confirming user).
+ * On success the shipment moves to PICKED_UP and tracking shows
+ * "Picked-up by [Kurir Name]".
  */
 export async function POST(req: NextRequest, { params }: Params) {
   return handle(async () => {
@@ -32,12 +38,48 @@ export async function POST(req: NextRequest, { params }: Params) {
       return fail(422, "Shipment belum punya detail barang — tambahkan detail sebelum pickup.");
     }
     if (!progress.allScanned) {
-      const remaining = progress.details.filter((d) => !d.scanned).map((d) => d.detailCode);
-      return fail(422, `Belum semua paket discan (${progress.scanned}/${progress.total}). Sisa: ${remaining.join(", ")}`);
+      const remaining = progress.total - progress.scanned;
+      return fail(422, `Belum semua paket discan (${progress.scanned}/${progress.total}, sisa ${remaining} paket).`);
     }
 
     const body = await req.json().catch(() => ({}));
     const notes = str(body.notes) ?? pickup.notes;
+
+    // --- DP rule: minimal 50% paid before the packages can be picked up -----
+    const summary = await paymentSummary(pickup.masterId);
+    if (summary.priceAmount != null && summary.priceAmount > 0 && !summary.dpOk) {
+      return fail(
+        422,
+        `DP belum cukup — minimal 50% dari ${"Rp"}${Math.round(summary.priceAmount).toLocaleString("id-ID")} (terbayar ${"Rp"}${Math.round(summary.paidAmount).toLocaleString("id-ID")}). Catat pembayaran DP terlebih dahulu.`,
+      );
+    }
+
+    // --- Optional balance payment collected by the kurir at pickup time -----
+    let paymentRecorded: { amount: number; method: string } | null = null;
+    const paymentInput = body.payment as { method?: unknown; amount?: unknown; reference?: unknown } | undefined;
+    const balanceAmount = num(paymentInput?.amount);
+    if (paymentInput && balanceAmount != null && balanceAmount > 0) {
+      const method = paymentInput.method === "TRANSFER" ? "TRANSFER" : "CASH";
+      const payment = await db.payment.create({
+        data: {
+          masterId: pickup.masterId,
+          method,
+          amount: balanceAmount,
+          status: "RECORDED",
+          reference: str(paymentInput.reference) ?? `SISA-${pickup.pickupCode}`,
+          recordedById: user.id,
+        },
+      });
+      paymentRecorded = { amount: payment.amount, method: payment.method };
+      await audit({
+        action: "created",
+        entityType: "payment",
+        entityId: payment.id,
+        entityLabel: `${pickup.master.masterCode} · sisa diambil kurir`,
+        actor: user,
+        after: { amount: payment.amount, method },
+      });
+    }
 
     // Assigned kurir name for the tracking event — fallback to confirming user.
     const kurirName = pickup.kurirId
@@ -55,7 +97,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       data: {
         masterId: pickup.masterId,
         event: "PICKED_UP",
-        description: `Picked-up by ${kurirName}`,
+        description: `Picked-up by ${kurirName}${paymentRecorded ? ` — sisa ${paymentRecorded.method} Rp${Math.round(paymentRecorded.amount).toLocaleString("id-ID")} diterima kurir` : ""}`,
         actorId: user.id,
       },
     });
@@ -65,8 +107,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       entityId: pickup.id,
       entityLabel: `${pickup.pickupCode} → COMPLETED`,
       actor: user,
-      after: { packagesScanned: `${progress.scanned}/${progress.total}`, kurir: kurirName },
+      after: { packagesScanned: `${progress.scanned}/${progress.total}`, kurir: kurirName, payment: paymentRecorded },
     });
-    return ok({ ...updated, tracking: `Picked-up by ${kurirName}` });
+    return ok({ ...updated, tracking: `Picked-up by ${kurirName}`, paymentRecorded });
   });
 }

@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { guard, ok, handle, requireStr, str, bool } from "@/lib/api-helpers";
+import { guard, ok, handle, requireStr, str, bool, num } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
 import { nextCode } from "@/lib/code-generator";
 
@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
         name,
         phone: str(body.phone),
         position: str(body.position),
+        warehouseId: num(body.warehouseId),
         isActive: true,
       },
     });

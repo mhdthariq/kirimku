@@ -24,6 +24,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { hasAnyPermission, hasPermission } from "@/lib/client-api";
 import { Logo } from "@/components/app/logo";
 import { ThemeToggle } from "@/components/app/theme-toggle";
+import { InstallAppMenuItem } from "@/components/app/pwa";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
@@ -51,6 +52,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     items: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, mobile: true },
       { href: "/pickups", label: "Pickups", icon: Truck, anyPermissions: ["pickup.view", "pickup.assign_kurir"], mobile: true },
+      { href: "/gudang-ops", label: "Gudang", icon: Warehouse, anyPermissions: ["shipment.view"], mobile: true },
       { href: "/shipments", label: "Shipments", icon: Package, anyPermissions: ["shipment.view"], mobile: true },
       { href: "/deliveries", label: "Deliveries", icon: ClipboardList, anyPermissions: ["delivery.view", "delivery.assign_kurir"], mobile: true },
       { href: "/transports", label: "Transports", icon: BarChart3, anyPermissions: ["transport.view"], mobile: true },
@@ -60,7 +62,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     title: "Gudang & Armada",
     items: [
       { href: "/vehicles", label: "Kendaraan", icon: CarFront, anyPermissions: ["vehicle.view"] },
-      { href: "/gudang", label: "Gudang", icon: Warehouse, anyPermissions: ["warehouse.view"] },
+      { href: "/gudang", label: "Master Gudang", icon: Warehouse, anyPermissions: ["warehouse.view"] },
       { href: "/routes", label: "Rute & Checkpoint", icon: MapPin, anyPermissions: ["checkpoint.view"] },
     ],
   },
@@ -270,6 +272,7 @@ export function AppShell({
                   <p className="text-sm font-semibold">{user.name}</p>
                   <p className="text-xs font-normal text-muted-foreground">@{user.username}</p>
                 </DropdownMenuLabel>
+                <InstallAppMenuItem />
                 <DropdownMenuSeparator />
                 <DropdownMenuItem variant="destructive" onClick={handleLogout}>
                   <LogOut className="h-4 w-4" /> Keluar

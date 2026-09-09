@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { guard, ok, handle, fail, str, num } from "@/lib/api-helpers";
 import { audit, diffFields } from "@/lib/audit";
-import { scanProgress } from "@/lib/scan-flow";
+import { scanProgress, paymentSummary } from "@/lib/scan-flow";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -16,7 +16,8 @@ export async function GET(req: NextRequest, { params }: Params) {
     });
     if (!pickup) return fail(404, "Pickup tidak ditemukan.");
     const progress = await scanProgress({ pickupId: pickup.id });
-    return ok({ ...pickup, progress });
+    const payment = await paymentSummary(pickup.masterId);
+    return ok({ ...pickup, progress, paymentSummary: payment });
   });
 }
 

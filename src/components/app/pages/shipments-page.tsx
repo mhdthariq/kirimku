@@ -8,10 +8,12 @@ import {
   Package,
   Pencil,
   Plus,
+  Printer,
   Receipt,
   Send,
   Trash2,
   Truck,
+  UserRound,
   Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -32,18 +34,23 @@ import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
 import { StatusBadge } from "@/components/app/status-badge";
-import { Field, FormSelect, Input, NumberInput, SubmitButton, formatDate, formatNumber, formatRupiah } from "@/components/app/form-parts";
+import { ResiPrint } from "@/components/app/resi-print";
+import { Field, FormSelect, Input, NumberInput, SubmitButton, Textarea, formatDate, formatNumber, formatRupiah } from "@/components/app/form-parts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 
 interface ShipmentForm {
   customerId: string;
   tariffId: string;
   originWarehouseId: string;
   destinationWarehouseId: string;
+  penerimaName: string;
+  penerimaAddress: string;
+  penerimaContact: string;
 }
 
 interface DetailForm {
@@ -55,7 +62,15 @@ interface DetailForm {
   actualWeightKg: string;
 }
 
-const EMPTY_SHIPMENT: ShipmentForm = { customerId: "", tariffId: "", originWarehouseId: "", destinationWarehouseId: "" };
+const EMPTY_SHIPMENT: ShipmentForm = {
+  customerId: "",
+  tariffId: "",
+  originWarehouseId: "",
+  destinationWarehouseId: "",
+  penerimaName: "",
+  penerimaAddress: "",
+  penerimaContact: "",
+};
 const EMPTY_DETAIL: DetailForm = { description: "", quantity: "1", lengthCm: "", widthCm: "", heightCm: "", actualWeightKg: "" };
 
 /** Row type for the "Ringkas" (grouped) detail view — pure UI aggregation. */
@@ -68,8 +83,8 @@ interface DetailGroupRow {
   totalKg: number;
 }
 
-export function ShipmentsPage({ shipmentId }: { shipmentId: number | null }) {
-  return shipmentId != null ? <ShipmentDetail id={shipmentId} /> : <ShipmentList />;
+export function ShipmentsPage({ shipmentId, autoPrint }: { shipmentId: number | null; autoPrint?: boolean }) {
+  return shipmentId != null ? <ShipmentDetail id={shipmentId} autoPrint={autoPrint} /> : <ShipmentList />;
 }
 
 // ---------------------------------------------------------------------------
@@ -99,12 +114,16 @@ function ShipmentList() {
     const q = search.toLowerCase();
     return data.filter(
       (s) =>
-        (statusFilter === "all" || s.status === statusFilter) &&
+        (statusFilter === "all" ||
+          (statusFilter === "GUDANG"
+            ? s.status === "RECEIVED_AT_GUDANG" || s.status === "ARRIVED_AT_GUDANG"
+            : s.status === statusFilter)) &&
         (!q ||
           s.masterCode.toLowerCase().includes(q) ||
           (s.customer?.name ?? "").toLowerCase().includes(q) ||
           s.origin.toLowerCase().includes(q) ||
-          s.destination.toLowerCase().includes(q)),
+          s.destination.toLowerCase().includes(q) ||
+          (s.penerimaName ?? "").toLowerCase().includes(q)),
     );
   }, [data, search, statusFilter]);
 
@@ -124,6 +143,9 @@ function ShipmentList() {
       tariffId: Number(form.tariffId),
       originWarehouseId: form.originWarehouseId ? Number(form.originWarehouseId) : null,
       destinationWarehouseId: form.destinationWarehouseId ? Number(form.destinationWarehouseId) : null,
+      penerimaName: form.penerimaName || null,
+      penerimaAddress: form.penerimaAddress || null,
+      penerimaContact: form.penerimaContact || null,
     };
     const ok = await runAction(() => apiPost("/shipments", payload), { success: "Shipment dibuat (CREATED). Tambahkan detail barang lalu submit untuk pickup." });
     setBusy(false);
@@ -183,10 +205,32 @@ function ShipmentList() {
             onSearchChange={setSearch}
             searchPlaceholder="Cari resi / customer / kota…"
             toolbar={
-              <div className="flex flex-wrap items-center gap-1.5">
-                {["all", "CREATED", "READY_FOR_PICKUP", "PICKED_UP", "IN_TRANSPORT", "DELIVERED", "CANCELLED"].map((s) => (
-                  <Button key={s} size="sm" variant={statusFilter === s ? "default" : "outline"} className="h-7 px-2.5 text-[11px]" onClick={() => setStatusFilter(s)}>
-                    {s === "all" ? "Semua" : s.replace(/_/g, " ")}
+              <div className="flex max-w-full items-center gap-1.5 overflow-x-auto pb-1">
+                {[
+                  { key: "all", label: "All" },
+                  { key: "CREATED", label: "Created" },
+                  { key: "READY_FOR_PICKUP", label: "Ready for Pickup" },
+                  { key: "PICKED_UP", label: "Picked Up" },
+                  { key: "GUDANG", label: "Arrive at Gudang" },
+                  { key: "IN_TRANSPORT", label: "In Transport" },
+                  { key: "DELIVERED", label: "Delivered" },
+                  { key: "CANCELLED", label: "Cancelled" },
+                ].map((t) => (
+                  <Button
+                    key={t.key}
+                    size="sm"
+                    variant={statusFilter === t.key ? "default" : "outline"}
+                    className="h-7 shrink-0 whitespace-nowrap px-2.5 text-[11px]"
+                    onClick={() => setStatusFilter(t.key)}
+                  >
+                    {t.label}
+                    {t.key !== "all" && (
+                      <span className="ml-1 opacity-70">
+                        {t.key === "GUDANG"
+                          ? data?.filter((s) => s.status === "RECEIVED_AT_GUDANG" || s.status === "ARRIVED_AT_GUDANG").length ?? 0
+                          : data?.filter((s) => s.status === t.key).length ?? 0}
+                      </span>
+                    )}
                   </Button>
                 ))}
               </div>
@@ -212,17 +256,35 @@ function ShipmentList() {
                     <p className="text-xs text-muted-foreground">
                       {s.origin} → {s.destination}
                     </p>
+                    {s.penerimaName && <p className="text-[11px] text-muted-foreground">penerima: {s.penerimaName}</p>}
                   </div>
                 ),
               },
-              { key: "details", header: "Detail", render: (s) => s._count?.details ?? s.details?.length ?? 0 },
+              { key: "details", header: "Detail", render: (s) => <span className="text-sm">{s.totals?.totalPackages ?? s._count?.details ?? 0} paket</span> },
               {
                 key: "price",
                 header: "Harga",
                 render: (s) => (
                   <div>
                     <p className="text-sm font-semibold">{formatRupiah(s.priceAmount)}</p>
-                    {s.chargeableWeightKg != null && <p className="text-[11px] text-muted-foreground">{formatNumber(s.chargeableWeightKg)} kg</p>}
+                    {s.chargeableWeightKg != null && <p className="text-[11px] text-muted-foreground">{formatNumber(s.chargeableWeightKg)} kg cw</p>}
+                  </div>
+                ),
+              },
+              {
+                key: "volume",
+                header: "Volume",
+                render: (s) => <span className="text-sm tabular-nums">{(s.totals?.totalVolumeM3 ?? 0).toFixed(3)} m³</span>,
+              },
+              {
+                key: "berat",
+                header: "Berat",
+                render: (s) => (
+                  <div>
+                    <p className="text-sm font-semibold tabular-nums">{formatNumber(s.chargeableWeightKg ?? s.totals?.totalActualKg ?? 0)} kg</p>
+                    {s.chargeableWeightKg != null && s.totals?.totalActualKg != null && Math.abs(s.chargeableWeightKg - s.totals.totalActualKg) > 0.01 && (
+                      <p className="text-[11px] text-muted-foreground">aktual {formatNumber(s.totals.totalActualKg)} kg</p>
+                    )}
                   </div>
                 ),
               },
@@ -236,6 +298,11 @@ function ShipmentList() {
                     <Button variant="outline" size="sm" className="h-7" onClick={() => (window.location.hash = `#/shipments/${s.id}`)}>
                       Detail
                     </Button>
+                    {s.status !== "CANCELLED" && (s.totals?.totalPackages ?? s._count?.details ?? 0) > 0 && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => (window.location.hash = `#/shipments/${s.id}?print=1`)} aria-label="Cetak resi" title="Cetak Resi">
+                        <Printer className="h-4 w-4" />
+                      </Button>
+                    )}
                     {can.delete && s.status === "CREATED" && (
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setConfirmDelete(s)} aria-label="Hapus shipment">
                         <Trash2 className="h-4 w-4" />
@@ -323,6 +390,38 @@ function ShipmentList() {
                   disabled={busy}
                 />
               </Field>
+              <div className="sm:col-span-2">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Penerima (dicetak pada resi)</p>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Nama Penerima" htmlFor="s-penerima-name" className="sm:col-span-2">
+                    <Input
+                      id="s-penerima-name"
+                      value={form.penerimaName}
+                      onChange={(e) => setForm({ ...form, penerimaName: e.target.value })}
+                      placeholder="mis. Hendra Gunawan"
+                      disabled={busy}
+                    />
+                  </Field>
+                  <Field label="Alamat Penerima" htmlFor="s-penerima-address" className="sm:col-span-2">
+                    <Input
+                      id="s-penerima-address"
+                      value={form.penerimaAddress}
+                      onChange={(e) => setForm({ ...form, penerimaAddress: e.target.value })}
+                      placeholder="mis. Jl. Merdeka No. 88, Bandung"
+                      disabled={busy}
+                    />
+                  </Field>
+                  <Field label="Kontak Penerima" htmlFor="s-penerima-contact" className="sm:col-span-2">
+                    <Input
+                      id="s-penerima-contact"
+                      value={form.penerimaContact}
+                      onChange={(e) => setForm({ ...form, penerimaContact: e.target.value })}
+                      placeholder="0812-xxxx-xxxx"
+                      disabled={busy}
+                    />
+                  </Field>
+                </div>
+              </div>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} disabled={busy}>
@@ -356,11 +455,12 @@ function ShipmentList() {
 // Detail view
 // ---------------------------------------------------------------------------
 
-function ShipmentDetail({ id }: { id: number }) {
+function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) {
   const { user } = useAuth();
   const can = {
     update: hasPermission(user, "shipment.update"),
     cancel: hasPermission(user, "shipment.cancel"),
+    submitPickup: hasPermission(user, "shipment.update") || hasPermission(user, "pickup.create"),
     detailCreate: hasPermission(user, "shipment_detail.create"),
     detailUpdate: hasPermission(user, "shipment_detail.update"),
     detailDelete: hasPermission(user, "shipment_detail.delete"),
@@ -398,6 +498,18 @@ function ShipmentDetail({ id }: { id: number }) {
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [paymentForm, setPaymentForm] = useState({ method: "CASH", amount: "", reference: "" });
   const [confirmDeleteDetail, setConfirmDeleteDetail] = useState<DetailShipment | null>(null);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [printOpen, setPrintOpen] = useState(false);
+  const [penerimaOpen, setPenerimaOpen] = useState(false);
+  const [penerimaForm, setPenerimaForm] = useState({ name: "", address: "", contact: "" });
+
+  // deep link #/shipments/{id}?print=1 — open the resi print preview
+  useEffect(() => {
+    if (autoPrint && shipment && shipment.details.length > 0 && !printOpen) {
+      setPrintOpen(true);
+      window.history.replaceState(null, "", `#/shipments/${id}`); // avoid re-trigger
+    }
+  }, [autoPrint, shipment, printOpen, id]);
 
   if (loading) {
     return (
@@ -430,14 +542,47 @@ function ShipmentDetail({ id }: { id: number }) {
 
   async function submitForPickup() {
     const ok = await runAction(() => apiPost(`/shipments/${shipment!.id}/ready`), {
-      success: "Shipment siap dijemput — buat task pickup di menu Pickups.",
+      success: "Shipment siap dijemput — resi siap dicetak. Buat task pickup di menu Pickups / Gudang.",
     });
-    if (ok) refresh();
+    if (ok) {
+      await refresh();
+      setPrintOpen(true); // print the Shipment Resi + Detail Resi when the pickup is requested
+    }
   }
 
   async function cancelShipment() {
+    setConfirmCancel(false);
     const ok = await runAction(() => apiPost(`/shipments/${shipment!.id}/cancel`), { success: "Shipment dibatalkan." });
     if (ok) refresh();
+  }
+
+  function openPenerimaEdit() {
+    setPenerimaForm({
+      name: shipment?.penerimaName ?? "",
+      address: shipment?.penerimaAddress ?? "",
+      contact: shipment?.penerimaContact ?? "",
+    });
+    setPenerimaOpen(true);
+  }
+
+  async function onPenerimaSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!shipment) return;
+    setBusy(true);
+    const ok = await runAction(
+      () =>
+        apiPut(`/shipments/${shipment.id}`, {
+          penerimaName: penerimaForm.name || null,
+          penerimaAddress: penerimaForm.address || null,
+          penerimaContact: penerimaForm.contact || null,
+        }),
+      { success: "Data Penerima disimpan — akan dicetak pada resi." },
+    );
+    setBusy(false);
+    if (ok) {
+      setPenerimaOpen(false);
+      refresh();
+    }
   }
 
   async function computePrice() {
@@ -574,18 +719,23 @@ function ShipmentDetail({ id }: { id: number }) {
         actions={
           <>
             <StatusBadge status={shipment.status} />
-            {shipment.status === "CREATED" && can.update && (
+            {shipment.status === "CREATED" && can.submitPickup && (
               <Button onClick={submitForPickup} disabled={shipment.details.length === 0}>
                 <Send className="h-4 w-4" /> Submit for Pickup
               </Button>
             )}
-            {can.update && shipment.details.length > 0 && ["CREATED", "READY_FOR_PICKUP", "PICKED_UP"].includes(shipment.status) && (
+            {can.submitPickup && shipment.details.length > 0 && ["CREATED", "READY_FOR_PICKUP", "PICKED_UP"].includes(shipment.status) && (
               <Button variant="secondary" onClick={computePrice}>
                 <Calculator className="h-4 w-4" /> {shipment.priceAmount != null ? "Hitung Ulang Harga" : "Hitung Harga"}
               </Button>
             )}
+            {shipment.status !== "CANCELLED" && shipment.details.length > 0 && (
+              <Button variant="secondary" onClick={() => setPrintOpen(true)}>
+                <Printer className="h-4 w-4" /> Cetak Resi
+              </Button>
+            )}
             {can.cancel && shipment.status !== "CANCELLED" && shipment.status !== "DELIVERED" && (
-              <Button variant="outline" className="text-destructive" onClick={cancelShipment}>
+              <Button variant="outline" className="text-destructive" onClick={() => setConfirmCancel(true)}>
                 <Ban className="h-4 w-4" /> Cancel
               </Button>
             )}
@@ -593,7 +743,16 @@ function ShipmentDetail({ id }: { id: number }) {
         }
       />
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      {/* Pickup submission checklist — price must be counted + penerima filled */}
+      {shipment.status === "CREATED" && can.submitPickup && (shipment.priceAmount == null || !shipment.penerimaName) && (
+        <p className="rounded-lg border border-amber-300 bg-amber-50/70 px-3 py-2 text-xs text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
+          Sebelum submit untuk pickup: {shipment.priceAmount == null ? "hitung harga shipment (wajib — pickup tidak bisa diajukan tanpa harga)" : ""}
+          {shipment.priceAmount == null && !shipment.penerimaName ? " dan " : ""}
+          {!shipment.penerimaName ? "isi data Penerima (dicetak pada Resi Shipment & Resi Detail)" : ""}.
+        </p>
+      )}
+
+      <div className="grid gap-4 lg:grid-cols-4">
         {/* Pricing summary */}
         <Card className="lg:col-span-1">
           <CardHeader className="pb-3">
@@ -603,6 +762,7 @@ function ShipmentDetail({ id }: { id: number }) {
           </CardHeader>
           <CardContent className="space-y-2.5">
             <Row label="Total paket" value={`${shipment.details.length} paket`} />
+            <Row label="Total volume" value={`${(shipment.totals?.totalVolumeM3 ?? 0).toFixed(3)} m³`} />
             <Row label="Berat aktual" value={`${formatNumber(actualWeight)} kg`} />
             <Row
               label={`Berat volumetrik (L×W×H/1.000.000 × ${pricing ? formatNumber(pricing.volumetricMultiplier, 0) : "?"})`}
@@ -630,11 +790,61 @@ function ShipmentDetail({ id }: { id: number }) {
               <span className="text-xs font-semibold text-primary">{shipment.priceAmount != null ? "TOTAL HARGA" : "ESTIMASI HARGA"}</span>
               <span className="text-base font-bold text-primary">{formatRupiah(shipment.priceAmount ?? pricing?.estimatedPrice ?? null)}</span>
             </div>
+            {shipment.paymentSummary && shipment.priceAmount != null && (
+              <div
+                className={cn(
+                  "rounded-lg border px-3 py-2 text-xs",
+                  shipment.paymentSummary.remainingAmount <= 0
+                    ? "border-emerald-300 bg-emerald-50/60 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300"
+                    : shipment.paymentSummary.dpOk
+                      ? "border-sky-300 bg-sky-50/60 text-sky-700 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300"
+                      : "border-amber-300 bg-amber-50/60 text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300",
+                )}
+              >
+                <p className="font-semibold">
+                  Terbayar {formatRupiah(shipment.paymentSummary.paidAmount)}
+                  {shipment.paymentSummary.remainingAmount > 0 ? ` · sisa ${formatRupiah(shipment.paymentSummary.remainingAmount)}` : " · LUNAS"}
+                </p>
+                <p className="mt-0.5">
+                  {shipment.paymentSummary.dpOk
+                    ? "DP ≥ 50% terpenuhi — paket bisa dijemput kurir."
+                    : `DP minimal 50% (${formatRupiah(shipment.paymentSummary.dpRequirement)}) belum terpenuhi — catat pembayaran dulu.`}
+                </p>
+              </div>
+            )}
             {!pricing && (
               <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
                 Tidak ada tarif aktif untuk rute {shipment.origin} → {shipment.destination} — buat tarif di menu Tariffs agar harga bisa dihitung.
               </p>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Penerima & pengirim */}
+        <Card className="lg:col-span-1">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <UserRound className="h-4 w-4 text-primary" /> Penerima
+              </CardTitle>
+              {shipment.status === "CREATED" && can.update && (
+                <Button size="sm" variant="ghost" className="h-7" onClick={openPenerimaEdit}>
+                  <Pencil className="h-3.5 w-3.5" /> Edit
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <Row label="Nama" value={shipment.penerimaName ?? "—"} />
+            <Row label="Kontak" value={shipment.penerimaContact ?? "—"} />
+            <p className="text-xs leading-relaxed text-muted-foreground">{shipment.penerimaAddress ?? "Alamat penerima belum diisi"}</p>
+            <div className="border-t pt-2">
+              <Row label="Pengirim" value={shipment.customer?.name ?? "—"} />
+              <Row label="Telp. pengirim" value={shipment.customer?.phone ?? "—"} />
+            </div>
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              Data Penerima &amp; CS Gudang dicetak pada Resi Shipment (customer) dan setiap Resi Detail (stiker paket).
+            </p>
           </CardContent>
         </Card>
 
@@ -916,6 +1126,61 @@ function ShipmentDetail({ id }: { id: number }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Cancel shipment — confirmation dialog (not a direct cancel) */}
+      <AlertDialog open={confirmCancel} onOpenChange={setConfirmCancel}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Batalkan shipment {shipment.masterCode}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Shipment akan diubah menjadi CANCELLED dan tidak bisa dilanjutkan lagi. Pastikan customer sudah dikonfirmasi sebelum melanjutkan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Tidak, lanjutkan shipment</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={cancelShipment}>
+              <Ban className="h-4 w-4" /> Ya, batalkan shipment
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Penerima edit dialog */}
+      <Dialog open={penerimaOpen} onOpenChange={setPenerimaOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserRound className="h-5 w-5 text-primary" /> Edit Penerima
+            </DialogTitle>
+            <DialogDescription>Data penerima dicetak pada Resi Shipment &amp; setiap Resi Detail (stiker paket).</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={onPenerimaSubmit} className="space-y-4">
+            <Field label="Nama Penerima" htmlFor="pe-name">
+              <Input id="pe-name" value={penerimaForm.name} onChange={(e) => setPenerimaForm({ ...penerimaForm, name: e.target.value })} required disabled={busy} />
+            </Field>
+            <Field label="Alamat Penerima" htmlFor="pe-address">
+              <Textarea id="pe-address" value={penerimaForm.address} onChange={(e) => setPenerimaForm({ ...penerimaForm, address: e.target.value })} rows={2} disabled={busy} />
+            </Field>
+            <Field label="Kontak Penerima" htmlFor="pe-contact">
+              <Input id="pe-contact" value={penerimaForm.contact} onChange={(e) => setPenerimaForm({ ...penerimaForm, contact: e.target.value })} placeholder="0812-xxxx-xxxx" disabled={busy} />
+            </Field>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setPenerimaOpen(false)} disabled={busy}>
+                Batal
+              </Button>
+              <SubmitButton busy={busy}>Simpan Penerima</SubmitButton>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Resi print overlay — 1 Resi Shipment + N Resi Detail stickers */}
+      {printOpen && (
+        <ResiPrint
+          shipment={shipment}
+          onClose={() => setPrintOpen(false)}
+        />
+      )}
     </div>
   );
 }

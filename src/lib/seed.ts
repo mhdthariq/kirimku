@@ -25,18 +25,36 @@ async function runSeed(): Promise<void> {
   const now = new Date();
   const daysAgo = (d: number) => new Date(now.getTime() - d * 24 * 60 * 60 * 1000);
 
+  // ----- Gudang (no gateway/type distinction) -------------------------------
+  // customerSupportContact is printed on the Shipment Resi & Detail Resi.
+  const gudangDefs = [
+    { code: "WH-000001", name: "Gudang Jakarta Pusat", city: "Jakarta Pusat", address: "Jl. Gunung Sahari No. 45", latitude: -6.1105, longitude: 106.8814, customerSupportContact: "0811-1000-001" },
+    { code: "WH-000002", name: "Gudang Bandung", city: "Bandung", address: "Jl. Soekarno Hatta No. 210", latitude: -6.9175, longitude: 107.6191, customerSupportContact: "0822-2000-002" },
+    { code: "WH-000003", name: "Gudang Surabaya", city: "Surabaya", address: "Jl. Ahmad Yani No. 88", latitude: -7.2575, longitude: 112.7521, customerSupportContact: "0833-3000-003" },
+  ];
+  const gudang: Record<string, number> = {};
+  for (const g of gudangDefs) {
+    const w = await db.warehouse.upsert({
+      where: { code: g.code },
+      create: g,
+      update: {},
+    });
+    gudang[g.city] = w.id;
+  }
+
   // ----- Employees + users -------------------------------------------------
   const staffPassword = hashPassword("Demo#Pass2026");
   const ownerPassword = hashPassword("ChangeMeOwner#2026");
 
-  const staff: { username: string; name: string; position: string; role: string; employeeNumber: string }[] = [
+  const staff: { username: string; name: string; position: string; role: string; employeeNumber: string; warehouseId?: string }[] = [
     { username: "siti", name: "Siti Rahma", position: "Admin Kantor", role: "admin-kantor", employeeNumber: "EMP-000002" },
     { username: "budi", name: "Budi Santoso", position: "Marketing", role: "marketing", employeeNumber: "EMP-000003" },
-    { username: "agus", name: "Agus Pratama", position: "Admin Gudang", role: "admin-gudang", employeeNumber: "EMP-000004" },
+    { username: "agus", name: "Agus Pratama", position: "Admin Gudang", role: "admin-gudang", employeeNumber: "EMP-000004", warehouseId: "Jakarta Pusat" },
     { username: "dewi", name: "Dewi Lestari", position: "Kurir", role: "kurir", employeeNumber: "EMP-000005" },
     { username: "rizky", name: "Rizky Hidayat", position: "Kurir", role: "kurir", employeeNumber: "EMP-000006" },
     { username: "joko", name: "Joko Widodo", position: "Driver", role: "driver", employeeNumber: "EMP-000007" },
     { username: "andi", name: "Andi Wijaya", position: "Kenek", role: "kenek", employeeNumber: "EMP-000008" },
+    { username: "wawan", name: "Wawan Setiawan", position: "Staff Gudang", role: "staff-gudang", employeeNumber: "EMP-000009", warehouseId: "Jakarta Pusat" },
   ];
 
   const ownerEmployee = await db.employee.upsert({
@@ -54,7 +72,10 @@ async function runSeed(): Promise<void> {
   for (const s of staff) {
     const employee = await db.employee.upsert({
       where: { employeeNumber: s.employeeNumber },
-      create: { employeeNumber: s.employeeNumber, name: s.name, position: s.position, phone: `08110000${s.employeeNumber.slice(-4)}` },
+      create: {
+        employeeNumber: s.employeeNumber, name: s.name, position: s.position, phone: `08110000${s.employeeNumber.slice(-4)}`,
+        warehouseId: s.warehouseId ? gudang[s.warehouseId] : null,
+      },
       update: {},
     });
     const user = await db.user.upsert({
@@ -69,22 +90,6 @@ async function runSeed(): Promise<void> {
       update: {},
     });
     usersByHandle[s.username] = { id: user.id, employeeId: employee.id };
-  }
-
-  // ----- Gudang (no gateway/type distinction) -------------------------------
-  const gudangDefs = [
-    { code: "WH-000001", name: "Gudang Jakarta Pusat", city: "Jakarta Pusat", address: "Jl. Gunung Sahari No. 45", latitude: -6.1105, longitude: 106.8814 },
-    { code: "WH-000002", name: "Gudang Bandung", city: "Bandung", address: "Jl. Soekarno Hatta No. 210", latitude: -6.9175, longitude: 107.6191 },
-    { code: "WH-000003", name: "Gudang Surabaya", city: "Surabaya", address: "Jl. Ahmad Yani No. 88", latitude: -7.2575, longitude: 112.7521 },
-  ];
-  const gudang: Record<string, number> = {};
-  for (const g of gudangDefs) {
-    const w = await db.warehouse.upsert({
-      where: { code: g.code },
-      create: g,
-      update: {},
-    });
-    gudang[g.city] = w.id;
   }
 
   // ----- Vehicles -----------------------------------------------------------
@@ -189,24 +194,37 @@ async function runSeed(): Promise<void> {
       destination: string;
       priced: boolean;
       createdDaysAgo: number;
+      penerima: { name: string; address: string; contact: string };
+      payment?: { amount: number; method: string; status: string };
       details: { description: string; quantity: number; weightKg: number; l: number; w: number; h: number }[];
     }[] = [
       {
+        // Priced + DP ≥ 50% so the open pickup task (rizky) can be confirmed —
+        // demonstrates the DP rule + QR scan flow end-to-end.
         masterCode: "MKT-000001", customer: "Rina Amelia", status: "READY_FOR_PICKUP",
-        origin: "Jakarta Pusat", destination: "Bandung", priced: false, createdDaysAgo: 1,
+        origin: "Jakarta Pusat", destination: "Bandung", priced: true, createdDaysAgo: 1,
+        penerima: { name: "Laksmi Dewi", address: "Jl. Melati No. 12, Bandung", contact: "0813-2222-3333" },
+        payment: { amount: 20000, method: "TRANSFER", status: "RECORDED" },
         details: [
           { description: "Paket pakaian", quantity: 1, weightKg: 2, l: 35, w: 25, h: 12 },
           { description: "Buku tulis", quantity: 3, weightKg: 1.5, l: 25, w: 20, h: 10 },
         ],
       },
       {
+        // PICKED_UP — sits in the gudang arrival queue (Admin Gudang scans the
+        // 10 packages / uses “Scan Semua”, then confirms arrival). Balance
+        // unpaid → “Notify Marketing” demo after arrival.
         masterCode: "MKT-000002", customer: "PT Maju Bersama", status: "PICKED_UP",
         origin: "Jakarta Pusat", destination: "Bandung", priced: true, createdDaysAgo: 2,
+        penerima: { name: "Hendra Gunawan", address: "Jl. Merdeka No. 88, Bandung", contact: "0814-4444-5555" },
+        payment: { amount: 60000, method: "TRANSFER", status: "VERIFIED" },
         details: [{ description: "Karton Tulis", quantity: 10, weightKg: 2.5, l: 25, w: 20, h: 20 }],
       },
       {
         masterCode: "MKT-000003", customer: "CV Sinar Jaya", status: "RECEIVED_AT_GUDANG",
         origin: "Jakarta Pusat", destination: "Surabaya", priced: true, createdDaysAgo: 4,
+        penerima: { name: "Bagian Gudang CV Sinar Jaya", address: "Jl. Pemuda No. 5, Surabaya", contact: "0815-5555-6666" },
+        payment: { amount: 450000, method: "TRANSFER", status: "VERIFIED" },
         details: [
           { description: "Mesin bubut mini", quantity: 1, weightKg: 40, l: 60, w: 45, h: 40 },
           { description: "Spare part", quantity: 4, weightKg: 5, l: 25, w: 20, h: 15 },
@@ -215,20 +233,29 @@ async function runSeed(): Promise<void> {
       {
         masterCode: "MKT-000004", customer: "Tono Susilo", status: "IN_TRANSPORT",
         origin: "Jakarta Pusat", destination: "Surabaya", priced: true, createdDaysAgo: 3,
+        penerima: { name: "Tono Susilo", address: "Jl. Kenanga No. 9, Surabaya", contact: "0812-3456-0004" },
+        payment: { amount: 25500, method: "CASH", status: "VERIFIED" },
         details: [{ description: "Kipas angin", quantity: 1, weightKg: 3, l: 30, w: 25, h: 12 }],
       },
       {
         masterCode: "MKT-000005", customer: "PT Maju Bersama", status: "DELIVERED",
         origin: "Jakarta Pusat", destination: "Bandung", priced: true, createdDaysAgo: 6,
+        penerima: { name: "Bagian Gudang PT Maju Bersama", address: "Jl. Sudirman Kav. 21, Jakarta", contact: "0812-3456-0002" },
+        payment: { amount: 180000, method: "CASH", status: "VERIFIED" },
         details: [{ description: "Paket promosi", quantity: 8, weightKg: 5, l: 30, w: 20, h: 15 }],
       },
       {
+        // CREATED + unpriced — walk-in candidate: customer hands the package
+        // straight to Admin Gudang (no scan needed).
         masterCode: "MKT-000006", customer: "Sari Indah", status: "CREATED",
         origin: "Jakarta Pusat", destination: "Bandung", priced: false, createdDaysAgo: 0,
+        penerima: { name: "Sari Indah", address: "Jl. Anggrek No. 3, Bandung", contact: "0812-3456-0005" },
         details: [{ description: "Kosmetik", quantity: 2, weightKg: 1, l: 20, w: 15, h: 10 }],
       },
     ];
     const priceByCode: Record<string, number> = {};
+    const shipmentIdByCode: Record<string, number> = {};
+    const detailRowsByCode: Record<string, { id: number; detailCode: string }[]> = {};
 
     for (const s of shipmentDefs) {
       const createdAt = daysAgo(s.createdDaysAgo);
@@ -243,9 +270,15 @@ async function runSeed(): Promise<void> {
           origin: s.origin, destination: s.destination,
           originWarehouseId: gudang["Jakarta Pusat"],
           destinationWarehouseId: gudang[s.destination],
+          arrivedWarehouseId: ["RECEIVED_AT_GUDANG", "ARRIVED_AT_GUDANG"].includes(s.status) ? gudang["Jakarta Pusat"] : null,
+          penerimaName: s.penerima.name,
+          penerimaAddress: s.penerima.address,
+          penerimaContact: s.penerima.contact,
           createdAt, updatedAt: createdAt,
         },
       });
+      shipmentIdByCode[s.masterCode] = shipment.id;
+      detailRowsByCode[s.masterCode] = [];
       // quantity N expands into N package rows — each with a unique detailCode (QR label)
       const pricedRows: { lengthCm: number | null; widthCm: number | null; heightCm: number | null; actualWeightKg: number }[] = [];
       let detailSeq = 1;
@@ -260,6 +293,7 @@ async function runSeed(): Promise<void> {
             },
           });
           pricedRows.push({ lengthCm: row.lengthCm, widthCm: row.widthCm, heightCm: row.heightCm, actualWeightKg: row.actualWeightKg });
+          detailRowsByCode[s.masterCode].push({ id: row.id, detailCode: row.detailCode });
         }
       }
       // Pricing snapshot computed with the shared engine (L×W×H/1.000.000 × multiplier)
@@ -298,27 +332,50 @@ async function runSeed(): Promise<void> {
         });
       }
 
-      // Pickup for statuses after CREATED
+      // Pickup for statuses after CREATED (+ per-package scans so Riwayat Scan
+      // shows SCANNED / TYPED methods on completed tasks)
       if (["PICKED_UP", "RECEIVED_AT_GUDANG", "IN_TRANSPORT", "DELIVERED"].includes(s.status)) {
-        await db.pickup.create({
+        const pickup = await db.pickup.create({
           data: {
             pickupCode: `PICK-2026-${s.masterCode.slice(-6)}`, masterId: shipment.id,
             kurirId: usersByHandle.dewi.employeeId,
             status: "COMPLETED", createdAt, completedAt: daysAgo(Math.max(0, s.createdDaysAgo - 0.4)), updatedAt: createdAt,
           },
         });
+        for (const [i, d] of detailRowsByCode[s.masterCode].entries()) {
+          await db.handoverScan.create({
+            data: {
+              pickupId: pickup.id, context: "pickup", scanLevel: "detail", detailId: d.id, payload: d.detailCode,
+              result: "ok", method: i % 4 === 3 ? "TYPED" : "SCANNED", // mostly scanner, some typed
+              scannedById: usersByHandle.dewi.id, scannedAt: daysAgo(Math.max(0, s.createdDaysAgo - 0.4)),
+            },
+          });
+        }
       }
-      // Payment for priced shipments (amount = computed price, keeps demo coherent)
+      // Gudang arrival scans for RECEIVED_AT_GUDANG shipments (mostly SCANNED,
+      // one TYPED so Riwayat Scan differentiates both methods)
+      if (["RECEIVED_AT_GUDANG"].includes(s.status)) {
+        for (const [i, d] of detailRowsByCode[s.masterCode].entries()) {
+          await db.handoverScan.create({
+            data: {
+              masterId: shipment.id, context: "gudang_arrival", scanLevel: "detail", detailId: d.id, payload: d.detailCode,
+              result: "ok", method: i === detailRowsByCode[s.masterCode].length - 1 ? "TYPED" : "SCANNED",
+              scannedById: usersByHandle.agus.id, scannedAt: daysAgo(Math.max(0, s.createdDaysAgo - 0.6)),
+            },
+          });
+        }
+      }
+      // Payment for priced shipments — DP/balance demo values per def
       const priceAmount = priceByCode[s.masterCode];
-      if (s.priced && priceAmount != null) {
+      if (s.payment && priceAmount != null) {
         await db.payment.create({
           data: {
-            masterId: shipment.id, method: s.status === "DELIVERED" ? "CASH" : "TRANSFER",
-            amount: priceAmount, status: s.status === "IN_TRANSPORT" ? "VERIFIED" : "RECORDED",
+            masterId: shipment.id, method: s.payment.method,
+            amount: s.payment.amount, status: s.payment.status,
             reference: `PAY-${s.masterCode.slice(-6)}`,
             recordedById: usersByHandle.dewi.id, createdAt,
-            verifiedById: s.status === "IN_TRANSPORT" ? usersByHandle.siti.id : null,
-            verifiedAt: s.status === "IN_TRANSPORT" ? daysAgo(Math.max(0, s.createdDaysAgo - 0.5)) : null,
+            verifiedById: s.payment.status === "VERIFIED" ? usersByHandle.siti.id : null,
+            verifiedAt: s.payment.status === "VERIFIED" ? daysAgo(Math.max(0, s.createdDaysAgo - 0.5)) : null,
           },
         });
       }
@@ -363,13 +420,22 @@ async function runSeed(): Promise<void> {
 
     // Completed delivery for MKT-000005
     const mkt5 = await db.masterShipment.findUniqueOrThrow({ where: { masterCode: "MKT-000005" } });
-    await db.delivery.create({
+    const delivery5 = await db.delivery.create({
       data: {
         deliveryCode: "DLV-2026-000001", masterId: mkt5.id, kurirId: usersByHandle.dewi.employeeId,
         status: "COMPLETED", proofOfDelivery: "Diterima oleh bagian gudang PT Maju Bersama",
         completedAt: daysAgo(2), createdAt: daysAgo(2.5),
       },
     });
+    // Delivery scans (SCANNED method) for the completed delivery — Riwayat Scan demo
+    for (const d of detailRowsByCode["MKT-000005"] ?? []) {
+      await db.handoverScan.create({
+        data: {
+          deliveryId: delivery5.id, context: "delivery", scanLevel: "detail", detailId: d.id, payload: d.detailCode,
+          result: "ok", method: "SCANNED", scannedById: usersByHandle.dewi.id, scannedAt: daysAgo(2),
+        },
+      });
+    }
 
     // Invoice for PT Maju
     const maju = await db.customer.findUniqueOrThrow({ where: { code: "CUS-000002" } });

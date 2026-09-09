@@ -65,6 +65,10 @@ export async function POST(req: NextRequest) {
     if (master.status !== "READY_FOR_PICKUP") {
       return fail(422, `Shipment harus berstatus READY_FOR_PICKUP (saat ini: ${master.status}).`);
     }
+    // Defensive gate: a pickup request requires a counted price (Revision rule)
+    if (master.priceAmount == null || master.priceAmount <= 0) {
+      return fail(422, "Harga shipment belum dihitung — hitung harga sebelum membuat task pickup.");
+    }
     const kurirId = num(body.kurirId);
     if (!kurirId) return fail(422, "Kurir wajib dipilih.", { kurirId: ["Kurir wajib dipilih."] });
     const kurir = await db.employee.findUnique({ where: { id: kurirId } });

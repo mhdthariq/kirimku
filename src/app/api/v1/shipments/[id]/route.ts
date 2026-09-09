@@ -1,8 +1,10 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { guard, ok, handle, fail, str } from "@/lib/api-helpers";
+import { guard, ok, handle, fail, str, num } from "@/lib/api-helpers";
 import { audit, diffFields } from "@/lib/audit";
 import { pricingPreview } from "@/lib/pricing";
+import { computeTotals } from "@/lib/shipment-totals";
+import { paymentSummary } from "@/lib/scan-flow";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -27,7 +29,9 @@ export async function GET(req: NextRequest, { params }: Params) {
     // Server-computed pricing preview (actual / volumetric / chargeable) so the
     // client never re-implements (or hardcodes) the volumetric formula.
     const preview = await pricingPreview(shipment);
-    return ok({ ...shipment, pricingPreview: preview });
+    const totals = computeTotals(shipment.details);
+    const payment = await paymentSummary(shipment.id);
+    return ok({ ...shipment, pricingPreview: preview, totals, paymentSummary: payment });
   });
 }
 
@@ -59,6 +63,10 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (body.destination !== undefined && data.destination === undefined) data.destination = str(body.destination) ?? existing.destination;
     if (body.originWarehouseId !== undefined) data.originWarehouseId = body.originWarehouseId ? Number(body.originWarehouseId) : null;
     if (body.destinationWarehouseId !== undefined) data.destinationWarehouseId = body.destinationWarehouseId ? Number(body.destinationWarehouseId) : null;
+    // Penerima (recipient) — printed on both resi types
+    if (body.penerimaName !== undefined) data.penerimaName = str(body.penerimaName);
+    if (body.penerimaAddress !== undefined) data.penerimaAddress = str(body.penerimaAddress);
+    if (body.penerimaContact !== undefined) data.penerimaContact = str(body.penerimaContact);
 
     const shipment = await db.masterShipment.update({ where: { id: existing.id }, data });
     await audit({

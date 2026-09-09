@@ -14,6 +14,7 @@ import { DeliveriesPage } from "@/components/app/pages/deliveries-page";
 import { TransportsPage } from "@/components/app/pages/transports-page";
 import { VehiclesPage } from "@/components/app/pages/vehicles-page";
 import { GudangPage } from "@/components/app/pages/gudang-page";
+import { GudangOpsPage } from "@/components/app/pages/gudang-ops-page";
 import { RoutesPage } from "@/components/app/pages/routes-page";
 import { CustomersPage } from "@/components/app/pages/customers-page";
 import { TariffsPage } from "@/components/app/pages/tariffs-page";
@@ -24,7 +25,7 @@ import { AuditPage } from "@/components/app/pages/audit-page";
 
 function Router() {
   const { user, loading } = useAuth();
-  const { segments } = useHashRoute();
+  const { segments, query } = useHashRoute();
 
   if (loading) {
     return (
@@ -45,8 +46,10 @@ function Router() {
     switch (section) {
       case "pickups":
         return <PickupsPage />;
+      case "gudang-ops":
+        return <GudangOpsPage />;
       case "shipments":
-        return <ShipmentsPage shipmentId={segments[1] ? Number(segments[1]) : null} />;
+        return <ShipmentsPage shipmentId={segments[1] ? Number(segments[1]) : null} autoPrint={query.get("print") === "1"} />;
       case "deliveries":
         return <DeliveriesPage />;
       case "transports":

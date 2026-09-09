@@ -15,8 +15,8 @@ export const SHIPMENT_STATUSES = [
 export type ShipmentStatus = (typeof SHIPMENT_STATUSES)[number];
 
 export const VALID_TRANSITIONS: Record<string, string[]> = {
-  CREATED: ["READY_FOR_PICKUP", "CANCELLED"],
-  READY_FOR_PICKUP: ["PICKED_UP", "CANCELLED"],
+  CREATED: ["READY_FOR_PICKUP", "RECEIVED_AT_GUDANG", "CANCELLED"],
+  READY_FOR_PICKUP: ["PICKED_UP", "RECEIVED_AT_GUDANG", "CANCELLED"],
   PICKED_UP: ["RECEIVED_AT_GUDANG", "CANCELLED"],
   RECEIVED_AT_GUDANG: ["IN_TRANSPORT", "CANCELLED"],
   IN_TRANSPORT: ["ARRIVED_AT_GUDANG", "CANCELLED"],
@@ -33,9 +33,9 @@ export const STATUS_LABELS: Record<string, string> = {
   CREATED: "Created",
   READY_FOR_PICKUP: "Ready for Pickup",
   PICKED_UP: "Picked Up",
-  RECEIVED_AT_GUDANG: "Received at Gudang",
+  RECEIVED_AT_GUDANG: "Arrive at Gudang",
   IN_TRANSPORT: "In Transport",
-  ARRIVED_AT_GUDANG: "Arrived at Gudang",
+  ARRIVED_AT_GUDANG: "Arrive at Gudang (Dest.)",
   DELIVERED: "Delivered",
   CANCELLED: "Cancelled",
   // pickups

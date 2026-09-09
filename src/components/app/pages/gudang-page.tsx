@@ -27,11 +27,12 @@ interface GudangForm {
   city: string;
   address: string;
   notes: string;
+  customerSupportContact: string;
   latitude: string;
   longitude: string;
 }
 
-const EMPTY: GudangForm = { name: "", city: "", address: "", notes: "", latitude: "", longitude: "" };
+const EMPTY: GudangForm = { name: "", city: "", address: "", notes: "", customerSupportContact: "", latitude: "", longitude: "" };
 
 export function GudangPage() {
   const { user } = useAuth();
@@ -71,6 +72,7 @@ export function GudangPage() {
       city: w.city ?? "",
       address: w.address ?? "",
       notes: w.notes ?? "",
+      customerSupportContact: w.customerSupportContact ?? "",
       latitude: w.latitude == null ? "" : String(w.latitude),
       longitude: w.longitude == null ? "" : String(w.longitude),
     });
@@ -85,6 +87,7 @@ export function GudangPage() {
       city: form.city || null,
       address: form.address || null,
       notes: form.notes || null,
+      customerSupportContact: form.customerSupportContact || null,
       latitude: form.latitude === "" ? null : Number(form.latitude),
       longitude: form.longitude === "" ? null : Number(form.longitude),
     };
@@ -158,6 +161,12 @@ export function GudangPage() {
               },
               { key: "city", header: "Kota", render: (w) => w.city ?? "—" },
               {
+                key: "cs",
+                header: "CS Contact",
+                hideOnMobile: true,
+                render: (w) => w.customerSupportContact ?? "—",
+              },
+              {
                 key: "coords",
                 header: "Koordinat",
                 hideOnMobile: true,
@@ -226,6 +235,9 @@ export function GudangPage() {
               </Field>
               <Field label="Alamat" htmlFor="g-address">
                 <Input id="g-address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Jl. …" disabled={busy} />
+              </Field>
+              <Field label="Customer Support" htmlFor="g-cs" hint="dicetak di resi">
+                <Input id="g-cs" value={form.customerSupportContact} onChange={(e) => setForm({ ...form, customerSupportContact: e.target.value })} placeholder="0811-1000-001" disabled={busy} />
               </Field>
               <Field label="Latitude" htmlFor="g-lat">
                 <Input id="g-lat" value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} placeholder="-6.9175" disabled={busy} />

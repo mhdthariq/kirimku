@@ -123,6 +123,7 @@ Reset total (hapus db lama mulai dari nol): hapus file `db/custom.db` → `bun r
 | `siti` | `Demo#Pass2026` | Admin Kantor | Operasional kantor, pembayaran, invoice |
 | `budi` | `Demo#Pass2026` | Marketing | Customer & shipment |
 | `agus` | `Demo#Pass2026` | Admin Gudang | Gudang, route, transport |
+| `wawan` | `Demo#Pass2026` | Staff Gudang | Gudang Jakarta Pusat saja (scoped) |
 | `dewi` | `Demo#Pass2026` | Kurir | Pickup & delivery |
 | `rizky` | `Demo#Pass2026` | Kurir | Pickup & delivery |
 | `joko` | `Demo#Pass2026` | Driver | Transport |
@@ -148,6 +149,12 @@ Semua password staff menggunakan `Demo#Pass2026`.
 12. **Perhitungan harga dengan multiplier configurable (Rev. 3)** — formula volumetrik `L × W × H / 1.000.000 × multiplier` (kg/m³, diatur per tarif di menu Tariffs); UI memakai **pratinjau harga terhitung server** (tidak ada angka hardcode lagi); tombol **"Hitung Ulang Harga"** tersedia untuk memperbaiki snapshot lama.
 13. **Rute dari dropdown tarif (Rev. 3)** — membuat shipment tidak lagi mengetik Kota Asal/Tujuan; pilih rute dari daftar tarif aktif yang **otomatis difilter sesuai tipe customer (B2B hanya melihat rute B2B, B2C hanya B2C)**; kota asal/tujuan + aturan tarif terisi otomatis.
 14. **1 baris = 1 paket dengan kode unik (Rev. 3)** — input "Karton Tulis" jumlah 10 → dibuat 10 baris dengan 10 kode unik (`DTL-…-01` s/d `-10`); halaman detail punya tab **Semua** (semua paket) dan **Ringkas** (digabung per deskripsi & dimensi — murni tampilan, database tetap 1 baris per paket).
+15. **Alur kedatangan gudang (Rev. 4)** — menu **Gudang** (antara Pickups & Shipments): antrean paket PICKED_UP yang dibawa kurir; Admin Gudang scan tiap paket / tombol **Scan Semua** (mode reader) / **walk-in** (customer serah langsung, tanpa scan); halaman **Isi Gudang** menghitung paket per gudang + **Notify Marketing** untuk kiriman belum lunas.
+16. **Scan kamera / reader / ketik — kode disembunyikan (Rev. 4)** — scan pakai **kamera HP** (jsQR) atau **reader tool** (keyboard-wedge, auto-terdeteksi) atau **ketik manual**; kode paket & QR **tidak pernah ditampilkan** dan paste diblokir; kamera & reader tercatat **Scanned**, ketik manual tercatat **Typed** di Riwayat Scan.
+17. **Cetak Resi (Rev. 4)** — **Resi Shipment** (untuk customer: no. resi + QR + kode, Penerima, Berat, Volume, jumlah Detail) + **Resi Detail per paket** (QR + kode, Penerima, berat & volume per paket, pcs `001/004`, Pengirim + telp) — nama perusahaan di bagian atas keduanya + CS tiap gudang; otomatis terbuka saat **Submit for Pickup**.
+18. **Penerima & kolom Volume/Berat (Rev. 4)** — data Penerima (nama/alamat/kontak) per shipment; tabel shipment kini: Resi · Customer & Rute · Detail · Harga · **Volume** · **Berat** · Dibuat · Status · Aksi; tab status lengkap (All/Created/Ready/Picked/**Arrive at Gudang**/In Transport/Delivered/Cancelled).
+19. **Aturan DP & gate pickup (Rev. 4)** — shipment **tidak bisa di-submit untuk pickup sebelum harga dihitung**; paket hanya boleh dijemput setelah **DP ≥ 50%**; kurir bisa mencatat **sisa pembayaran saat pickup**; cancel shipment selalu dengan **dialog konfirmasi**.
+20. **PWA — bisa di-install (Rev. 4)** — manifest + icon + service worker; item "Install App" di menu akun (iOS: instruksi Add to Home Screen); layout responsif terverifikasi desktop/laptop/tablet/ponsel.
 
 ---
 

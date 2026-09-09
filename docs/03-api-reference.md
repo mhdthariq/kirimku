@@ -92,13 +92,13 @@ The first request after a fresh `db:push` triggers `ensureSeed()` (RBAC + demo d
 
 | Method | Endpoint | Permission | Description |
 |---|---|---|---|
-| GET | `/shipments` | `shipment.view` | List + `?status`, `?q`, `?customerId`, `?unpaid` |
-| POST | `/shipments` | `shipment.create` | `{customerId, tariffId, originWarehouseId?, destinationWarehouseId?}` — **tariffId** from the route dropdown (filtered by customer B2B/B2C); origin/destination auto-filled from the tariff and `tariffId` stored on the shipment. Legacy `{origin, destination}` still accepted. → code `MKT-000NNN` + resi + tracking `CREATED` |
-| GET | `/shipments/{id}` | `shipment.view` | Full detail (customer, gudang, tariff, pricing, counts, latest payment) **+ `pricingPreview`** (server-computed actual/volumetric/chargeable kg, multiplier, estimation) |
-| PUT | `/shipments/{id}` | `shipment.update` | Update master fields (while editable) — accepts `tariffId` to change the route |
+| GET | `/shipments` | `shipment.view` | List + `?status`, `?q`, `?customerId`, `?unpaid` — every row also carries **`totals {totalPackages, totalActualKg, totalVolumeM3}`** (Revision 4: Volume + Berat columns) and the penerima fields |
+| POST | `/shipments` | `shipment.create` | `{customerId, tariffId, originWarehouseId?, destinationWarehouseId?, penerimaName?, penerimaAddress?, penerimaContact?}` — **tariffId** from the route dropdown (filtered by customer B2B/B2C); origin/destination auto-filled from the tariff and `tariffId` stored on the shipment. Penerima (recipient) is printed on both resi types. Legacy `{origin, destination}` still accepted. → code `MKT-000NNN` + resi + tracking `CREATED` |
+| GET | `/shipments/{id}` | `shipment.view` | Full detail (customer, gudang, tariff, pricing, counts, latest payment) **+ `pricingPreview`** (server-computed actual/volumetric/chargeable kg, multiplier, estimation), **+ `totals`**, **+ `paymentSummary`** (paid/remaining/DP status) |
+| PUT | `/shipments/{id}` | `shipment.update` | Update master fields (while editable) — accepts `tariffId` to change the route, and `penerimaName/penerimaAddress/penerimaContact` |
 | DELETE | `/shipments/{id}` | `shipment.delete` | Delete (cascades details/tracking) |
-| POST | `/shipments/{id}/ready` | `shipment.update` | `CREATED → READY_FOR_PICKUP` |
-| POST | `/shipments/{id}/cancel` | `shipment.cancel` | Any non-terminal → `CANCELLED` (blocked if priced & paid) |
+| POST | `/shipments/{id}/ready` | `shipment.update` ∥ `pickup.create` | `CREATED → READY_FOR_PICKUP`. **Gates (Revision 4):** 422 if the price has not been counted, 422 if Penerima is empty (it is printed on the resi). After success the UI opens the Resi print preview (Shipment Resi + Detail Resi) |
+| POST | `/shipments/{id}/cancel` | `shipment.cancel` | Any non-terminal → `CANCELLED`; the UI always asks for confirmation first (Revision 4) |
 | GET | `/shipments/{id}/tracking` | `shipment.view_tracking` | Tracking timeline (events + actors, newest first) |
 | GET | `/shipments/{id}/details` | `shipment_detail.view` | Package rows (one row per package) |
 | POST | `/shipments/{id}/price` | `shipment.update` | Compute pricing from tariff + packages → sets CW, rate, amount, `pricedAt`. **Recomputable** while `CREATED/READY_FOR_PICKUP/PICKED_UP` (fixes previously wrong numbers) |
@@ -124,8 +124,8 @@ Kurir executor mode: `GET /pickups?mine=true` returns only tasks assigned to the
 | GET | `/pickups/{id}` | `pickup.view` | Pickup + master details + scan log + `progress {total, scanned, allScanned, details[]}` |
 | POST | `/pickups` | `pickup.create` | `{masterId, kurirId?, notes?}` → code `PICK-YYYY-…`; shipment must be `READY_FOR_PICKUP` |
 | PUT | `/pickups/{id}` | `pickup.assign_kurir` | Reassign kurir / update notes |
-| POST | `/pickups/{id}/scans` | `pickup.scan` | `{payload}` — QR handover scan. Matches payload against detail codes: `ok` marks the package scanned, `duplicate` re-scan, `unexpected` unknown QR. Only the assigned kurir (or assigner/owner) may scan. Returns `{scan, message, progress}` |
-| POST | `/pickups/{id}/confirm` | `pickup.confirm` | **Requires every package scanned** (`progress.allScanned`); `{notes?}` → pickup `COMPLETED`, shipment `PICKED_UP`, tracking shows `Picked-up by [Kurir Name]` |
+| POST | `/pickups/{id}/scans` | `pickup.scan` | `{payload, method?}` — QR handover scan. `method`: `SCANNED` (camera / reader tool) or `TYPED` (manual input) — recorded on every scan and shown in Riwayat Scan. Matches payload against detail codes: `ok` marks the package scanned, `duplicate` re-scan, `unexpected` unknown QR. Only the assigned kurir (or assigner/owner) may scan. Returns `{scan, message, progress}` — messages never echo the code back (anti copy-paste) |
+| POST | `/pickups/{id}/confirm` | `pickup.confirm` | **Requires every package scanned** AND **DP ≥ 50% paid**; `{notes?, payment?: {method, amount, reference?}}` — the optional `payment` records the remaining balance collected by the kurir at pickup → pickup `COMPLETED`, shipment `PICKED_UP`, tracking `Picked-up by [Kurir Name] — sisa CASH Rp… diterima kurir` |
 | DELETE | `/pickups/{id}` | `pickup.view` (owner/assigner) | Cancel pickup while `ASSIGNED` |
 
 ## Deliveries
@@ -160,6 +160,24 @@ Same executor mode: `GET /deliveries?mine=true` filters to the logged-in kurir. 
 | GET | `/vehicles` | `vehicle.view` | List + `?status`, `?q` (includes current crew assignment) |
 | POST | `/vehicles` | `vehicle.create` | `{vehicleNumber, name?, maxWeightKg, maxVolumeM3, status?, notes?}` |
 | PUT | `/vehicles/{id}` | `vehicle.update` | Update fields/status |
+
+## Gudang operations (arrival workspace)
+
+`GET /gudang` — the workspace behind the "Gudang" menu (between Pickups and Shipments). Guard: `shipment.view`. Response:
+
+- `scope` — `{warehouseId, warehouseName, scoped}`: `scoped=true` for users holding `warehouse.scope_own` (staff gudang, see `Employee.warehouseId`) — their view is filtered to their own gudang
+- `arrivals[]` — shipments with status `PICKED_UP` a kurir is bringing back to the gudang: masterCode, customer, route, price/paid/remaining (`dpOk`), packages count, `scannedCount` + `scannedByMethod {SCANNED, TYPED}`, kurir name
+- `walkIns[]` — shipments `CREATED`/`READY_FOR_PICKUP` a customer can hand over directly at the counter
+- `warehouses[]` — per-gudang contents: `heldShipments`, `heldPackages`, `heldWeightKg`, `unpaidCount`, `customerSupportContact` + the shipments currently held (origin-stage & destination-stage)
+
+| Method | Endpoint | Permission | Description |
+|---|---|---|---|
+| GET | `/gudang` | `shipment.view` | Workspace feed described above (warehouse-scoped for staff gudang) |
+| GET | `/shipments/{id}/arrival-scans` | `shipment.view` | Arrival scan progress for a shipment (gudang_arrival context) — includes per-package `scanMethod` |
+| POST | `/shipments/{id}/arrival-scans` | `shipment.confirm_arrival` | `{payload, method?}` — one package scan while the kurir drops off picked-up packages. Shipment must be `PICKED_UP`. Codes never echoed back |
+| POST | `/shipments/{id}/arrival-scan-all` | `shipment.confirm_arrival` | **Scan-Semua**: bulk-marks every not-yet-scanned package as `SCANNED` (reader batch mode) → `{created, progress, message}` |
+| POST | `/shipments/{id}/arrive` | `shipment.confirm_arrival` | `{warehouseId, mode: "scan" \| "walk_in", notes?}` — confirm Tiba di Gudang. `scan` mode requires `PICKED_UP` + all packages scanned; `walk_in` (customer at the counter, no scan) works straight from `CREATED`/`READY_FOR_PICKUP` → `RECEIVED_AT_GUDANG`, stamps `arrivedWarehouseId` |
+| POST | `/shipments/{id}/notify-marketing` | `shipment.notify_marketing` | `{note?}` — gudang tells marketing an unpaid shipment is sitting at the gudang (tracking event + audit) |
 
 ## Gudang (warehouses) — no "type" field
 

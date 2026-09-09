@@ -52,6 +52,26 @@ Database and API were fully rebuilt and corrected in the process — details in 
 | R5 | **Price recompute** — "Hitung Ulang Harga" available while `CREATED/READY_FOR_PICKUP/PICKED_UP` so previously wrong snapshots can be corrected | `shipments-page.tsx` + price route guard |
 | R6 | Seed data rewritten to match: tariffs with multipliers (250/300), N-package rows, prices computed by the real engine (payments & invoice lines stay coherent) | `src/lib/seed.ts` |
 
+## Revision round 4 — gudang arrival workflow, scan methods, resi printing, PWA
+
+| # | Revision | Where it is implemented |
+|---|---|---|
+| R1 | **Pickup requires a counted price** — submitting a shipment for pickup is rejected (422) until "Hitung Harga" has stored a price; Penerima must also be filled (printed on resi) | `POST /shipments/{id}/ready` gates; guidance banner in shipments detail |
+| R2 | **Cancel confirmation dialog** — cancelling a shipment always asks first (AlertDialog), never a direct cancel | `shipments-page.tsx` cancel AlertDialog |
+| R3 | **Permission to confirm arrival at gudang** (`shipment.confirm_arrival`) + **Scan-Semua button** for Admin Gudang to bulk-scan every pending package in reader mode | `POST /shipments/{id}/arrive`, `POST /shipments/{id}/arrival-scan-all`; Gudang ops page |
+| R4 | **Camera / reader / typed scanning with codes hidden** — kurir & gudang scan via phone camera (jsQR), hardware reader tools (fast keyboard-wedge auto-detected), or manual typing; package codes & QR are never displayed and paste into the scan field is blocked | `scan-console.tsx`; reworked `qr-scan-dialog.tsx`; scan APIs accept `method` |
+| R5 | **Scanned vs Typed differentiation** — every HandoverScan stores `method`; Riwayat Scan shows Scanned (camera/reader) vs Typed badges | `HandoverScan.method`, progress responses include `scanMethod` |
+| R6 | **Reader tools supported** — barcode guns act as fast keyboards; the timing heuristic marks them SCANNED | `scan-console.tsx` keystroke timing detection |
+| R7 | **Admin Gudang can request pickups & walk-in arrival** — gudang staff may create pickup tasks for customers they know; a customer handing the package over at the counter is confirmed "Tiba di Gudang" directly, no scanning | Gudang ops "Pelanggan Langsung" tab; `POST /shipments/{id}/arrive` `mode:"walk_in"` |
+| R8 | **Resi printing when pickup is requested** — after Submit for Pickup the print preview opens automatically; also a "Cetak Resi" button | `resi-print.tsx` overlay; `shipments-page.tsx` |
+| R9 | **Volume + Berat columns** in the shipment list | `GET /shipments` totals; list columns |
+| R10 | **Penerima (name/address/contact)** on every shipment + **customer support contact per gudang** — both printed on Resi Shipment & Resi Detail | `MasterShipment.penerima*`, `Warehouse.customerSupportContact` |
+| R11 | **Resi Shipment** (resi no + QR + code, Penerima, Berat, Volume, Detail count, company header) + **Resi Detail sticker per package** (QR + code, Penerima, individual berat/volume, pcs 001/004, Pengirim + phone) | `resi-print.tsx`; `@media print` rules in `globals.css` |
+| R12 | **Status tabs** All / Created / Ready for Pickup / Picked Up / Arrive at Gudang / In Transport / Delivered / Cancelled | shipments list toolbar (Arrive at Gudang merges RECEIVED + ARRIVED) |
+| R13 | **Responsive + PWA** — installable app (manifest, icons, service worker, install menu item), layout verified desktop/laptop/tablet/phone | `public/manifest.webmanifest`, `public/sw.js`, `pwa.tsx`, `layout.tsx` metadata |
+| R14 | **DP payment rule** — packages can only be picked up after ≥ 50% is paid; kurir records the balance at pickup; gudang can Notify Marketing about unpaid shipments | `POST /pickups/{id}/confirm` DP gate + `payment`; `POST /shipments/{id}/notify-marketing` |
+| R15 | **Warehouse scoping** — roles below Admin Gudang (new `staff-gudang` role, demo user `wawan`) only see their own gudang's queue/contents | `warehouse.scope_own` permission, `Employee.warehouseId`, `GET /gudang` scope filter |
+
 ## Document index
 
 | File | Contents |
@@ -97,6 +117,7 @@ prisma/
 | `siti` | `Demo#Pass2026` | Admin Kantor |
 | `budi` | `Demo#Pass2026` | Marketing |
 | `agus` | `Demo#Pass2026` | Admin Gudang |
+| `wawan` | `Demo#Pass2026` | Staff Gudang (scoped to Gudang Jakarta Pusat) |
 | `dewi`, `rizky` | `Demo#Pass2026` | Kurir |
 | `joko` | `Demo#Pass2026` | Driver |
 | `andi` | `Demo#Pass2026` | Kenek |

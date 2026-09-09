@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { guard, ok, handle, fail, num } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
 import { resolveTariff, computePricing } from "@/lib/pricing";
+import { hasPermission } from "@/lib/auth";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -14,7 +15,11 @@ type Params = { params: Promise<{ id: string }> };
  */
 export async function POST(req: NextRequest, { params }: Params) {
   return handle(async () => {
-    const user = await guard(req, "shipment.update");
+    const user = await guard(req, "shipment.view");
+    // allowed: shipment editors, or staff who may initiate a pickup request
+    if (!hasPermission(user, "shipment.update") && !hasPermission(user, "pickup.create")) {
+      return fail(403, "Missing permission: shipment.update");
+    }
     const { id } = await params;
     const master = await db.masterShipment.findUnique({
       where: { id: Number(id) },

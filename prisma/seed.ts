@@ -42,7 +42,7 @@ async function main() {
     ]);
 
   console.log("✔ Seed selesai. Ringkasan data mock-up:");
-  console.log(`   Users: ${users} (owner + 7 staff)`);
+  console.log(`   Users: ${users} (owner + 8 staff)`);
   console.log(`   Employees: ${employees}`);
   console.log(`   Gudang: ${warehouses}`);
   console.log(`   Vehicles: ${vehicles}`);
@@ -64,6 +64,7 @@ async function main() {
   console.log("  rizky  / Demo#Pass2026        (kurir)");
   console.log("  joko   / Demo#Pass2026        (driver)");
   console.log("  andi   / Demo#Pass2026        (kenek)");
+  console.log("  wawan  / Demo#Pass2026        (staff gudang, scoped ke Gudang Jakarta Pusat)");
 }
 
 main()

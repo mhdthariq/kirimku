@@ -20,6 +20,9 @@ model Employee {
   name           String
   phone          String?
   position       String?
+  // staff gudang assignment — roles below Admin Gudang are scoped to their own
+  // gudang (queue, contents, scans) via this field
+  warehouseId    Int?
   isActive       Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -134,6 +137,13 @@ model MasterShipment {
   destination            String
   originWarehouseId      Int?
   destinationWarehouseId Int?
+  // gudang where the package physically arrived (set when Admin Gudang confirms
+  // arrival — via kurir drop-off scan or walk-in)
+  arrivedWarehouseId     Int?
+  // Penerima (recipient) — typed manually, printed on both resi types
+  penerimaName           String?
+  penerimaAddress        String?
+  penerimaContact        String?
   chargeableWeightKg     Float?
   ratePerKg              Float?
   priceAmount            Float?
@@ -189,6 +199,8 @@ model Warehouse {
   address   String?
   latitude  Float?
   longitude Float?
+  // customer support contact printed on Shipment Resi & Detail Resi
+  customerSupportContact String?
   isActive  Boolean  @default(true)
   notes     String?
   createdAt DateTime @default(now())
@@ -324,17 +336,21 @@ model Pickup {
 
 // QR handover scan log — each physical package (detail barang) carries a QR
 // label encoding its detailCode. Kurir scans every package at pickup and at
-// delivery; a task can only be confirmed once all details scanned "ok".
+// delivery; Admin Gudang scans every package when a kurir drops them off at
+// the gudang. A task can only be confirmed once all details scanned "ok".
 model HandoverScan {
   id          Int      @id @default(autoincrement())
   pickupId    Int?
   pickup      Pickup?  @relation(fields: [pickupId], references: [id], onDelete: Cascade)
   deliveryId  Int?
   delivery    Delivery? @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  context     String   @default("pickup") // pickup | delivery | gudang_arrival
+  masterId    Int?     // set for gudang_arrival scans (no pickup/delivery task)
   scanLevel   String   // master | detail
   detailId    Int?     // set when the payload matched a detail barang
   payload     String
   result      String   // ok | duplicate | unexpected
+  method      String   @default("TYPED") // SCANNED (camera / reader tool) | TYPED (manual input)
   scannedById Int?
   scannedBy   User?    @relation(fields: [scannedById], references: [id])
   scannedAt   DateTime @default(now())

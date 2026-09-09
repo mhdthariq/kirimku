@@ -26,7 +26,7 @@
 | Model | Purpose | Notable fields / rules |
 |---|---|---|
 | `Customer` | Shipper master | `code @unique`, `type` = `"b2b" \| "b2c"` (drives tariff selection + invoice eligibility) |
-| `MasterShipment` | The shipment/booking | `masterCode @unique` (`MKT-000NNN`), `resi @unique`, `status` (lifecycle — see `05-business-flows.md`), `origin`/`destination` city names, `tariffId` (tariff selected from the route dropdown — Revision 3), FKs to origin/destination `Warehouse`, pricing snapshot: `chargeableWeightKg`, `ratePerKg`, `priceAmount`, `pricedAt` |
+| `MasterShipment` | The shipment/booking | `masterCode @unique` (`MKT-000NNN`), `resi @unique`, `status` (lifecycle — see `05-business-flows.md`), `origin`/`destination` city names, `tariffId` (tariff selected from the route dropdown — Revision 3), FKs to origin/destination `Warehouse`, `arrivedWarehouseId` (gudang where arrival was confirmed — Revision 4), **Penerima**: `penerimaName`/`penerimaAddress`/`penerimaContact` (printed on both resi types — Revision 4), pricing snapshot: `chargeableWeightKg`, `ratePerKg`, `priceAmount`, `pricedAt` |
 | `DetailShipment` | **One row = one physical package** (Revision 3) | `detailCode @unique` (`DTL-…`), `description`, dims `lengthCm/widthCm/heightCm`, `actualWeightKg` — cascade delete with master. No `quantity` column: an input of N packages expands into N rows, each carrying its own QR label |
 | `TrackingEvent` | Immutable tracking timeline | `event`, `description`, optional `actorId` (User), `occurredAt` — cascade with master |
 
@@ -34,7 +34,7 @@
 
 | Model | Purpose | Notable fields / rules |
 |---|---|---|
-| `Warehouse` | Physical warehouse node | `code @unique` (`WH-000NNN`), `name`, `city`, `address`, optional `latitude`/`longitude` (map picker in UI) |
+| `Warehouse` | Physical warehouse node | `code @unique` (`WH-000NNN`), `name`, `city`, `address`, optional `latitude`/`longitude` (map picker in UI), `customerSupportContact` (printed on Resi Shipment & Resi Detail — Revision 4) |
 
 > Per requirement #9: there is **no `type` column and no separate "Gateway" entity/table** in the rebuilt schema. A gudang is a single kind of physical node; origin/destination linkage on `MasterShipment` covers everything the old split table tried to represent.
 
@@ -55,7 +55,7 @@
 | Model | Purpose | Notable fields / rules |
 |---|---|---|
 | `Pickup` | Kurir pickup task | `pickupCode @unique` (`PICK-YYYY-…`), FK `masterId`, `kurirId` (→ Employee), `status` = `ASSIGNED \| IN_PROGRESS \| COMPLETED \| CANCELLED` |
-| `HandoverScan` | QR scan log at pickup & delivery handover | `pickupId?` / `deliveryId?` (one set), `scanLevel` = `master \| detail`, `detailId?` matched package, `payload`, `result` = `ok \| duplicate \| unexpected`, `scannedById` |
+| `HandoverScan` | QR scan log at pickup, delivery & gudang-arrival handover | `pickupId?` / `deliveryId?` (one set) or `masterId + context="gudang_arrival"`, `scanLevel` = `master \| detail`, `detailId?` matched package, `payload`, `result` = `ok \| duplicate \| unexpected`, **`method`** = `SCANNED` (camera / reader tool) \| `TYPED` (manual input — Revision 4), `scannedById` |
 | `Discrepancy` | Missing/unexpected items | `type` = `MISSING_DETAIL \| UNEXPECTED_PAYLOAD`, `resolvedById/At`, `resolution` |
 | `Delivery` | Last-mile delivery task | `deliveryCode @unique` (`DLV-YYYY-…`), `kurirId`, `status` = `ASSIGNED \| COMPLETED \| FAILED`, `proofOfDelivery` text |
 
@@ -87,8 +87,10 @@ MasterShipment 1—* DetailShipment
 MasterShipment 1—* TrackingEvent
 MasterShipment 1—* Pickup 1—* HandoverScan   (QR detail scans)
 MasterShipment 1—* Delivery 1—* HandoverScan  (QR detail scans)
+MasterShipment 1—* HandoverScan (context = gudang_arrival — Revision 4)
 MasterShipment 1—* Payment
 MasterShipment *—* Transport   (via TransportShipment)
+Employee *—1 Warehouse (staff gudang scope — Revision 4)
 
 Route 1—* Checkpoint
 Route 1—* Transport *—1 Vehicle
@@ -221,3 +223,11 @@ A response containing `"token"` means the Supabase database is live and seeded.
 
 **Reset everything (SQLite):** delete `db/custom.db` → `bun run db:push` → `bun run db:seed`.
 **Reset everything (Supabase):** Supabase Dashboard → Database → Reset database, then re-run push + seed.
+
+### Revision 4 — schema additions
+
+- `MasterShipment`: `penerimaName` / `penerimaAddress` / `penerimaContact` (recipient — printed on resi), `arrivedWarehouseId` (gudang that confirmed the arrival)
+- `Warehouse.customerSupportContact` — CS phone printed on Resi Shipment & Resi Detail
+- `Employee.warehouseId` — staff gudang assignment; combined with the `warehouse.scope_own` permission it scopes roles below Admin Gudang to their own gudang (new `staff-gudang` system role)
+- `HandoverScan`: `method` (`SCANNED` \| `TYPED`), `context` (`pickup` \| `delivery` \| `gudang_arrival`), `masterId` (for gudang-arrival scans)
+- Status flow: `CREATED`/`READY_FOR_PICKUP` → `RECEIVED_AT_GUDANG` direct transitions added (walk-in arrivals)

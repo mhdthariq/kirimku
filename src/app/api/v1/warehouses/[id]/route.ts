@@ -19,6 +19,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (body.latitude !== undefined) data.latitude = num(body.latitude);
     if (body.longitude !== undefined) data.longitude = num(body.longitude);
     if (body.notes !== undefined) data.notes = str(body.notes);
+    if (body.customerSupportContact !== undefined) data.customerSupportContact = str(body.customerSupportContact);
     if (body.isActive !== undefined) data.isActive = Boolean(body.isActive);
     const warehouse = await db.warehouse.update({ where: { id: existing.id }, data });
     await audit({ action: "updated", entityType: "warehouse", entityId: warehouse.id, entityLabel: warehouse.name, actor: user, before: diffFields(existing, warehouse as unknown as Record<string, unknown>) });

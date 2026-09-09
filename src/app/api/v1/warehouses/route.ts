@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
         latitude: num(body.latitude),
         longitude: num(body.longitude),
         notes: str(body.notes),
+        customerSupportContact: str(body.customerSupportContact),
         isActive: true,
       },
     });

@@ -151,3 +151,50 @@ ASSIGNED ──scan all customer packages──► (all scanned) ──complete 
 - **Global view**: `#/audit` — filter by entity, actor, action, date range; CSV export.
 - **Per-menu view**: each page's "Log Aktivitas" tab calls `GET /audit-logs?entityType=<module>` — e.g. Gudang shows only `warehouse` events.
 - Logs are append-only; the API exposes no update/delete for audit rows.
+
+## Gudang arrival workflow (Revision 4)
+
+The **Gudang** menu (between Pickups and Shipments) is the warehouse workspace. Its lifecycle position:
+
+```
+CREATED ──(submit for pickup¹)──▶ READY_FOR_PICKUP ──(kurir scans all + confirm²)──▶ PICKED_UP
+   │                                     │                                                │
+   │                                     │(walk-in: customer hands package                │ kurir brings packages
+   │                                     │ over at the counter — NO scan)                 │ back to the gudang
+   │                                     ▼                                                ▼
+   └──────────────────────▶ RECEIVED_AT_GUDANG ◀──(Admin Gudang scans every package ──────┘
+                                            or "Scan Semua", then confirm)
+                                            │
+                                            ▼ (loaded into transport + depart)
+                                         IN_TRANSPORT ──▶ ARRIVED_AT_GUDANG ──▶ DELIVERED
+```
+
+¹ Submit-for-pickup gates: the **price must be counted** first ("Hitung Harga") and **Penerima must be filled** — both are printed on the resi. Submitting the pickup request automatically opens the **Resi print preview** (1 Resi Shipment + N Resi Detail stickers).
+
+² Kurir pickup confirm gates: every package scanned AND **DP ≥ 50% paid**. The kurir can record the remaining balance in the confirm dialog (`payment: {method, amount}`) — it becomes a RECORDED payment and the tracking event shows "sisa CASH Rp… diterima kurir".
+
+**Scan methods (anti copy-paste):** package codes and QR images are never displayed in the scanning UI. Scanning happens through:
+
+- **Phone camera** — getUserMedia + jsQR decoding, live video preview with a scan frame
+- **Reader tools** — USB/bluetooth barcode guns act as fast keyboards; the whole code arrives within ~100 ms and is auto-detected (keystroke timing heuristic)
+- **Manual typing** — reading the code from the physical label
+
+Camera and reader-tool captures are stored as `method = "SCANNED"`; manual typing is `method = "TYPED"`. Riwayat Scan differentiates them with badges. Paste into the scan field is blocked.
+
+**Walk-in arrivals** need no scanning: Admin Gudang confirms "Tiba di Gudang" straight from CREATED/READY_FOR_PICKUP (`POST /shipments/{id}/arrive {mode: "walk_in"}`). Scanning is only required for packages with status **PICKED_UP** (kurir drop-off).
+
+**"Scan Semua Paket"** (`arrival-scan-all`) bulk-marks every not-yet-scanned package as SCANNED in reader-batch mode, then the arrival confirmation unlocks.
+
+**Warehouse scoping:** Admin Gudang sees every gudang (contents grouped per gudang with package counts). Roles below Admin Gudang (`staff-gudang`, demo user `wawan`) hold `warehouse.scope_own` and are limited to their own gudang via `Employee.warehouseId` — queue, walk-ins and contents are all filtered.
+
+**Unpaid follow-up:** shipments sitting at a gudang with an open balance can be flagged to marketing ("Notify Marketing") — a tracking event + audit entry; marketing then follows up with the customer.
+
+## Resi printing (Revision 4)
+
+Printed via the browser (Cetak / Simpan PDF). Company name (configurable via `NEXT_PUBLIC_COMPANY_NAME`) is printed at the top of BOTH resi types; the gudang customer support contact appears on both too.
+
+**Resi Shipment** (given to the customer): resi number + QR code + the code printed below · Penerima (name/address/contact) · Berat (chargeable kg) · Volume (m³) · Detail (how many resi detail / packages) · Pengirim + phone · route · price · CS gudang asal & tujuan.
+
+**Resi Detail** (sticker per package): QR code + the code printed below · Penerima (name/contact/address) · Berat individual package · Volume individual · pcs `001/004` (package N of M) · Pengirim + phone number · dimensions & description · destination-gudang CS contact.
+
+Each resi prints on its own page (`@media print` rules; print preview hides the rest of the app).

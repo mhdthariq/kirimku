@@ -167,9 +167,15 @@ export interface Shipment {
   customer?: Customer | null;
   originWarehouseId?: number | null;
   destinationWarehouseId?: number | null;
+  arrivedWarehouseId?: number | null;
+  penerimaName?: string | null;
+  penerimaAddress?: string | null;
+  penerimaContact?: string | null;
   tariffId?: number | null;
   tariff?: Tariff | null;
   pricingPreview?: PricingPreview | null;
+  totals?: ShipmentTotals;
+  paymentSummary?: PaymentSummary;
   chargeableWeightKg: number | null;
   ratePerKg: number | null;
   priceAmount: number | null;
@@ -178,6 +184,21 @@ export interface Shipment {
   details?: DetailShipment[];
   _count?: { details: number; pickups: number; deliveries: number; payments: number };
   trackingEvents?: { id: number; event: string; description: string | null; occurredAt: string; actor?: { name: string } | null }[];
+}
+
+export interface ShipmentTotals {
+  totalPackages: number;
+  totalActualKg: number;
+  totalVolumeM3: number;
+}
+
+export interface PaymentSummary {
+  priceAmount: number | null;
+  paidAmount: number;
+  remainingAmount: number;
+  dpRequirement: number;
+  dpOk: boolean;
+  status: "UNPAID" | "DP" | "PAID" | "UNPRICED";
 }
 
 export interface TrackingEvent {
@@ -208,6 +229,8 @@ export interface ScanDetailState {
   scanned: boolean;
   scannedAt: string | null;
   scannedByName: string | null;
+  /** SCANNED (camera / reader tool) | TYPED (manual input) — Riwayat Scan */
+  scanMethod: string | null;
 }
 
 export interface ScanProgress {
@@ -218,7 +241,7 @@ export interface ScanProgress {
 }
 
 export interface ScanResponse {
-  scan: { id: number; payload: string; result: string; scanLevel: string; detailId: number | null; scannedAt: string };
+  scan: { id: number; payload: string; result: string; scanLevel: string; detailId: number | null; method?: string; scannedAt: string };
   message: string;
   progress: ScanProgress;
 }
@@ -283,6 +306,7 @@ export interface Warehouse {
   address: string | null;
   latitude: number | null;
   longitude: number | null;
+  customerSupportContact?: string | null;
   isActive: boolean;
   notes: string | null;
 }
@@ -437,13 +461,90 @@ export interface Permission {
 }
 
 export interface Options {
-  employees: { id: number; name: string; position: string | null }[];
+  company: { name: string };
+  employees: { id: number; name: string; position: string | null; warehouseId: number | null }[];
   vehicles: { id: number; vehicleNumber: string; name: string | null; maxWeightKg: number }[];
   routes: { id: number; name: string; origin: string | null; destination: string | null }[];
-  warehouses: { id: number; code: string; name: string; city: string | null }[];
+  warehouses: { id: number; code: string; name: string; city: string | null; customerSupportContact?: string | null }[];
   customers: { id: number; code: string; name: string; type: string }[];
   tariffs: { id: number; origin: string; destination: string; customerType: string | null; ratePerKg: number; minChargeableKg: number; volumetricMultiplier: number; roundingMode: string; roundingUnitKg: number }[];
   permissions: { id: number; slug: string; module: string; description: string | null }[];
+}
+
+// ---------------------------------------------------------------------------
+// Gudang operations workspace (GET /gudang)
+// ---------------------------------------------------------------------------
+
+export interface GudangArrivalQueueItem {
+  id: number;
+  masterCode: string;
+  customerName: string;
+  customerPhone: string | null;
+  origin: string;
+  destination: string;
+  originWarehouseId: number | null;
+  destinationWarehouseId: number | null;
+  priceAmount: number | null;
+  paidAmount: number;
+  remainingAmount: number | null;
+  dpOk: boolean;
+  penerimaName: string | null;
+  detailsCount: number;
+  totalWeightKg: number;
+  totalVolumeM3: number;
+  scannedCount: number;
+  scannedByMethod: { SCANNED: number; TYPED: number };
+  pickupCode: string | null;
+  kurirName: string | null;
+  updatedAt: string;
+}
+
+export interface GudangWalkInItem {
+  id: number;
+  masterCode: string;
+  customerName: string;
+  origin: string;
+  destination: string;
+  originWarehouseId: number | null;
+  destinationWarehouseId: number | null;
+  status: string;
+  priceAmount: number | null;
+  penerimaName: string | null;
+  detailsCount: number;
+  totalWeightKg: number;
+  totalVolumeM3: number;
+}
+
+export interface GudangContentShipment {
+  id: number;
+  masterCode: string;
+  customerName: string;
+  status: string;
+  stage: string;
+  packages: number;
+  weightKg: number;
+  volumeM3: number;
+  priceAmount: number | null;
+  remainingAmount: number | null;
+  updatedAt: string;
+}
+
+export interface GudangWorkspace {
+  scope: { warehouseId: number | null; warehouseName: string | null; scoped: boolean };
+  arrivals: GudangArrivalQueueItem[];
+  walkIns: GudangWalkInItem[];
+  warehouses: {
+    id: number;
+    code: string;
+    name: string;
+    city: string | null;
+    customerSupportContact: string | null;
+    heldShipments: number;
+    heldPackages: number;
+    heldWeightKg: number;
+    unpaidCount: number;
+    shipments: GudangContentShipment[];
+  }[];
 }
 
 export interface UnpaidShipment {

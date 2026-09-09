@@ -182,3 +182,39 @@
 .pulse-dot {
   animation: pulse-dot 2s ease-in-out infinite;
 }
+
+/* ---------------------------------------------------------------------------
+Resi print — when the ResiPrint portal is open, only it is printed
+(1 Resi Shipment + N Resi Detail stickers, one per page).
+--------------------------------------------------------------------------- */
+@media print {
+  body > *:not(#resi-print-portal) {
+    display: none !important;
+  }
+  #resi-print-portal {
+    position: static !important;
+    inset: auto !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+  }
+  #resi-print-portal > div:first-child {
+    display: none !important; /* hide the preview toolbar */
+  }
+  #resi-print-portal > div:last-child {
+    padding: 0 !important;
+  }
+  .resi-sheet {
+    break-after: page;
+    page-break-after: always;
+    box-shadow: none !important;
+    border: 1px solid #d4d4d4 !important;
+    max-width: 100% !important;
+  }
+  .resi-sheet:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+  @page {
+    margin: 10mm;
+  }
+}

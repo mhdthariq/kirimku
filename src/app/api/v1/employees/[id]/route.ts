@@ -16,6 +16,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (body.name !== undefined) data.name = str(body.name) ?? existing.name;
     if (body.phone !== undefined) data.phone = str(body.phone);
     if (body.position !== undefined) data.position = str(body.position);
+    if (body.warehouseId !== undefined) data.warehouseId = body.warehouseId ? Number(body.warehouseId) : null;
     if (body.isActive !== undefined) data.isActive = Boolean(body.isActive);
     const employee = await db.employee.update({ where: { id: existing.id }, data });
     await audit({ action: "updated", entityType: "employee", entityId: employee.id, entityLabel: employee.name, actor: user, before: diffFields(existing, employee as unknown as Record<string, unknown>) });

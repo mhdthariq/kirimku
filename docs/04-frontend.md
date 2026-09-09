@@ -115,3 +115,13 @@ The Gudang form reuses a smaller map picker for optional warehouse coordinates.
 - Sonner toasts for success/error feedback on every mutation.
 - Skeleton-free but instant switching (local state) with consistent loading spinners on tables.
 - Mobile cards preserve every action via icon buttons and overflow menus — nothing is desktop-only.
+
+## Revision 4 — Gudang ops page, scan console, resi printing, PWA
+
+- **Gudang (ops) page** (`gudang-ops-page.tsx`, menu between Pickups & Shipments): tabs *Kedatangan* (arrival queue for PICKED_UP shipments with per-shipment scan progress, sisa bayar, kurir), *Pelanggan Langsung* (walk-in confirm + "Minta Pickup" for Admin Gudang), *Isi Gudang* (per-gudang cards with held packages/shipments/kg + expandable shipment list + Notify Marketing for unpaid), *Log Aktivitas*. Warehouse-scoped for staff gudang. The old warehouse master-data page moved to **Master Gudang**.
+- **Scan console** (`scan-console.tsx`): shared by kurir (pickup/delivery) and Admin Gudang (arrival). Phone-camera scanning (jsQR), hardware reader auto-detection (keystroke timing), manual typing; codes never displayed, paste blocked; camera/reader → `SCANNED`, typing → `TYPED`.
+- **QR scan dialog rework**: no QR images / code list anymore (anti copy-paste); checklist shows "Paket N — description" with Scanned/Typed badges (Riwayat Scan); pickup confirm collects the payment balance (DP rule display included).
+- **Resi printing** (`resi-print.tsx`): full-screen print portal — 1 Resi Shipment + N Resi Detail stickers, QR codes, pcs numbering, Penerima, company header, gudang CS contacts. Opens automatically after Submit for Pickup; also via the "Cetak Resi" button and deep link `#/shipments/{id}?print=1`.
+- **Shipments list**: status tabs (All / Created / Ready for Pickup / Picked Up / Arrive at Gudang / In Transport / Delivered / Cancelled — counts included), new **Volume** and **Berat** columns, penerima shown under the customer, print shortcut in the row actions.
+- **Cancel shipment** always shows a confirmation AlertDialog first.
+- **PWA**: `manifest.webmanifest` + generated PNG icons (192/512/maskable/apple-touch) + `sw.js` (icons cache-first, UI network-first so dev iterations stay fresh) + "Install App" menu item (iOS shows Add-to-Home-Screen instructions). Responsive layout verified at 1440px, 900px, 768px (tables) and 390px (cards + bottom nav).
