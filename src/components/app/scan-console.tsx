@@ -81,12 +81,13 @@ export function ScanConsole({ onScan, disabled, placeholder = "Arahkan QR ke kam
         audio: false,
       });
       streamRef.current = stream;
+      // Reveal the <video> element first (it isn't mounted yet — it only
+      // renders once cameraOn is true) — the effect below attaches the
+      // stream once the element actually exists in the DOM. Attaching
+      // synchronously here would silently no-op because videoRef.current
+      // is still null on this render pass, which was the root cause of
+      // "camera doesn't work" (permission granted, no preview, no scans).
       setCameraOn(true);
-      const video = videoRef.current;
-      if (video) {
-        video.srcObject = stream;
-        await video.play().catch(() => undefined);
-      }
       // decode loop
       timerRef.current = setInterval(() => {
         const v = videoRef.current;
@@ -116,6 +117,21 @@ export function ScanConsole({ onScan, disabled, placeholder = "Arahkan QR ke kam
       setCameraOn(false);
     }
   }, [submit]);
+
+  // Attach the live stream to the <video> element once it's actually
+  // mounted (it only renders while cameraOn is true). Doing this in an
+  // effect — rather than right after getUserMedia resolves — guarantees
+  // videoRef.current is populated, since effects run after React commits
+  // the DOM for the render that turned cameraOn on.
+  useEffect(() => {
+    if (!cameraOn) return;
+    const video = videoRef.current;
+    const stream = streamRef.current;
+    if (!video || !stream) return;
+    video.srcObject = stream;
+    const playPromise = video.play();
+    if (playPromise) playPromise.catch(() => undefined);
+  }, [cameraOn]);
 
   // cleanup on unmount
   useEffect(() => () => stopCamera(), [stopCamera]);

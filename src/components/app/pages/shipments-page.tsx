@@ -9,7 +9,9 @@ import {
   Pencil,
   Plus,
   Printer,
+  QrCode,
   Receipt,
+  ScanLine,
   Send,
   Trash2,
   Truck,
@@ -25,6 +27,8 @@ import {
   apiPut,
   hasPermission,
   type DetailShipment,
+  type GudangArrivalQueueItem,
+  type GudangWorkspace,
   type Options,
   type Payment,
   type Shipment,
@@ -35,9 +39,11 @@ import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
 import { StatusBadge } from "@/components/app/status-badge";
 import { ResiPrint } from "@/components/app/resi-print";
+import { ArrivalScanDialog } from "@/components/app/arrival-scan-dialog";
 import { Field, FormSelect, Input, NumberInput, SubmitButton, Textarea, formatDate, formatNumber, formatRupiah } from "@/components/app/form-parts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -98,6 +104,7 @@ function ShipmentList() {
     create: hasPermission(user, "shipment.create"),
     cancel: hasPermission(user, "shipment.cancel"),
     delete: hasPermission(user, "shipment.delete"),
+    confirmArrival: hasPermission(user, "shipment.confirm_arrival"),
   };
 
   const { data, loading, reload } = useApiData<Shipment[]>(() => apiGet<Shipment[]>("/shipments"), []);
@@ -108,6 +115,7 @@ function ShipmentList() {
   const [form, setForm] = useState<ShipmentForm>(EMPTY_SHIPMENT);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<Shipment | null>(null);
+  const [scanPickerOpen, setScanPickerOpen] = useState(false);
 
   const rows = useMemo(() => {
     if (!data) return [];
@@ -184,11 +192,18 @@ function ShipmentList() {
         subtitle="Master shipment beserta lifecycle CREATED → DELIVERED."
         icon={<Package className="h-5 w-5" />}
         actions={
-          can.create && (
-            <Button onClick={() => { setForm(EMPTY_SHIPMENT); setDialogOpen(true); }}>
-              <Plus className="h-4 w-4" /> Buat Shipment
-            </Button>
-          )
+          <>
+            {can.confirmArrival && (
+              <Button variant="outline" onClick={() => setScanPickerOpen(true)}>
+                <ScanLine className="h-4 w-4" /> Scan Kedatangan
+              </Button>
+            )}
+            {can.create && (
+              <Button onClick={() => { setForm(EMPTY_SHIPMENT); setDialogOpen(true); }}>
+                <Plus className="h-4 w-4" /> Buat Shipment
+              </Button>
+            )}
+          </>
         }
       />
 
@@ -447,7 +462,130 @@ function ShipmentList() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {can.confirmArrival && (
+        <ScanArrivalPickerDialog open={scanPickerOpen} onOpenChange={setScanPickerOpen} onDone={reload} />
+      )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Scan Kedatangan — quick-access picker beside "Buat Shipment": lists every
+// shipment currently PICKED_UP (kurir bringing it back to the gudang) and
+// opens the same camera/reader/manual scan flow used in the Gudang menu.
+// Only shows for users with shipment.confirm_arrival (Admin Gudang & co).
+// ---------------------------------------------------------------------------
+
+function ScanArrivalPickerDialog({
+  open,
+  onOpenChange,
+  onDone,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onDone: () => void;
+}) {
+  const { data, loading, reload } = useApiData<GudangWorkspace>(() => apiGet<GudangWorkspace>("/gudang"), []);
+  const { data: options } = useApiData<Options>(() => apiGet<Options>("/options"), []);
+  const [search, setSearch] = useState("");
+  const [task, setTask] = useState<GudangArrivalQueueItem | null>(null);
+
+  // Refresh the queue every time the picker is (re)opened.
+  useEffect(() => {
+    if (open) reload();
+  }, [open, reload]);
+
+  const arrivals = useMemo(() => {
+    const list = data?.arrivals ?? [];
+    const q = search.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter(
+      (a) =>
+        a.masterCode.toLowerCase().includes(q) ||
+        a.customerName.toLowerCase().includes(q) ||
+        (a.kurirName ?? "").toLowerCase().includes(q),
+    );
+  }, [data, search]);
+
+  const warehouses = (options?.warehouses ?? []).map((w) => ({ id: w.id, name: w.name }));
+  const scopedWarehouseId = data?.scope?.scoped ? data.scope.warehouseId : null;
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <QrCode className="h-5 w-5 text-primary" /> Scan Kedatangan
+            </DialogTitle>
+            <DialogDescription>
+              Semua shipment berstatus <b>PICKED UP</b> — sedang dibawa kurir kembali ke gudang. Pilih satu untuk scan tiap paketnya (kamera HP
+              / reader tool / ketik manual), lalu konfirmasi <b>Tiba di Gudang</b> setelah semua paket lengkap.
+            </DialogDescription>
+          </DialogHeader>
+
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cari resi / customer / kurir…"
+            className="w-full"
+          />
+
+          <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-0.5">
+            {loading && <p className="px-2 py-6 text-center text-sm text-muted-foreground">Memuat…</p>}
+            {!loading && arrivals.length === 0 && (
+              <p className="px-2 py-8 text-center text-sm text-muted-foreground">
+                Tidak ada shipment PICKED_UP menunggu diterima gudang saat ini.
+              </p>
+            )}
+            {arrivals.map((a) => {
+              const pct = a.detailsCount ? Math.round((a.scannedCount / a.detailsCount) * 100) : 0;
+              return (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => setTask(a)}
+                  className="flex w-full flex-col gap-2 rounded-xl border bg-card p-3 text-left transition-colors hover:bg-accent"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-mono text-xs font-semibold text-primary">{a.masterCode}</p>
+                      <p className="truncate text-sm font-medium text-foreground">{a.customerName}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {a.origin} → {a.destination}
+                        {a.kurirName ? ` · kurir: ${a.kurirName}` : ""}
+                      </p>
+                    </div>
+                    <Button size="sm" className="h-7 shrink-0">
+                      <ScanLine className="h-3.5 w-3.5" /> Scan
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Progress value={pct} className="h-1.5 flex-1" />
+                    <span className={cn("shrink-0 font-mono text-[11px] font-semibold", a.scannedCount === a.detailsCount ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground")}>
+                      {a.scannedCount}/{a.detailsCount}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <ArrivalScanDialog
+        key={task ? `arr-${task.id}` : "arr-none"}
+        task={task}
+        warehouses={warehouses}
+        scopedWarehouseId={scopedWarehouseId}
+        onClose={() => setTask(null)}
+        onDone={() => {
+          reload();
+          onDone();
+        }}
+      />
+    </>
   );
 }
 
@@ -1043,7 +1181,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
             <Field label="Deskripsi" htmlFor="d-desc">
               <Input id="d-desc" value={detailForm.description} onChange={(e) => setDetailForm({ ...detailForm, description: e.target.value })} placeholder="mis. Karton Tulis" required disabled={busy} />
             </Field>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {!editingDetail && (
                 <Field label="Jumlah paket" htmlFor="d-qty" hint="dibuat 1 kode unik per paket">
                   <NumberInput id="d-qty" value={detailForm.quantity} onChange={(e) => setDetailForm({ ...detailForm, quantity: e.target.value })} required disabled={busy} min={1} max={500} />
@@ -1052,7 +1190,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
               <Field label="Berat aktual (kg)" htmlFor="d-weight" hint={editingDetail ? undefined : "per paket"}>
                 <NumberInput id="d-weight" value={detailForm.actualWeightKg} onChange={(e) => setDetailForm({ ...detailForm, actualWeightKg: e.target.value })} placeholder="0" required disabled={busy} />
               </Field>
-              <div className="col-span-2 grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-2 sm:col-span-2 sm:gap-3">
                 <Field label="Panjang (cm)" htmlFor="d-l">
                   <NumberInput id="d-l" value={detailForm.lengthCm} onChange={(e) => setDetailForm({ ...detailForm, lengthCm: e.target.value })} placeholder="30" disabled={busy} />
                 </Field>

@@ -299,7 +299,7 @@ export function InvoicesPage() {
                   disabled={busy || customerOptions.length === 0}
                 />
               </Field>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Tanggal terbit" htmlFor="inv-issue">
                   <Input id="inv-issue" type="date" value={form.issueDate} onChange={(e) => setForm({ ...form, issueDate: e.target.value })} disabled={busy} />
                 </Field>
@@ -387,8 +387,8 @@ export function InvoicesPage() {
           </DialogHeader>
           {detailWithLines && "lines" in detailWithLines && (
             <div className="space-y-4">
-              <div className="overflow-hidden rounded-lg border">
-                <table className="w-full text-sm">
+              <div className="overflow-x-auto rounded-lg border">
+                <table className="w-full min-w-[480px] text-sm">
                   <thead>
                     <tr className="border-b bg-muted/50 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
                       <th className="px-3 py-2 font-semibold">Deskripsi</th>
@@ -458,7 +458,7 @@ export function InvoicesPage() {
             <Field label="Jumlah (Rp)" htmlFor="st-amount">
               <NumberInput id="st-amount" value={settleAmount} onChange={(e) => setSettleAmount(e.target.value)} required disabled={busy} />
             </Field>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Metode" htmlFor="st-method">
                 <select
                   id="st-method"

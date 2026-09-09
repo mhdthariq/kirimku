@@ -151,7 +151,7 @@ function EmployeesTab({ can }: { can: { employeeCreate: boolean; employeeUpdate:
             <Field label="Nama" htmlFor="e-name">
               <Input id="e-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required disabled={busy} />
             </Field>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="Posisi" htmlFor="e-position">
                 <Input id="e-position" value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} placeholder="Kurir / Driver" disabled={busy} />
               </Field>
@@ -317,7 +317,7 @@ function UsersTab({ can }: { can: { userCreate: boolean; userUpdate: boolean } }
             <DialogDescription>{editing ? "Kosongkan password jika tidak ingin mengganti." : "User baru aktif langsung dengan role terpilih."}</DialogDescription>
           </DialogHeader>
           <form onSubmit={onSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="Username" htmlFor="u-username">
                 <Input id="u-username" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} required disabled={busy || !!editing} autoComplete="off" />
               </Field>
@@ -507,7 +507,7 @@ function RolesTab({ can }: { can: { roleCreate: boolean; roleUpdate: boolean } }
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={onSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="Nama Role" htmlFor="r-name">
                 <Input id="r-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required disabled={busy || !!editing?.isSystem} />
               </Field>

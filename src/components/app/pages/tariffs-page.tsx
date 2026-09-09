@@ -244,7 +244,7 @@ export function TariffsPage() {
               <Field label="Tarif per kg (Rp)" htmlFor="tf-rate">
                 <NumberInput id="tf-rate" value={form.ratePerKg} onChange={(e) => setForm({ ...form, ratePerKg: e.target.value })} placeholder="4500" required disabled={busy} />
               </Field>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Min. kg" htmlFor="tf-min">
                   <NumberInput id="tf-min" value={form.minChargeableKg} onChange={(e) => setForm({ ...form, minChargeableKg: e.target.value })} disabled={busy} />
                 </Field>
@@ -252,7 +252,7 @@ export function TariffsPage() {
                   <NumberInput id="tf-multiplier" value={form.volumetricMultiplier} onChange={(e) => setForm({ ...form, volumetricMultiplier: e.target.value })} placeholder="250" disabled={busy} />
                 </Field>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Pembulatan" htmlFor="tf-rounding">
                   <select
                     id="tf-rounding"

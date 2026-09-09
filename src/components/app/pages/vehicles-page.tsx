@@ -224,7 +224,7 @@ export function VehiclesPage() {
                   <option value="INACTIVE">Nonaktif</option>
                 </select>
               </Field>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Max Berat (kg)" htmlFor="v-weight">
                   <NumberInput id="v-weight" value={form.maxWeightKg} onChange={(e) => setForm({ ...form, maxWeightKg: e.target.value })} placeholder="3500" required disabled={busy} />
                 </Field>
