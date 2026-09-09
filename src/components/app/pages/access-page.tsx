@@ -43,7 +43,7 @@ export function AccessPage() {
       />
 
       <Tabs defaultValue={can.userView ? "users" : can.employeeView ? "employees" : "roles"}>
-        <TabsList className="flex-wrap">
+        <TabsList>
           {can.userView && <TabsTrigger value="users">Users</TabsTrigger>}
           {can.roleView && <TabsTrigger value="roles">Roles</TabsTrigger>}
           {can.employeeView && <TabsTrigger value="employees">Employees</TabsTrigger>}

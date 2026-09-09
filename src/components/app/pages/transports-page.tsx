@@ -159,7 +159,7 @@ export function TransportsPage() {
             onSearchChange={setSearch}
             searchPlaceholder="Cari kode / rute / nopol…"
             toolbar={
-              <div className="flex items-center gap-1.5">
+              <div className="flex max-w-full flex-wrap items-center gap-1.5">
                 {["all", "PLANNED", "DEPARTED", "ARRIVED"].map((s) => (
                   <Button
                     key={s}

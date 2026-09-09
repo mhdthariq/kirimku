@@ -80,7 +80,7 @@ export function DataTable<T extends { id: number | string }>({
       {(onSearchChange || toolbar) && (
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           {onSearchChange ? (
-            <div className="relative w-full sm:max-w-xs">
+            <div className="relative w-full shrink-0 sm:max-w-xs">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={search ?? ""}
@@ -92,7 +92,7 @@ export function DataTable<T extends { id: number | string }>({
           ) : (
             <div />
           )}
-          {toolbar && <div className="flex flex-wrap items-center gap-2">{toolbar}</div>}
+          {toolbar && <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">{toolbar}</div>}
         </div>
       )}
 

@@ -155,7 +155,7 @@ export function PickupsPage() {
             onSearchChange={setSearch}
             searchPlaceholder="Cari kode pickup / resi / customer…"
             toolbar={
-              <div className="flex items-center gap-1.5">
+              <div className="flex max-w-full flex-wrap items-center gap-1.5">
                 {["all", "ASSIGNED", "IN_PROGRESS", "COMPLETED", "CANCELLED"].map((s) => (
                   <Button key={s} size="sm" variant={statusFilter === s ? "default" : "outline"} className="h-7 px-2.5 text-xs" onClick={() => setStatusFilter(s)}>
                     {s === "all" ? "Semua" : s.replace("_", " ")}

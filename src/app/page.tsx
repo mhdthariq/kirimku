@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { useHashRoute } from "@/hooks/use-hash-route";
@@ -14,7 +15,6 @@ import { DeliveriesPage } from "@/components/app/pages/deliveries-page";
 import { TransportsPage } from "@/components/app/pages/transports-page";
 import { VehiclesPage } from "@/components/app/pages/vehicles-page";
 import { GudangPage } from "@/components/app/pages/gudang-page";
-import { GudangOpsPage } from "@/components/app/pages/gudang-ops-page";
 import { RoutesPage } from "@/components/app/pages/routes-page";
 import { CustomersPage } from "@/components/app/pages/customers-page";
 import { TariffsPage } from "@/components/app/pages/tariffs-page";
@@ -26,6 +26,15 @@ import { AuditPage } from "@/components/app/pages/audit-page";
 function Router() {
   const { user, loading } = useAuth();
   const { segments, query } = useHashRoute();
+
+  // Legacy redirect: the old "Gudang" operations menu (#/gudang-ops) was merged
+  // into the Gudang master page (#/gudang) — arrival scanning now lives in
+  // Shipments (Picked Up tab) and Isi Gudang is a tab of the Gudang page.
+  useEffect(() => {
+    if (segments[0] === "gudang-ops") {
+      window.location.replace("#/gudang");
+    }
+  }, [segments]);
 
   if (loading) {
     return (
@@ -46,8 +55,6 @@ function Router() {
     switch (section) {
       case "pickups":
         return <PickupsPage />;
-      case "gudang-ops":
-        return <GudangOpsPage />;
       case "shipments":
         return <ShipmentsPage shipmentId={segments[1] ? Number(segments[1]) : null} autoPrint={query.get("print") === "1"} />;
       case "deliveries":

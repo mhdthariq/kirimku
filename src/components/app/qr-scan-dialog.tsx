@@ -157,11 +157,7 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
             <QrCode className="h-5 w-5 text-primary" />
             {isPickup ? `Scan Paket — Pickup ${task?.code ?? ""}` : `Scan Paket — Delivery ${task?.code ?? ""}`}
           </DialogTitle>
-          <DialogDescription>
-            {isPickup
-              ? `Scan setiap paket dari ${task?.customerName ?? ""} (${task?.masterCode ?? ""}) dengan kamera HP / reader. Kode paket tidak ditampilkan.`
-              : `Scan setiap paket untuk ${task?.customerName ?? ""} (${task?.masterCode ?? ""}) sebelum serah terima. Kode paket tidak ditampilkan.`}
-          </DialogDescription>
+
         </DialogHeader>
 
         {/* Progress */}

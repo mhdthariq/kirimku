@@ -52,7 +52,6 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     items: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, mobile: true },
       { href: "/pickups", label: "Pickups", icon: Truck, anyPermissions: ["pickup.view", "pickup.assign_kurir"], mobile: true },
-      { href: "/gudang-ops", label: "Gudang", icon: Warehouse, anyPermissions: ["shipment.view"], mobile: true },
       { href: "/shipments", label: "Shipments", icon: Package, anyPermissions: ["shipment.view"], mobile: true },
       { href: "/deliveries", label: "Deliveries", icon: ClipboardList, anyPermissions: ["delivery.view", "delivery.assign_kurir"], mobile: true },
       { href: "/transports", label: "Transports", icon: BarChart3, anyPermissions: ["transport.view"], mobile: true },
@@ -61,8 +60,8 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: "Gudang & Armada",
     items: [
+      { href: "/gudang", label: "Gudang", icon: Warehouse, anyPermissions: ["warehouse.view", "shipment.view"], mobile: false },
       { href: "/vehicles", label: "Kendaraan", icon: CarFront, anyPermissions: ["vehicle.view"] },
-      { href: "/gudang", label: "Master Gudang", icon: Warehouse, anyPermissions: ["warehouse.view"] },
       { href: "/routes", label: "Rute & Checkpoint", icon: MapPin, anyPermissions: ["checkpoint.view"] },
     ],
   },

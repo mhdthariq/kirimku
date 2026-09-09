@@ -185,7 +185,7 @@ export function InvoicesPage() {
             onSearchChange={setSearch}
             searchPlaceholder="Cari nomor / customer…"
             toolbar={
-              <div className="flex items-center gap-1.5">
+              <div className="flex max-w-full flex-wrap items-center gap-1.5">
                 {["all", "DRAFT", "SENT", "PARTIALLY_SETTLED", "SETTLED"].map((s) => (
                   <Button key={s} size="sm" variant={statusFilter === s ? "default" : "outline"} className="h-7 px-2.5 text-[11px]" onClick={() => setStatusFilter(s)}>
                     {s === "all" ? "Semua" : s === "PARTIALLY_SETTLED" ? "PARTIAL" : s}

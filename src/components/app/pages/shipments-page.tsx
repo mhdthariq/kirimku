@@ -15,6 +15,7 @@ import {
   Send,
   Trash2,
   Truck,
+  UserCheck,
   UserRound,
   Wallet,
 } from "lucide-react";
@@ -28,6 +29,7 @@ import {
   hasPermission,
   type DetailShipment,
   type GudangArrivalQueueItem,
+  type GudangWalkInItem,
   type GudangWorkspace,
   type Options,
   type Payment,
@@ -40,6 +42,7 @@ import { ActivityLogPanel } from "@/components/app/activity-log-panel";
 import { StatusBadge } from "@/components/app/status-badge";
 import { ResiPrint } from "@/components/app/resi-print";
 import { ArrivalScanDialog } from "@/components/app/arrival-scan-dialog";
+import { WalkInDialog } from "@/components/app/walk-in-dialog";
 import { Field, FormSelect, Input, NumberInput, SubmitButton, Textarea, formatDate, formatNumber, formatRupiah } from "@/components/app/form-parts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -109,6 +112,12 @@ function ShipmentList() {
 
   const { data, loading, reload } = useApiData<Shipment[]>(() => apiGet<Shipment[]>("/shipments"), []);
   const { data: options } = useApiData<Options>(() => apiGet<Options>("/options"), []);
+  // Gudang workspace (scope + live scan progress) — only loaded for users who
+  // can confirm arrivals, so the "Picked Up" rows can be scanned directly.
+  const { data: gudang, reload: reloadGudang } = useApiData<GudangWorkspace>(
+    () => (can.confirmArrival ? apiGet<GudangWorkspace>("/gudang") : Promise.resolve(null as unknown as GudangWorkspace)),
+    [can.confirmArrival],
+  );
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -116,6 +125,7 @@ function ShipmentList() {
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<Shipment | null>(null);
   const [scanPickerOpen, setScanPickerOpen] = useState(false);
+  const [rowScanTask, setRowScanTask] = useState<GudangArrivalQueueItem | null>(null);
 
   const rows = useMemo(() => {
     if (!data) return [];
@@ -171,6 +181,36 @@ function ShipmentList() {
     if (ok) reload();
   }
 
+  /** Open the arrival-scan dialog straight from a PICKED_UP row. */
+  function openRowScan(s: Shipment) {
+    const live = gudang?.arrivals.find((a) => a.id === s.id);
+    setRowScanTask(
+      live ?? {
+        id: s.id,
+        masterCode: s.masterCode,
+        customerName: s.customer?.name ?? "—",
+        customerPhone: s.customer?.phone ?? null,
+        origin: s.origin,
+        destination: s.destination,
+        originWarehouseId: s.originWarehouseId ?? null,
+        destinationWarehouseId: s.destinationWarehouseId ?? null,
+        priceAmount: s.priceAmount,
+        paidAmount: s.paymentSummary?.paidAmount ?? 0,
+        remainingAmount: s.paymentSummary?.remainingAmount ?? null,
+        dpOk: s.paymentSummary?.dpOk ?? false,
+        penerimaName: s.penerimaName ?? null,
+        detailsCount: s.totals?.totalPackages ?? s._count?.details ?? 0,
+        totalWeightKg: s.totals?.totalActualKg ?? 0,
+        totalVolumeM3: s.totals?.totalVolumeM3 ?? 0,
+        scannedCount: 0,
+        scannedByMethod: { SCANNED: 0, TYPED: 0 },
+        pickupCode: null,
+        kurirName: null,
+        updatedAt: s.createdAt,
+      },
+    );
+  }
+
   if (!can.view) {
     return <PageHeader title="Shipments" subtitle="Anda tidak memiliki izin melihat shipment." />;
   }
@@ -212,7 +252,13 @@ function ShipmentList() {
           <TabsTrigger value="list">Daftar</TabsTrigger>
           <TabsTrigger value="activity">Log Aktivitas</TabsTrigger>
         </TabsList>
-        <TabsContent value="list" className="mt-3">
+        <TabsContent value="list" className="mt-3 space-y-3">
+          {statusFilter === "PICKED_UP" && can.confirmArrival && (
+            <p className="rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-2 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300">
+              Shipment <b>PICKED UP</b> sedang dibawa kurir kembali ke gudang. Klik <b>Terima / Scan</b> pada baris untuk scan tiap paketnya
+              (kamera / reader / manual) lalu konfirmasi <b>Tiba di Gudang</b>.
+            </p>
+          )}
           <DataTable
             rows={rows}
             loading={loading}
@@ -220,7 +266,7 @@ function ShipmentList() {
             onSearchChange={setSearch}
             searchPlaceholder="Cari resi / customer / kota…"
             toolbar={
-              <div className="flex max-w-full items-center gap-1.5 overflow-x-auto pb-1">
+              <div className="flex max-w-full flex-wrap items-center gap-1.5">
                 {[
                   { key: "all", label: "All" },
                   { key: "CREATED", label: "Created" },
@@ -313,6 +359,11 @@ function ShipmentList() {
                     <Button variant="outline" size="sm" className="h-7" onClick={() => (window.location.hash = `#/shipments/${s.id}`)}>
                       Detail
                     </Button>
+                    {can.confirmArrival && s.status === "PICKED_UP" && (
+                      <Button size="sm" className="h-7" onClick={() => openRowScan(s)} title="Scan paket & konfirmasi tiba di gudang">
+                        <ScanLine className="h-3.5 w-3.5" /> Terima / Scan
+                      </Button>
+                    )}
                     {s.status !== "CANCELLED" && (s.totals?.totalPackages ?? s._count?.details ?? 0) > 0 && (
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => (window.location.hash = `#/shipments/${s.id}?print=1`)} aria-label="Cetak resi" title="Cetak Resi">
                         <Printer className="h-4 w-4" />
@@ -339,9 +390,6 @@ function ShipmentList() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Buat Shipment</DialogTitle>
-            <DialogDescription>
-              Resi (MKT-xxxxxx) dibuat otomatis. Kota asal & tujuan tidak lagi diketik manual — rute dipilih dari daftar tarif aktif sesuai tipe customer (B2B/B2C).
-            </DialogDescription>
           </DialogHeader>
           <form onSubmit={onSubmit} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
@@ -374,7 +422,7 @@ function ShipmentList() {
                   disabled={busy || !selectedCustomer}
                 />
               </Field>
-              {selectedTariff && (
+              {/*{selectedTariff && (
                 <div className="sm:col-span-2 space-y-1 rounded-lg border bg-muted/40 px-3 py-2.5 text-xs text-muted-foreground">
                   <p>
                     <span className="font-medium text-foreground">Kota Asal:</span> {selectedTariff.origin} ·{" "}
@@ -386,7 +434,7 @@ function ShipmentList() {
                     {selectedTariff.roundingMode === "NEAREST" ? "terdekat" : "ke atas"} {selectedTariff.roundingUnitKg} kg
                   </p>
                 </div>
-              )}
+              )}*/}
               <Field label="Gudang Asal" htmlFor="s-warehouse-from" hint="Opsional">
                 <FormSelect
                   value={form.originWarehouseId}
@@ -465,6 +513,21 @@ function ShipmentList() {
 
       {can.confirmArrival && (
         <ScanArrivalPickerDialog open={scanPickerOpen} onOpenChange={setScanPickerOpen} onDone={reload} />
+      )}
+
+      {/* Per-row arrival scan — opens straight from a PICKED_UP row ("Picked Up" tab) */}
+      {can.confirmArrival && (
+        <ArrivalScanDialog
+          key={rowScanTask ? `row-arr-${rowScanTask.id}` : "row-arr-none"}
+          task={rowScanTask}
+          warehouses={(options?.warehouses ?? []).map((w) => ({ id: w.id, name: w.name }))}
+          scopedWarehouseId={gudang?.scope?.scoped ? gudang.scope.warehouseId : null}
+          onClose={() => setRowScanTask(null)}
+          onDone={() => {
+            reload();
+            reloadGudang();
+          }}
+        />
       )}
     </div>
   );
@@ -606,11 +669,25 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
     paymentView: hasPermission(user, "payment.view"),
     paymentRecord: hasPermission(user, "payment.record"),
     paymentVerify: hasPermission(user, "payment.verify"),
+    // Walk-in arrival (customer hands the package over at the gudang counter) —
+    // only visible/usable for users granted this permission (e.g. Admin Gudang).
+    confirmArrival: hasPermission(user, "shipment.confirm_arrival"),
   };
 
   const [shipment, setShipment] = useState<(Shipment & { details: DetailShipment[]; trackingEvents: TrackingEvent[]; payments: Payment[] }) | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Walk-in support data: warehouse list + gudang scope (only for permitted users)
+  const { data: options } = useApiData<Options>(
+    () => (can.confirmArrival ? apiGet<Options>("/options") : Promise.resolve(null as unknown as Options)),
+    [can.confirmArrival],
+  );
+  const { data: gudangScope } = useApiData<GudangWorkspace>(
+    () => (can.confirmArrival ? apiGet<GudangWorkspace>("/gudang") : Promise.resolve(null as unknown as GudangWorkspace)),
+    [can.confirmArrival],
+  );
+  const [walkInTask, setWalkInTask] = useState<GudangWalkInItem | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -862,6 +939,13 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
                 <Send className="h-4 w-4" /> Submit for Pickup
               </Button>
             )}
+            {/* Walk-in: customer came straight to the gudang — confirm arrival
+                directly instead of requesting a kurir pickup. Permission-gated. */}
+            {can.confirmArrival && ["CREATED", "READY_FOR_PICKUP"].includes(shipment.status) && (
+              <Button variant="secondary" onClick={() => setWalkInTask(toWalkInItem(shipment))}>
+                <UserCheck className="h-4 w-4" /> Tiba di Gudang
+              </Button>
+            )}
             {can.submitPickup && shipment.details.length > 0 && ["CREATED", "READY_FOR_PICKUP", "PICKED_UP"].includes(shipment.status) && (
               <Button variant="secondary" onClick={computePrice}>
                 <Calculator className="h-4 w-4" /> {shipment.priceAmount != null ? "Hitung Ulang Harga" : "Hitung Harga"}
@@ -903,7 +987,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
             <Row label="Total volume" value={`${(shipment.totals?.totalVolumeM3 ?? 0).toFixed(3)} m³`} />
             <Row label="Berat aktual" value={`${formatNumber(actualWeight)} kg`} />
             <Row
-              label={`Berat volumetrik (L×W×H/1.000.000 × ${pricing ? formatNumber(pricing.volumetricMultiplier, 0) : "?"})`}
+              label={`Berat volumetrik (${pricing ? formatNumber(pricing.volumetricMultiplier, 0) : "?"})`}
               value={`${formatNumber(volumetric)} kg`}
             />
             <Row
@@ -1102,9 +1186,6 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
                     { key: "total", header: "Total Berat", render: (g) => <span className="font-semibold">{formatNumber(g.totalKg)} kg</span> },
                   ]}
                 />
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Tab “Ringkas” hanya tampilan — paket dengan deskripsi & dimensi sama digabung. Database tetap menyimpan 1 baris per paket dengan kode unik (seperti tab “Semua”).
-                </p>
               </TabsContent>
             </Tabs>
           )}
@@ -1319,15 +1400,46 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
           onClose={() => setPrintOpen(false)}
         />
       )}
+
+      {/* Walk-in arrival dialog — customer hands the package over at the gudang counter */}
+      {can.confirmArrival && (
+        <WalkInDialog
+          key={walkInTask ? `walk-${walkInTask.id}-${walkInTask.status}` : "walk-none"}
+          task={walkInTask}
+          warehouses={(options?.warehouses ?? []).map((w) => ({ id: w.id, name: w.name }))}
+          scopedWarehouseId={gudangScope?.scope?.scoped ? gudangScope.scope.warehouseId : null}
+          onClose={() => setWalkInTask(null)}
+          onDone={refresh}
+        />
+      )}
     </div>
   );
 }
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between text-sm">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-semibold text-foreground">{value}</span>
+    <div className="flex items-center justify-between gap-3 text-sm">
+      <span className="shrink-0 text-muted-foreground">{label}</span>
+      <span className="text-right font-semibold text-foreground">{value}</span>
     </div>
   );
+}
+
+/** Map a loaded Shipment to the walk-in dialog task shape. */
+function toWalkInItem(s: Shipment & { details: DetailShipment[] }): GudangWalkInItem {
+  return {
+    id: s.id,
+    masterCode: s.masterCode,
+    customerName: s.customer?.name ?? "—",
+    origin: s.origin,
+    destination: s.destination,
+    originWarehouseId: s.originWarehouseId ?? null,
+    destinationWarehouseId: s.destinationWarehouseId ?? null,
+    status: s.status,
+    priceAmount: s.priceAmount,
+    penerimaName: s.penerimaName ?? null,
+    detailsCount: s.details.length,
+    totalWeightKg: s.totals?.totalActualKg ?? s.details.reduce((sum, d) => sum + d.actualWeightKg, 0),
+    totalVolumeM3: s.totals?.totalVolumeM3 ?? 0,
+  };
 }

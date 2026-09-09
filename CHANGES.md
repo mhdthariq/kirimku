@@ -1,99 +1,99 @@
-# Changes — Responsive layout, camera scan fix, Gudang scan shortcut, PWA review
+# Changes — Gudang menu restructure, walk-in & scan UX, true responsive layout
 
-## 1. Responsive layout (Desktop / Laptop / Tablet / Handphone)
+This round builds on the previous update (dialog max-height, camera scan fix,
+"Scan Kedatangan" shortcut, PWA review — see git history / previous notes).
 
-- **`src/components/ui/dialog.tsx`** and **`src/components/ui/alert-dialog.tsx`**:
-  dialogs previously had no max-height, so any form taller than the phone's
-  viewport (e.g. the "Buat Shipment" or "Tambah Paket" dialogs) got cut off
-  with no way to scroll to the submit button. Added
-  `max-h-[calc(100dvh-2rem)]` + `overflow-y-auto`, tightened side margins on
-  small screens (`max-w-[calc(100%-1.5rem)]`), and reduced padding on mobile
-  (`p-4` → `sm:p-6`). This fixes every dialog in the app at once.
-- **`access-page.tsx`, `tariffs-page.tsx`, `vehicles-page.tsx`,
-  `invoices-page.tsx`, `shipments-page.tsx`**: several dialog forms used
-  `grid-cols-2` / `grid-cols-3` with no responsive breakpoint, forcing two
-  fields side-by-side even on a 360px phone screen. Changed to
-  `grid-cols-1 … sm:grid-cols-2` so fields stack on phones and pair up from
-  tablet width (640px) up.
-- **`invoices-page.tsx`**: the invoice line-items table inside the detail
-  dialog was wrapped in `overflow-hidden`, which clipped columns instead of
-  letting them scroll on narrow screens. Changed to `overflow-x-auto` with a
-  `min-w` on the table.
-- Audited the rest of the app (dashboard, data table, app shell, checkpoint
-  map editor, login screen, resi print) — these already had solid responsive
-  patterns (table → card on mobile, sidebar → sheet + bottom nav, etc.), so
-  I left them as-is rather than rewriting working code.
+## 1. Menu "Gudang" restructured (Operasional → Gudang & Armada)
 
-## 2. Camera scan fix
+- **`src/components/app/app-shell.tsx`**: removed the "Gudang" (`#/gudang-ops`)
+  item from the **Operasional** group. The "Gudang" menu now lives once, in
+  **Gudang & Armada**, and points to `#/gudang` (the former "Master Gudang").
+  Its visibility is `warehouse.view` **or** `shipment.view`, so Staff Gudang
+  (warehouse-scoped, no warehouse master rights) still reach their workspace.
+- **`src/app/page.tsx`**: the `gudang-ops-page` route was removed; old bookmarks
+  `#/gudang-ops` are permanently redirected to `#/gudang`.
+- **`src/components/app/pages/gudang-ops-page.tsx`**: deleted. Its features were
+  not lost — they moved:
+  - *Kedatangan* (arrival queue scanning) → **Shipments** (see §3)
+  - *Pelanggan Langsung* (walk-in confirm) → **Shipment detail** (see §4)
+  - *Isi Gudang* (per-gudang contents) → **Gudang page** tab (see §2)
 
-- **`src/components/app/scan-console.tsx`**: the root cause — `getUserMedia()`
-  resolved, then the code immediately tried `videoRef.current.srcObject = stream`
-  in the same synchronous block. But the `<video>` element only renders once
-  `cameraOn` becomes `true`, and React hadn't committed that DOM update yet,
-  so `videoRef.current` was still `null`. The permission prompt worked (camera
-  light turned on) but no frame was ever attached to the video element, so
-  jsQR never received image data — the scanner looked "broken" with no
-  preview and no scans.
-  Fix: moved the stream attachment into a `useEffect` keyed on `cameraOn`,
-  which runs after the `<video>` element is actually mounted, so
-  `videoRef.current` is guaranteed to be valid before `srcObject` is set and
-  `.play()` is called.
+## 2. Gudang page — new "Isi Gudang" tab
 
-## 3. "Scan Kedatangan" button beside "Buat Shipment"
+- **`src/components/app/pages/gudang-page.tsx`**: tabs are now
+  **Daftar | Isi Gudang | Log Aktivitas**. "Isi Gudang" (visible only with
+  `shipment.view`) shows per-gudang cards — held packages/shipments/kg, unpaid
+  counts, expandable kiriman list, and "Notify Marketing" for unpaid ones.
+- **`src/components/app/notify-marketing-dialog.tsx`** (new): extracted shared
+  dialog for the notify-marketing flow.
+- Card title reworked for phones: name + city badge stack vertically instead of
+  truncating each other.
 
-The scan-to-arrive workflow (PICKED_UP → scan every package → RECEIVED_AT_GUDANG,
-shown in the UI as "Arrive at Gudang") already existed in the Gudang menu. I
-extracted it into a shared component and added a quick-access entry point:
+## 3. Scan arrive at Gudang — inside the Shipments "Picked Up" view
 
-- **`src/components/app/arrival-scan-dialog.tsx`** (new): the camera / reader /
-  manual scan dialog + "Scan Semua Paket" + confirm, extracted from
-  `gudang-ops-page.tsx` so it can be reused without duplicating ~200 lines.
-- **`src/components/app/pages/gudang-ops-page.tsx`**: now imports
-  `ArrivalScanDialog` from the shared file instead of defining it locally.
-  No behavior change here — the Gudang → Kedatangan tab works exactly as
-  before.
-- **`src/components/app/pages/shipments-page.tsx`**: added a **"Scan
-  Kedatangan"** button next to **"Buat Shipment"**, visible only to users
-  with the `shipment.confirm_arrival` permission (Admin Gudang and anyone
-  else granted it). Clicking it opens a picker listing every shipment
-  currently `PICKED_UP` (i.e. a kurir is bringing it back to the gudang) with
-  a live scan-progress bar per shipment. Picking one opens the same
-  camera/reader/manual scan flow used in the Gudang menu; once every package
-  is scanned, "Konfirmasi Tiba di Gudang" flips the shipment's status. Every
-  scan is still tagged `SCANNED` (camera/reader) vs `TYPED` (manual) exactly
-  like the driver pickup/delivery flow, visible in Riwayat Scan.
-  No backend changes were needed — this reuses the existing
-  `GET /gudang`, `POST /shipments/{id}/arrival-scans`,
-  `POST /shipments/{id}/arrival-scan-all`, and `POST /shipments/{id}/arrive`
-  endpoints and their permission checks.
+- **`src/components/app/pages/shipments-page.tsx`**: every row with status
+  `PICKED_UP` now has a **"Terima / Scan"** action button (permission
+  `shipment.confirm_arrival`), opening the same camera/reader/manual scan
+  dialog directly — no detour through another menu. An info banner explains
+  the flow when the *Picked Up* filter is active.
+- The header **"Scan Kedatangan"** quick-access picker is kept as a
+  queue-overview entry point; both use the shared `ArrivalScanDialog`.
+- The list now also mirrors the gudang workspace scope for scoped users.
 
-## 4. PWA
+## 4. Walk-in (customer comes straight to the Gudang)
 
-Reviewed the existing PWA setup — it was already complete: manifest with all
-icon sizes (192/512/maskable/apple-touch), `display: standalone`, a
-cache-first/network-first service worker, an install-prompt handler for
-Android/desktop Chrome, and "Add to Home Screen" instructions for iOS Safari
-(which has no install prompt API). No changes were needed here. To test:
+- **`src/components/app/walk-in-dialog.tsx`** (new): the walk-in confirm
+  dialog, extracted from the old gudang-ops page.
+- **Shipment detail**: next to "Submit for Pickup", shipments that are still
+  `CREATED` / `READY_FOR_PICKUP` now show a **"Tiba di Gudang"** button —
+  visible **only** to users with `shipment.confirm_arrival` (Admin Gudang &
+  anyone granted it). One click + gudang choice confirms arrival without
+  scanning; the journey starts at that gudang (backend `POST
+  /shipments/{id}/arrive` mode `walk_in` — unchanged).
 
-- **Android (Chrome)**: open the site, tap the account menu → "Install App
-  di Perangkat Ini" (or the browser's own install banner).
-- **iPhone (Safari)**: open the site in Safari (not Chrome — iOS only
-  supports installing PWAs from Safari), tap Share → "Add to Home Screen".
+## 5. Responsive overhaul (the big one)
 
-Both require the app to be served over **HTTPS** (or `localhost` during
-development) — `getUserMedia` (camera scanning) also requires a secure
-context, so make sure whatever host you deploy to has a valid TLS
-certificate.
+Root causes found while testing 1920×1080, 1366×768, 768×1024 and 390×844:
 
-## Notes on verification
+- **`src/components/ui/dialog.tsx` / `alert-dialog.tsx`** — dialogs were a
+  scrollable `grid` where tall forms pushed the submit button out of view.
+  Now a flex column with a **sticky footer bar** (`bg-background/95`,
+  backdrop-blur, border-t, negative margins over the dialog padding): the
+  Batal/Submit buttons are always visible at every resolution, including
+  behind the phone keyboard. Header got `shrink-0 pr-8` so titles never run
+  under the close (X) button; added `overscroll-contain`; width is
+  `w-[calc(100%-1.5rem)]` capped by `max-h-[calc(100dvh-2rem)]`.
+- **`src/components/ui/tabs.tsx`** — tab lists overflowed on narrow screens
+  (page-wide horizontal scroll on phones). Now a full-width segmented control
+  on mobile (equal flex segments, hidden scrollbar, horizontal scroll
+  fallback when labels are long) and the classic inline pill list ≥sm.
+- **`src/components/ui/card.tsx`** — Card/CardHeader/CardContent lacked
+  `min-w-0`. Grid/flex "automatic minimum size" made cards blow past their
+  grid track whenever content contained `whitespace-nowrap` items (the
+  dashboard status chart with long badges was the worst offender — cards were
+  788px wide inside a 728px track at 768px). Fixed globally.
+- **`src/components/app/data-table.tsx`** — toolbar wrapper now
+  `min-w-0 max-w-full flex-wrap`, so filter chips can never push the page
+  wider than the viewport.
+- **Status filter chips** (`shipments-page`, `pickups-page`,
+  `deliveries-page`, `transports-page`, `invoices-page`): changed from a
+  single non-shrinkable row (which overflowed ~463px on phones/tablets and
+  HID filters like Delivered/Cancelled behind a scroll) to wrapping pills.
 
-This environment has no network access, so I couldn't run `bun install` /
-`next build` / a live dev server to visually confirm the fixes. I instead:
-- Parsed every edited file (and the full `src/` tree — 161 files) with the
-  TypeScript compiler's parser to catch syntax errors — all clean.
-- Manually cross-checked every import against its usage in each file I
-  touched or refactored.
+### QC performed (browser-verified at every resolution)
 
-I'd still recommend running `bun install && bun dev` yourself and clicking
-through the flows (especially the camera scan on an actual phone, since
-`getUserMedia` behavior varies by browser) before shipping.
+- 1920×1080 (desktop), 1366×768 (laptop), 768×1024 (tablet), 390×844 (phone):
+  all 14 pages scanned for horizontal overflow — 0 overflows remaining
+  (before: dashboard + 5 list pages overflowed on tablet/phone).
+- Dialogs measured in-viewport with reachable submit at all 4 resolutions,
+  including the tallest (Gudang create with Leaflet map, 890px tall on
+  desktop, scrollable + sticky footer on laptop/phone).
+- End-to-end flows tested with a real browser session:
+  - walk-in confirm (MKT-000006 → RECEIVED_AT_GUDANG),
+  - Picked Up row → "Terima / Scan" → "Scan Semua Paket" → "Konfirmasi Tiba
+    di Gudang" (MKT-000002 → RECEIVED_AT_GUDANG),
+  - permission gating (Marketing account sees none of the new buttons),
+  - legacy `#/gudang-ops` redirect, mobile bottom nav & hamburger sheet,
+  - "Isi Gudang" tab + Notify Marketing dialog.
+- Visual review (screenshots) of login, dashboard, shipments, gudang,
+  dialogs on phone/tablet/laptop/desktop — no clipped/overlapping UI.
