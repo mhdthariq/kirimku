@@ -20,9 +20,11 @@ model Employee {
   name           String
   phone          String?
   position       String?
-  // staff gudang assignment — roles below Admin Gudang are scoped to their own
-  // gudang (queue, contents, scans) via this field
+  // every karyawan belongs to exactly one gudang (branch) — ALL operational
+  // data (shipments, pickups, deliveries, transports) is scoped by this
+  // field; only the owner sees data across all gudang
   warehouseId    Int?
+  warehouse      Warehouse? @relation(fields: [warehouseId], references: [id])
   isActive       Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -205,6 +207,8 @@ model Warehouse {
   notes     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  employees Employee[]
 }
 
 // ---------------------------------------------------------------------------

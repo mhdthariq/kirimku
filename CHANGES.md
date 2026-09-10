@@ -1,4 +1,88 @@
-# Changes — Gudang menu restructure, walk-in & scan UX, true responsive layout
+# Changes — Gudang data separation (revisi pemisahan data antar gudang)
+
+This round implements warehouse-level data isolation across the whole app,
+plus per-gudang browsing tabs for the owner.
+
+## 1. Every karyawan belongs to one gudang (`Employee.warehouseId`)
+
+- **`prisma/schema.prisma`**: `Employee.warehouse` relation added (with the
+  `Warehouse.employees[]` back-relation) — the field already existed, now it
+  is a first-class relation and the single source of gudang membership.
+- **`src/lib/gudang-scope.ts`** (new): universal scoping helpers.
+  `scopeForUser()` resolves the user's gudang: the **owner (or `*`
+  permissions) is unscoped**; **every other user is scoped to their
+  employee's gudang** — an account without a gudang sees no operational data.
+- **`src/lib/rbac.ts`**: the obsolete `warehouse.scope_own` permission was
+  removed (scoping is no longer permission-based — it applies to every
+  non-owner role). `ensureRbac()` now prunes permissions that were removed
+  from the catalog so the count check stays in sync.
+- **`src/lib/seed.ts`**: every seeded employee is stationed at a gudang
+  (default Jakarta Pusat); new demo account **`ratna` (Admin Gudang ·
+  Gudang Bandung)** demonstrates the isolation. A backfill assigns the first
+  gudang to unbound employees of pre-existing databases.
+
+## 2. Data visibility — gudang sendiri saja, owner melihat semua
+
+Ownership follows the physical package location in the lifecycle:
+
+| Entity | Gudang(s) |
+|---|---|
+| Shipment CREATED → RECEIVED_AT_GUDANG | gudang asal (arrivedWarehouseId saat sudah diterima) |
+| Shipment IN_TRANSPORT | kedua ujung rute (asal + tujuan) |
+| Shipment ARRIVED_AT_GUDANG / DELIVERED | gudang tujuan |
+| Pickup | gudang asal master (tetap, histori milik cabang pelaksana) |
+| Delivery | gudang posisi master saat ini |
+| Transport | gudang asal + tujuan rute (+ shipment yang dimuat) |
+
+- APIs now scope their responses: `GET /shipments`, `/pickups`,
+  `/deliveries`, `/transports`, `/gudang` (workspace), `/dashboard`
+  (operational counters & recent shipments), `/audit-logs` (entries about
+  shipment/pickup/delivery/transport/payment entities are filtered to the
+  scope; company-wide entities such as customers/invoices remain visible),
+  and `/unpaid`. Each list row also carries **`gudangIds`** so the owner UI
+  can group rows per gudang.
+- `GET /shipments/{id}` **rejects cross-gudang access with 403** ("Shipment
+  ini berada di gudang lain — data terpisah antar gudang").
+- `POST /transports/{id}/arrive` now stamps `arrivedWarehouseId` on every
+  shipment (destination gudang) so the scoping stays accurate after arrival.
+- `AuthUser` / login / me responses include `warehouseId` & `warehouseName`
+  (the badge "Data gudang Anda: …" uses it).
+
+## 3. Owner gets per-gudang tabs on the four operational menus
+
+Before: `Daftar | Log Aktivitas`
+After (owner): `Daftar | Gudang Jakarta Pusat | Bandung | Surabaya | … | Log Aktivitas`
+
+- **`src/components/app/gudang-tabs.tsx`** (new): shared tab triggers (one
+  per active gudang — the "Gudang " prefix is stripped for short labels),
+  the active-gudang banner, and the staff scope badge.
+- **`shipments-page` / `pickups-page` / `deliveries-page` /
+  `transports-page`**: controlled tabs; owner-only gudang tabs filter rows by
+  `gudangIds`; every other role keeps `Daftar | Log Aktivitas` and only ever
+  receives their own gudang's rows (scope badge in the header).
+
+## 4. Gudang menu is owner-only
+
+- **`app-shell.tsx`**: the "Gudang" nav item is `ownerOnly` — hidden for
+  everyone else. **`gudang-page.tsx`** gates direct `#/gudang` access with a
+  friendly message (staff gudang keep working through Shipments — "Terima /
+  Scan" on PICKED_UP rows, walk-in on shipment detail).
+
+## 5. Access Control → Employees: gudang assignment UI
+
+- New **Gudang** column (warehouse badge / "belum ditugaskan") and a
+  **Gudang Penempatan** select in the create/edit dialog
+  (`GET /employees` now includes the `warehouse` relation). Employee create
+  and update already accepted `warehouseId` server-side.
+
+## 6. Login screen
+
+- Demo account list updated: hints now show each account's gudang, plus
+  **ratna** (Admin Gudang · Bandung) for trying the isolation live.
+
+---
+
+# Previous round — Gudang menu restructure, walk-in & scan UX, true responsive layout
 
 This round builds on the previous update (dialog max-height, camera scan fix,
 "Scan Kedatangan" shortcut, PWA review — see git history / previous notes).

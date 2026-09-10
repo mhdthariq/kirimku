@@ -1,14 +1,19 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { guard, ok, handle, str, num } from "@/lib/api-helpers";
+import { filterAuditEntriesForScope, scopeForUser } from "@/lib/gudang-scope";
 
 /**
  * Audit timeline. Supports per-menu filtering via ?entityType=customer|shipment|...
  * so every menu can render its own activity log panel.
+ * Gudang data separation: entries about gudang-scoped entities (shipment,
+ * pickup, delivery, transport, payment, …) are only visible to the gudang
+ * they belong to — only the owner sees entries across all gudang.
  */
 export async function GET(req: NextRequest) {
   return handle(async () => {
-    await guard(req, "audit_log.view");
+    const user = await guard(req, "audit_log.view");
+    const scope = await scopeForUser(user);
     const params = req.nextUrl.searchParams;
     const entityType = str(params.get("entityType"));
     const action = str(params.get("action"));
@@ -32,21 +37,32 @@ export async function GET(req: NextRequest) {
         : {}),
     };
 
-    const [logs, total, entityTypes, actions] = await Promise.all([
-      db.auditLog.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        take: limit,
-        skip: offset,
-        include: { actor: true },
-      }),
-      db.auditLog.count({ where }),
+    // Over-fetch when scoped so filtering to the user's gudang still fills
+    // the page (scoped visibility is computed per entry afterwards).
+    const logs = await db.auditLog.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      take: scope.unscoped ? limit : Math.min(500, limit + offset),
+      ...(scope.unscoped ? { skip: offset } : {}),
+      include: { actor: true },
+    });
+
+    let visible = logs;
+    if (!scope.unscoped) {
+      const flags = await filterAuditEntriesForScope(logs, scope);
+      visible = logs.filter((_, i) => flags[i]).slice(offset, offset + limit);
+    }
+    const total = scope.unscoped
+      ? await db.auditLog.count({ where })
+      : visible.length;
+
+    const [entityTypes, actions] = await Promise.all([
       db.auditLog.groupBy({ by: ["entityType"] }),
       db.auditLog.groupBy({ by: ["action"] }),
     ]);
 
     return ok(
-      logs.map((l) => ({
+      visible.map((l) => ({
         id: l.id,
         action: l.action,
         entityType: l.entityType,

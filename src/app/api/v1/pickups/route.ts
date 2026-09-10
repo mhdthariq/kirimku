@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { guard, ok, handle, fail, requireStr, str, num } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
 import { nextCode } from "@/lib/code-generator";
+import { cityIndex, inScope, pickupGudangIds, scopeForUser } from "@/lib/gudang-scope";
 
 export async function GET(req: NextRequest) {
   return handle(async () => {
@@ -33,8 +34,20 @@ export async function GET(req: NextRequest) {
         scans: { select: { detailId: true, result: true } },
       },
     });
+
+    // Gudang data separation: pickups belong to the origin-side gudang of
+    // their master shipment; scoped users only see their own gudang's tasks.
+    // Each row carries gudangIds for the owner's per-gudang tabs.
+    const scope = await scopeForUser(user);
+    const cityIdx = await cityIndex();
+    const withGudang = pickups.map((p) => ({
+      p,
+      gudangIds: pickupGudangIds(p.master, cityIdx),
+    }));
+    const visible = withGudang.filter(({ gudangIds }) => inScope(gudangIds, scope));
+
     return ok(
-      pickups.map((p) => ({
+      visible.map(({ p, gudangIds }) => ({
         id: p.id,
         pickupCode: p.pickupCode,
         status: p.status,
@@ -50,6 +63,7 @@ export async function GET(req: NextRequest) {
         customerType: p.master.customer.type,
         detailsCount: p.master._count.details,
         scannedCount: new Set(p.scans.filter((s) => s.detailId != null && s.result !== "unexpected").map((s) => s.detailId)).size,
+        gudangIds,
       })),
     );
   });

@@ -47,7 +47,6 @@ export const PERMISSIONS: { slug: string; module: string; description: string }[
   { slug: "warehouse.create", module: "Gudang", description: "Create gudang" },
   { slug: "warehouse.update", module: "Gudang", description: "Update gudang" },
   { slug: "warehouse.delete", module: "Gudang", description: "Delete/deactivate gudang" },
-  { slug: "warehouse.scope_own", module: "Gudang", description: "Gudang-scoped access: only see data of own gudang (roles below Admin Gudang)" },
   // Routes & checkpoints
   { slug: "checkpoint.view", module: "Routes", description: "View routes & checkpoints" },
   { slug: "checkpoint.create", module: "Routes", description: "Create routes/checkpoints" },
@@ -115,7 +114,7 @@ export const ROLE_TEMPLATES: { slug: string; name: string; description: string; 
   {
     slug: "admin-gudang",
     name: "Admin Gudang",
-    description: "Warehouse operations: arrival scanning, gudang, fleet, routes, transports",
+    description: "Warehouse operations: arrival scanning, fleet, routes, transports — data terbatas ke gudang tempatnya bertugas",
     permissions: [
       "warehouse.view", "warehouse.create", "warehouse.update", "warehouse.delete",
       "vehicle.view", "vehicle.create", "vehicle.update",
@@ -132,9 +131,9 @@ export const ROLE_TEMPLATES: { slug: string; name: string; description: string; 
   {
     slug: "staff-gudang",
     name: "Staff Gudang",
-    description: "Warehouse floor staff: arrival scanning & walk-in confirm — scoped to own gudang",
+    description: "Warehouse floor staff: arrival scanning & walk-in confirm — data terbatas ke gudang tempatnya bertugas",
     permissions: [
-      "warehouse.view", "warehouse.scope_own",
+      "warehouse.view",
       "shipment.view", "shipment.view_tracking", "shipment.confirm_arrival",
       "shipment_detail.view",
       "pickup.view",
@@ -145,7 +144,7 @@ export const ROLE_TEMPLATES: { slug: string; name: string; description: string; 
   {
     slug: "kurir",
     name: "Kurir",
-    description: "First/last mile: pickup & delivery execution with QR scanning",
+    description: "First/last mile: pickup & delivery execution with QR scanning — data terbatas ke gudang tempatnya bertugas",
     permissions: [
       "pickup.view", "pickup.create", "pickup.scan", "pickup.confirm",
       "delivery.view", "delivery.scan", "delivery.confirm",
@@ -193,6 +192,12 @@ export async function ensureRbac(): Promise<void> {
         update: { module: p.module, description: p.description },
       });
     }
+    // prune permissions removed from the catalog (e.g. the obsolete
+    // warehouse.scope_own — gudang scoping is now universal for every
+    // non-owner role) so the count check stays in sync
+    const keep = PERMISSIONS.map((p) => p.slug);
+    await db.rolePermission.deleteMany({ where: { permission: { slug: { notIn: keep } } } });
+    await db.permission.deleteMany({ where: { slug: { notIn: keep } } });
   }
   const roleCount = await db.role.count();
   if (roleCount < ROLE_TEMPLATES.length || catalogChanged) {

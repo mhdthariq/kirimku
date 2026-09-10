@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
 
     const user = await db.user.findUnique({
       where: { username: username.toLowerCase() },
-      include: { employee: true },
+      include: { employee: { include: { warehouse: true } } },
     });
 
     if (!user || !user.isActive || !verifyPassword(password, user.passwordHash)) {
@@ -41,6 +41,8 @@ export async function POST(req: NextRequest) {
       isOwner: user.isOwner,
       isActive: user.isActive,
       employeeId: user.employeeId,
+      warehouseId: user.employee?.warehouseId ?? null,
+      warehouseName: user.employee?.warehouse?.name ?? null,
       roles: roles.map((r) => ({ id: r.role.id, slug: r.role.slug, name: r.role.name })),
       permissions,
     };

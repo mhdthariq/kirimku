@@ -1,33 +1,33 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { guard, ok, handle } from "@/lib/api-helpers";
-import { gudangScopeFor, shipmentInScope } from "@/lib/scan-flow";
+import { cityIndex, inScope, scopeForUser, shipmentGudangIds } from "@/lib/gudang-scope";
 import { computeTotals } from "@/lib/shipment-totals";
 
 /**
- * Gudang operations workspace (menu between Pickups and Shipments):
+ * Gudang operations workspace:
  * - arrivals: shipments with status PICKED_UP that a kurir is bringing back to
  *   the gudang — Admin Gudang must scan every package before confirming arrival
  * - walkIns: shipments a customer can hand over directly at the gudang
  *   (Admin Gudang confirms "Arrive at Gudang" without scanning)
  * - warehouses: per-gudang contents — what packages are currently held at each
- *   gudang and how many (Admin Gudang sees all gudang; roles below Admin Gudang
- *   are scoped to their own gudang via employee.warehouseId).
+ *   gudang. Gudang data separation: every non-owner user only sees their own
+ *   gudang (employee.warehouseId); only the owner sees every gudang.
  */
 export async function GET(req: NextRequest) {
   return handle(async () => {
     const user = await guard(req, "shipment.view");
-    const scopeWarehouseId = await gudangScopeFor(user);
+    const scope = await scopeForUser(user);
 
     const warehouses = await db.warehouse.findMany({
       where: { isActive: true },
       orderBy: { code: "asc" },
       select: { id: true, code: true, name: true, city: true, customerSupportContact: true },
     });
-    const cityByWarehouse = new Map(warehouses.map((w) => [w.id, w.city ?? ""]));
+    const cityIdx = await cityIndex();
 
-    const inScope = (s: { originWarehouseId: number | null; origin: string }) =>
-      shipmentInScope(s, scopeWarehouseId, cityByWarehouse);
+    const inScopeNow = (s: { status: string; originWarehouseId: number | null; destinationWarehouseId: number | null; arrivedWarehouseId: number | null; origin: string; destination: string }) =>
+      inScope(shipmentGudangIds(s, cityIdx), scope);
 
     // --- Arrival queue: PICKED_UP shipments brought back by kurir -----------
     const pendingArrivals = await db.masterShipment.findMany({
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
         pickups: { orderBy: { completedAt: "desc" }, take: 1, select: { id: true, pickupCode: true, kurirId: true, completedAt: true } },
       },
     });
-    const scopedArrivals = pendingArrivals.filter((s) => inScope(s));
+    const scopedArrivals = pendingArrivals.filter((s) => inScopeNow(s));
     const arrivalIds = scopedArrivals.map((s) => s.id);
     const arrivalScanRows = arrivalIds.length
       ? await db.handoverScan.findMany({
@@ -110,7 +110,7 @@ export async function GET(req: NextRequest) {
       },
     });
     const walkIns = walkInShipments
-      .filter((s) => inScope(s))
+      .filter((s) => inScopeNow(s))
       .map((s) => {
         const totals = computeTotals(s.details);
         return {
@@ -150,7 +150,7 @@ export async function GET(req: NextRequest) {
 
     const sameCity = (a: string, b: string | null | undefined) => !!b && a.toLowerCase() === b.toLowerCase();
     const warehouseContents = warehouses
-      .filter((w) => scopeWarehouseId == null || w.id === scopeWarehouseId)
+      .filter((w) => (scope.unscoped ? true : scope.warehouseId != null && w.id === scope.warehouseId))
       .map((w) => {
         const shipments = heldShipments.filter((s) => {
           if (s.status === "RECEIVED_AT_GUDANG") {
@@ -195,7 +195,7 @@ export async function GET(req: NextRequest) {
         };
       });
 
-    const scopeWarehouse = scopeWarehouseId != null ? warehouses.find((w) => w.id === scopeWarehouseId) ?? null : null;
+    const scopeWarehouse = !scope.unscoped && scope.warehouseId != null ? warehouses.find((w) => w.id === scope.warehouseId) ?? null : null;
     return ok({
       scope: scopeWarehouse
         ? { warehouseId: scopeWarehouse.id, warehouseName: scopeWarehouse.name, scoped: true }

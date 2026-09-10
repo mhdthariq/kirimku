@@ -1,6 +1,6 @@
 # Shipment & Logistics Management System
 
-Aplikasi manajemen logistik pengiriman (shipment management) yang dibangun ulang dengan standar UI/UX modern: responsif penuh (desktop / tablet / ponsel), mode terang & gelap, CRUD berbasis modal, peta Leaflet untuk checkpoint, RBAC, audit trail, dan **database seeder mock-up lengkap**.
+Aplikasi manajemen logistik pengiriman (shipment management) yang dibangun ulang dengan standar UI/UX modern: responsif penuh (desktop / tablet / ponsel), mode terang & gelap, CRUD berbasis modal, peta Leaflet untuk checkpoint, RBAC, audit trail, **pemisahan data antar gudang** (setiap karyawan hanya melihat data gudangnya; hanya Owner yang melihat semua gudang), dan **database seeder mock-up lengkap**.
 
 Dibangun dengan **Next.js 16 + TypeScript + Tailwind CSS 4 + shadcn/ui + Prisma (SQLite)** — siap dialihkan ke **Supabase Postgres** (lihat `.env.example` dan `docs/02-database.md`).
 
@@ -86,8 +86,8 @@ Data mock-up yang dibuat:
 
 | Entitas | Jumlah | Keterangan |
 |---|---|---|
-| Users | 8 | 1 owner + 7 staff dengan role berbeda |
-| Employees | 8 | Lengkap dengan posisi & nomor pegawai |
+| Users | 9 | 1 owner + 8 staff dengan role berbeda (termasuk Admin Gudang Bandung) |
+| Employees | 9 | Lengkap dengan posisi, nomor pegawai & **penempatan gudang** |
 | Gudang | 3 | Jakarta Pusat, Bandung, Surabaya (tanpa field `type`) |
 | Vehicles | 3 | Engkel Box, CDD, Fuso (1 status MAINTENANCE) |
 | Routes | 2 | JKT–BDG, JKT–SBY |
@@ -119,17 +119,33 @@ Reset total (hapus db lama mulai dari nol): hapus file `db/custom.db` → `bun r
 
 | Username | Password | Role | Akses |
 |---|---|---|---|
-| `owner` | `ChangeMeOwner#2026` | Owner | Semua menu & permission |
-| `siti` | `Demo#Pass2026` | Admin Kantor | Operasional kantor, pembayaran, invoice |
-| `budi` | `Demo#Pass2026` | Marketing | Customer & shipment |
-| `agus` | `Demo#Pass2026` | Admin Gudang | Gudang, route, transport |
-| `wawan` | `Demo#Pass2026` | Staff Gudang | Gudang Jakarta Pusat saja (scoped) |
-| `dewi` | `Demo#Pass2026` | Kurir | Pickup & delivery |
-| `rizky` | `Demo#Pass2026` | Kurir | Pickup & delivery |
-| `joko` | `Demo#Pass2026` | Driver | Transport |
-| `andi` | `Demo#Pass2026` | Kenek | Transport |
+| `owner` | `ChangeMeOwner#2026` | Owner | Semua menu & permission — **satu-satunya yang melihat data SEMUA gudang** + tab per-gudang |
+| `siti` | `Demo#Pass2026` | Admin Kantor | Operasional kantor, pembayaran, invoice — data Gudang Jakarta |
+| `budi` | `Demo#Pass2026` | Marketing | Customer & shipment — data Gudang Jakarta |
+| `agus` | `Demo#Pass2026` | Admin Gudang | Route, transport, scan kedatangan — data Gudang Jakarta |
+| `ratna` | `Demo#Pass2026` | Admin Gudang | Data **Gudang Bandung** saja — untuk demo isolasi data antar gudang |
+| `wawan` | `Demo#Pass2026` | Staff Gudang | Data Gudang Jakarta Pusat saja (scoped) |
+| `dewi` | `Demo#Pass2026` | Kurir | Pickup & delivery — data Gudang Jakarta |
+| `rizky` | `Demo#Pass2026` | Kurir | Pickup & delivery — data Gudang Jakarta |
+| `joko` | `Demo#Pass2026` | Driver | Transport — data Gudang Jakarta |
+| `andi` | `Demo#Pass2026` | Kenek | Transport — data Gudang Jakarta |
 
 Semua password staff menggunakan `Demo#Pass2026`.
+
+---
+
+## 🏭 Pemisahan Data Antar Gudang
+
+Setiap **karyawan** (employee) ditugaskan ke **satu gudang** lewat field `Employee.warehouseId` — kolom **Gudang Penempatan** di halaman Access Control → Employees. Semua data operasional dipisah berdasarkan gudang tersebut:
+
+- **Shipments, Pickups, Deliveries, Transports** — hanya menampilkan data gudang sendiri. Staff di Jakarta tidak bisa melihat data Gudang Bandung (demikian juga sebaliknya), termasuk saat membuka detail shipment lewat URL (API menolak dengan 403).
+- **Hanya Owner** yang melihat data semua gudang. Di menu Shipments / Pickups / Deliveries / Transports, Owner mendapat tab **`Daftar | Gudang A | Gudang B | Gudang C | … | Log Aktivitas`** — satu tab per gudang untuk menelusuri data masing-masing.
+- **Role lain** tetap memakai layout `Daftar | Log Aktivitas` — datanya otomatis dibatasi ke gudang tempat karyawan bertugas (badge "Data gudang Anda: …" tampil di header halaman).
+- **Dashboard, Log Aktivitas, B2C Belum Bayar** juga mengikuti scope gudang. Data master kantor (customer, tarif, invoice, kendaraan, rute) tetap lintas gudang karena bukan data operasional gudang.
+- **Menu Gudang** (master gudang + Isi Gudang) hanya tampil untuk Owner. Staff Gudang bekerja lewat menu Shipments (tombol Terima / Scan).
+- Karyawan tanpa gudang tidak melihat data operasional apa pun — pastikan setiap employee diberi gudang.
+
+Aturan kepemilikan data mengikuti lokasi fisik paket pada lifecycle: status sebelum transport milik gudang asal; `IN_TRANSPORT` terlihat oleh kedua gudang ujung rute; setelah tiba/terkirim milik gudang tujuan. Transport linehaul terlihat oleh gudang asal & tujuan rutenya.
 
 ---
 

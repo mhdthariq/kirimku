@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
           : {}),
       },
       orderBy: { id: "asc" },
-      include: { user: { include: { roles: { include: { role: true } } } } },
+      include: { user: { include: { roles: { include: { role: true } } } }, warehouse: { select: { id: true, name: true, city: true } } },
     });
     return ok(employees);
   });

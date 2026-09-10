@@ -31,6 +31,10 @@ export interface AuthUser {
   isOwner: boolean;
   isActive: boolean;
   employeeId: number | null;
+  /** gudang the user's employee belongs to (null when unbound / owner) */
+  warehouseId: number | null;
+  /** display name of the user's gudang */
+  warehouseName: string | null;
   roles: { id: number; slug: string; name: string }[];
   permissions: string[];
 }
@@ -65,7 +69,7 @@ export async function getAuthUser(req: NextRequest): Promise<AuthUser | null> {
       user: {
         include: {
           roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } },
-          employee: true,
+          employee: { include: { warehouse: true } },
         },
       },
     },
@@ -97,6 +101,8 @@ export async function getAuthUser(req: NextRequest): Promise<AuthUser | null> {
     isOwner: user.isOwner,
     isActive: user.isActive,
     employeeId: user.employeeId,
+    warehouseId: user.employee?.warehouseId ?? null,
+    warehouseName: user.employee?.warehouse?.name ?? null,
     roles,
     permissions,
   };

@@ -18,13 +18,6 @@ export function ensureSeed(): Promise<void> {
 async function runSeed(): Promise<void> {
   await ensureRbac();
 
-  const ownerExists = await db.user.findFirst({ where: { username: "owner" } });
-  const shipmentCount = await db.masterShipment.count();
-  if (ownerExists && shipmentCount >= 6) return; // already seeded
-
-  const now = new Date();
-  const daysAgo = (d: number) => new Date(now.getTime() - d * 24 * 60 * 60 * 1000);
-
   // ----- Gudang (no gateway/type distinction) -------------------------------
   // customerSupportContact is printed on the Shipment Resi & Detail Resi.
   const gudangDefs = [
@@ -42,19 +35,39 @@ async function runSeed(): Promise<void> {
     gudang[g.city] = w.id;
   }
 
+  // ----- Backfill: every karyawan must belong to a gudang (data separation) --
+  // Employees without a gudang see no operational data (only the owner sees
+  // everything), so older databases are backfilled with the first gudang.
+  const unbound = await db.employee.findMany({ where: { warehouseId: null, isActive: true }, select: { id: true } });
+  if (unbound.length > 0) {
+    await db.employee.updateMany({ where: { id: { in: unbound.map((e) => e.id) } }, data: { warehouseId: gudang["Jakarta Pusat"] } });
+  }
+
+  const ownerExists = await db.user.findFirst({ where: { username: "owner" } });
+  const shipmentCount = await db.masterShipment.count();
+  if (ownerExists && shipmentCount >= 6) return; // already seeded
+
+  const now = new Date();
+  const daysAgo = (d: number) => new Date(now.getTime() - d * 24 * 60 * 60 * 1000);
+
   // ----- Employees + users -------------------------------------------------
+  // EVERY karyawan is stationed at one gudang (warehouseId) — operational data
+  // (shipments, pickups, deliveries, transports) is separated by that gudang.
+  // ratna (Admin Gudang Bandung) demonstrates the data isolation: she only
+  // sees Bandung-side data, never Jakarta's.
   const staffPassword = hashPassword("Demo#Pass2026");
   const ownerPassword = hashPassword("ChangeMeOwner#2026");
 
-  const staff: { username: string; name: string; position: string; role: string; employeeNumber: string; warehouseId?: string }[] = [
-    { username: "siti", name: "Siti Rahma", position: "Admin Kantor", role: "admin-kantor", employeeNumber: "EMP-000002" },
-    { username: "budi", name: "Budi Santoso", position: "Marketing", role: "marketing", employeeNumber: "EMP-000003" },
+  const staff: { username: string; name: string; position: string; role: string; employeeNumber: string; warehouseId: string }[] = [
+    { username: "siti", name: "Siti Rahma", position: "Admin Kantor", role: "admin-kantor", employeeNumber: "EMP-000002", warehouseId: "Jakarta Pusat" },
+    { username: "budi", name: "Budi Santoso", position: "Marketing", role: "marketing", employeeNumber: "EMP-000003", warehouseId: "Jakarta Pusat" },
     { username: "agus", name: "Agus Pratama", position: "Admin Gudang", role: "admin-gudang", employeeNumber: "EMP-000004", warehouseId: "Jakarta Pusat" },
-    { username: "dewi", name: "Dewi Lestari", position: "Kurir", role: "kurir", employeeNumber: "EMP-000005" },
-    { username: "rizky", name: "Rizky Hidayat", position: "Kurir", role: "kurir", employeeNumber: "EMP-000006" },
-    { username: "joko", name: "Joko Widodo", position: "Driver", role: "driver", employeeNumber: "EMP-000007" },
-    { username: "andi", name: "Andi Wijaya", position: "Kenek", role: "kenek", employeeNumber: "EMP-000008" },
+    { username: "dewi", name: "Dewi Lestari", position: "Kurir", role: "kurir", employeeNumber: "EMP-000005", warehouseId: "Jakarta Pusat" },
+    { username: "rizky", name: "Rizky Hidayat", position: "Kurir", role: "kurir", employeeNumber: "EMP-000006", warehouseId: "Jakarta Pusat" },
+    { username: "joko", name: "Joko Widodo", position: "Driver", role: "driver", employeeNumber: "EMP-000007", warehouseId: "Jakarta Pusat" },
+    { username: "andi", name: "Andi Wijaya", position: "Kenek", role: "kenek", employeeNumber: "EMP-000008", warehouseId: "Jakarta Pusat" },
     { username: "wawan", name: "Wawan Setiawan", position: "Staff Gudang", role: "staff-gudang", employeeNumber: "EMP-000009", warehouseId: "Jakarta Pusat" },
+    { username: "ratna", name: "Ratna Kurnia", position: "Admin Gudang", role: "admin-gudang", employeeNumber: "EMP-000010", warehouseId: "Bandung" },
   ];
 
   const ownerEmployee = await db.employee.upsert({
@@ -74,9 +87,9 @@ async function runSeed(): Promise<void> {
       where: { employeeNumber: s.employeeNumber },
       create: {
         employeeNumber: s.employeeNumber, name: s.name, position: s.position, phone: `08110000${s.employeeNumber.slice(-4)}`,
-        warehouseId: s.warehouseId ? gudang[s.warehouseId] : null,
+        warehouseId: gudang[s.warehouseId] ?? null,
       },
-      update: {},
+      update: { warehouseId: gudang[s.warehouseId] ?? null },
     });
     const user = await db.user.upsert({
       where: { username: s.username },

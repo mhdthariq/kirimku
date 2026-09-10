@@ -11,10 +11,11 @@ import { LogoMark } from "@/components/app/logo";
 import { ThemeToggle } from "@/components/app/theme-toggle";
 
 const DEMO_ACCOUNTS = [
-  { username: "owner", password: "ChangeMeOwner#2026", label: "Owner", hint: "Akses penuh" },
-  { username: "budi", password: "Demo#Pass2026", label: "Budi", hint: "Marketing" },
-  { username: "agus", password: "Demo#Pass2026", label: "Agus", hint: "Admin Gudang" },
-  { username: "wawan", password: "Demo#Pass2026", label: "Wawan", hint: "Staff Gudang" },
+  { username: "owner", password: "ChangeMeOwner#2026", label: "Owner", hint: "Akses penuh, semua gudang" },
+  { username: "budi", password: "Demo#Pass2026", label: "Budi", hint: "Marketing · Gudang Jakarta" },
+  { username: "agus", password: "Demo#Pass2026", label: "Agus", hint: "Admin Gudang · Jakarta" },
+  { username: "ratna", password: "Demo#Pass2026", label: "Ratna", hint: "Admin Gudang · Bandung" },
+  { username: "wawan", password: "Demo#Pass2026", label: "Wawan", hint: "Staff Gudang · Jakarta" },
   { username: "siti", password: "Demo#Pass2026", label: "Siti", hint: "Admin Kantor" },
   { username: "dewi", password: "Demo#Pass2026", label: "Dewi", hint: "Kurir" },
 ];

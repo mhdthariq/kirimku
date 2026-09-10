@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { guard, ok, handle, fail, requireStr, str, num } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
 import { nextCode } from "@/lib/code-generator";
+import { cityIndex, deliveryGudangIds, inScope, scopeForUser } from "@/lib/gudang-scope";
 
 export async function GET(req: NextRequest) {
   return handle(async () => {
@@ -33,8 +34,20 @@ export async function GET(req: NextRequest) {
         scans: { where: { result: { in: ["ok", "duplicate"] } }, select: { detailId: true } },
       },
     });
+
+    // Gudang data separation: deliveries belong to the gudang where their
+    // master shipment currently sits; scoped users only see their own
+    // gudang's tasks. Each row carries gudangIds for the owner's tabs.
+    const scope = await scopeForUser(user);
+    const cityIdx = await cityIndex();
+    const withGudang = deliveries.map((d) => ({
+      d,
+      gudangIds: deliveryGudangIds(d.master, cityIdx),
+    }));
+    const visible = withGudang.filter(({ gudangIds }) => inScope(gudangIds, scope));
+
     return ok(
-      deliveries.map((d) => {
+      visible.map(({ d, gudangIds }) => {
         const scannedIds = new Set(d.scans.filter((s) => s.detailId != null).map((s) => s.detailId));
         return {
           id: d.id,
@@ -61,6 +74,7 @@ export async function GET(req: NextRequest) {
             description: x.description,
             scanned: scannedIds.has(x.id),
           })),
+          gudangIds,
         };
       }),
     );

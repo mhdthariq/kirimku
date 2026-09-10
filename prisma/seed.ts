@@ -56,15 +56,16 @@ async function main() {
   console.log(`   Audit logs: ${auditLogs}`);
   console.log("");
   console.log("Akun demo:");
-  console.log("  owner  / ChangeMeOwner#2026   (akses penuh)");
-  console.log("  siti   / Demo#Pass2026        (admin kantor)");
-  console.log("  budi   / Demo#Pass2026        (marketing)");
-  console.log("  agus   / Demo#Pass2026        (admin gudang)");
-  console.log("  dewi   / Demo#Pass2026        (kurir)");
-  console.log("  rizky  / Demo#Pass2026        (kurir)");
-  console.log("  joko   / Demo#Pass2026        (driver)");
-  console.log("  andi   / Demo#Pass2026        (kenek)");
-  console.log("  wawan  / Demo#Pass2026        (staff gudang, scoped ke Gudang Jakarta Pusat)");
+  console.log("  owner  / ChangeMeOwner#2026   (akses penuh — satu-satunya yang melihat data SEMUA gudang)");
+  console.log("  siti   / Demo#Pass2026        (admin kantor, Gudang Jakarta Pusat)");
+  console.log("  budi   / Demo#Pass2026        (marketing, Gudang Jakarta Pusat)");
+  console.log("  agus   / Demo#Pass2026        (admin gudang, Gudang Jakarta Pusat)");
+  console.log("  ratna  / Demo#Pass2026        (admin gudang, Gudang Bandung — demo isolasi data)");
+  console.log("  dewi   / Demo#Pass2026        (kurir, Gudang Jakarta Pusat)");
+  console.log("  rizky  / Demo#Pass2026        (kurir, Gudang Jakarta Pusat)");
+  console.log("  joko   / Demo#Pass2026        (driver, Gudang Jakarta Pusat)");
+  console.log("  andi   / Demo#Pass2026        (kenek, Gudang Jakarta Pusat)");
+  console.log("  wawan  / Demo#Pass2026        (staff gudang, Gudang Jakarta Pusat)");
 }
 
 main()

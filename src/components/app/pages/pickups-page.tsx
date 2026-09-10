@@ -10,6 +10,7 @@ import { ActivityLogPanel } from "@/components/app/activity-log-panel";
 import { StatusBadge } from "@/components/app/status-badge";
 import { Field, FormSelect, SubmitButton, Textarea, formatDate } from "@/components/app/form-parts";
 import { QrScanDialog, type ScanTaskInfo } from "@/components/app/qr-scan-dialog";
+import { GudangScopeBadge, GudangTabBanner, GudangTabsTriggers, gudangTabValue, parseGudangTabValue } from "@/components/app/gudang-tabs";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -48,6 +49,7 @@ export function PickupsPage() {
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [tab, setTab] = useState("list");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<PickupTask | null>(null);
   const [form, setForm] = useState<PickupForm>(EMPTY);
@@ -55,18 +57,26 @@ export function PickupsPage() {
   const [confirmDelete, setConfirmDelete] = useState<PickupTask | null>(null);
   const [scanTask, setScanTask] = useState<ScanTaskInfo | null>(null);
 
+  // Owner per-gudang tabs (Daftar | Gudang A | Gudang B | … | Log Aktivitas):
+  // filter the already-fetched rows to the selected gudang. Non-owner users
+  // only ever receive their own gudang's data from the API.
+  const isOwner = !!user?.isOwner;
+  const gudangOptions = options?.warehouses ?? [];
+  const activeGudangId = parseGudangTabValue(tab);
+
   const rows = useMemo(() => {
     if (!data) return [];
     const q = search.toLowerCase();
     return data.filter(
       (p) =>
         (statusFilter === "all" || p.status === statusFilter) &&
+        (activeGudangId == null || (p.gudangIds ?? []).includes(activeGudangId)) &&
         (!q ||
           p.pickupCode.toLowerCase().includes(q) ||
           p.masterCode.toLowerCase().includes(q) ||
           p.customerName.toLowerCase().includes(q)),
     );
-  }, [data, search, statusFilter]);
+  }, [data, search, statusFilter, activeGudangId]);
 
   function openCreate() {
     setEditing(null);
@@ -127,6 +137,99 @@ export function PickupsPage() {
     label: `${s.masterCode} · ${s.customer?.name ?? ""} (${s.details?.length ?? s._count?.details ?? 0} detail)`,
   }));
 
+  const tableView = (
+    <DataTable
+      rows={rows}
+      loading={loading}
+      search={search}
+      onSearchChange={setSearch}
+      searchPlaceholder="Cari kode pickup / resi / customer…"
+      toolbar={
+        <div className="flex max-w-full flex-wrap items-center gap-1.5">
+          {["all", "ASSIGNED", "IN_PROGRESS", "COMPLETED", "CANCELLED"].map((s) => (
+            <Button key={s} size="sm" variant={statusFilter === s ? "default" : "outline"} className="h-7 px-2.5 text-xs" onClick={() => setStatusFilter(s)}>
+              {s === "all" ? "Semua" : s.replace("_", " ")}
+            </Button>
+          ))}
+        </div>
+      }
+      emptyMessage="Belum ada task pickup. Shipment berstatus READY_FOR_PICKUP bisa dijemput."
+      columns={[
+        {
+          key: "code",
+          header: "Kode",
+          primary: true,
+          render: (p) => (
+            <div>
+              <p className="font-mono text-xs font-semibold text-foreground">{p.pickupCode}</p>
+              <p className="text-xs text-muted-foreground">{p.masterCode}</p>
+            </div>
+          ),
+        },
+        {
+          key: "customer",
+          header: "Customer & Rute",
+          render: (p) => (
+            <div>
+              <p className="text-sm font-medium text-foreground">{p.customerName}</p>
+              <p className="text-xs text-muted-foreground">
+                {p.origin} → {p.destination}
+              </p>
+            </div>
+          ),
+        },
+        {
+          key: "kurir",
+          header: "Kurir",
+          render: (p) => {
+            const kurir = options?.employees?.find((e) => e.id === p.kurirId);
+            return <span className="text-sm text-muted-foreground">{kurir?.name ?? "—"}</span>;
+          },
+        },
+        { key: "createdAt", header: "Dibuat", hideOnMobile: true, render: (p) => formatDate(p.createdAt, true) },
+        {
+          key: "scan",
+          header: "Paket Ter-scan",
+          hideOnMobile: true,
+          render: (p) => (
+            <span className="font-mono text-xs text-muted-foreground">
+              {p.scannedCount ?? 0}/{p.detailsCount}
+            </span>
+          ),
+        },
+        { key: "status", header: "Status", render: (p) => <StatusBadge status={p.status} /> },
+        {
+          key: "actions",
+          header: "Aksi",
+          render: (p) => (
+            <div className="flex flex-wrap gap-1.5">
+              {p.status !== "COMPLETED" && p.status !== "CANCELLED" && (can.confirm || can.scan) && (
+                <Button size="sm" className="h-7" onClick={() => openScan(p)}>
+                  <QrCode className="h-3.5 w-3.5" /> {isExecutor ? "Proses / Scan QR" : "Selesaikan (Scan QR)"}
+                </Button>
+              )}
+              {p.status === "COMPLETED" && (can.confirm || can.scan) && (
+                <Button variant="outline" size="sm" className="h-7" onClick={() => openScan(p)}>
+                  <QrCode className="h-3.5 w-3.5" /> Riwayat Scan
+                </Button>
+              )}
+              {p.status !== "COMPLETED" && p.status !== "CANCELLED" && can.assign && (
+                <>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(p)} aria-label={`Edit ${p.pickupCode}`}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setConfirmDelete(p)} aria-label={`Batalkan ${p.pickupCode}`}>
+                    <XCircle className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+            </div>
+          ),
+        },
+      ]}
+    />
+  );
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -134,111 +237,33 @@ export function PickupsPage() {
         subtitle="Penjemputan kiriman oleh kurir dari alamat customer."
         icon={<Truck className="h-5 w-5" />}
         actions={
-          can.create && (
-            <Button onClick={openCreate}>
-              <Plus className="h-4 w-4" /> Buat Pickup
-            </Button>
-          )
+          <>
+            {!isOwner && <GudangScopeBadge gudangName={user?.warehouseName ?? null} />}
+            {can.create && (
+              <Button onClick={openCreate}>
+                <Plus className="h-4 w-4" /> Buat Pickup
+              </Button>
+            )}
+          </>
         }
       />
 
-      <Tabs defaultValue="list">
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="list">Daftar</TabsTrigger>
+          {isOwner && <GudangTabsTriggers warehouses={gudangOptions} />}
           <TabsTrigger value="activity">Log Aktivitas</TabsTrigger>
         </TabsList>
         <TabsContent value="list" className="mt-3">
-          <DataTable
-            rows={rows}
-            loading={loading}
-            search={search}
-            onSearchChange={setSearch}
-            searchPlaceholder="Cari kode pickup / resi / customer…"
-            toolbar={
-              <div className="flex max-w-full flex-wrap items-center gap-1.5">
-                {["all", "ASSIGNED", "IN_PROGRESS", "COMPLETED", "CANCELLED"].map((s) => (
-                  <Button key={s} size="sm" variant={statusFilter === s ? "default" : "outline"} className="h-7 px-2.5 text-xs" onClick={() => setStatusFilter(s)}>
-                    {s === "all" ? "Semua" : s.replace("_", " ")}
-                  </Button>
-                ))}
-              </div>
-            }
-            emptyMessage="Belum ada task pickup. Shipment berstatus READY_FOR_PICKUP bisa dijemput."
-            columns={[
-              {
-                key: "code",
-                header: "Kode",
-                primary: true,
-                render: (p) => (
-                  <div>
-                    <p className="font-mono text-xs font-semibold text-foreground">{p.pickupCode}</p>
-                    <p className="text-xs text-muted-foreground">{p.masterCode}</p>
-                  </div>
-                ),
-              },
-              {
-                key: "customer",
-                header: "Customer & Rute",
-                render: (p) => (
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{p.customerName}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {p.origin} → {p.destination}
-                    </p>
-                  </div>
-                ),
-              },
-              {
-                key: "kurir",
-                header: "Kurir",
-                render: (p) => {
-                  const kurir = options?.employees?.find((e) => e.id === p.kurirId);
-                  return <span className="text-sm text-muted-foreground">{kurir?.name ?? "—"}</span>;
-                },
-              },
-              { key: "createdAt", header: "Dibuat", hideOnMobile: true, render: (p) => formatDate(p.createdAt, true) },
-              {
-                key: "scan",
-                header: "Paket Ter-scan",
-                hideOnMobile: true,
-                render: (p) => (
-                  <span className="font-mono text-xs text-muted-foreground">
-                    {p.scannedCount ?? 0}/{p.detailsCount}
-                  </span>
-                ),
-              },
-              { key: "status", header: "Status", render: (p) => <StatusBadge status={p.status} /> },
-              {
-                key: "actions",
-                header: "Aksi",
-                render: (p) => (
-                  <div className="flex flex-wrap gap-1.5">
-                    {p.status !== "COMPLETED" && p.status !== "CANCELLED" && (can.confirm || can.scan) && (
-                      <Button size="sm" className="h-7" onClick={() => openScan(p)}>
-                        <QrCode className="h-3.5 w-3.5" /> {isExecutor ? "Proses / Scan QR" : "Selesaikan (Scan QR)"}
-                      </Button>
-                    )}
-                    {p.status === "COMPLETED" && (can.confirm || can.scan) && (
-                      <Button variant="outline" size="sm" className="h-7" onClick={() => openScan(p)}>
-                        <QrCode className="h-3.5 w-3.5" /> Riwayat Scan
-                      </Button>
-                    )}
-                    {p.status !== "COMPLETED" && p.status !== "CANCELLED" && can.assign && (
-                      <>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(p)} aria-label={`Edit ${p.pickupCode}`}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setConfirmDelete(p)} aria-label={`Batalkan ${p.pickupCode}`}>
-                          <XCircle className="h-4 w-4" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                ),
-              },
-            ]}
-          />
+          {tableView}
         </TabsContent>
+        {isOwner &&
+          gudangOptions.map((w) => (
+            <TabsContent key={w.id} value={gudangTabValue(w.id)} className="mt-3 space-y-3">
+              <GudangTabBanner gudangName={w.name} count={rows.length} />
+              {tableView}
+            </TabsContent>
+          ))}
         <TabsContent value="activity" className="mt-3">
           <ActivityLogPanel entityTypes={["pickup"]} />
         </TabsContent>

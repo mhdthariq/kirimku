@@ -43,6 +43,8 @@ export interface NavItem {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   anyPermissions?: string[];
+  /** visible only to the owner (e.g. the Gudang master-data menu) */
+  ownerOnly?: boolean;
   mobile?: boolean;
 }
 
@@ -60,7 +62,9 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: "Gudang & Armada",
     items: [
-      { href: "/gudang", label: "Gudang", icon: Warehouse, anyPermissions: ["warehouse.view", "shipment.view"], mobile: false },
+      // Gudang master data is owner-only — staff gudang reach their gudang
+      // workspace through Shipments (arrival scanning) instead.
+      { href: "/gudang", label: "Gudang", icon: Warehouse, ownerOnly: true, mobile: false },
       { href: "/vehicles", label: "Kendaraan", icon: CarFront, anyPermissions: ["vehicle.view"] },
       { href: "/routes", label: "Rute & Checkpoint", icon: MapPin, anyPermissions: ["checkpoint.view"] },
     ],
@@ -126,7 +130,9 @@ export function AppShell({
   const visibleGroups = NAV_GROUPS.map((g) => ({
     ...g,
     items: g.items.filter(
-      (item) => !item.anyPermissions || hasAnyPermission(user, item.anyPermissions),
+      (item) =>
+        (!item.ownerOnly || user.isOwner) &&
+        (!item.anyPermissions || hasAnyPermission(user, item.anyPermissions)),
     ),
   })).filter((g) => g.items.length > 0);
 

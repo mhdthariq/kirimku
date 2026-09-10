@@ -10,6 +10,7 @@ import { ActivityLogPanel } from "@/components/app/activity-log-panel";
 import { StatusBadge } from "@/components/app/status-badge";
 import { Field, FormSelect, SubmitButton, Textarea, formatDate, formatRupiah } from "@/components/app/form-parts";
 import { QrScanDialog, type ScanTaskInfo } from "@/components/app/qr-scan-dialog";
+import { GudangScopeBadge, GudangTabBanner, GudangTabsTriggers, gudangTabValue, parseGudangTabValue } from "@/components/app/gudang-tabs";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -51,6 +52,7 @@ export function DeliveriesPage() {
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [tab, setTab] = useState("list");
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<DeliveryTask | null>(null);
   const [detailTarget, setDetailTarget] = useState<DeliveryTask | null>(null);
@@ -59,15 +61,23 @@ export function DeliveriesPage() {
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<DeliveryTask | null>(null);
 
+  // Owner per-gudang tabs (Daftar | Gudang A | Gudang B | … | Log Aktivitas):
+  // filter the fetched rows to the selected gudang. Non-owner users only
+  // ever receive their own gudang's data from the API.
+  const isOwner = !!user?.isOwner;
+  const gudangOptions = options?.warehouses ?? [];
+  const activeGudangId = parseGudangTabValue(tab);
+
   const rows = useMemo(() => {
     if (!data) return [];
     const q = search.toLowerCase();
     return data.filter(
       (d) =>
         (statusFilter === "all" || d.status === statusFilter) &&
+        (activeGudangId == null || (d.gudangIds ?? []).includes(activeGudangId)) &&
         (!q || d.deliveryCode.toLowerCase().includes(q) || d.masterCode.toLowerCase().includes(q) || d.customerName.toLowerCase().includes(q)),
     );
-  }, [data, search, statusFilter]);
+  }, [data, search, statusFilter, activeGudangId]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -125,27 +135,35 @@ export function DeliveriesPage() {
         subtitle="Pengiriman akhir ke penerima — kurir scan QR semua paket customer sebelum konfirmasi."
         icon={<ClipboardList className="h-5 w-5" />}
         actions={
-          can.assign && (
-            <Button
-              onClick={() => {
-                setEditTarget(null);
-                setForm(EMPTY);
-                setCreateOpen(true);
-              }}
-            >
-              <Plus className="h-4 w-4" /> Buat Delivery
-            </Button>
-          )
+          <>
+            {!isOwner && <GudangScopeBadge gudangName={user?.warehouseName ?? null} />}
+            {can.assign && (
+              <Button
+                onClick={() => {
+                  setEditTarget(null);
+                  setForm(EMPTY);
+                  setCreateOpen(true);
+                }}
+              >
+                <Plus className="h-4 w-4" /> Buat Delivery
+              </Button>
+            )}
+          </>
         }
       />
 
-      <Tabs defaultValue="list">
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="list">Daftar</TabsTrigger>
+          {isOwner && <GudangTabsTriggers warehouses={gudangOptions} />}
           <TabsTrigger value="activity">Log Aktivitas</TabsTrigger>
         </TabsList>
-        <TabsContent value="list" className="mt-3">
-          <DataTable
+        {["list", ...(isOwner ? gudangOptions.map((g) => gudangTabValue(g.id)) : [])].map((v) => {
+          const activeW = gudangOptions.find((g) => gudangTabValue(g.id) === v) ?? null;
+          return (
+            <TabsContent key={v} value={v} className="mt-3 space-y-3">
+              {activeW && <GudangTabBanner gudangName={activeW.name} count={rows.length} />}
+              <DataTable
             rows={rows}
             loading={loading}
             search={search}
@@ -251,7 +269,9 @@ export function DeliveriesPage() {
               },
             ]}
           />
-        </TabsContent>
+            </TabsContent>
+          );
+        })}
         <TabsContent value="activity" className="mt-3">
           <ActivityLogPanel entityTypes={["delivery"]} />
         </TabsContent>

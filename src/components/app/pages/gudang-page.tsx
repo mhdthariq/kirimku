@@ -123,6 +123,17 @@ export function GudangPage() {
     if (ok) reload();
   }
 
+  // Gudang master data is owner-only (menu hidden for everyone else; direct
+  // hash access is stopped here too).
+  if (!user?.isOwner) {
+    return (
+      <PageHeader
+        title="Gudang"
+        subtitle="Data master gudang hanya dapat dilihat oleh Owner. Staff gudang bekerja melalui menu Shipments."
+      />
+    );
+  }
+
   if (!can.view) {
     return <PageHeader title="Gudang" subtitle="Anda tidak memiliki izin melihat data gudang." />;
   }

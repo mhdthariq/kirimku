@@ -43,6 +43,7 @@ import { StatusBadge } from "@/components/app/status-badge";
 import { ResiPrint } from "@/components/app/resi-print";
 import { ArrivalScanDialog } from "@/components/app/arrival-scan-dialog";
 import { WalkInDialog } from "@/components/app/walk-in-dialog";
+import { GudangScopeBadge, GudangTabBanner, GudangTabsTriggers, gudangTabValue, parseGudangTabValue } from "@/components/app/gudang-tabs";
 import { Field, FormSelect, Input, NumberInput, SubmitButton, Textarea, formatDate, formatNumber, formatRupiah } from "@/components/app/form-parts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -120,12 +121,20 @@ function ShipmentList() {
   );
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [tab, setTab] = useState("list");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState<ShipmentForm>(EMPTY_SHIPMENT);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<Shipment | null>(null);
   const [scanPickerOpen, setScanPickerOpen] = useState(false);
   const [rowScanTask, setRowScanTask] = useState<GudangArrivalQueueItem | null>(null);
+
+  // Owner per-gudang tabs (Daftar | Gudang A | Gudang B | … | Log Aktivitas):
+  // filter the fetched rows to the selected gudang. Non-owner users only
+  // ever receive their own gudang's data from the API.
+  const isOwner = !!user?.isOwner;
+  const gudangOptions = options?.warehouses ?? [];
+  const activeGudangId = parseGudangTabValue(tab);
 
   const rows = useMemo(() => {
     if (!data) return [];
@@ -136,6 +145,7 @@ function ShipmentList() {
           (statusFilter === "GUDANG"
             ? s.status === "RECEIVED_AT_GUDANG" || s.status === "ARRIVED_AT_GUDANG"
             : s.status === statusFilter)) &&
+        (activeGudangId == null || (s.gudangIds ?? []).includes(activeGudangId)) &&
         (!q ||
           s.masterCode.toLowerCase().includes(q) ||
           (s.customer?.name ?? "").toLowerCase().includes(q) ||
@@ -143,7 +153,7 @@ function ShipmentList() {
           s.destination.toLowerCase().includes(q) ||
           (s.penerimaName ?? "").toLowerCase().includes(q)),
     );
-  }, [data, search, statusFilter]);
+  }, [data, search, statusFilter, activeGudangId]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -233,6 +243,7 @@ function ShipmentList() {
         icon={<Package className="h-5 w-5" />}
         actions={
           <>
+            {!isOwner && <GudangScopeBadge gudangName={user?.warehouseName ?? null} />}
             {can.confirmArrival && (
               <Button variant="outline" onClick={() => setScanPickerOpen(true)}>
                 <ScanLine className="h-4 w-4" /> Scan Kedatangan
@@ -247,19 +258,24 @@ function ShipmentList() {
         }
       />
 
-      <Tabs defaultValue="list">
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="list">Daftar</TabsTrigger>
+          {isOwner && <GudangTabsTriggers warehouses={gudangOptions} />}
           <TabsTrigger value="activity">Log Aktivitas</TabsTrigger>
         </TabsList>
-        <TabsContent value="list" className="mt-3 space-y-3">
-          {statusFilter === "PICKED_UP" && can.confirmArrival && (
-            <p className="rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-2 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300">
-              Shipment <b>PICKED UP</b> sedang dibawa kurir kembali ke gudang. Klik <b>Terima / Scan</b> pada baris untuk scan tiap paketnya
-              (kamera / reader / manual) lalu konfirmasi <b>Tiba di Gudang</b>.
-            </p>
-          )}
-          <DataTable
+        {["list", ...(isOwner ? gudangOptions.map((g) => gudangTabValue(g.id)) : [])].map((v) => {
+          const activeW = gudangOptions.find((g) => gudangTabValue(g.id) === v) ?? null;
+          return (
+            <TabsContent key={v} value={v} className="mt-3 space-y-3">
+              {activeW && <GudangTabBanner gudangName={activeW.name} count={rows.length} />}
+              {statusFilter === "PICKED_UP" && can.confirmArrival && (
+                <p className="rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-2 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300">
+                  Shipment <b>PICKED UP</b> sedang dibawa kurir kembali ke gudang. Klik <b>Terima / Scan</b> pada baris untuk scan tiap paketnya
+                  (kamera / reader / manual) lalu konfirmasi <b>Tiba di Gudang</b>.
+                </p>
+              )}
+              <DataTable
             rows={rows}
             loading={loading}
             search={search}
@@ -379,7 +395,9 @@ function ShipmentList() {
               },
             ]}
           />
-        </TabsContent>
+            </TabsContent>
+          );
+        })}
         <TabsContent value="activity" className="mt-3">
           <ActivityLogPanel entityTypes={["shipment", "shipment_detail"]} />
         </TabsContent>

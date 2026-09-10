@@ -3,10 +3,11 @@ import { db } from "@/lib/db";
 import { guard, ok, handle, fail, str, num } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
 import { nextCode } from "@/lib/code-generator";
+import { cityIndex, inScope, scopeForUser, transportGudangIds } from "@/lib/gudang-scope";
 
 export async function GET(req: NextRequest) {
   return handle(async () => {
-    await guard(req, "transport.view");
+    const user = await guard(req, "transport.view");
     const params = req.nextUrl.searchParams;
     const search = str(params.get("search"))?.toLowerCase();
     const status = str(params.get("status"));
@@ -35,8 +36,20 @@ export async function GET(req: NextRequest) {
     const employees = await db.employee.findMany({ where: { isActive: true } });
     const employeeName = (id: number | null) => (id == null ? null : employees.find((e) => e.id === id)?.name ?? null);
 
+    // Gudang data separation: a transport belongs to the endpoint gudangs of
+    // its route (origin loads it, destination receives it); scoped users only
+    // see transports touching their own gudang. Rows carry gudangIds for the
+    // owner's per-gudang tabs.
+    const scope = await scopeForUser(user);
+    const cityIdx = await cityIndex();
+    const withGudang = transports.map((t) => ({
+      t,
+      gudangIds: transportGudangIds(t.route ?? { origin: null, destination: null }, t.shipments.map((s) => s.master), cityIdx),
+    }));
+    const visible = withGudang.filter(({ gudangIds }) => inScope(gudangIds, scope));
+
     return ok(
-      transports.map((t) => ({
+      visible.map(({ t, gudangIds }) => ({
         id: t.id,
         transportCode: t.transportCode,
         status: t.status,
@@ -53,6 +66,7 @@ export async function GET(req: NextRequest) {
         createdAt: t.createdAt,
         shipments: t.shipments.map((s) => ({ id: s.master.id, masterCode: s.master.masterCode, status: s.master.status })),
         checkpointRecordsCount: t._count.checkpointRecords,
+        gudangIds,
       })),
     );
   });

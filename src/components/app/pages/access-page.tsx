@@ -66,10 +66,11 @@ export function AccessPage() {
 
 function EmployeesTab({ can }: { can: { employeeCreate: boolean; employeeUpdate: boolean } }) {
   const { data, loading, reload } = useApiData<Employee[]>(() => apiGet<Employee[]>("/employees"), []);
+  const { data: options } = useApiData<Options>(() => apiGet<Options>("/options"), []);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Employee | null>(null);
-  const [form, setForm] = useState({ name: "", phone: "", position: "" });
+  const [form, setForm] = useState({ name: "", phone: "", position: "", warehouseId: "" });
   const [busy, setBusy] = useState(false);
 
   const rows = useMemo(() => {
@@ -81,7 +82,7 @@ function EmployeesTab({ can }: { can: { employeeCreate: boolean; employeeUpdate:
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
-    const payload = { name: form.name, phone: form.phone || null, position: form.position || null };
+    const payload = { name: form.name, phone: form.phone || null, position: form.position || null, warehouseId: form.warehouseId ? Number(form.warehouseId) : null };
     const ok = await runAction(
       () => (editing ? apiPut(`/employees/${editing.id}`, payload) : apiPost("/employees", payload)),
       { success: editing ? "Employee diperbarui." : "Employee dibuat." },
@@ -103,7 +104,7 @@ function EmployeesTab({ can }: { can: { employeeCreate: boolean; employeeUpdate:
         searchPlaceholder="Cari nama / nomor / posisi…"
         toolbar={
           can.employeeCreate && (
-            <Button size="sm" onClick={() => { setEditing(null); setForm({ name: "", phone: "", position: "" }); setDialogOpen(true); }}>
+            <Button size="sm" onClick={() => { setEditing(null); setForm({ name: "", phone: "", position: "", warehouseId: "" }); setDialogOpen(true); }}>
               <UserPlus className="h-4 w-4" /> Tambah Employee
             </Button>
           )
@@ -113,6 +114,16 @@ function EmployeesTab({ can }: { can: { employeeCreate: boolean; employeeUpdate:
           { key: "number", header: "Nomor", primary: true, render: (e) => <span className="font-mono text-xs">{e.employeeNumber}</span> },
           { key: "name", header: "Nama", render: (e) => <span className="font-medium">{e.name}</span> },
           { key: "position", header: "Posisi", render: (e) => e.position ?? "—" },
+          {
+            key: "gudang",
+            header: "Gudang",
+            render: (e) =>
+              e.warehouse ? (
+                <Badge variant="outline" className="max-w-[180px] truncate text-[11px]">{e.warehouse.name}</Badge>
+              ) : (
+                <span className="text-xs text-muted-foreground" title="Data operational kosong — hanya Owner melihat semua gudang">belum ditugaskan</span>
+              ),
+          },
           { key: "phone", header: "Telepon", hideOnMobile: true, render: (e) => e.phone ?? "—" },
           {
             key: "account",
@@ -131,7 +142,7 @@ function EmployeesTab({ can }: { can: { employeeCreate: boolean; employeeUpdate:
                   key: "actions",
                   header: "Aksi",
                   render: (e: Employee) => (
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditing(e); setForm({ name: e.name, phone: e.phone ?? "", position: e.position ?? "" }); setDialogOpen(true); }} aria-label="Edit employee">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditing(e); setForm({ name: e.name, phone: e.phone ?? "", position: e.position ?? "", warehouseId: e.warehouseId != null ? String(e.warehouseId) : "" }); setDialogOpen(true); }} aria-label="Edit employee">
                       <Pencil className="h-4 w-4" />
                     </Button>
                   ),
@@ -150,6 +161,15 @@ function EmployeesTab({ can }: { can: { employeeCreate: boolean; employeeUpdate:
           <form onSubmit={onSubmit} className="space-y-4">
             <Field label="Nama" htmlFor="e-name">
               <Input id="e-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required disabled={busy} />
+            </Field>
+            <Field label="Gudang Penempatan" htmlFor="e-warehouse" hint="Semua data operasional karyawan dibatasi ke gudang ini">
+              <FormSelect
+                value={form.warehouseId}
+                onValueChange={(v) => setForm({ ...form, warehouseId: v })}
+                placeholder="Pilih gudang…"
+                options={(options?.warehouses ?? []).map((w) => ({ value: String(w.id), label: w.name }))}
+                disabled={busy}
+              />
             </Field>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="Posisi" htmlFor="e-position">

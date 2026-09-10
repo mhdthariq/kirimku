@@ -5,6 +5,7 @@ import { audit } from "@/lib/audit";
 import { nextCode, nextDetailCodes } from "@/lib/code-generator";
 import { hasPermission } from "@/lib/auth";
 import { totalsByMaster } from "@/lib/shipment-totals";
+import { cityIndex, inScope, shipmentGudangIds, scopeForUser } from "@/lib/gudang-scope";
 
 export async function GET(req: NextRequest) {
   return handle(async () => {
@@ -36,11 +37,20 @@ export async function GET(req: NextRequest) {
         ...(hasPermission(user, "shipment.view_tracking") ? { trackingEvents: { orderBy: { occurredAt: "desc" as const }, take: 1 } } : {}),
       },
     });
+
+    // Gudang data separation: non-owner users only see shipments that belong
+    // to their own gudang; each row carries gudangIds so the owner's
+    // per-gudang tabs can filter client-side.
+    const scope = await scopeForUser(user);
+    const cityIdx = await cityIndex();
+    const visible = shipments.filter((s) => inScope(shipmentGudangIds(s, cityIdx), scope));
+
     // Physical totals (volume m³ + weight kg) for the list columns
-    const totals = await totalsByMaster(shipments.map((s) => s.id));
+    const totals = await totalsByMaster(visible.map((s) => s.id));
     return ok(
-      shipments.map((s) => ({
+      visible.map((s) => ({
         ...s,
+        gudangIds: shipmentGudangIds(s, cityIdx),
         totals: totals.get(s.id) ?? { totalPackages: 0, totalActualKg: 0, totalVolumeM3: 0 },
       })),
     );

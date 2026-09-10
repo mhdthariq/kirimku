@@ -105,6 +105,10 @@ export interface SessionUser {
   name: string;
   isOwner: boolean;
   employeeId: number | null;
+  /** gudang the user's employee belongs to (null when unbound / owner) */
+  warehouseId: number | null;
+  /** display name of the user's gudang */
+  warehouseName: string | null;
   roles: { id: number; slug: string; name: string }[];
   permissions: string[];
 }
@@ -168,6 +172,8 @@ export interface Shipment {
   originWarehouseId?: number | null;
   destinationWarehouseId?: number | null;
   arrivedWarehouseId?: number | null;
+  /** gudang(s) this shipment currently belongs to — drives the owner's per-gudang tabs */
+  gudangIds?: number[];
   penerimaName?: string | null;
   penerimaAddress?: string | null;
   penerimaContact?: string | null;
@@ -262,6 +268,8 @@ export interface PickupTask {
   customerType: string;
   detailsCount: number;
   scannedCount: number;
+  /** gudang(s) this pickup belongs to (origin side of the master shipment) */
+  gudangIds?: number[];
 }
 
 export interface DeliveryTask {
@@ -284,6 +292,8 @@ export interface DeliveryTask {
   scannedCount: number;
   allScanned: boolean;
   details: { id: number; detailCode: string; description: string; scanned: boolean }[];
+  /** gudang(s) this delivery belongs to */
+  gudangIds?: number[];
 }
 
 export interface Vehicle {
@@ -349,6 +359,8 @@ export interface Transport {
   createdAt: string;
   shipments: { id: number; masterCode: string; status: string }[];
   checkpointRecordsCount: number;
+  /** gudang(s) this transport belongs to (route endpoints + shipments) */
+  gudangIds?: number[];
 }
 
 export interface Tariff {
@@ -428,6 +440,8 @@ export interface Employee {
   name: string;
   phone: string | null;
   position: string | null;
+  warehouseId: number | null;
+  warehouse?: { id: number; name: string; city: string | null } | null;
   isActive: boolean;
   user?: { id: number; username: string; isActive: boolean; roles: { role: { id: number; name: string; slug: string }[] } } | null;
 }

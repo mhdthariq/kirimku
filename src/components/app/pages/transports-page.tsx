@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { GudangScopeBadge, GudangTabBanner, GudangTabsTriggers, gudangTabValue, parseGudangTabValue } from "@/components/app/gudang-tabs";
 
 interface TransportForm {
   routeId: string;
@@ -47,11 +48,19 @@ export function TransportsPage() {
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [tab, setTab] = useState("list");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Transport | null>(null);
   const [form, setForm] = useState<TransportForm>(EMPTY);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<Transport | null>(null);
+
+  // Owner per-gudang tabs (Daftar | Gudang A | Gudang B | … | Log Aktivitas):
+  // filter the fetched rows to the selected gudang. Non-owner users only
+  // ever receive their own gudang's data from the API.
+  const isOwner = !!user?.isOwner;
+  const gudangOptions = options?.warehouses ?? [];
+  const activeGudangId = parseGudangTabValue(tab);
 
   const rows = useMemo(() => {
     if (!data) return [];
@@ -59,12 +68,13 @@ export function TransportsPage() {
     return data.filter(
       (t) =>
         (statusFilter === "all" || t.status === statusFilter) &&
+        (activeGudangId == null || (t.gudangIds ?? []).includes(activeGudangId)) &&
         (!q ||
           t.transportCode.toLowerCase().includes(q) ||
           (t.routeName ?? "").toLowerCase().includes(q) ||
           t.vehicleNumber.toLowerCase().includes(q)),
     );
-  }, [data, search, statusFilter]);
+  }, [data, search, statusFilter, activeGudangId]);
 
   function openCreate() {
     setEditing(null);
@@ -138,21 +148,29 @@ export function TransportsPage() {
         subtitle="Perjalanan linehaul antar gudang mengikuti rute checkpoint."
         icon={<BarChart3 className="h-5 w-5" />}
         actions={
-          can.create && (
-            <Button onClick={openCreate}>
-              <Plus className="h-4 w-4" /> Buat Transport
-            </Button>
-          )
+          <>
+            {!isOwner && <GudangScopeBadge gudangName={user?.warehouseName ?? null} />}
+            {can.create && (
+              <Button onClick={openCreate}>
+                <Plus className="h-4 w-4" /> Buat Transport
+              </Button>
+            )}
+          </>
         }
       />
 
-      <Tabs defaultValue="list">
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="list">Daftar</TabsTrigger>
+          {isOwner && <GudangTabsTriggers warehouses={gudangOptions} />}
           <TabsTrigger value="activity">Log Aktivitas</TabsTrigger>
         </TabsList>
-        <TabsContent value="list" className="mt-3">
-          <DataTable
+        {["list", ...(isOwner ? gudangOptions.map((g) => gudangTabValue(g.id)) : [])].map((v) => {
+          const activeW = gudangOptions.find((g) => gudangTabValue(g.id) === v) ?? null;
+          return (
+            <TabsContent key={v} value={v} className="mt-3 space-y-3">
+              {activeW && <GudangTabBanner gudangName={activeW.name} count={rows.length} />}
+              <DataTable
             rows={rows}
             loading={loading}
             search={search}
@@ -238,7 +256,9 @@ export function TransportsPage() {
               },
             ]}
           />
-        </TabsContent>
+            </TabsContent>
+          );
+        })}
         <TabsContent value="activity" className="mt-3">
           <ActivityLogPanel entityTypes={["transport"]} />
         </TabsContent>

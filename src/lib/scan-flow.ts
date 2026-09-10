@@ -139,30 +139,7 @@ export async function paymentSummary(masterId: number): Promise<PaymentSummary> 
 }
 
 // ---------------------------------------------------------------------------
-// Warehouse scoping (roles below Admin Gudang see only their own gudang)
+// Warehouse scoping — moved to src/lib/gudang-scope.ts (universal: every
+// non-owner user is scoped to their employee's gudang; only the owner sees
+// data across all gudang).
 // ---------------------------------------------------------------------------
-
-/**
- * Resolve the gudang scope for a user:
- * - null → unscoped (Admin Gudang / owner): sees every gudang
- * - number → scoped user (holds `warehouse.scope_own`): only their gudang
- */
-export async function gudangScopeFor(user: AuthUser): Promise<number | null> {
-  if (user.isOwner || user.permissions.includes("*")) return null;
-  if (!user.permissions.includes("warehouse.scope_own")) return null;
-  if (user.employeeId == null) return null;
-  const employee = await db.employee.findUnique({ where: { id: user.employeeId }, select: { warehouseId: true } });
-  return employee?.warehouseId ?? null;
-}
-
-/** Does a shipment belong to the given gudang scope (by warehouse id or origin city)? */
-export function shipmentInScope(
-  shipment: { originWarehouseId: number | null; origin: string },
-  scopeWarehouseId: number | null,
-  warehouseCities: Map<number, string>,
-): boolean {
-  if (scopeWarehouseId == null) return true;
-  if (shipment.originWarehouseId != null) return shipment.originWarehouseId === scopeWarehouseId;
-  const city = warehouseCities.get(scopeWarehouseId);
-  return !!city && shipment.origin.toLowerCase() === city.toLowerCase();
-}

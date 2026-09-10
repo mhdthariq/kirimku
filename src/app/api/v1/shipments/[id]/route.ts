@@ -5,12 +5,13 @@ import { audit, diffFields } from "@/lib/audit";
 import { pricingPreview } from "@/lib/pricing";
 import { computeTotals } from "@/lib/shipment-totals";
 import { paymentSummary } from "@/lib/scan-flow";
+import { cityIndex, inScope, shipmentGudangIds, scopeForUser } from "@/lib/gudang-scope";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(req: NextRequest, { params }: Params) {
   return handle(async () => {
-    await guard(req, "shipment.view");
+    const user = await guard(req, "shipment.view");
     const { id } = await params;
     const shipment = await db.masterShipment.findUnique({
       where: { id: Number(id) },
@@ -26,6 +27,12 @@ export async function GET(req: NextRequest, { params }: Params) {
       },
     });
     if (!shipment) return fail(404, "Shipment tidak ditemukan.");
+    // Gudang data separation: scoped users may only open shipments of their
+    // own gudang (e.g. Bandung staff cannot open a Jakarta shipment by id).
+    const scope = await scopeForUser(user);
+    if (!inScope(shipmentGudangIds(shipment, await cityIndex()), scope)) {
+      return fail(403, "Shipment ini berada di gudang lain — data terpisah antar gudang.");
+    }
     // Server-computed pricing preview (actual / volumetric / chargeable) so the
     // client never re-implements (or hardcodes) the volumetric formula.
     const preview = await pricingPreview(shipment);
