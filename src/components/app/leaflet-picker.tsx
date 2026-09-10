@@ -32,8 +32,9 @@ export function LeafletPicker({
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
+    // Revision Part H — default focus is Medan / North Sumatra (never Jakarta).
     const center: [number, number] =
-      latitude != null && longitude != null ? [latitude, longitude] : [-6.2, 106.816666];
+      latitude != null && longitude != null ? [latitude, longitude] : [3.5952, 98.6722];
 
     const map = L.map(containerRef.current, { scrollWheelZoom: true }).setView(center, zoom);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {

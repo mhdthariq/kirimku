@@ -146,7 +146,7 @@ export function PickupsPage() {
       searchPlaceholder="Cari kode pickup / resi / customer…"
       toolbar={
         <div className="flex max-w-full flex-wrap items-center gap-1.5">
-          {["all", "ASSIGNED", "IN_PROGRESS", "COMPLETED", "CANCELLED"].map((s) => (
+          {["all", "ASSIGNED", "PICKED_UP", "COMPLETED", "CANCELLED"].map((s) => (
             <Button key={s} size="sm" variant={statusFilter === s ? "default" : "outline"} className="h-7 px-2.5 text-xs" onClick={() => setStatusFilter(s)}>
               {s === "all" ? "Semua" : s.replace("_", " ")}
             </Button>
@@ -197,7 +197,23 @@ export function PickupsPage() {
             </span>
           ),
         },
-        { key: "status", header: "Status", render: (p) => <StatusBadge status={p.status} /> },
+        {
+          key: "status",
+          header: "Status",
+          render: (p) => (
+            <div className="space-y-1">
+              <StatusBadge status={p.status} />
+              {/* Revision Part A — distinguish pickup task state vs package location */}
+              {p.status === "PICKED_UP" && (
+                <p className="text-[10px] leading-tight text-muted-foreground">
+                  {p.masterStatus === "RECEIVED_AT_GUDANG" || p.masterStatus === "ARRIVED_AT_GUDANG"
+                    ? "Sudah tiba di gudang"
+                    : "Paket dibawa kurir ke gudang"}
+                </p>
+              )}
+            </div>
+          ),
+        },
         {
           key: "actions",
           header: "Aksi",

@@ -1,14 +1,26 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, CheckCircle2, Pencil, Plus, Truck, XCircle } from "lucide-react";
+import {
+  ArrowRight,
+  Boxes,
+  Calendar,
+  Coins,
+  PackageSearch,
+  Pencil,
+  Plus,
+  Route,
+  Scale,
+  Truck,
+  XCircle,
+} from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type Transport, type Options, type Shipment } from "@/lib/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
 import { StatusBadge } from "@/components/app/status-badge";
-import { Field, FormSelect, SubmitButton, Textarea, formatDate } from "@/components/app/form-parts";
+import { Field, FormSelect, SubmitButton, Textarea, formatDate, formatNumber, formatRupiah } from "@/components/app/form-parts";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -20,34 +32,61 @@ interface TransportForm {
   vehicleId: string;
   driverId: string;
   kenekId: string;
+  origin: string;
+  destination: string;
+  plannedDepartureAt: string; // datetime-local
+  plannedArrivalAt: string; // datetime-local
   shipmentIds: number[];
   notes: string;
 }
 
-const EMPTY: TransportForm = { routeId: "", vehicleId: "", driverId: "", kenekId: "", shipmentIds: [], notes: "" };
+const EMPTY: TransportForm = {
+  routeId: "", vehicleId: "", driverId: "", kenekId: "",
+  origin: "", destination: "", plannedDepartureAt: "", plannedArrivalAt: "",
+  shipmentIds: [], notes: "",
+};
 
-export function TransportsPage() {
+/** datetime-local value (local timezone) for a Date. */
+function toLocalInput(d: Date | null | undefined): string {
+  if (!d) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/**
+ * Transports list (Revision Parts I/J/M/N):
+ * - Road-style Route icon instead of the old chart/transport glyph (Part I)
+ * - planning fields on create/edit: origin, destination, planned departure &
+ *   arrival (Part J)
+ * - aggregate columns: shipment count, Total Berat, Total Volume, Total Price
+ *   computed by backend database aggregation (Part M/L)
+ * - NO manual "Arrived" button (Part N) — arrival is auto-detected when the
+ *   crew checks in inside the final checkpoint radius (see detail page).
+ */
+export function TransportsPage({ historyMode = false }: { historyMode?: boolean }) {
   const { user } = useAuth();
   const can = {
     view: hasPermission(user, "transport.view"),
     create: hasPermission(user, "transport.create"),
     depart: hasPermission(user, "transport.depart"),
-    arrive: hasPermission(user, "transport.arrive"),
   };
 
-  const { data, loading, reload } = useApiData<Transport[]>(() => apiGet<Transport[]>("/transports"), []);
+  const { data, loading, reload } = useApiData<Transport[]>(
+    () => apiGet<Transport[]>(`/transports${historyMode ? "?history=true&mine=true" : ""}`),
+    [historyMode],
+  );
   const { data: options } = useApiData<Options>(() => apiGet<Options>("/options"), []);
   const [readyShipments, setReadyShipments] = useState<Shipment[]>([]);
 
   useEffect(() => {
-    if (!can.create) return;
+    if (!can.create || historyMode) return;
     apiGet<Shipment[]>("/shipments?status=RECEIVED_AT_GUDANG")
       .then(setReadyShipments)
       .catch(() => undefined);
-  }, [can.create, data]);
+  }, [can.create, data, historyMode]);
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState(historyMode ? "all" : "all");
   const [tab, setTab] = useState("list");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Transport | null>(null);
@@ -55,9 +94,7 @@ export function TransportsPage() {
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<Transport | null>(null);
 
-  // Owner per-gudang tabs (Daftar | Gudang A | Gudang B | … | Log Aktivitas):
-  // filter the fetched rows to the selected gudang. Non-owner users only
-  // ever receive their own gudang's data from the API.
+  // Owner per-gudang tabs: filter the fetched rows to the selected gudang.
   const isOwner = !!user?.isOwner;
   const gudangOptions = options?.warehouses ?? [];
   const activeGudangId = parseGudangTabValue(tab);
@@ -72,7 +109,9 @@ export function TransportsPage() {
         (!q ||
           t.transportCode.toLowerCase().includes(q) ||
           (t.routeName ?? "").toLowerCase().includes(q) ||
-          t.vehicleNumber.toLowerCase().includes(q)),
+          t.vehicleNumber.toLowerCase().includes(q) ||
+          (t.origin ?? "").toLowerCase().includes(q) ||
+          (t.destination ?? "").toLowerCase().includes(q)),
     );
   }, [data, search, statusFilter, activeGudangId]);
 
@@ -89,6 +128,10 @@ export function TransportsPage() {
       vehicleId: String(t.vehicleId),
       driverId: "",
       kenekId: "",
+      origin: t.origin ?? "",
+      destination: t.destination ?? "",
+      plannedDepartureAt: toLocalInput(t.plannedDepartureAt ? new Date(t.plannedDepartureAt) : null),
+      plannedArrivalAt: toLocalInput(t.plannedArrivalAt ? new Date(t.plannedArrivalAt) : null),
       shipmentIds: [],
       notes: "",
     });
@@ -101,13 +144,17 @@ export function TransportsPage() {
     const payload: Record<string, unknown> = {
       routeId: Number(form.routeId),
       vehicleId: Number(form.vehicleId),
+      origin: form.origin || null,
+      destination: form.destination || null,
+      plannedDepartureAt: form.plannedDepartureAt ? new Date(form.plannedDepartureAt).toISOString() : null,
+      plannedArrivalAt: form.plannedArrivalAt ? new Date(form.plannedArrivalAt).toISOString() : null,
     };
     if (form.driverId) payload.driverId = Number(form.driverId);
     if (form.kenekId) payload.kenekId = Number(form.kenekId);
     if (!editing && form.shipmentIds.length > 0) payload.shipmentIds = form.shipmentIds;
     const ok = await runAction(
       () => (editing ? apiPut(`/transports/${editing.id}`, payload) : apiPost("/transports", payload)),
-      { success: editing ? "Transport diperbarui." : "Transport dibuat." },
+      { success: editing ? "Transport diperbarui." : "Transport direncanakan." },
     );
     setBusy(false);
     if (ok) {
@@ -121,11 +168,6 @@ export function TransportsPage() {
     if (ok) reload();
   }
 
-  async function onArrive(t: Transport) {
-    const ok = await runAction(() => apiPost(`/transports/${t.id}/arrive`), { success: `${t.transportCode} tiba di tujuan.` });
-    if (ok) reload();
-  }
-
   async function onDelete() {
     if (!confirmDelete) return;
     const target = confirmDelete;
@@ -135,24 +177,158 @@ export function TransportsPage() {
   }
 
   if (!can.view) {
-    return <PageHeader title="Transports" subtitle="Anda tidak memiliki izin melihat transport." />;
+    return <PageHeader title="Transport" subtitle="Anda tidak memiliki izin melihat transport." />;
   }
 
   const employeeOptions = (options?.employees ?? []).map((e) => ({ value: String(e.id), label: `${e.name}${e.position ? ` — ${e.position}` : ""}` }));
   const routeOptions = (options?.routes ?? []).map((r) => ({ value: String(r.id), label: r.name }));
 
+  // auto-fill origin/destination from the selected route (still editable)
+  const selectedRouteMeta = options?.routes?.find((r) => String(r.id) === form.routeId);
+
+  const listTable = (
+    <DataTable
+      rows={rows}
+      loading={loading}
+      search={search}
+      onSearchChange={setSearch}
+      searchPlaceholder="Cari kode / rute / nopol…"
+      toolbar={
+        <div className="flex max-w-full flex-wrap items-center gap-1.5">
+          {["all", ...(historyMode ? ["ARRIVED", "CANCELLED"] : ["PLANNED", "DEPARTED", "ARRIVED"])].map((s) => (
+            <Button
+              key={s}
+              size="sm"
+              variant={statusFilter === s ? "default" : "outline"}
+              className="h-7 px-2.5 text-xs"
+              onClick={() => setStatusFilter(s)}
+            >
+              {s === "all" ? "Semua" : s}
+            </Button>
+          ))}
+        </div>
+      }
+      emptyMessage={historyMode ? "Belum ada riwayat transport selesai." : "Belum ada transport. Klik “Rencanakan Transport” untuk menjadwalkan linehaul."}
+      columns={[
+        {
+          key: "code",
+          header: "Kode / Kendaraan",
+          primary: true,
+          render: (t) => (
+            <a href={`#/transports/${t.id}`} className="group block">
+              <p className="font-mono text-xs font-semibold text-primary group-hover:underline">{t.transportCode}</p>
+              <p className="text-xs text-muted-foreground">{t.vehicleNumber}</p>
+              <p className="mt-0.5 flex items-center gap-1 text-[11px] font-medium text-foreground/80 group-hover:text-primary">
+                Detail <ArrowRight className="h-3 w-3" />
+              </p>
+            </a>
+          ),
+        },
+        {
+          key: "route",
+          header: "Koridor / Rute",
+          render: (t) => (
+            <div>
+              <p className="text-sm font-medium text-foreground">
+                {t.origin ?? "?"} → {t.destination ?? "?"}
+              </p>
+              <p className="text-[11px] text-muted-foreground">{t.routeName ?? "—"}</p>
+            </div>
+          ),
+        },
+        {
+          key: "crew",
+          header: "Kru",
+          hideOnMobile: true,
+          render: (t) => (
+            <span className="text-sm text-muted-foreground">
+              {t.driverName ?? "—"}{t.kenekName ? ` · ${t.kenekName}` : ""}
+            </span>
+          ),
+        },
+        {
+          key: "schedule",
+          header: "Jadwal",
+          hideOnMobile: true,
+          render: (t) => (
+            <div>
+              <p className="flex items-center gap-1 text-xs text-foreground">
+                <Calendar className="h-3 w-3 text-muted-foreground" />
+                {t.plannedDepartureAt ? formatDate(t.plannedDepartureAt, true) : "—"}
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                {t.plannedArrivalAt ? `→ tiba ${formatDate(t.plannedArrivalAt, true)}` : t.departedAt ? `berangkat ${formatDate(t.departedAt, true)}` : ""}
+              </p>
+            </div>
+          ),
+        },
+        {
+          key: "totals",
+          header: "Muatan (Berat · Volume · Harga)",
+          render: (t) => (
+            <div className="space-y-0.5">
+              <p className="flex items-center gap-1.5 text-xs text-foreground">
+                <Boxes className="h-3 w-3 text-muted-foreground" />
+                <strong>{formatNumber(t.shipmentCount, 0)}</strong> shipment · {formatNumber(t.shipments.reduce((s, x) => s + x.packages, 0), 0)} paket
+              </p>
+              <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <Scale className="h-3 w-3" /> {formatNumber(t.totalWeightKg, 1)} KG · <PackageSearch className="h-3 w-3" /> {formatNumber(t.totalVolumeM3, 2)} M³
+              </p>
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold text-foreground">
+                <Coins className="h-3 w-3 text-primary" /> {t.totalPrice != null ? formatRupiah(t.totalPrice) : "—"}
+              </p>
+            </div>
+          ),
+        },
+        { key: "status", header: "Status", render: (t) => <StatusBadge status={t.status} /> },
+        {
+          key: "actions",
+          header: "Aksi",
+          render: (t) => (
+            <div className="flex flex-wrap gap-1.5">
+              <Button asChild variant="outline" size="sm" className="h-7">
+                <a href={`#/transports/${t.id}`}>
+                  <Route className="h-3.5 w-3.5" /> Detail
+                </a>
+              </Button>
+              {t.status === "PLANNED" && can.depart && (
+                <Button size="sm" className="h-7" onClick={() => onDepart(t)}>
+                  <Truck className="h-3.5 w-3.5" /> Depart
+                </Button>
+              )}
+              {t.status === "PLANNED" && can.create && (
+                <>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(t)} aria-label={`Edit ${t.transportCode}`}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setConfirmDelete(t)} aria-label={`Hapus ${t.transportCode}`}>
+                    <XCircle className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+            </div>
+          ),
+        },
+      ]}
+    />
+  );
+
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Transports"
-        subtitle="Perjalanan linehaul antar gudang mengikuti rute checkpoint."
-        icon={<BarChart3 className="h-5 w-5" />}
+        title={historyMode ? "Riwayat Transport" : "Transport"}
+        subtitle={
+          historyMode
+            ? "Transport selesai yang pernah Anda jalani sebagai driver/kenek."
+            : "Perjalanan linehaul antar gudang mengikuti rute checkpoint — tiba terdeteksi otomatis lewat check-in checkpoint akhir."
+        }
+        icon={<Route className="h-5 w-5" />}
         actions={
           <>
-            {!isOwner && <GudangScopeBadge gudangName={user?.warehouseName ?? null} />}
-            {can.create && (
+            {!isOwner && !historyMode && <GudangScopeBadge gudangName={user?.warehouseName ?? null} />}
+            {can.create && !historyMode && (
               <Button onClick={openCreate}>
-                <Plus className="h-4 w-4" /> Buat Transport
+                <Plus className="h-4 w-4" /> Rencanakan Transport
               </Button>
             )}
           </>
@@ -161,121 +337,51 @@ export function TransportsPage() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="list">Daftar</TabsTrigger>
-          {isOwner && <GudangTabsTriggers warehouses={gudangOptions} />}
-          <TabsTrigger value="activity">Log Aktivitas</TabsTrigger>
+          <TabsTrigger value="list">{historyMode ? "Riwayat" : "Daftar"}</TabsTrigger>
+          {isOwner && !historyMode && <GudangTabsTriggers warehouses={gudangOptions} />}
+          {!historyMode && <TabsTrigger value="activity">Log Aktivitas</TabsTrigger>}
         </TabsList>
-        {["list", ...(isOwner ? gudangOptions.map((g) => gudangTabValue(g.id)) : [])].map((v) => {
+        {["list", ...(isOwner && !historyMode ? gudangOptions.map((g) => gudangTabValue(g.id)) : [])].map((v) => {
           const activeW = gudangOptions.find((g) => gudangTabValue(g.id) === v) ?? null;
           return (
             <TabsContent key={v} value={v} className="mt-3 space-y-3">
               {activeW && <GudangTabBanner gudangName={activeW.name} count={rows.length} />}
-              <DataTable
-            rows={rows}
-            loading={loading}
-            search={search}
-            onSearchChange={setSearch}
-            searchPlaceholder="Cari kode / rute / nopol…"
-            toolbar={
-              <div className="flex max-w-full flex-wrap items-center gap-1.5">
-                {["all", "PLANNED", "DEPARTED", "ARRIVED"].map((s) => (
-                  <Button
-                    key={s}
-                    size="sm"
-                    variant={statusFilter === s ? "default" : "outline"}
-                    className="h-7 px-2.5 text-xs"
-                    onClick={() => setStatusFilter(s)}
-                  >
-                    {s === "all" ? "Semua" : s}
-                  </Button>
-                ))}
-              </div>
-            }
-            emptyMessage="Belum ada transport. Klik “Buat Transport” untuk menjadwalkan linehaul."
-            columns={[
-              {
-                key: "code",
-                header: "Kode",
-                primary: true,
-                render: (t) => (
-                  <div>
-                    <p className="font-mono text-xs font-semibold text-foreground">{t.transportCode}</p>
-                    <p className="text-xs text-muted-foreground">{t.vehicleNumber}</p>
-                  </div>
-                ),
-              },
-              {
-                key: "route",
-                header: "Rute",
-                render: (t) => (
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{t.routeName ?? "—"}</p>
-                    <p className="text-[11px] text-muted-foreground">{t.shipments.length} shipment</p>
-                  </div>
-                ),
-              },
-              {
-                key: "crew",
-                header: "Kru",
-                hideOnMobile: true,
-                render: (t) => (
-                  <span className="text-sm text-muted-foreground">
-                    {t.driverName ?? "—"}{t.kenekName ? ` · ${t.kenekName}` : ""}
-                  </span>
-                ),
-              },
-              { key: "departedAt", header: "Depart", hideOnMobile: true, render: (t) => formatDate(t.departedAt, true) },
-              { key: "status", header: "Status", render: (t) => <StatusBadge status={t.status} /> },
-              {
-                key: "actions",
-                header: "Aksi",
-                render: (t) => (
-                  <div className="flex flex-wrap gap-1.5">
-                    {t.status === "PLANNED" && can.depart && (
-                      <Button size="sm" className="h-7" onClick={() => onDepart(t)}>
-                        <Truck className="h-3.5 w-3.5" /> Depart
-                      </Button>
-                    )}
-                    {t.status === "DEPARTED" && can.arrive && (
-                      <Button size="sm" variant="secondary" className="h-7" onClick={() => onArrive(t)}>
-                        <CheckCircle2 className="h-3.5 w-3.5" /> Arrive
-                      </Button>
-                    )}
-                    {t.status === "PLANNED" && can.create && (
-                      <>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(t)} aria-label={`Edit ${t.transportCode}`}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setConfirmDelete(t)} aria-label={`Hapus ${t.transportCode}`}>
-                          <XCircle className="h-4 w-4" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                ),
-              },
-            ]}
-          />
+              {listTable}
             </TabsContent>
           );
         })}
-        <TabsContent value="activity" className="mt-3">
-          <ActivityLogPanel entityTypes={["transport"]} />
-        </TabsContent>
+        {!historyMode && (
+          <TabsContent value="activity" className="mt-3">
+            <ActivityLogPanel entityTypes={["transport"]} />
+          </TabsContent>
+        )}
       </Tabs>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>{editing ? `Edit Transport — ${editing.transportCode}` : "Buat Transport"}</DialogTitle>
+            <DialogTitle>{editing ? `Edit Transport — ${editing.transportCode}` : "Rencanakan Transport"}</DialogTitle>
             <DialogDescription>
-              {editing ? "Hanya transport PLANNED yang bisa diubah." : "Pilih rute (wajib ≥ 3 checkpoint), kendaraan, kru, dan shipment yang dimuat."}
+              {editing ? "Hanya transport PLANNED yang bisa diubah." : "Pilih rute (wajib ≥ 3 checkpoint), kendaraan, kru, jadwal, dan shipment yang dimuat."}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={onSubmit} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Rute" htmlFor="t-route">
-                <FormSelect value={form.routeId} onValueChange={(v) => setForm({ ...form, routeId: v })} placeholder="Pilih rute" options={routeOptions} disabled={busy} />
+                <FormSelect
+                  value={form.routeId}
+                  onValueChange={(v) =>
+                    setForm((f) => ({
+                      ...f,
+                      routeId: v,
+                      origin: f.origin || options?.routes?.find((r) => String(r.id) === v)?.origin || "",
+                      destination: f.destination || options?.routes?.find((r) => String(r.id) === v)?.destination || "",
+                    }))
+                  }
+                  placeholder="Pilih rute"
+                  options={routeOptions}
+                  disabled={busy}
+                />
               </Field>
               <Field label="Kendaraan" htmlFor="t-vehicle">
                 <FormSelect
@@ -289,8 +395,48 @@ export function TransportsPage() {
               <Field label="Driver" htmlFor="t-driver">
                 <FormSelect value={form.driverId} onValueChange={(v) => setForm({ ...form, driverId: v })} placeholder="Pilih driver" options={employeeOptions} disabled={busy} />
               </Field>
-              <Field label="Kenek" htmlFor="t-kenek">
+              <Field label="Kenek (opsional)" htmlFor="t-kenek">
                 <FormSelect value={form.kenekId} onValueChange={(v) => setForm({ ...form, kenekId: v })} placeholder="Pilih kenek" options={employeeOptions} disabled={busy} />
+              </Field>
+              <Field label="Asal (Origin)" htmlFor="t-origin">
+                <input
+                  id="t-origin"
+                  className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
+                  value={form.origin}
+                  onChange={(e) => setForm({ ...form, origin: e.target.value })}
+                  placeholder={selectedRouteMeta?.origin ?? "mis. Medan"}
+                  disabled={busy}
+                />
+              </Field>
+              <Field label="Tujuan (Destination)" htmlFor="t-destination">
+                <input
+                  id="t-destination"
+                  className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
+                  value={form.destination}
+                  onChange={(e) => setForm({ ...form, destination: e.target.value })}
+                  placeholder={selectedRouteMeta?.destination ?? "mis. Banda Aceh"}
+                  disabled={busy}
+                />
+              </Field>
+              <Field label="Rencana Berangkat" htmlFor="t-planned-dep">
+                <input
+                  id="t-planned-dep"
+                  type="datetime-local"
+                  className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
+                  value={form.plannedDepartureAt}
+                  onChange={(e) => setForm({ ...form, plannedDepartureAt: e.target.value })}
+                  disabled={busy}
+                />
+              </Field>
+              <Field label="Rencana Tiba" htmlFor="t-planned-arr">
+                <input
+                  id="t-planned-arr"
+                  type="datetime-local"
+                  className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
+                  value={form.plannedArrivalAt}
+                  onChange={(e) => setForm({ ...form, plannedArrivalAt: e.target.value })}
+                  disabled={busy}
+                />
               </Field>
             </div>
 
@@ -331,7 +477,7 @@ export function TransportsPage() {
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} disabled={busy}>
                 Batal
               </Button>
-              <SubmitButton busy={busy}>{editing ? "Simpan Perubahan" : "Buat Transport"}</SubmitButton>
+              <SubmitButton busy={busy}>{editing ? "Simpan Perubahan" : "Rencanakan Transport"}</SubmitButton>
             </DialogFooter>
           </form>
         </DialogContent>

@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  BarChart3,
   ClipboardList,
   Coins,
   History,
@@ -13,6 +12,7 @@ import {
   Menu,
   Package,
   Receipt,
+  Route,
   ShieldCheck,
   Tag,
   Truck,
@@ -21,7 +21,7 @@ import {
   Warehouse,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { hasAnyPermission, hasPermission } from "@/lib/client-api";
+import { hasAnyPermission } from "@/lib/client-api";
 import { Logo } from "@/components/app/logo";
 import { ThemeToggle } from "@/components/app/theme-toggle";
 import { InstallAppMenuItem } from "@/components/app/pwa";
@@ -56,7 +56,8 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { href: "/pickups", label: "Pickups", icon: Truck, anyPermissions: ["pickup.view", "pickup.assign_kurir"], mobile: true },
       { href: "/shipments", label: "Shipments", icon: Package, anyPermissions: ["shipment.view"], mobile: true },
       { href: "/deliveries", label: "Deliveries", icon: ClipboardList, anyPermissions: ["delivery.view", "delivery.assign_kurir"], mobile: true },
-      { href: "/transports", label: "Transports", icon: BarChart3, anyPermissions: ["transport.view"], mobile: true },
+      // Revision Part I — transport = road linehaul between gudang → road Route icon
+      { href: "/transports", label: "Transports", icon: Route, anyPermissions: ["transport.view"], mobile: true },
     ],
   },
   {
@@ -127,7 +128,43 @@ export function AppShell({
 
   if (!user) return null;
 
-  const visibleGroups = NAV_GROUPS.map((g) => ({
+  // -----------------------------------------------------------------------
+  // Revision Parts S/V/W/X — simplified navigation for operational roles:
+  //   Kurir          → Dashboard, Pickups, Delivery
+  //   Driver / Kenek → Dashboard, Transport, Transport History
+  // These roles use a simple bottom navigation on mobile (NO hamburger menu)
+  // and a slim sidebar on desktop. Everyone else keeps the full menu.
+  // -----------------------------------------------------------------------
+  const roleSlugs = user.roles.map((r) => r.slug);
+  const isKurir = roleSlugs.includes("kurir");
+  const isDriverCrew = roleSlugs.includes("driver") || roleSlugs.includes("kenek");
+  const simplifiedOperational = isKurir || isDriverCrew;
+
+  const OPERATIONAL_GROUPS: { title: string; items: NavItem[] }[] = isKurir
+    ? [
+        {
+          title: "Operasional Kurir",
+          items: [
+            { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, mobile: true },
+            { href: "/pickups", label: "Pickups", icon: Truck, mobile: true },
+            { href: "/deliveries", label: "Delivery", icon: ClipboardList, mobile: true },
+          ],
+        },
+      ]
+    : [
+        {
+          title: "Operasional Driver",
+          items: [
+            { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, mobile: true },
+            { href: "/transports", label: "Transport", icon: Route, mobile: true },
+            { href: "/transport-history", label: "Transport History", icon: History, mobile: true },
+          ],
+        },
+      ];
+
+  const groups = simplifiedOperational ? OPERATIONAL_GROUPS : NAV_GROUPS;
+
+  const visibleGroups = groups.map((g) => ({
     ...g,
     items: g.items.filter(
       (item) =>
@@ -136,10 +173,14 @@ export function AppShell({
     ),
   })).filter((g) => g.items.length > 0);
 
-  const mobileItems = visibleGroups
-    .flatMap((g) => g.items)
-    .filter((item) => item.mobile)
-    .slice(0, 5);
+  // bottom navigation = the operational roles' three primary destinations;
+  // everyone else keeps the ≤5 item mobile strip
+  const mobileItems = simplifiedOperational
+    ? visibleGroups.flatMap((g) => g.items).filter((item) => item.mobile)
+    : visibleGroups
+        .flatMap((g) => g.items)
+        .filter((item) => item.mobile)
+        .slice(0, 5);
 
   const roleLabel = user.isOwner
     ? "Owner"
@@ -204,44 +245,47 @@ export function AppShell({
         {/* Top bar */}
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-2 border-b bg-background/80 px-3 backdrop-blur-md sm:px-5">
           <div className="flex items-center gap-2">
-            {/* Mobile: sheet menu */}
-            <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="lg:hidden" aria-label="Buka menu navigasi">
-                  <Menu className="h-5 w-5" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="w-72 p-0">
-                <SheetTitle className="sr-only">Menu navigasi</SheetTitle>
-                <div className="flex h-16 items-center border-b px-5">
-                  <Logo />
-                </div>
-                <nav className="space-y-5 overflow-y-auto px-3 py-4" aria-label="Navigasi utama (mobile)">
-                  {visibleGroups.map((group) => (
-                    <div key={group.title}>
-                      <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/70">
-                        {group.title}
-                      </p>
-                      <div className="space-y-0.5">
-                        {group.items.map((item) => (
-                          <NavLink
-                            key={item.href}
-                            item={item}
-                            active={path.startsWith(item.href)}
-                            onNavigate={() => setMenuOpen(false)}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </nav>
-                <div className="absolute bottom-0 left-0 right-0 border-t p-3">
-                  <Button variant="outline" className="w-full" onClick={handleLogout}>
-                    <LogOut className="h-4 w-4" /> Keluar
+            {/* Mobile: sheet menu — hidden for simplified operational roles
+                (Revision Part X: they use the bottom navigation only) */}
+            {!simplifiedOperational && (
+              <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="lg:hidden" aria-label="Buka menu navigasi">
+                    <Menu className="h-5 w-5" />
                   </Button>
-                </div>
-              </SheetContent>
-            </Sheet>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-72 p-0">
+                  <SheetTitle className="sr-only">Menu navigasi</SheetTitle>
+                  <div className="flex h-16 items-center border-b px-5">
+                    <Logo />
+                  </div>
+                  <nav className="space-y-5 overflow-y-auto px-3 py-4" aria-label="Navigasi utama (mobile)">
+                    {visibleGroups.map((group) => (
+                      <div key={group.title}>
+                        <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/70">
+                          {group.title}
+                        </p>
+                        <div className="space-y-0.5">
+                          {group.items.map((item) => (
+                            <NavLink
+                              key={item.href}
+                              item={item}
+                              active={path.startsWith(item.href)}
+                              onNavigate={() => setMenuOpen(false)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </nav>
+                  <div className="absolute bottom-0 left-0 right-0 border-t p-3">
+                    <Button variant="outline" className="w-full" onClick={handleLogout}>
+                      <LogOut className="h-4 w-4" /> Keluar
+                    </Button>
+                  </div>
+                </SheetContent>
+              </Sheet>
+            )}
 
             {/* Tablet/mobile: logo */}
             <div className="lg:hidden">
@@ -293,29 +337,33 @@ export function AppShell({
         </main>
       </div>
 
-      {/* Mobile bottom navigation */}
-      <nav
-        className="fixed inset-x-0 bottom-0 z-30 flex justify-around border-t bg-background/90 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden"
-        aria-label="Navigasi bawah"
-      >
-        {mobileItems.map((item) => {
-          const active = path.startsWith(item.href);
-          return (
-            <a
-              key={item.href}
-              href={`#${item.href}`}
-              className={cn(
-                "flex min-w-[64px] flex-col items-center gap-0.5 px-2 py-2 text-[10px] font-medium transition-colors",
-                active ? "text-primary" : "text-muted-foreground hover:text-foreground",
-              )}
-              aria-current={active ? "page" : undefined}
-            >
-              <item.icon className="h-5 w-5" />
-              {item.label}
-            </a>
-          );
-        })}
-      </nav>
+      {/* Mobile bottom navigation — for operational roles this is THE
+          navigation (no hamburger); persistent, safe-area aware, content
+          padded via main's pb-24 (Revision Part X). */}
+      {mobileItems.length > 0 && (
+        <nav
+          className="fixed inset-x-0 bottom-0 z-30 flex justify-around border-t bg-background/90 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden"
+          aria-label="Navigasi bawah"
+        >
+          {mobileItems.map((item) => {
+            const active = path.startsWith(item.href);
+            return (
+              <a
+                key={item.href}
+                href={`#${item.href}`}
+                className={cn(
+                  "flex min-w-[64px] flex-1 flex-col items-center gap-0.5 px-2 py-2 text-[10px] font-medium transition-colors",
+                  active ? "text-primary" : "text-muted-foreground hover:text-foreground",
+                )}
+                aria-current={active ? "page" : undefined}
+              >
+                <item.icon className="h-5 w-5" />
+                {item.label}
+              </a>
+            );
+          })}
+        </nav>
+      )}
     </div>
   );
 }

@@ -346,13 +346,20 @@ async function runSeed(): Promise<void> {
       }
 
       // Pickup for statuses after CREATED (+ per-package scans so Riwayat Scan
-      // shows SCANNED / TYPED methods on completed tasks)
+      // shows SCANNED / TYPED methods on completed tasks).
+      // Revision Part A — pickup lifecycle: PICKED_UP while the package is in
+      // the kurir's custody; COMPLETED only once the package has arrived and
+      // been received at the gudang (RECEIVED_AT_GUDANG and beyond).
       if (["PICKED_UP", "RECEIVED_AT_GUDANG", "IN_TRANSPORT", "DELIVERED"].includes(s.status)) {
+        const arrivedAtGudang = s.status !== "PICKED_UP";
         const pickup = await db.pickup.create({
           data: {
             pickupCode: `PICK-2026-${s.masterCode.slice(-6)}`, masterId: shipment.id,
             kurirId: usersByHandle.dewi.employeeId,
-            status: "COMPLETED", createdAt, completedAt: daysAgo(Math.max(0, s.createdDaysAgo - 0.4)), updatedAt: createdAt,
+            status: arrivedAtGudang ? "COMPLETED" : "PICKED_UP",
+            createdAt,
+            completedAt: arrivedAtGudang ? daysAgo(Math.max(0, s.createdDaysAgo - 0.4)) : null,
+            updatedAt: createdAt,
           },
         });
         for (const [i, d] of detailRowsByCode[s.masterCode].entries()) {

@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { ArrowLeft, MapPin, Pencil, Plus, Route as RouteIcon, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, MapPin, Pencil, Plus, RotateCcw, Trash2, Waypoints } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type Route as RouteModel, type Checkpoint } from "@/lib/client-api";
@@ -25,6 +25,7 @@ const CheckpointMapEditor = dynamic(
   },
 );
 import type { DraftCheckpoint } from "@/components/app/checkpoint-map-editor";
+import { metersToKm } from "@/components/app/checkpoint-geo";
 
 interface RouteForm {
   name: string;
@@ -56,26 +57,99 @@ export function RoutesPage({ routeId }: { routeId: number | null }) {
     [routes, routeId],
   );
 
-  // Draft checkpoints for the selected route — derived per route, overridden by edits
-  const [draftsState, setDraftsState] = useState<{ routeId: number | null; items: DraftCheckpoint[] }>({
+  // ---------------------------------------------------------------------
+  // Revision Parts B/D/AA — ONE draft collection as the single source of
+  // truth. Drafts are keyed by route id and derived from the SERVER list
+  // until the user edits anything. Adding a checkpoint appends to the
+  // existing items — existing checkpoints can never disappear. The main
+  // "Simpan Semua Checkpoint" action bulk-saves the whole collection.
+  // ---------------------------------------------------------------------
+  const toDraft = (c: Checkpoint): DraftCheckpoint => ({
+    id: c.id,
+    name: c.name,
+    latitude: c.latitude,
+    longitude: c.longitude,
+    radiusMeters: c.radiusMeters,
+  });
+  const [draftsState, setDraftsState] = useState<{ routeId: number | null; items: DraftCheckpoint[]; base: DraftCheckpoint[] }>({
     routeId: null,
     items: [],
+    base: [],
   });
   const selectedRouteId = selectedRoute?.id ?? null;
-  const drafts =
-    draftsState.routeId === selectedRouteId
-      ? draftsState.items
-      : (selectedRoute?.checkpoints ?? []).map((c: Checkpoint) => ({
-          id: c.id,
-          name: c.name,
-          latitude: c.latitude,
-          longitude: c.longitude,
-          radiusMeters: c.radiusMeters,
-        }));
-  const setDrafts = useCallback(
-    (next: DraftCheckpoint[]) => setDraftsState({ routeId: selectedRouteId, items: next }),
-    [selectedRouteId],
+  const serverDrafts = useMemo(
+    () => (selectedRoute?.checkpoints ?? []).map(toDraft),
+    [selectedRoute],
   );
+  const drafts = draftsState.routeId === selectedRouteId ? draftsState.items : serverDrafts;
+  const baseDrafts = draftsState.routeId === selectedRouteId ? draftsState.base : serverDrafts;
+
+  const setDrafts = useCallback(
+    (next: DraftCheckpoint[]) => setDraftsState((s) => ({ routeId: selectedRouteId, items: next, base: s.routeId === selectedRouteId ? s.base : serverDrafts })),
+    [selectedRouteId, serverDrafts],
+  );
+
+  // Dirty = the draft collection differs from the server state (name, coords,
+  // radius, order or membership).  Simplified structural compare by value.
+  const cpSignature = (list: DraftCheckpoint[]) =>
+    list.map((c) => `${c.name.trim()}|${c.latitude.toFixed(7)}|${c.longitude.toFixed(7)}|${Math.round(c.radiusMeters)}`).join(";");
+  const dirty = cpSignature(drafts) !== cpSignature(baseDrafts);
+  const newCount = drafts.filter((d) => !d.id).length;
+
+  // Warn before navigating away with unsaved checkpoint edits
+  const dirtyRef = useRef(dirty);
+  useEffect(() => {
+    dirtyRef.current = dirty;
+  }, [dirty]);
+  useEffect(() => {
+    const onHashChange = () => {
+      if (dirtyRef.current) toast.info("Ada perubahan checkpoint yang belum disimpan — kembali ke rute untuk menyimpan.");
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  // ---------------------------------------------------------------------
+  // Main save (Revision Part D/AA): ONE bulk request persists the entire
+  // collection — new checkpoints are created, existing ones updated, removed
+  // ones deleted — inside a single transaction.
+  // ---------------------------------------------------------------------
+  const saveAllCheckpoints = useCallback(async () => {
+    const route = selectedRoute;
+    if (!route) return;
+    if (drafts.length < 3) {
+      toast.error(`Rute wajib memiliki minimal 3 checkpoint (saat ini: ${drafts.length}).`);
+      return;
+    }
+    if (drafts.some((d) => !d.name.trim())) {
+      toast.error("Semua checkpoint wajib memiliki nama sebelum menyimpan.");
+      return;
+    }
+    const ok = await runAction(
+      () =>
+        apiPut(`/routes/${route.id}/checkpoints`, {
+          checkpoints: drafts.map((d) => ({
+            id: d.id,
+            name: d.name.trim(),
+            latitude: d.latitude,
+            longitude: d.longitude,
+            radiusMeters: d.radiusMeters,
+          })),
+        }),
+      { success: `Semua checkpoint tersimpan (${drafts.length} checkpoint).` },
+    );
+    if (ok) {
+      const updated = await apiGet<RouteModel[]>(`/routes`);
+      const fresh = updated.find((r) => r.id === route.id);
+      const freshDrafts = (fresh?.checkpoints ?? []).map(toDraft);
+      setDraftsState({ routeId: route.id, items: freshDrafts, base: freshDrafts });
+      reload();
+    }
+  }, [selectedRoute, drafts, reload]);
+
+  const resetDrafts = useCallback(() => {
+    setDraftsState((s) => ({ ...s, items: s.base }));
+  }, []);
 
   const rows = useMemo(() => {
     if (!routes) return [];
@@ -123,53 +197,6 @@ export function RoutesPage({ routeId }: { routeId: number | null }) {
     }
   }
 
-  const saveCheckpoint = useCallback(
-    async (cp: DraftCheckpoint) => {
-      const route = selectedRoute;
-      if (!route) return;
-      if (!cp.name.trim()) {
-        toast.error("Beri nama checkpoint sebelum menyimpan.");
-        return;
-      }
-      const ok = await runAction(
-        () =>
-          cp.id
-            ? apiPut(`/checkpoints/${cp.id}`, { name: cp.name, latitude: cp.latitude, longitude: cp.longitude, radiusMeters: cp.radiusMeters })
-            : apiPost(`/routes/${route.id}/checkpoints`, {
-                name: cp.name,
-                latitude: cp.latitude,
-                longitude: cp.longitude,
-                radiusMeters: cp.radiusMeters,
-              }),
-        { success: cp.id ? "Checkpoint diperbarui." : "Checkpoint ditambahkan." },
-      );
-      if (ok) {
-        const updated = await apiGet<RouteModel[]>(`/routes`);
-        const fresh = updated.find((r) => r.id === route.id);
-        if (fresh) {
-          setDrafts(
-            fresh.checkpoints.map((c: Checkpoint) => ({
-              id: c.id,
-              name: c.name,
-              latitude: c.latitude,
-              longitude: c.longitude,
-              radiusMeters: c.radiusMeters,
-            })),
-          );
-        }
-      }
-    },
-     
-    [selectedRoute, setDrafts],
-  );
-
-  const deleteCheckpoint = useCallback(
-    async (cp: DraftCheckpoint) => {
-      if (!cp.id) return;
-      await runAction(() => apiDelete(`/checkpoints/${cp.id}`), { success: "Checkpoint dihapus." });
-    },
-    [],
-  );
 
   if (!can.view) {
     return <PageHeader title="Rute & Checkpoint" subtitle="Anda tidak memiliki izin melihat rute." />;
@@ -177,6 +204,7 @@ export function RoutesPage({ routeId }: { routeId: number | null }) {
 
   // ----- Detail view: checkpoint editor for a selected route -----
   if (selectedRoute) {
+    const totalRadiusKm = drafts.reduce((s, d) => s + metersToKm(d.radiusMeters), 0);
     return (
       <div className="space-y-4">
         <Button variant="ghost" size="sm" onClick={() => (window.location.hash = "#/routes")} className="-ml-2">
@@ -185,22 +213,47 @@ export function RoutesPage({ routeId }: { routeId: number | null }) {
 
         <PageHeader
           title={selectedRoute.name}
-          subtitle={`${selectedRoute.origin ?? "?"} → ${selectedRoute.destination ?? "?"} · ${selectedRoute.checkpoints.length} checkpoint · dipakai ${selectedRoute._count?.transports ?? 0} transport`}
-          icon={<RouteIcon className="h-5 w-5" />}
+          subtitle={`${selectedRoute.origin ?? "?"} → ${selectedRoute.destination ?? "?"} · ${drafts.length} checkpoint · dipakai ${selectedRoute._count?.transports ?? 0} transport`}
+          icon={<Waypoints className="h-5 w-5" />}
           actions={
-            can.update && (
-              <Button variant="outline" onClick={() => openEdit(selectedRoute)}>
-                <Pencil className="h-4 w-4" /> Edit Rute
-              </Button>
-            )
+            <div className="flex flex-wrap items-center gap-2">
+              {can.update && (
+                <Button variant="outline" onClick={() => openEdit(selectedRoute)}>
+                  <Pencil className="h-4 w-4" /> Edit Rute
+                </Button>
+              )}
+              {(can.create || can.update) && (
+                <>
+                  {dirty && (
+                    <Button variant="ghost" onClick={resetDrafts} className="text-muted-foreground">
+                      <RotateCcw className="h-4 w-4" /> Reset
+                    </Button>
+                  )}
+                  <Button onClick={saveAllCheckpoints} disabled={!dirty || busy} title={dirty ? "Simpan seluruh koleksi checkpoint" : "Tidak ada perubahan"}>
+                    <Check className="h-4 w-4" /> Simpan Semua Checkpoint
+                  </Button>
+                </>
+              )}
+            </div>
           }
         />
+
+        {/* Status strip — one source of truth for the collection state */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border bg-muted/40 px-3.5 py-2.5 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1.5 font-semibold text-foreground">
+            <MapPin className="h-3.5 w-3.5 text-primary" /> Koleksi Checkpoint
+          </span>
+          <span>Total: <strong className="text-foreground">{drafts.length}</strong></span>
+          <span>Baru (belum tersimpan): <strong className="text-foreground">{newCount}</strong></span>
+          <span>Total radius: <strong className="text-foreground">{totalRadiusKm.toFixed(2)} KM</strong></span>
+          <span className={dirty ? "font-semibold text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}>
+            {dirty ? "Ada perubahan belum disimpan" : "Sinkron dengan server"}
+          </span>
+        </div>
 
         <CheckpointMapEditor
           checkpoints={drafts}
           onChange={setDrafts}
-          onSaveCheckpoint={can.create || can.update ? saveCheckpoint : undefined}
-          onDeleteCheckpoint={can.delete ? deleteCheckpoint : undefined}
           canEdit={can.create || can.update}
         />
 
@@ -313,7 +366,7 @@ export function RoutesPage({ routeId }: { routeId: number | null }) {
           <DialogHeader>
             <DialogTitle>{editing ? "Edit Rute" : "Tambah Rute"}</DialogTitle>
             <DialogDescription>
-              {editing ? "Perbarui informasi rute." : "Setelah rute dibuat, buka editornya untuk menambah checkpoint GPS di peta (minimal 3)."}
+              {editing ? "Perbarui informasi rute." : "Setelah rute dibuat, buka editornya untuk menambah checkpoint GPS di peta (minimal 3). Semua checkpoint disimpan sekaligus lewat tombol “Simpan Semua Checkpoint”."}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={onSubmit} className="space-y-4">

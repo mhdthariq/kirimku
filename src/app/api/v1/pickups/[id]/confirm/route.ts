@@ -7,7 +7,7 @@ import { assertKurirAssignment, scanProgress, paymentSummary } from "@/lib/scan-
 type Params = { params: Promise<{ id: string }> };
 
 /**
- * Confirm pickup completion.
+ * Confirm that the kurir has PICKED UP the package from the customer.
  * Requirements:
  * - every detail barang (package) must have been QR-scanned "ok" before the
  *   kurir can confirm;
@@ -15,6 +15,13 @@ type Params = { params: Promise<{ id: string }> };
  *   be picked up. The kurir may record the remaining balance at pickup time
  *   via body.payment = { method, amount, reference } (recorded as CASH/TRANSFER
  *   payment by the confirming user).
+ *
+ * Pickup lifecycle (Revision Part A):
+ *   ASSIGNED → PICKED_UP (this action) → … in transit … → the package arrives
+ *   at the gudang and Admin Gudang confirms arrival (scan / walk-in) → the
+ *   pickup is then marked COMPLETED by that arrival workflow.
+ * The kurir must NOT be able to complete the pickup here — the task stays
+ * PICKED_UP while the package is in the kurir's custody.
  * On success the shipment moves to PICKED_UP and tracking shows
  * "Picked-up by [Kurir Name]".
  */
@@ -29,6 +36,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (!pickup) return fail(404, "Pickup tidak ditemukan.");
     if (pickup.status === "COMPLETED") return fail(422, "Pickup sudah selesai.");
     if (pickup.status === "CANCELLED") return fail(422, "Pickup sudah dibatalkan.");
+    if (pickup.status === "PICKED_UP") return fail(422, "Paket sudah diambil kurir (Picked Up) — pickup akan selesai otomatis saat paket tiba di gudang.");
 
     const denied = assertKurirAssignment(pickup, user, "pickup.assign_kurir", pickup.pickupCode);
     if (denied) return fail(403, denied);
@@ -88,7 +96,10 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     const updated = await db.pickup.update({
       where: { id: pickup.id },
-      data: { status: "COMPLETED", completedAt: new Date(), notes },
+      // Revision Part A: the kurir picking up the package moves the task to
+      // PICKED_UP — NOT COMPLETED. Completion happens later, when Admin
+      // Gudang confirms the package arrived at the gudang (arrival workflow).
+      data: { status: "PICKED_UP", notes },
     });
     if (pickup.master.status === "READY_FOR_PICKUP") {
       await db.masterShipment.update({ where: { id: pickup.masterId }, data: { status: "PICKED_UP" } });
@@ -105,7 +116,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       action: "status_change",
       entityType: "pickup",
       entityId: pickup.id,
-      entityLabel: `${pickup.pickupCode} → COMPLETED`,
+      entityLabel: `${pickup.pickupCode} → PICKED_UP`,
       actor: user,
       after: { packagesScanned: `${progress.scanned}/${progress.total}`, kurir: kurirName, payment: paymentRecorded },
     });

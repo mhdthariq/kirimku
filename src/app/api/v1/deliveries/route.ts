@@ -5,6 +5,13 @@ import { audit } from "@/lib/audit";
 import { nextCode } from "@/lib/code-generator";
 import { cityIndex, deliveryGudangIds, inScope, scopeForUser } from "@/lib/gudang-scope";
 
+/** Executor = view-only delivery user without assign rights (kurir). */
+function executorOnly(user: { isOwner: boolean; permissions: string[] }): boolean {
+  if (user.isOwner || user.permissions.includes("*")) return false;
+  const has = (slug: string) => user.permissions.includes(slug);
+  return !has("delivery.assign_kurir");
+}
+
 export async function GET(req: NextRequest) {
   return handle(async () => {
     const user = await guard(req, "delivery.view");
@@ -12,7 +19,9 @@ export async function GET(req: NextRequest) {
     const search = str(params.get("search"))?.toLowerCase();
     const status = str(params.get("status"));
     // ?mine=true — kurir executor view: only deliveries assigned to me.
-    const mine = params.get("mine") === "true";
+    // Revision Part Y — executor scoping is enforced SERVER-side: a kurir
+    // (view-only, no assign rights) always sees only their own tasks.
+    const mine = params.get("mine") === "true" || executorOnly(user);
 
     const deliveries = await db.delivery.findMany({
       where: {

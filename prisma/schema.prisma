@@ -287,6 +287,16 @@ model Transport {
   kenekId       Int?
   kenek         Employee? @relation("TransportKenek", fields: [kenekId], references: [id])
   status        String   @default("PLANNED") // PLANNED | DEPARTED | ARRIVED | CANCELLED
+  // Transport planning (Revision Part J) — explicit endpoints & schedule.
+  // Fallback to the route's origin/destination when null.
+  origin              String?    // e.g. "Medan"
+  destination         String?    // e.g. "Banda Aceh"
+  plannedDepartureAt  DateTime?
+  plannedArrivalAt    DateTime?
+  // Last known position — updated by checkpoint check-ins (Revision Parts K/N)
+  currentLatitude     Float?
+  currentLongitude    Float?
+  lastLocationAt      DateTime?
   departedAt    DateTime?
   arrivedAt     DateTime?
   createdAt     DateTime @default(now())
@@ -294,6 +304,10 @@ model Transport {
 
   shipments        TransportShipment[]
   checkpointRecords CheckpointRecord[]
+
+  @@index([driverId, status])
+  @@index([kenekId, status])
+  @@index([status])
 }
 
 model TransportShipment {
@@ -303,6 +317,8 @@ model TransportShipment {
   master      MasterShipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
 
   @@id([transportId, shipmentId])
+  @@index([transportId])
+  @@index([shipmentId])
 }
 
 model CheckpointRecord {
@@ -314,9 +330,16 @@ model CheckpointRecord {
   latitude     Float
   longitude    Float
   withinRadius Boolean
+  // Revision Part O — selfie/photo evidence (compressed JPEG data URL) and
+  // distance from the checkpoint at check-in time.
+  photoUrl     String?
+  distanceMeters Float?
   recordedById Int?
   recordedBy   User?    @relation(fields: [recordedById], references: [id])
   recordedAt   DateTime @default(now())
+
+  @@index([transportId, recordedAt])
+  @@index([checkpointId])
 }
 
 // ---------------------------------------------------------------------------
@@ -329,13 +352,16 @@ model Pickup {
   masterId    Int
   master      MasterShipment @relation(fields: [masterId], references: [id], onDelete: Cascade)
   kurirId     Int?
-  status      String   @default("ASSIGNED") // ASSIGNED | IN_PROGRESS | COMPLETED | CANCELLED
+  status      String   @default("ASSIGNED") // ASSIGNED | PICKED_UP | COMPLETED | CANCELLED (Revision Part A)
   notes       String?
   createdAt   DateTime @default(now())
   completedAt DateTime?
   updatedAt   DateTime @updatedAt
 
   scans HandoverScan[]
+
+  @@index([kurirId, status])
+  @@index([masterId, status])
 }
 
 // QR handover scan log — each physical package (detail barang) carries a QR

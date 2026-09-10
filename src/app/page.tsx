@@ -9,10 +9,13 @@ import { AppShell } from "@/components/app/app-shell";
 import { Loader2 } from "lucide-react";
 
 import { DashboardPage } from "@/components/app/pages/dashboard-page";
+import { KurirDashboard } from "@/components/app/pages/kurir-dashboard-page";
+import { DriverDashboard } from "@/components/app/pages/driver-dashboard-page";
 import { PickupsPage } from "@/components/app/pages/pickups-page";
 import { ShipmentsPage } from "@/components/app/pages/shipments-page";
 import { DeliveriesPage } from "@/components/app/pages/deliveries-page";
 import { TransportsPage } from "@/components/app/pages/transports-page";
+import { TransportDetailPage } from "@/components/app/pages/transport-detail-page";
 import { VehiclesPage } from "@/components/app/pages/vehicles-page";
 import { GudangPage } from "@/components/app/pages/gudang-page";
 import { RoutesPage } from "@/components/app/pages/routes-page";
@@ -51,6 +54,13 @@ function Router() {
 
   const section = segments[0] ?? "dashboard";
 
+  // Revision Part P — role-aware dashboard: kurir and driver/kenek get their
+  // dedicated operational dashboards; everyone else (owner, admin, …) keeps
+  // the existing full dashboard (Part Q).
+  const roleSlugs = user.roles.map((r) => r.slug);
+  const isKurir = roleSlugs.includes("kurir");
+  const isDriverCrew = roleSlugs.includes("driver") || roleSlugs.includes("kenek");
+
   const page = (() => {
     switch (section) {
       case "pickups":
@@ -60,7 +70,11 @@ function Router() {
       case "deliveries":
         return <DeliveriesPage />;
       case "transports":
-        return <TransportsPage />;
+        // #/transports — list; #/transports/{id} — detail (Revision Part K)
+        return segments[1] ? <TransportDetailPage transportId={Number(segments[1])} /> : <TransportsPage />;
+      case "transport-history":
+        // Revision Part V — driver/kenek transport history view
+        return <TransportsPage historyMode />;
       case "vehicles":
         return <VehiclesPage />;
       case "gudang":
@@ -80,6 +94,8 @@ function Router() {
       case "audit":
         return <AuditPage />;
       default:
+        if (isKurir) return <KurirDashboard />;
+        if (isDriverCrew) return <DriverDashboard />;
         return <DashboardPage />;
     }
   })();

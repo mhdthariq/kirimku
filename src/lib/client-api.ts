@@ -354,13 +354,109 @@ export interface Transport {
   vehicleName: string | null;
   driverName: string | null;
   kenekName: string | null;
+  /** Planning fields (Revision Part J) */
+  origin: string | null;
+  destination: string | null;
+  plannedDepartureAt: string | null;
+  plannedArrivalAt: string | null;
   departedAt: string | null;
   arrivedAt: string | null;
   createdAt: string;
-  shipments: { id: number; masterCode: string; status: string }[];
+  /** last known position (Revision Part K) */
+  currentLatitude: number | null;
+  currentLongitude: number | null;
+  lastLocationAt: string | null;
+  shipments: { id: number; masterCode: string; status: string; packages: number }[];
   checkpointRecordsCount: number;
+  /** aggregate totals (Revision Parts L/M) */
+  shipmentCount: number;
+  totalWeightKg: number;
+  totalVolumeM3: number;
+  totalPrice: number | null;
   /** gudang(s) this transport belongs to (route endpoints + shipments) */
   gudangIds?: number[];
+}
+
+/** Transport detail (GET /transports/{id}) — Revision Part K. */
+export interface TransportDetail {
+  id: number;
+  transportCode: string;
+  status: string;
+  routeId: number | null;
+  routeName: string | null;
+  routeOrigin: string | null;
+  routeDestination: string | null;
+  checkpoints: Checkpoint[];
+  origin: string | null;
+  destination: string | null;
+  plannedDepartureAt: string | null;
+  plannedArrivalAt: string | null;
+  departedAt: string | null;
+  arrivedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  vehicle: {
+    id: number;
+    vehicleNumber: string;
+    name: string | null;
+    status: string;
+    maxWeightKg: number;
+    maxVolumeM3: number;
+  };
+  driver: { id: number; name: string } | null;
+  kenek: { id: number; name: string } | null;
+  currentLatitude: number | null;
+  currentLongitude: number | null;
+  lastLocationAt: string | null;
+  checkpointRecords: {
+    id: number;
+    checkpointId: number;
+    checkpointName: string;
+    checkpointSequence: number;
+    latitude: number;
+    longitude: number;
+    withinRadius: boolean;
+    distanceMeters: number | null;
+    photoUrl: string | null;
+    recordedBy: { id: number; name: string } | null;
+    recordedAt: string;
+  }[];
+  shipments: {
+    id: number;
+    masterCode: string;
+    resi: string | null;
+    status: string;
+    origin: string;
+    destination: string;
+    customerName: string | null;
+    penerimaName: string | null;
+    packages: number;
+    weightKg: number;
+    volumeM3: number;
+    priceAmount: number | null;
+  }[];
+  shipmentCount: number;
+  totalWeightKg: number;
+  totalVolumeM3: number;
+  totalPrice: number | null;
+}
+
+/** Check-in response (POST /transports/{id}/checkins) — Revision Part O. */
+export interface CheckinResponse {
+  record: {
+    id: number;
+    checkpointId: number;
+    checkpointName: string;
+    latitude: number;
+    longitude: number;
+    distanceMeters: number;
+    withinRadius: boolean;
+    recordedAt: string;
+  };
+  distanceKm: number;
+  radiusKm: number;
+  autoArrived: boolean;
+  message: string;
 }
 
 export interface Tariff {

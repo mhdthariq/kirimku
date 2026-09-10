@@ -35,9 +35,10 @@ export const PERMISSIONS: { slug: string; module: string; description: string }[
   { slug: "delivery.confirm", module: "Deliveries", description: "Complete deliveries (all packages scanned + POD)" },
   // Transport
   { slug: "transport.view", module: "Transports", description: "View transports" },
-  { slug: "transport.create", module: "Transports", description: "Create transports" },
+  { slug: "transport.create", module: "Transports", description: "Create/plan transports" },
   { slug: "transport.depart", module: "Transports", description: "Mark transport departed" },
-  { slug: "transport.arrive", module: "Transports", description: "Mark transport arrived" },
+  { slug: "transport.arrive", module: "Transports", description: "Mark transport arrived (admin override — arrival is normally auto-detected at the destination checkpoint)" },
+  { slug: "transport.checkin", module: "Transports", description: "Checkpoint selfie check-in with GPS validation (driver/kenek)" },
   // Vehicle
   { slug: "vehicle.view", module: "Vehicles", description: "View vehicles" },
   { slug: "vehicle.create", module: "Vehicles", description: "Create vehicles" },
@@ -155,17 +156,17 @@ export const ROLE_TEMPLATES: { slug: string; name: string; description: string; 
   {
     slug: "driver",
     name: "Driver",
-    description: "Linehaul driver: transport depart/arrive",
+    description: "Linehaul driver: depart transport + checkpoint selfie check-in",
     permissions: [
-      "transport.view", "transport.depart", "transport.arrive",
+      "transport.view", "transport.depart", "transport.arrive", "transport.checkin",
       "shipment.view",
     ],
   },
   {
     slug: "kenek",
     name: "Kenek",
-    description: "Linehaul assistant: view transports",
-    permissions: ["transport.view", "shipment.view"],
+    description: "Linehaul assistant: view assigned transports + checkpoint selfie check-in",
+    permissions: ["transport.view", "transport.checkin", "shipment.view"],
   },
 ];
 

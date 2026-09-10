@@ -66,6 +66,15 @@ export async function POST(req: NextRequest, { params }: Params) {
       },
     });
 
+    // Revision Part A — pickup lifecycle: now that the package has physically
+    // ARRIVED at the gudang and the arrival workflow is successfully completed,
+    // the pickup task(s) that fetched it become COMPLETED. (Kurir confirmation
+    // only moved them to PICKED_UP earlier.)
+    await db.pickup.updateMany({
+      where: { masterId: master.id, status: { in: ["ASSIGNED", "IN_PROGRESS", "PICKED_UP"] } },
+      data: { status: "COMPLETED", completedAt: new Date() },
+    });
+
     const description =
       mode === "scan"
         ? `Paket diterima di ${warehouse.name} — ${master.details.length} paket terverifikasi scan${master.customer ? ` (kurir drop-off, shipment ${master.customer.name})` : ""}`

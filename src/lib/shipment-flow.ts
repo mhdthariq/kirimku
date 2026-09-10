@@ -38,9 +38,13 @@ export const STATUS_LABELS: Record<string, string> = {
   ARRIVED_AT_GUDANG: "Arrive at Gudang (Dest.)",
   DELIVERED: "Delivered",
   CANCELLED: "Cancelled",
-  // pickups
+  // pickups — Revision Part A lifecycle: ASSIGNED → PICKED_UP (kurir fetches
+  // the package) → the package arrives at the gudang (shipment RECEIVED_AT_
+  // GUDANG via the arrival scan workflow) → COMPLETED. The kurir never
+  // completes the pickup manually.
   ASSIGNED: "Assigned",
   IN_PROGRESS: "In Progress",
+  PICKED_UP: "Picked Up",
   COMPLETED: "Completed",
   FAILED: "Failed",
   // transports

@@ -16,6 +16,7 @@ const STATUS_MAP: Record<string, { label: string; variant: "default" | "secondar
   // Tasks
   ASSIGNED: { label: "Assigned", variant: "secondary" },
   IN_PROGRESS: { label: "In Progress", variant: "default", pulse: true },
+  PICKED_UP: { label: "Picked Up", variant: "default", pulse: true },
   COMPLETED: { label: "Completed", variant: "default" },
   FAILED: { label: "Failed", variant: "destructive" },
   // Transport

@@ -64,9 +64,9 @@ export async function POST(req: NextRequest, { params }: Params) {
         scannedById: user.id,
       },
     });
-    if (pickup.status === "ASSIGNED") {
-      await db.pickup.update({ where: { id: pickup.id }, data: { status: "IN_PROGRESS" } });
-    }
+    // Revision Part A — scanning packages is verification only; the pickup
+    // stays ASSIGNED until the kurir confirms the physical handover (→
+    // PICKED_UP). No IN_PROGRESS transitional state in the new lifecycle.
     await audit({
       action: alreadyScanned ? "duplicate_scan" : "scanned",
       entityType: "pickup",

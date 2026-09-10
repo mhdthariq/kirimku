@@ -49,6 +49,12 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     const existing = await db.pickup.findUnique({ where: { id: Number(id) }, include: { master: true } });
     if (!existing) return fail(404, "Pickup tidak ditemukan.");
     if (existing.status === "COMPLETED") return fail(422, "Pickup yang sudah selesai tidak bisa dihapus.");
+    // Revision Part A — once the package is in the kurir's custody (PICKED_UP),
+    // the task cannot be cancelled: it will complete when the package reaches
+    // the gudang.
+    if (existing.status === "PICKED_UP") {
+      return fail(422, "Paket sudah diambil kurir (PICKED_UP) — pickup tidak bisa dibatalkan; tunggu paket tiba di gudang.");
+    }
 
     await db.pickup.update({ where: { id: existing.id }, data: { status: "CANCELLED" } }).catch(() => undefined);
     if (existing.master.status === "PICKED_UP") {

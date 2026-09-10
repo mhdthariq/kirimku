@@ -135,7 +135,7 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
       const res = await apiPost<{ tracking: string }>(`${basePath}/${isPickup ? "confirm" : "complete"}`, body);
       toast.success(
         isPickup
-          ? `Pickup ${task.code} selesai — tracking: ${res.tracking ?? "Picked-up"}`
+          ? `Paket ${task.code} telah diambil (Picked Up) — tracking: ${res.tracking ?? "Picked-up"}. Pickup selesai otomatis saat paket tiba di gudang.`
           : `Delivery ${task.code} selesai — ${res.tracking ?? "Delivered"}`,
       );
       onOpenChange(false);
@@ -296,8 +296,13 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
             </div>
             <Button className="w-full" onClick={onConfirm} disabled={confirming}>
               <CheckCircle2 className="h-4 w-4" />
-              {confirming ? "Memproses…" : isPickup ? "Konfirmasi Pickup Selesai" : "Konfirmasi Delivered (Di Tangan Customer)"}
+              {confirming ? "Memproses…" : isPickup ? "Konfirmasi Paket Diambil (Picked Up)" : "Konfirmasi Delivered (Di Tangan Customer)"}
             </Button>
+            {isPickup && (
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                Pickup berstatus <strong>Picked Up</strong> setelah paket diambil — pickup baru menjadi <strong>Completed</strong> saat paket tiba dan diterima di gudang (dikonfirmasi Admin Gudang).
+              </p>
+            )}
           </div>
         )}
 

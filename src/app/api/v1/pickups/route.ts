@@ -5,6 +5,13 @@ import { audit } from "@/lib/audit";
 import { nextCode } from "@/lib/code-generator";
 import { cityIndex, inScope, pickupGudangIds, scopeForUser } from "@/lib/gudang-scope";
 
+/** Executor = view-only pickup user without create/assign rights (kurir). */
+function executorOnly(user: { isOwner: boolean; permissions: string[] }): boolean {
+  if (user.isOwner || user.permissions.includes("*")) return false;
+  const has = (slug: string) => user.permissions.includes(slug);
+  return !has("pickup.create") && !has("pickup.assign_kurir");
+}
+
 export async function GET(req: NextRequest) {
   return handle(async () => {
     const user = await guard(req, "pickup.view");
@@ -12,7 +19,10 @@ export async function GET(req: NextRequest) {
     const search = str(params.get("search"))?.toLowerCase();
     const status = str(params.get("status"));
     // ?mine=true — kurir executor view: only pickups assigned to me.
-    const mine = params.get("mine") === "true";
+    // Revision Part Y — executor scoping is enforced SERVER-side: a user who
+    // can view but not create/assign pickups (the kurir role) is ALWAYS
+    // limited to their own tasks, even without the query flag.
+    const mine = params.get("mine") === "true" || executorOnly(user);
 
     const pickups = await db.pickup.findMany({
       where: {

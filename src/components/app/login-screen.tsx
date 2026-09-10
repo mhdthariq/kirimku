@@ -33,6 +33,9 @@ export function LoginScreen() {
     setError(null);
     try {
       await login(username.trim(), password);
+      // always land on the dashboard — the previous user's hash (e.g. a
+      // transport detail the new user has no access to) must not leak
+      window.location.hash = "#/dashboard";
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login gagal.");
     } finally {
@@ -47,6 +50,7 @@ export function LoginScreen() {
     setError(null);
     try {
       await login(acc.username, acc.password);
+      window.location.hash = "#/dashboard";
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login gagal.");
     } finally {
