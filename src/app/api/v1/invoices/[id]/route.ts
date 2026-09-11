@@ -11,10 +11,17 @@ export async function GET(req: NextRequest, { params }: Params) {
     const { id } = await params;
     const invoice = await db.invoice.findUnique({
       where: { id: Number(id) },
-      include: { customer: true, lines: { orderBy: { id: "asc" } }, settlements: { orderBy: { settledAt: "desc" } } },
+      include: {
+        customer: true,
+        lines: { orderBy: { id: "asc" }, include: { shipment: { select: { id: true, masterCode: true } } } },
+        settlements: { orderBy: { settledAt: "desc" } },
+        commission: { include: { partner: { include: { user: { select: { name: true } } } } } },
+      },
     });
     if (!invoice) return fail(404, "Invoice tidak ditemukan.");
-    return ok(invoice);
+    const total = invoice.lines.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0);
+    const settled = invoice.settlements.reduce((sum, s) => sum + s.amount, 0);
+    return ok({ ...invoice, totalAmount: total, settledAmount: settled, remainingAmount: total - settled });
   });
 }
 

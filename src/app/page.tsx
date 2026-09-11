@@ -11,6 +11,7 @@ import { Loader2 } from "lucide-react";
 import { DashboardPage } from "@/components/app/pages/dashboard-page";
 import { KurirDashboard } from "@/components/app/pages/kurir-dashboard-page";
 import { DriverDashboard } from "@/components/app/pages/driver-dashboard-page";
+import { VehicleOwnerDashboard } from "@/components/app/pages/vo-dashboard-page";
 import { PickupsPage } from "@/components/app/pages/pickups-page";
 import { ShipmentsPage } from "@/components/app/pages/shipments-page";
 import { DeliveriesPage } from "@/components/app/pages/deliveries-page";
@@ -25,6 +26,18 @@ import { InvoicesPage } from "@/components/app/pages/invoices-page";
 import { UnpaidPage } from "@/components/app/pages/unpaid-page";
 import { AccessPage } from "@/components/app/pages/access-page";
 import { AuditPage } from "@/components/app/pages/audit-page";
+// Revise.md — partner wallet financial system pages
+import { WalletPage } from "@/components/app/pages/wallet-page";
+import { B2BCommissionsPage } from "@/components/app/pages/b2b-commissions-page";
+import { MyVehiclesPage } from "@/components/app/pages/my-vehicles-page";
+import { VOTransportHistoryPage } from "@/components/app/pages/vo-transport-history-page";
+import { RepairsPage } from "@/components/app/pages/repairs-page";
+import { FinancePage } from "@/components/app/pages/finance-page";
+import { TopUpManagementPage } from "@/components/app/pages/topups-page";
+import { WithdrawalManagementPage } from "@/components/app/pages/withdrawals-page";
+import { SettlementsPage } from "@/components/app/pages/settlements-page";
+import { PartnersPage } from "@/components/app/pages/partners-page";
+import { ProfilePage } from "@/components/app/pages/profile-page";
 
 function Router() {
   const { user, loading } = useAuth();
@@ -55,11 +68,12 @@ function Router() {
   const section = segments[0] ?? "dashboard";
 
   // Revision Part P — role-aware dashboard: kurir and driver/kenek get their
-  // dedicated operational dashboards; everyone else (owner, admin, …) keeps
-  // the existing full dashboard (Part Q).
+  // dedicated operational dashboards; Vehicle Owner gets the partner financial
+  // dashboard (Revise.md §17); everyone else keeps the full dashboard.
   const roleSlugs = user.roles.map((r) => r.slug);
   const isKurir = roleSlugs.includes("kurir");
   const isDriverCrew = roleSlugs.includes("driver") || roleSlugs.includes("kenek");
+  const isVehicleOwner = user.partnerType === "VEHICLE_OWNER";
 
   const page = (() => {
     switch (section) {
@@ -75,8 +89,17 @@ function Router() {
       case "transport-history":
         // Revision Part V — driver/kenek transport history view
         return <TransportsPage historyMode />;
+      case "vo-transport-history":
+        // Revise.md §16 — Vehicle Owner transport history
+        return <VOTransportHistoryPage />;
+      case "earnings":
+        // Revise.md §32 — Vehicle Owner earnings view (same page, earnings tab)
+        return <VOTransportHistoryPage initialTab="earnings" />;
       case "vehicles":
         return <VehiclesPage />;
+      case "my-vehicles":
+        // Revise.md §13/§32 — Vehicle Owner's own vehicles
+        return <MyVehiclesPage />;
       case "gudang":
         return <GudangPage />;
       case "routes":
@@ -93,9 +116,29 @@ function Router() {
         return <AccessPage />;
       case "audit":
         return <AuditPage />;
+      // ----- Revise.md — partner wallet financial system -------------------
+      case "wallet":
+        return <WalletPage />;
+      case "b2b":
+        return <B2BCommissionsPage />;
+      case "repairs":
+        return <RepairsPage />;
+      case "finance":
+        return <FinancePage />;
+      case "topups":
+        return <TopUpManagementPage />;
+      case "withdrawals":
+        return <WithdrawalManagementPage />;
+      case "settlements":
+        return <SettlementsPage />;
+      case "partners":
+        return <PartnersPage />;
+      case "profile":
+        return <ProfilePage />;
       default:
         if (isKurir) return <KurirDashboard />;
         if (isDriverCrew) return <DriverDashboard />;
+        if (isVehicleOwner) return <VehicleOwnerDashboard />;
         return <DashboardPage />;
     }
   })();

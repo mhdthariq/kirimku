@@ -19,7 +19,19 @@ export async function POST(req: NextRequest, { params }: Params) {
     const unitPrice = num(body.unitPrice) ?? 0;
     if (unitPrice <= 0) return fail(422, "Harga satuan harus lebih dari 0.", { unitPrice: ["Harga satuan harus > 0."] });
 
-    const line = await db.invoiceLine.create({ data: { invoiceId: invoice.id, description, quantity, unitPrice } });
+    // Revise.md §7 — optional B2B shipment link on the invoice line.
+    let shipmentId: number | null = null;
+    const rawShipmentId = num(body.shipmentId);
+    if (rawShipmentId) {
+      const shipment = await db.masterShipment.findUnique({ where: { id: rawShipmentId } });
+      if (!shipment) return fail(404, "Shipment tidak ditemukan.");
+      if (shipment.customerId !== invoice.customerId) {
+        return fail(422, `Shipment ${shipment.masterCode} bukan milik customer invoice ini.`);
+      }
+      shipmentId = shipment.id;
+    }
+
+    const line = await db.invoiceLine.create({ data: { invoiceId: invoice.id, description, quantity, unitPrice, shipmentId } });
     await audit({ action: "created", entityType: "invoice_line", entityId: line.id, entityLabel: `${invoice.invoiceNumber} · ${description}`, actor: user, after: line });
     return ok(line);
   });

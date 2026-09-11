@@ -35,6 +35,9 @@ export interface AuthUser {
   warehouseId: number | null;
   /** display name of the user's gudang */
   warehouseName: string | null;
+  /** partner profile when the user is a Marketing / Vehicle Owner partner */
+  partnerId: number | null;
+  partnerType: "MARKETING" | "VEHICLE_OWNER" | null;
   roles: { id: number; slug: string; name: string }[];
   permissions: string[];
 }
@@ -70,6 +73,7 @@ export async function getAuthUser(req: NextRequest): Promise<AuthUser | null> {
         include: {
           roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } },
           employee: { include: { warehouse: true } },
+          partner: true,
         },
       },
     },
@@ -103,6 +107,8 @@ export async function getAuthUser(req: NextRequest): Promise<AuthUser | null> {
     employeeId: user.employeeId,
     warehouseId: user.employee?.warehouseId ?? null,
     warehouseName: user.employee?.warehouse?.name ?? null,
+    partnerId: user.partner?.id ?? null,
+    partnerType: (user.partner?.type as "MARKETING" | "VEHICLE_OWNER" | undefined) ?? null,
     roles,
     permissions,
   };

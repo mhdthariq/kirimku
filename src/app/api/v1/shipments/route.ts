@@ -66,6 +66,10 @@ export async function POST(req: NextRequest) {
     const customer = await db.customer.findUnique({ where: { id: customerId } });
     if (!customer) return fail(422, "Customer tidak ditemukan.", { customerId: ["Customer tidak ditemukan."] });
 
+    // Revise.md §6 — Marketing enters the discount as an AMOUNT in Rupiah.
+    // The percentage is always derived by the system, never typed manually.
+    const discountAmount = Math.max(0, num(body.discountAmount) ?? 0);
+
     // Route comes from the tariff dropdown (Kota Asal/Tujuan no longer typed by hand).
     // Legacy clients may still send origin/destination directly.
     const tariffId = num(body.tariffId);
@@ -104,6 +108,11 @@ export async function POST(req: NextRequest) {
     const originWarehouseId = num(body.originWarehouseId);
     const destinationWarehouseId = num(body.destinationWarehouseId);
 
+    // Revise.md — attribute the shipment to the Marketing partner that
+    // created it (drives B2B commission + discount validation). Non-partner
+    // users (owner/admin) create unattributed shipments.
+    const createdByPartnerId = user.partnerType === "MARKETING" && user.partnerId ? user.partnerId : null;
+
     const shipment = await db.masterShipment.create({
       data: {
         masterCode,
@@ -118,6 +127,8 @@ export async function POST(req: NextRequest) {
         penerimaName: str(body.penerimaName),
         penerimaAddress: str(body.penerimaAddress),
         penerimaContact: str(body.penerimaContact),
+        discountAmount,
+        createdByPartnerId,
       },
     });
 

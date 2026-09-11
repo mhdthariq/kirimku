@@ -28,6 +28,8 @@ export async function GET(req: NextRequest) {
       visible.map((s) => {
         const paid = s.payments.filter((p) => p.status === "VERIFIED").reduce((sum, p) => sum + p.amount, 0);
         const pending = s.payments.filter((p) => p.status === "RECORDED").reduce((sum, p) => sum + p.amount, 0);
+        // Revise.md §6 — the customer owes the discounted FINAL price.
+        const finalPrice = s.finalPriceAmount ?? (s.priceAmount != null ? s.priceAmount - (s.discountAmount ?? 0) : 0);
         return {
           id: s.id,
           masterCode: s.masterCode,
@@ -36,9 +38,11 @@ export async function GET(req: NextRequest) {
           customerName: s.customer.name,
           customerPhone: s.customer.phone,
           priceAmount: s.priceAmount ?? 0,
+          discountAmount: s.discountAmount ?? 0,
+          finalPriceAmount: finalPrice,
           paidAmount: paid,
           pendingAmount: pending,
-          remainingAmount: Math.max(0, (s.priceAmount ?? 0) - paid - pending),
+          remainingAmount: Math.max(0, finalPrice - paid - pending),
           payments: s.payments.map((p) => ({
             id: p.id, method: p.method, amount: p.amount, status: p.status,
             reference: p.reference, createdAt: p.createdAt, recordedByName: p.recordedBy?.name ?? null,

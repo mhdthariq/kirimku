@@ -108,33 +108,48 @@ export function assertKurirAssignment(
 
 export interface PaymentSummary {
   priceAmount: number | null;
+  discountAmount: number; // Revise.md §6 — Marketing-funded discount
+  finalPriceAmount: number | null; // what the customer actually owes
   paidAmount: number; // sum of RECORDED + VERIFIED payments
-  remainingAmount: number; // price - paid (>= 0)
-  dpRequirement: number; // 50% of price
-  dpOk: boolean; // paid >= 50% of price
+  remainingAmount: number; // final price - paid (>= 0)
+  dpRequirement: number; // 50% of final price
+  dpOk: boolean; // paid >= 50% of final price
   status: "UNPAID" | "DP" | "PAID" | "UNPRICED";
 }
 
-/** Payment summary of a shipment: DP rule = at least 50% paid before pickup. */
+/** Payment summary of a shipment: DP rule = at least 50% paid before pickup.
+ *  Revise.md §6 — the customer owes the DISCOUNTED final price; the company
+ *  share is still calculated from the original price at settlement time. */
 export async function paymentSummary(masterId: number): Promise<PaymentSummary> {
   const [master, payments] = await Promise.all([
-    db.masterShipment.findUnique({ where: { id: masterId }, select: { priceAmount: true } }),
+    db.masterShipment.findUnique({
+      where: { id: masterId },
+      select: { priceAmount: true, discountAmount: true, finalPriceAmount: true },
+    }),
     db.payment.findMany({ where: { masterId, status: { in: ["RECORDED", "VERIFIED"] } }, select: { amount: true } }),
   ]);
   const priceAmount = master?.priceAmount ?? null;
+  const discountAmount = master?.discountAmount ?? 0;
+  const finalPriceAmount =
+    master?.finalPriceAmount ?? (priceAmount != null ? Math.round((priceAmount - discountAmount) * 100) / 100 : null);
   const paidAmount = payments.reduce((sum, p) => sum + p.amount, 0);
-  if (priceAmount == null || priceAmount <= 0) {
-    return { priceAmount, paidAmount, remainingAmount: 0, dpRequirement: 0, dpOk: false, status: "UNPRICED" };
+  if (finalPriceAmount == null || finalPriceAmount <= 0) {
+    return {
+      priceAmount, discountAmount, finalPriceAmount,
+      paidAmount, remainingAmount: 0, dpRequirement: 0, dpOk: false, status: "UNPRICED",
+    };
   }
-  const dpRequirement = priceAmount / 2;
-  const remainingAmount = Math.max(0, priceAmount - paidAmount);
+  const dpRequirement = finalPriceAmount / 2;
+  const remainingAmount = Math.max(0, finalPriceAmount - paidAmount);
   return {
     priceAmount,
+    discountAmount,
+    finalPriceAmount,
     paidAmount,
     remainingAmount,
     dpRequirement,
     dpOk: paidAmount >= dpRequirement - 0.01,
-    status: paidAmount >= priceAmount - 0.01 ? "PAID" : paidAmount > 0 ? "DP" : "UNPAID",
+    status: paidAmount >= finalPriceAmount - 0.01 ? "PAID" : paidAmount > 0 ? "DP" : "UNPAID",
   };
 }
 

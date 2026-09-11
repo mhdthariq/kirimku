@@ -42,8 +42,9 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: "desc" },
       include: {
         route: { include: { checkpoints: { orderBy: { sequence: "asc" } } } },
-        vehicle: true,
+        vehicle: { include: { owner: { include: { user: { select: { name: true } } } } } },
         shipments: { include: { master: true } },
+        settlement: true,
         _count: { select: { checkpointRecords: true } },
       },
     });
@@ -81,6 +82,21 @@ export async function GET(req: NextRequest) {
           vehicleId: t.vehicleId,
           vehicleNumber: t.vehicle.vehicleNumber,
           vehicleName: t.vehicle.name,
+          // Revise.md §14 — vehicle owner + settlement state for the settle action
+          vehicleOwnerId: t.vehicle.ownerId,
+          vehicleOwnerName: t.vehicle.owner?.user.name ?? null,
+          settlement: t.settlement
+            ? {
+                settlementCode: t.settlement.settlementCode,
+                status: t.settlement.status,
+                transportValue: t.settlement.transportValue,
+                companyPercent: t.settlement.companyPercent,
+                ownerPercent: t.settlement.ownerPercent,
+                companyAmount: t.settlement.companyAmount,
+                ownerAmount: t.settlement.ownerAmount,
+                finalizedAt: t.settlement.finalizedAt,
+              }
+            : null,
           driverName: employeeName(t.driverId),
           kenekName: employeeName(t.kenekId),
           // Planning fields (Revision Part J)

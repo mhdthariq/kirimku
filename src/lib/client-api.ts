@@ -109,6 +109,9 @@ export interface SessionUser {
   warehouseId: number | null;
   /** display name of the user's gudang */
   warehouseName: string | null;
+  /** partner profile when the user is a Marketing / Vehicle Owner partner */
+  partnerId: number | null;
+  partnerType: "MARKETING" | "VEHICLE_OWNER" | null;
   roles: { id: number; slug: string; name: string }[];
   permissions: string[];
 }
@@ -186,6 +189,11 @@ export interface Shipment {
   ratePerKg: number | null;
   priceAmount: number | null;
   pricedAt: string | null;
+  /** Revise.md §6 — Marketing-funded B2C discount */
+  discountAmount: number;
+  discountPercentage: number | null;
+  finalPriceAmount: number | null;
+  createdByPartnerId?: number | null;
   createdAt: string;
   details?: DetailShipment[];
   _count?: { details: number; pickups: number; deliveries: number; payments: number };
@@ -200,6 +208,8 @@ export interface ShipmentTotals {
 
 export interface PaymentSummary {
   priceAmount: number | null;
+  discountAmount: number; // Revise.md §6 — Marketing-funded discount
+  finalPriceAmount: number | null; // what the customer actually owes
   paidAmount: number;
   remainingAmount: number;
   dpRequirement: number;
@@ -304,6 +314,9 @@ export interface Vehicle {
   maxWeightKg: number;
   maxVolumeM3: number;
   notes: string | null;
+  /** Revise.md §13 — linked Vehicle Owner (null = company-owned) */
+  ownerId: number | null;
+  owner?: { id: number; user: { name: string } } | null;
   assignments: { driverId: number | null; driver: { name: string } | null; kenek: { name: string } | null }[];
   _count?: { transports: number };
 }
@@ -352,6 +365,19 @@ export interface Transport {
   vehicleId: number;
   vehicleNumber: string;
   vehicleName: string | null;
+  /** Revise.md §14 — partner owner + settlement state of this transport */
+  vehicleOwnerId?: number | null;
+  vehicleOwnerName?: string | null;
+  settlement?: {
+    settlementCode: string;
+    status: string;
+    transportValue: number;
+    companyPercent: number;
+    ownerPercent: number;
+    companyAmount: number;
+    ownerAmount: number;
+    finalizedAt: string | null;
+  } | null;
   driverName: string | null;
   kenekName: string | null;
   /** Planning fields (Revision Part J) */
@@ -480,6 +506,9 @@ export interface InvoiceLine {
   description: string;
   quantity: number;
   unitPrice: number;
+  /** Revise.md §7.1 — linked B2B shipment billed by this line */
+  shipmentId?: number | null;
+  shipment?: { id: number; masterCode: string } | null;
 }
 
 export interface InvoiceSettlement {
@@ -510,6 +539,13 @@ export interface Invoice {
   createdAt: string;
   lines?: InvoiceLine[];
   settlements?: InvoiceSettlement[];
+  /** Revise.md §8 — Marketing commission attached to this invoice */
+  commission?: {
+    status: string;
+    partnerName: string;
+    commissionAmount: number;
+    partnerPercent: number;
+  } | null;
 }
 
 export interface AuditEntry {
@@ -579,6 +615,10 @@ export interface Options {
   customers: { id: number; code: string; name: string; type: string }[];
   tariffs: { id: number; origin: string; destination: string; customerType: string | null; ratePerKg: number; minChargeableKg: number; volumetricMultiplier: number; roundingMode: string; roundingUnitKg: number }[];
   permissions: { id: number; slug: string; module: string; description: string | null }[];
+  /** Revise.md §13 — vehicle-owner partners (vehicle ownership dropdown) */
+  vehicleOwners?: { id: number; name: string; username: string; profitShare: { company: number; partner: number } }[];
+  /** Revise.md §7.1 — B2B shipments available for invoice line linking */
+  b2bShipments?: { id: number; masterCode: string; priceAmount: number | null; finalPriceAmount: number | null; customerId: number; createdByPartnerId: number | null; origin: string; destination: string }[];
 }
 
 // ---------------------------------------------------------------------------
@@ -692,4 +732,219 @@ export interface DashboardData {
     actorName: string;
     createdAt: string;
   }[];
+}
+
+// ---------------------------------------------------------------------------
+// Revise.md — Partner wallet financial system types
+// ---------------------------------------------------------------------------
+
+export interface WalletSummaryData {
+  partnerId: number;
+  walletId: number;
+  balance: number;
+  reserved: number;
+  available: number;
+  partnerType: "MARKETING" | "VEHICLE_OWNER";
+  partnerName: string;
+  profitShare: { company: number; partner: number };
+  bank: { bankName: string | null; bankAccountName: string | null; bankAccountNumber: string | null };
+}
+
+export interface WalletTransaction {
+  id: number;
+  walletId: number;
+  type: "TOPUP" | "COMMISSION" | "TRANSPORT_PROFIT_SHARE" | "REPAIR_DEDUCTION" | "WITHDRAWAL" | "ADJUSTMENT";
+  amount: number;
+  direction: "CREDIT" | "DEBIT";
+  balanceBefore: number;
+  balanceAfter: number;
+  referenceType: string | null;
+  referenceId: number | null;
+  businessRef: string;
+  status: string;
+  description: string | null;
+  createdAt: string;
+}
+
+export interface TopUpRequest {
+  id: number;
+  requestCode: string;
+  partnerId: number;
+  amount: number;
+  status: "PENDING_PAYMENT" | "PENDING_VERIFICATION" | "VERIFIED" | "REJECTED" | "CANCELLED";
+  partnerNote: string | null;
+  partnerProofUrl: string | null;
+  proofUrl: string | null;
+  rejectReason: string | null;
+  submittedForVerificationAt: string | null;
+  verifiedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  partner?: { user: { name: string; username: string }; type: string } | null;
+  verifiedBy?: { name: string } | null;
+}
+
+export interface TopUpsResponse {
+  topUps: TopUpRequest[];
+  bankInfo: { bankName: string; accountNumber: string; accountName: string };
+}
+
+export interface WithdrawalRequest {
+  id: number;
+  requestCode: string;
+  partnerId: number;
+  amount: number;
+  status: "PENDING" | "APPROVED" | "REJECTED" | "PROCESSING" | "COMPLETED" | "FAILED" | "CANCELLED";
+  bankName: string | null;
+  bankAccountName: string | null;
+  bankAccountNumber: string | null;
+  partnerNote: string | null;
+  transferProofUrl: string | null;
+  rejectReason: string | null;
+  reviewedById: number | null;
+  processedById: number | null;
+  completedAt: string | null;
+  createdAt: string;
+  partner?: { user: { name: string; username: string }; type: string } | null;
+  reviewedBy?: { name: string } | null;
+  processedBy?: { name: string } | null;
+}
+
+export interface CommissionRow {
+  id: number;
+  commissionCode: string;
+  status: "PENDING" | "RELEASED" | "CANCELLED";
+  invoiceId: number;
+  invoiceNumber: string;
+  invoiceStatus: string;
+  customerName: string;
+  invoiceAmount: number;
+  paidAmount: number;
+  remainingAmount: number;
+  companyPercent: number;
+  partnerPercent: number;
+  commissionAmount: number;
+  releasedAt: string | null;
+  createdAt: string;
+  shipments: number;
+}
+
+export interface VehicleRepairRow {
+  id: number;
+  repairCode: string;
+  vehicleId: number;
+  ownerId: number;
+  description: string;
+  amount: number;
+  repairDate: string;
+  workshopVendor: string | null;
+  proofUrl: string | null;
+  relatedTransportId: number | null;
+  notes: string | null;
+  status: "PENDING_CONFIRMATION" | "OWNER_CONFIRMED" | "VERIFIED" | "REJECTED";
+  rejectReason: string | null;
+  createdAt: string;
+  vehicle: { id: number; vehicleNumber: string; name: string | null };
+  owner?: { user: { name: string } } | null;
+  confirmations: { id: number; party: "VEHICLE_OWNER" | "OWNER_COMPANY"; decision: string; note: string | null; user: { name: string } | null; createdAt: string }[];
+}
+
+export interface PartnerRow {
+  id: number;
+  userId: number;
+  name: string;
+  username: string;
+  userActive: boolean;
+  type: "MARKETING" | "VEHICLE_OWNER";
+  profitShare: { company: number; partner: number };
+  bank: { bankName: string | null; bankAccountName: string | null; bankAccountNumber: string | null };
+  isActive: boolean;
+  notes: string | null;
+  wallet: { balance: number; reserved: number; available: number };
+  totals: { transportEarnings: number; commissions: number; repairDeductions: number; withdrawals: number };
+  counts: { vehicles: number; commissions: number; settlements: number; topUps: number; withdrawals: number; repairs: number };
+}
+
+export interface VehicleOwnerDashboard {
+  wallet: { balance: number; reserved: number; available: number };
+  totals: { earnings: number; transportCount: number; repairDeductions: number; withdrawals: number };
+  vehicles: { id: number; vehicleNumber: string; name: string | null; status: string; maxWeightKg: number; maxVolumeM3: number }[];
+  recentSettlements: {
+    id: number;
+    settlementCode: string;
+    transportValue: number;
+    ownerPercent: number;
+    ownerAmount: number;
+    finalizedAt: string | null;
+    transport: { transportCode: string; origin: string | null; destination: string | null; arrivedAt: string | null };
+    vehicle: { vehicleNumber: string };
+  }[];
+  recentTransactions: WalletTransaction[];
+  pendingRepairs: number;
+}
+
+export interface VOTransportRow {
+  id: number;
+  transportCode: string;
+  status: string;
+  routeName: string;
+  vehicleNumber: string;
+  shipmentCount: number;
+  transportValue: number;
+  ownerPercent: number;
+  ownerEarnings: number | null;
+  departedAt: string | null;
+  arrivedAt: string | null;
+  createdAt: string;
+  settlement: {
+    settlementCode: string;
+    status: string;
+    companyPercent: number;
+    ownerPercent: number;
+    transportValue: number;
+    companyAmount: number;
+    ownerAmount: number;
+    finalizedAt: string | null;
+  } | null;
+}
+
+export interface FinanceSummary {
+  totals: {
+    partnerCount: number;
+    marketingCount: number;
+    vehicleOwnerCount: number;
+    totalWalletBalance: number;
+    totalReserved: number;
+    totalAvailable: number;
+    verifiedTopUps: number;
+    releasedCommissions: number;
+    transportSharePaid: number;
+    transportValueSettled: number;
+    repairDeductions: number;
+    withdrawalsCompleted: number;
+    unsettledArrivedTransports: number;
+  };
+  pending: {
+    topUps: { id: number; requestCode: string; partnerName: string; partnerType: string; amount: number; status: string; createdAt: string }[];
+    withdrawals: { id: number; requestCode: string; partnerName: string; partnerType: string; amount: number; status: string; bankName: string | null; bankAccountNumber: string | null; createdAt: string }[];
+    repairs: { id: number; repairCode: string; vehicleNumber: string; ownerName: string; amount: number; status: string; createdAt: string }[];
+    commissions: { id: number; commissionCode: string; partnerName: string; invoiceNumber: string; commissionAmount: number; createdAt: string }[];
+  };
+  partners: { id: number; name: string; username: string; type: string; profitShare: { company: number; partner: number }; walletBalance: number; vehicleCount: number }[];
+  monthlyLedger: { month: string; byType: Record<string, number> }[];
+}
+
+export interface ProfileData {
+  id: number;
+  username: string;
+  name: string;
+  isOwner: boolean;
+  roles: { name: string; slug: string }[];
+  warehouse: { name: string; city: string | null } | null;
+  partner: {
+    id: number;
+    type: "MARKETING" | "VEHICLE_OWNER";
+    profitShare: { company: number; partner: number };
+    bank: { bankName: string | null; bankAccountName: string | null; bankAccountNumber: string | null };
+  } | null;
 }

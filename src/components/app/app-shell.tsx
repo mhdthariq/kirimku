@@ -6,6 +6,7 @@ import {
   ClipboardList,
   Coins,
   History,
+  Landmark,
   LayoutDashboard,
   LogOut,
   MapPin,
@@ -15,10 +16,15 @@ import {
   Route,
   ShieldCheck,
   Tag,
+  TrendingUp,
   Truck,
+  UserCircle2,
   Users,
+  Wallet,
+  Wrench,
   CarFront,
   Warehouse,
+  Briefcase,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { hasAnyPermission } from "@/lib/client-api";
@@ -80,10 +86,23 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     ],
   },
   {
+    title: "Finance Partner",
+    items: [
+      // Revise.md §33/§34 — company-side financial management (permission-based)
+      { href: "/finance", label: "Finance Dashboard", icon: Landmark, anyPermissions: ["financial.report.view"] },
+      { href: "/topups", label: "Top Up Requests", icon: Receipt, anyPermissions: ["wallet.topup.view"] },
+      { href: "/withdrawals", label: "Withdrawal Requests", icon: Landmark, anyPermissions: ["wallet.withdrawal.view"] },
+      { href: "/settlements", label: "Partner Settlements", icon: TrendingUp, anyPermissions: ["transport.settle", "invoice.view"] },
+      { href: "/repairs", label: "Repair Verification", icon: Wrench, anyPermissions: ["repair.view", "repair.create"] },
+      { href: "/partners", label: "Partner Wallets", icon: Briefcase, anyPermissions: ["partner.view"] },
+    ],
+  },
+  {
     title: "Administrasi",
     items: [
       { href: "/access", label: "Access Control", icon: ShieldCheck, anyPermissions: ["user.view", "role.view", "employee.view"] },
       { href: "/audit", label: "Audit Timeline", icon: History, anyPermissions: ["audit_log.view"] },
+      { href: "/profile", label: "Profil", icon: UserCircle2 },
     ],
   },
 ];
@@ -132,13 +151,19 @@ export function AppShell({
   // Revision Parts S/V/W/X — simplified navigation for operational roles:
   //   Kurir          → Dashboard, Pickups, Delivery
   //   Driver / Kenek → Dashboard, Transport, Transport History
+  // Revise.md §31/§32 — partner navigation:
+  //   Marketing      → Dashboard, Shipments, Customers, B2B, Wallet, Profile
+  //   Vehicle Owner  → Dashboard, My Vehicles, Transport History, Earnings,
+  //                     Repairs, Wallet, Profile
   // These roles use a simple bottom navigation on mobile (NO hamburger menu)
   // and a slim sidebar on desktop. Everyone else keeps the full menu.
   // -----------------------------------------------------------------------
   const roleSlugs = user.roles.map((r) => r.slug);
   const isKurir = roleSlugs.includes("kurir");
   const isDriverCrew = roleSlugs.includes("driver") || roleSlugs.includes("kenek");
-  const simplifiedOperational = isKurir || isDriverCrew;
+  const isVehicleOwner = user.partnerType === "VEHICLE_OWNER";
+  const isMarketingPartner = user.partnerType === "MARKETING" && roleSlugs.includes("marketing");
+  const simplifiedOperational = isKurir || isDriverCrew || isVehicleOwner || isMarketingPartner;
 
   const OPERATIONAL_GROUPS: { title: string; items: NavItem[] }[] = isKurir
     ? [
@@ -151,16 +176,55 @@ export function AppShell({
           ],
         },
       ]
-    : [
-        {
-          title: "Operasional Driver",
-          items: [
-            { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, mobile: true },
-            { href: "/transports", label: "Transport", icon: Route, mobile: true },
-            { href: "/transport-history", label: "Transport History", icon: History, mobile: true },
-          ],
-        },
-      ];
+    : isVehicleOwner
+      ? [
+          {
+            title: "Vehicle Owner",
+            items: [
+              { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, mobile: true },
+              { href: "/my-vehicles", label: "My Vehicles", icon: CarFront, mobile: true },
+              { href: "/vo-transport-history", label: "Transport History", icon: History, mobile: true },
+              { href: "/earnings", label: "Earnings", icon: TrendingUp },
+            ],
+          },
+          {
+            title: "Keuangan",
+            items: [
+              { href: "/repairs", label: "Repairs", icon: Wrench, mobile: true },
+              { href: "/wallet", label: "Wallet", icon: Wallet, mobile: true },
+              { href: "/profile", label: "Profil", icon: UserCircle2 },
+            ],
+          },
+        ]
+      : isMarketingPartner
+        ? [
+            {
+              title: "Marketing",
+              items: [
+                { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, mobile: true },
+                { href: "/shipments", label: "Shipments", icon: Package, mobile: true },
+                { href: "/customers", label: "Customers", icon: Users, mobile: true },
+                { href: "/b2b", label: "B2B", icon: Briefcase, mobile: true },
+              ],
+            },
+            {
+              title: "Keuangan",
+              items: [
+                { href: "/wallet", label: "Wallet", icon: Wallet, mobile: true },
+                { href: "/profile", label: "Profil", icon: UserCircle2 },
+              ],
+            },
+          ]
+        : [
+            {
+              title: "Operasional Driver",
+              items: [
+                { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, mobile: true },
+                { href: "/transports", label: "Transport", icon: Route, mobile: true },
+                { href: "/transport-history", label: "Transport History", icon: History, mobile: true },
+              ],
+            },
+          ];
 
   const groups = simplifiedOperational ? OPERATIONAL_GROUPS : NAV_GROUPS;
 
@@ -173,10 +237,13 @@ export function AppShell({
     ),
   })).filter((g) => g.items.length > 0);
 
-  // bottom navigation = the operational roles' three primary destinations;
+  // bottom navigation = the operational roles' primary destinations;
   // everyone else keeps the ≤5 item mobile strip
   const mobileItems = simplifiedOperational
-    ? visibleGroups.flatMap((g) => g.items).filter((item) => item.mobile)
+    ? visibleGroups
+        .flatMap((g) => g.items)
+        .filter((item, idx, arr) => item.mobile && arr.findIndex((x) => x.href === item.href) === idx)
+        .slice(0, 5)
     : visibleGroups
         .flatMap((g) => g.items)
         .filter((item) => item.mobile)
@@ -207,7 +274,7 @@ export function AppShell({
               <div className="space-y-0.5">
                 {group.items.map((item) => (
                   <NavLink
-                    key={item.href}
+                    key={`${item.href}:${item.label}`}
                     item={item}
                     active={path.startsWith(item.href)}
                   />
@@ -268,7 +335,7 @@ export function AppShell({
                         <div className="space-y-0.5">
                           {group.items.map((item) => (
                             <NavLink
-                              key={item.href}
+                              key={`${item.href}:${item.label}`}
                               item={item}
                               active={path.startsWith(item.href)}
                               onNavigate={() => setMenuOpen(false)}
@@ -349,7 +416,7 @@ export function AppShell({
             const active = path.startsWith(item.href);
             return (
               <a
-                key={item.href}
+                key={`${item.href}:${item.label}`}
                 href={`#${item.href}`}
                 className={cn(
                   "flex min-w-[64px] flex-1 flex-col items-center gap-0.5 px-2 py-2 text-[10px] font-medium transition-colors",

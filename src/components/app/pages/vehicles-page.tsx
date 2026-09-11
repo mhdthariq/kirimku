@@ -3,12 +3,12 @@
 import { useMemo, useState } from "react";
 import { CarFront, Pencil, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type Vehicle } from "@/lib/client-api";
+import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type Options, type Vehicle } from "@/lib/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
 import { ActiveBadge, StatusBadge } from "@/components/app/status-badge";
-import { Field, Input, NumberInput, SubmitButton, Textarea, formatNumber } from "@/components/app/form-parts";
+import { Field, FormSelect, Input, NumberInput, SubmitButton, Textarea, formatNumber } from "@/components/app/form-parts";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -21,9 +21,10 @@ interface VehicleForm {
   maxWeightKg: string;
   maxVolumeM3: string;
   notes: string;
+  ownerId: string;
 }
 
-const EMPTY: VehicleForm = { vehicleNumber: "", name: "", status: "ACTIVE", maxWeightKg: "", maxVolumeM3: "", notes: "" };
+const EMPTY: VehicleForm = { vehicleNumber: "", name: "", status: "ACTIVE", maxWeightKg: "", maxVolumeM3: "", notes: "", ownerId: "" };
 
 export function VehiclesPage() {
   const { user } = useAuth();
@@ -34,6 +35,7 @@ export function VehiclesPage() {
   };
 
   const { data, loading, reload } = useApiData<Vehicle[]>(() => apiGet<Vehicle[]>("/vehicles"), []);
+  const { data: options } = useApiData<Options>(() => apiGet<Options>("/options"), []);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Vehicle | null>(null);
@@ -62,6 +64,7 @@ export function VehiclesPage() {
       maxWeightKg: String(v.maxWeightKg),
       maxVolumeM3: String(v.maxVolumeM3),
       notes: v.notes ?? "",
+      ownerId: v.ownerId ? String(v.ownerId) : "",
     });
     setDialogOpen(true);
   }
@@ -76,6 +79,8 @@ export function VehiclesPage() {
       maxWeightKg: Number(form.maxWeightKg),
       maxVolumeM3: Number(form.maxVolumeM3),
       notes: form.notes || null,
+      // Revise.md §13 — optional Vehicle Owner (empty = company-owned)
+      ownerId: form.ownerId ? Number(form.ownerId) : null,
     };
     const ok = await runAction(
       () => (editing ? apiPut(`/vehicles/${editing.id}`, payload) : apiPost("/vehicles", payload)),
@@ -148,6 +153,19 @@ export function VehiclesPage() {
                     {formatNumber(v.maxWeightKg, 0)} kg · {formatNumber(v.maxVolumeM3, 0)} m³
                   </span>
                 ),
+              },
+              {
+                key: "owner",
+                header: "Vehicle Owner",
+                render: (v) =>
+                  v.owner ? (
+                    <div>
+                      <p className="text-sm font-medium">{v.owner.user.name}</p>
+                      <p className="text-[11px] text-muted-foreground">partner</p>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">perusahaan</span>
+                  ),
               },
               {
                 key: "crew",
@@ -234,6 +252,24 @@ export function VehiclesPage() {
               </div>
               <Field label="Catatan" htmlFor="v-notes" className="sm:col-span-2">
                 <Textarea id="v-notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} placeholder="Opsional" disabled={busy} />
+              </Field>
+              {/* Revise.md §13 — link the vehicle to its Vehicle Owner */}
+              <Field
+                label="Vehicle Owner"
+                htmlFor="v-owner"
+                className="sm:col-span-2"
+                hint="Kendaraan partner dihubungkan ke pemiliknya — profit share transport dibayarkan ke wallet owner."
+              >
+                <FormSelect
+                  value={form.ownerId}
+                  onValueChange={(v) => setForm({ ...form, ownerId: v === "none" ? "" : v })}
+                  placeholder="Milik perusahaan"
+                  options={[
+                    { value: "none", label: "Milik perusahaan (tanpa owner)" },
+                    ...(options?.vehicleOwners ?? []).map((o) => ({ value: String(o.id), label: `${o.name} (share ${o.profitShare.partner}%)` })),
+                  ]}
+                  disabled={busy}
+                />
               </Field>
             </div>
             <DialogFooter>

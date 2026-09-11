@@ -56,6 +56,15 @@ model User {
   paymentsVerified Payment[]      @relation("PaymentVerifier")
   handoverScans HandoverScan[]
   checkpointRecords CheckpointRecord[]
+  walletTransactionsCreated WalletTransaction[] @relation("WalletTransactionCreator")
+  repairConfirmationsMade RepairConfirmation[] @relation("RepairConfirmationBy")
+  verifiedTopUps TopUpRequest[] @relation("TopUpVerifier")
+  reviewedWithdrawals WithdrawalRequest[] @relation("WithdrawalReviewer")
+  processedWithdrawals WithdrawalRequest[] @relation("WithdrawalProcessor")
+
+  // Partner wallet system (Revise.md) — a user MAY be a partner
+  // (Marketing or Vehicle Owner) with a wallet & profit-sharing config.
+  partner      Partner?
 }
 
 model Role {
@@ -106,6 +115,150 @@ model SessionToken {
 }
 
 // ---------------------------------------------------------------------------
+// Partner wallet system — Revise.md "Partner Wallet, B2B & Vehicle Owner
+// Financial Rules"
+// ---------------------------------------------------------------------------
+
+// A partner is an external business partner of the company:
+//   MARKETING      — sales / customer-acquisition partner (creates shipments,
+//                    earns B2B commissions, has a wallet + top-up workflow)
+//   VEHICLE_OWNER  — transport partner owning vehicles (earns transport
+//                    profit share, bears confirmed repair deductions)
+model Partner {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String   // MARKETING | VEHICLE_OWNER
+  // individual profit-sharing configuration (validated: sum must equal 100)
+  companyPercent Float  @default(80)
+  partnerPercent Float  @default(20)
+  // registered bank account used for withdrawals (partner-maintained)
+  bankName        String?
+  bankAccountName String?
+  bankAccountNumber String?
+  isActive    Boolean  @default(true)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  wallet             Wallet?
+  topUps             TopUpRequest[]
+  withdrawals        WithdrawalRequest[]
+  vehicles           Vehicle[]
+  transportSettlements TransportSettlement[]
+  repairs            VehicleRepair[]
+  commissions        MarketingCommission[]
+  shipmentsCreated   MasterShipment[]  @relation("ShipmentCreatorPartner")
+}
+
+// Ledger-based wallet: the cached `balance` is ONLY mutated inside atomic
+// ledger operations (lib/wallet.ts) — every change creates a
+// WalletTransaction row with balanceBefore/balanceAfter. No ad-hoc edits.
+model Wallet {
+  id        Int      @id @default(autoincrement())
+  partnerId Int      @unique
+  partner   Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  balance   Float    @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactions WalletTransaction[]
+}
+
+// Append-only financial ledger. Completed rows are immutable — corrections
+// happen through new ADJUSTMENT rows. `businessRef` is the unique business
+// reference that guarantees exactly-once settlement (duplicate callbacks /
+// double clicks / retried requests cannot double-credit).
+model WalletTransaction {
+  id             Int      @id @default(autoincrement())
+  walletId       Int
+  wallet         Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  // TOPUP | COMMISSION | TRANSPORT_PROFIT_SHARE | REPAIR_DEDUCTION | WITHDRAWAL | ADJUSTMENT
+  type           String
+  amount         Float    // always positive; `direction` decides credit/debit
+  direction      String   // CREDIT | DEBIT
+  balanceBefore  Float
+  balanceAfter   Float
+  referenceType  String?  // topup | commission | transport_settlement | repair | withdrawal | adjustment
+  referenceId    Int?
+  businessRef    String   @unique
+  status         String   @default("COMPLETED")
+  description    String?
+  createdById    Int?
+  createdBy      User?    @relation("WalletTransactionCreator", fields: [createdById], references: [id])
+  createdAt      DateTime @default(now())
+
+  @@index([walletId, createdAt])
+}
+
+// Marketing wallet top-up workflow (Revise.md §10):
+//   PENDING_PAYMENT → PENDING_VERIFICATION → VERIFIED (atomic wallet credit)
+//   (or REJECTED / CANCELLED at the appropriate stages)
+model TopUpRequest {
+  id            Int      @id @default(autoincrement())
+  requestCode   String   @unique
+  partnerId     Int
+  partner       Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  amount        Float
+  // PENDING_PAYMENT | PENDING_VERIFICATION | VERIFIED | REJECTED | CANCELLED
+  status        String   @default("PENDING_PAYMENT")
+  // partner-submitted transfer information / proof (data URL image + note)
+  partnerNote   String?
+  partnerProofUrl String?
+  // Admin Kantor-uploaded official transfer proof (data URL image)
+  proofUrl      String?
+  // rejection / cancellation reason
+  rejectReason  String?
+  requestedById Int
+  submittedForVerificationAt DateTime?
+  verifiedById   Int?
+  verifiedBy     User?    @relation("TopUpVerifier", fields: [verifiedById], references: [id])
+  verifiedAt     DateTime?
+  // ledger entry created when VERIFIED (atomic with status change)
+  walletTransactionId Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([partnerId, status])
+  @@index([status])
+}
+
+// Partner withdrawal (Marketing + Vehicle Owner) with balance reservation:
+// a PENDING/APPROVED/PROCESSING withdrawal reserves its amount so the same
+// funds cannot be withdrawn twice; rejection/cancel/failure releases it and
+// completion atomically debits the wallet.
+model WithdrawalRequest {
+  id            Int      @id @default(autoincrement())
+  requestCode   String   @unique
+  partnerId     Int
+  partner       Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  amount        Float
+  // PENDING | APPROVED | REJECTED | PROCESSING | COMPLETED | FAILED | CANCELLED
+  status        String   @default("PENDING")
+  // bank account snapshot at request time (from partner profile)
+  bankName        String?
+  bankAccountName String?
+  bankAccountNumber String?
+  partnerNote   String?
+  transferProofUrl String?
+  rejectReason  String?
+  requestedById Int
+  reviewedById  Int?
+  reviewedBy    User?    @relation("WithdrawalReviewer", fields: [reviewedById], references: [id])
+  reviewedAt    DateTime?
+  processedById Int?
+  processedBy   User?    @relation("WithdrawalProcessor", fields: [processedById], references: [id])
+  processedAt   DateTime?
+  completedAt   DateTime?
+  walletTransactionId Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([partnerId, status])
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
 // Customers & shipments
 // ---------------------------------------------------------------------------
 
@@ -150,6 +303,19 @@ model MasterShipment {
   ratePerKg              Float?
   priceAmount            Float?
   pricedAt               DateTime?
+
+  // ----- Revise.md: Marketing B2C discount + partner attribution ----------
+  // Marketing enters the discount as an AMOUNT (Rupiah); the percentage is
+  // always derived: discount% = discountAmount / priceAmount × 100.
+  // The discount is absorbed by Marketing's share (company share keeps being
+  // calculated from the ORIGINAL price).
+  discountAmount         Float    @default(0)
+  discountPercentage     Float?   // computed at pricing time
+  finalPriceAmount       Float?   // priceAmount − discountAmount (customer pays)
+  // partner (Marketing) that created this shipment — drives B2B commission
+  createdByPartnerId     Int?
+  createdByPartner       Partner? @relation("ShipmentCreatorPartner", fields: [createdByPartnerId], references: [id])
+
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 
@@ -159,6 +325,7 @@ model MasterShipment {
   deliveries    Delivery[]
   payments      Payment[]
   transportItems TransportShipment[]
+  invoiceLines  InvoiceLine[]
 }
 
 // One row = ONE physical package with its own unique detailCode (QR label).
@@ -223,11 +390,17 @@ model Vehicle {
   maxWeightKg   Float
   maxVolumeM3   Float
   notes         String?
+  // Revise.md §13 — partner-owned vehicles link to their Vehicle Owner;
+  // null = company-owned vehicle.
+  ownerId       Int?
+  owner         Partner? @relation(fields: [ownerId], references: [id])
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   assignments VehicleAssignment[]
   transports  Transport[]
+  repairs     VehicleRepair[]
+  settlements TransportSettlement[]
 }
 
 model VehicleAssignment {
@@ -304,6 +477,7 @@ model Transport {
 
   shipments        TransportShipment[]
   checkpointRecords CheckpointRecord[]
+  settlement       TransportSettlement?
 
   @@index([driverId, status])
   @@index([kenekId, status])
@@ -471,6 +645,7 @@ model Invoice {
 
   lines       InvoiceLine[]
   settlements InvoiceSettlement[]
+  commission  MarketingCommission?
 }
 
 model InvoiceLine {
@@ -480,6 +655,10 @@ model InvoiceLine {
   description String
   quantity    Float   @default(1)
   unitPrice   Float
+  // Revise.md §7 — link B2B invoice lines to the shipments they bill so the
+  // system knows which Marketing partner's commission the invoice carries.
+  shipmentId  Int?
+  shipment    MasterShipment? @relation(fields: [shipmentId], references: [id])
 }
 
 model InvoiceSettlement {
@@ -508,4 +687,118 @@ model AuditLog {
   beforeData String?
   afterData  String?
   createdAt  DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Vehicle Owner transport profit sharing (Revise.md §14/§15)
+// ---------------------------------------------------------------------------
+
+// One settlement per transport. Snapshots the value + percentages used at
+// settlement time — historical settlements are never recalculated when the
+// partner's profit-sharing configuration later changes (§37).
+model TransportSettlement {
+  id            Int      @id @default(autoincrement())
+  settlementCode String  @unique
+  transportId   Int      @unique
+  transport     Transport @relation(fields: [transportId], references: [id])
+  vehicleId     Int
+  vehicle       Vehicle  @relation(fields: [vehicleId], references: [id])
+  ownerId       Int
+  owner         Partner @relation(fields: [ownerId], references: [id])
+  transportValue Float
+  companyPercent Float
+  ownerPercent   Float
+  companyAmount  Float
+  ownerAmount    Float
+  // PENDING | FINALIZED | CANCELLED
+  status        String   @default("FINALIZED")
+  finalizedById Int?
+  finalizedAt   DateTime?
+  walletTransactionId Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([ownerId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Repair / maintenance deduction (Revise.md §19–§22)
+// ---------------------------------------------------------------------------
+
+// Company-submitted repair cost deducted from the Vehicle Owner's profit.
+// Created as PENDING_CONFIRMATION — the wallet is NOT touched until BOTH the
+// Vehicle Owner AND Owner Company confirm (two-party rule §21). The deduction
+// is a separate REPAIR_DEDUCTION ledger entry; transport earnings stay intact.
+model VehicleRepair {
+  id          Int      @id @default(autoincrement())
+  repairCode  String   @unique
+  vehicleId   Int
+  vehicle     Vehicle  @relation(fields: [vehicleId], references: [id])
+  ownerId     Int
+  owner       Partner  @relation(fields: [ownerId], references: [id])
+  description String
+  amount      Float
+  repairDate  DateTime
+  workshopVendor String?
+  proofUrl    String?  // invoice / receipt / photo (data URL)
+  relatedTransportId Int?
+  notes       String?
+  // PENDING_CONFIRMATION | OWNER_CONFIRMED | VERIFIED | REJECTED
+  status      String   @default("PENDING_CONFIRMATION")
+  rejectReason String?
+  createdById Int?
+  walletTransactionId Int?
+  verifiedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  confirmations RepairConfirmation[]
+
+  @@index([ownerId, status])
+  @@index([vehicleId])
+}
+
+// One row per party decision — the two required parties are
+// VEHICLE_OWNER and OWNER_COMPANY (§21).
+model RepairConfirmation {
+  id        Int      @id @default(autoincrement())
+  repairId  Int
+  repair    VehicleRepair @relation(fields: [repairId], references: [id], onDelete: Cascade)
+  party     String   // VEHICLE_OWNER | OWNER_COMPANY
+  decision  String   // CONFIRMED | REJECTED
+  note      String?
+  userId    Int?
+  user      User?    @relation("RepairConfirmationBy", fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([repairId])
+}
+
+// ---------------------------------------------------------------------------
+// Marketing B2B commission (Revise.md §8/§9)
+// ---------------------------------------------------------------------------
+
+// One commission per B2B invoice attributed to the Marketing partner who
+// created the underlying shipment(s). PENDING from invoice creation; released
+// to the Marketing wallet ONLY when the invoice becomes FULLY PAID (SETTLED),
+// exactly once (unique businessRef COMM-{invoiceId}).
+model MarketingCommission {
+  id             Int      @id @default(autoincrement())
+  commissionCode String   @unique
+  partnerId      Int
+  partner        Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  invoiceId      Int      @unique
+  invoice        Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoiceAmount  Float    // snapshot of the invoice total
+  companyPercent Float
+  partnerPercent Float
+  commissionAmount Float
+  // PENDING | RELEASED | CANCELLED
+  status         String   @default("PENDING")
+  walletTransactionId Int?
+  releasedAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([partnerId, status])
 }

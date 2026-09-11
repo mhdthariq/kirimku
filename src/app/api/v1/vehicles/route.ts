@@ -18,6 +18,7 @@ export async function GET(req: NextRequest) {
       },
       orderBy: { id: "desc" },
       include: {
+        owner: { include: { user: { select: { name: true } } } },
         assignments: { where: { validTo: null }, include: { driver: true, kenek: true } },
         _count: { select: { transports: true } },
       },
@@ -35,6 +36,21 @@ export async function POST(req: NextRequest) {
     if (existing) return fail(422, `Nomor polisi ${vehicleNumber} sudah terdaftar.`, { vehicleNumber: ["Nomor polisi sudah terdaftar."] });
 
     const status = VEHICLE_STATUSES.includes(body.status) ? body.status : "ACTIVE";
+
+    // Revise.md §13 — optional Vehicle Owner (external partner vehicle).
+    let ownerId: number | null = null;
+    if (body.ownerId != null && body.ownerId !== "") {
+      const oid = num(body.ownerId);
+      if (oid) {
+        const partner = await db.partner.findUnique({ where: { id: oid } });
+        if (!partner) return fail(404, "Vehicle Owner tidak ditemukan.");
+        if (partner.type !== "VEHICLE_OWNER") {
+          return fail(422, "Partner terpilih bukan Vehicle Owner.", { ownerId: ["Harus partner bertipe Vehicle Owner."] });
+        }
+        ownerId = partner.id;
+      }
+    }
+
     const vehicle = await db.vehicle.create({
       data: {
         vehicleNumber,
@@ -43,6 +59,7 @@ export async function POST(req: NextRequest) {
         maxWeightKg: requireNum(body.maxWeightKg, "maxWeightKg", 1),
         maxVolumeM3: requireNum(body.maxVolumeM3, "maxVolumeM3", 0.1),
         notes: str(body.notes),
+        ownerId,
       },
     });
     await audit({ action: "created", entityType: "vehicle", entityId: vehicle.id, entityLabel: vehicle.vehicleNumber, actor: user, after: vehicle });

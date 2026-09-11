@@ -36,6 +36,16 @@ const STATUS_MAP: Record<string, { label: string; variant: "default" | "secondar
   ACTIVE: { label: "Active", variant: "default" },
   MAINTENANCE: { label: "Maintenance", variant: "secondary" },
   INACTIVE: { label: "Inactive", variant: "destructive" },
+  // Revise.md — partner wallet financial statuses
+  PENDING_PAYMENT: { label: "Menunggu Bayar", variant: "secondary" },
+  PENDING_VERIFICATION: { label: "Menunggu Verifikasi", variant: "default", pulse: true },
+  PENDING: { label: "Pending", variant: "secondary" },
+  APPROVED: { label: "Disetujui", variant: "default" },
+  PROCESSING: { label: "Diproses", variant: "default", pulse: true },
+  RELEASED: { label: "Dirilis", variant: "default" },
+  PENDING_CONFIRMATION: { label: "Menunggu Konfirmasi", variant: "secondary", pulse: true },
+  OWNER_CONFIRMED: { label: "VO Konfirmasi", variant: "default" },
+  FINALIZED: { label: "Final", variant: "default" },
 };
 
 export function StatusBadge({ status, className }: { status: string; className?: string }) {

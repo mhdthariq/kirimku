@@ -68,6 +68,10 @@ async function runSeed(): Promise<void> {
     { username: "andi", name: "Andi Wijaya", position: "Kenek", role: "kenek", employeeNumber: "EMP-000008", warehouseId: "Jakarta Pusat" },
     { username: "wawan", name: "Wawan Setiawan", position: "Staff Gudang", role: "staff-gudang", employeeNumber: "EMP-000009", warehouseId: "Jakarta Pusat" },
     { username: "ratna", name: "Ratna Kurnia", position: "Admin Gudang", role: "admin-gudang", employeeNumber: "EMP-000010", warehouseId: "Bandung" },
+    // Revise.md §12 — Vehicle Owner: first-class external partner (NOT an
+    // employee). hendra & sari own vehicles and earn transport profit share.
+    { username: "hendra", name: "Hendra Gunawan", position: "Vehicle Owner", role: "vehicle-owner", employeeNumber: "EMP-000011", warehouseId: "Jakarta Pusat" },
+    { username: "sari", name: "Sari Puspita", position: "Vehicle Owner", role: "vehicle-owner", employeeNumber: "EMP-000012", warehouseId: "Bandung" },
   ];
 
   const ownerEmployee = await db.employee.upsert({
@@ -105,15 +109,51 @@ async function runSeed(): Promise<void> {
     usersByHandle[s.username] = { id: user.id, employeeId: employee.id };
   }
 
+  // ----- Revise.md: Partner profiles + wallets (§3/§12) ---------------------
+  // budi (Marketing 80/20), hendra (Vehicle Owner 80/20), sari (Vehicle
+  // Owner 70/30 — different config demonstrates per-partner profit sharing).
+  const partnerDefs: { username: string; type: "MARKETING" | "VEHICLE_OWNER"; companyPercent: number; partnerPercent: number; bank: { bankName: string; bankAccountName: string; bankAccountNumber: string } }[] = [
+    { username: "budi", type: "MARKETING", companyPercent: 80, partnerPercent: 20, bank: { bankName: "Bank BCA", bankAccountName: "Budi Santoso", bankAccountNumber: "1234567890" } },
+    { username: "hendra", type: "VEHICLE_OWNER", companyPercent: 80, partnerPercent: 20, bank: { bankName: "Bank Mandiri", bankAccountName: "Hendra Gunawan", bankAccountNumber: "9876543210" } },
+    { username: "sari", type: "VEHICLE_OWNER", companyPercent: 70, partnerPercent: 30, bank: { bankName: "Bank BRI", bankAccountName: "Sari Puspita", bankAccountNumber: "5555444433" } },
+  ];
+  const partnersByUsername: Record<string, number> = {};
+  for (const p of partnerDefs) {
+    const userId = usersByHandle[p.username]?.id;
+    if (!userId) continue;
+    const partner = await db.partner.upsert({
+      where: { userId },
+      create: {
+        userId,
+        type: p.type,
+        companyPercent: p.companyPercent,
+        partnerPercent: p.partnerPercent,
+        bankName: p.bank.bankName,
+        bankAccountName: p.bank.bankAccountName,
+        bankAccountNumber: p.bank.bankAccountNumber,
+      },
+      update: {},
+    });
+    partnersByUsername[p.username] = partner.id;
+    await db.wallet.upsert({ where: { partnerId: partner.id }, create: { partnerId: partner.id }, update: {} });
+  }
+
   // ----- Vehicles -----------------------------------------------------------
+  // Revise.md §13 — B 9102 KTA & B 9455 KTB belong to Vehicle Owner hendra;
+  // L 7788 KTC belongs to sari (multiple vehicles per owner, multiple owners).
   const vehicleDefs = [
-    { vehicleNumber: "B 9102 KTA", name: "Engkel Box", status: "ACTIVE", maxWeightKg: 1200, maxVolumeM3: 6 },
-    { vehicleNumber: "B 9455 KTB", name: "CDD 6 Ban", status: "ACTIVE", maxWeightKg: 3500, maxVolumeM3: 14 },
-    { vehicleNumber: "L 7788 KTC", name: "Fuso Besar", status: "MAINTENANCE", maxWeightKg: 8000, maxVolumeM3: 28, notes: "Perawatan berkala, kembali aktif minggu depan." },
+    { vehicleNumber: "B 9102 KTA", name: "Engkel Box", status: "ACTIVE", maxWeightKg: 1200, maxVolumeM3: 6, ownerUsername: "hendra" },
+    { vehicleNumber: "B 9455 KTB", name: "CDD 6 Ban", status: "ACTIVE", maxWeightKg: 3500, maxVolumeM3: 14, ownerUsername: "hendra" },
+    { vehicleNumber: "L 7788 KTC", name: "Fuso Besar", status: "MAINTENANCE", maxWeightKg: 8000, maxVolumeM3: 28, notes: "Perawatan berkala, kembali aktif minggu depan.", ownerUsername: "sari" },
   ];
   const vehicles: Record<string, number> = {};
-  for (const v of vehicleDefs) {
-    const vehicle = await db.vehicle.upsert({ where: { vehicleNumber: v.vehicleNumber }, create: v, update: {} });
+  for (const { ownerUsername, ...v } of vehicleDefs) {
+    const ownerId = ownerUsername ? partnersByUsername[ownerUsername] ?? null : null;
+    const vehicle = await db.vehicle.upsert({
+      where: { vehicleNumber: v.vehicleNumber },
+      create: { ...v, ownerId },
+      update: { ownerId },
+    });
     vehicles[v.vehicleNumber] = vehicle.id;
   }
   // default crew for CDD: driver Joko + kenek Andi
@@ -274,6 +314,9 @@ async function runSeed(): Promise<void> {
       const createdAt = daysAgo(s.createdDaysAgo);
       const cust = customers[s.customer];
       const tariff = tariffByRoute[`${s.origin}|${s.destination}|${cust.type}`] ?? null;
+      // All demo shipments are created by the Marketing partner budi (§8 —
+      // attribution drives the B2B commission on the demo invoice).
+      const createdByPartnerId = partnersByUsername["budi"] ?? null;
       const shipment = await db.masterShipment.create({
         data: {
           masterCode: s.masterCode, resi: s.masterCode,
@@ -287,6 +330,7 @@ async function runSeed(): Promise<void> {
           penerimaName: s.penerima.name,
           penerimaAddress: s.penerima.address,
           penerimaContact: s.penerima.contact,
+          createdByPartnerId,
           createdAt, updatedAt: createdAt,
         },
       });
@@ -312,9 +356,21 @@ async function runSeed(): Promise<void> {
       // Pricing snapshot computed with the shared engine (L×W×H/1.000.000 × multiplier)
       if (s.priced && tariff) {
         const r = computePricing(pricedRows, tariff);
+        // Revise.md §6 demo — MKT-000001 carries a Marketing-funded B2C
+        // discount (amount input; percentage auto-derived by the system).
+        const discount = s.masterCode === "MKT-000001" ? 5000 : 0;
         await db.masterShipment.update({
           where: { id: shipment.id },
-          data: { chargeableWeightKg: r.chargeableKg, ratePerKg: tariff.ratePerKg, priceAmount: r.price, pricedAt: createdAt },
+          data: {
+            chargeableWeightKg: r.chargeableKg, ratePerKg: tariff.ratePerKg, priceAmount: r.price, pricedAt: createdAt,
+            ...(discount > 0
+              ? {
+                  discountAmount: discount,
+                  discountPercentage: Math.round((discount / r.price) * 10000) / 100,
+                  finalPriceAmount: Math.round((r.price - discount) * 100) / 100,
+                }
+              : {}),
+          },
         });
         priceByCode[s.masterCode] = r.price;
       }
@@ -457,7 +513,8 @@ async function runSeed(): Promise<void> {
       });
     }
 
-    // Invoice for PT Maju
+    // Invoice for PT Maju — lines linked to the B2B shipments (§7.1) so the
+    // Marketing commission (§8) attaches to the invoice.
     const maju = await db.customer.findUniqueOrThrow({ where: { code: "CUS-000002" } });
     const invoice = await db.invoice.create({
       data: {
@@ -466,11 +523,134 @@ async function runSeed(): Promise<void> {
         notes: "Tagihan pengiriman periode ini", createdAt: daysAgo(3),
       },
     });
+    const mkt2 = await db.masterShipment.findUniqueOrThrow({ where: { masterCode: "MKT-000002" } });
+    const mkt5Row = await db.masterShipment.findUniqueOrThrow({ where: { masterCode: "MKT-000005" } });
     await db.invoiceLine.createMany({
       data: [
-        { invoiceId: invoice.id, description: "MKT-000002 — pengiriman Jakarta → Bandung (25 kg × Rp4.500)", quantity: 1, unitPrice: priceByCode["MKT-000002"] ?? 112500 },
-        { invoiceId: invoice.id, description: "MKT-000005 — pengiriman Jakarta → Bandung (40 kg × Rp4.500)", quantity: 1, unitPrice: priceByCode["MKT-000005"] ?? 180000 },
+        { invoiceId: invoice.id, description: "MKT-000002 — pengiriman Jakarta → Bandung (25 kg × Rp4.500)", quantity: 1, unitPrice: priceByCode["MKT-000002"] ?? 112500, shipmentId: mkt2.id },
+        { invoiceId: invoice.id, description: "MKT-000005 — pengiriman Jakarta → Bandung (40 kg × Rp4.500)", quantity: 1, unitPrice: priceByCode["MKT-000005"] ?? 180000, shipmentId: mkt5Row.id },
       ],
+    });
+    // Partial settlement — invoice PARTIALLY_SETTLED, commission stays
+    // PENDING (§8.1: partial payment must NOT credit the wallet).
+    await db.invoiceSettlement.create({
+      data: { invoiceId: invoice.id, amount: 100000, method: "TRANSFER", reference: "TRF-MAJU-001", recordedById: usersByHandle.siti.id, settledAt: daysAgo(1.5) },
+    });
+    const invoiceTotal = (priceByCode["MKT-000002"] ?? 112500) + (priceByCode["MKT-000005"] ?? 180000);
+    await db.invoice.update({ where: { id: invoice.id }, data: { status: "PARTIALLY_SETTLED" } });
+
+    // PENDING Marketing commission on the invoice (§8) — 20% for budi.
+    const budiPartnerId = partnersByUsername["budi"]!;
+    await db.marketingCommission.create({
+      data: {
+        commissionCode: "COM-000001", partnerId: budiPartnerId, invoiceId: invoice.id,
+        invoiceAmount: invoiceTotal, companyPercent: 80, partnerPercent: 20,
+        commissionAmount: Math.round(invoiceTotal * 0.2 * 100) / 100,
+        status: "PENDING", createdAt: daysAgo(3),
+      },
+    });
+
+    // ----- Revise.md demo: completed transport with settlement (§14/§15) ---
+    // TRP-2026-000002: ARRIVED JKT→BDG with hendra's Engkel Box carrying the
+    // delivered MKT-000005; settled at an explicit transport value of
+    // Rp500.000 → hendra 20% = Rp100.000 credited as TRANSPORT_PROFIT_SHARE.
+    const settledTransport = await db.transport.create({
+      data: {
+        transportCode: "TRP-2026-000002", routeId: routes["JKT - BDG Tol Cipularang"],
+        vehicleId: vehicles["B 9102 KTA"],
+        driverId: usersByHandle.joko.employeeId, kenekId: usersByHandle.andi.employeeId,
+        status: "ARRIVED",
+        origin: "Jakarta Pusat", destination: "Bandung",
+        departedAt: daysAgo(5), arrivedAt: daysAgo(4.5), createdAt: daysAgo(5.5),
+      },
+    });
+    await db.transportShipment.create({ data: { transportId: settledTransport.id, shipmentId: mkt5Row.id } });
+    const hendraPartnerId = partnersByUsername["hendra"]!;
+    const hendraWallet = await db.wallet.upsert({ where: { partnerId: hendraPartnerId }, create: { partnerId: hendraPartnerId }, update: {} });
+    const transportValue = 500000;
+    const ownerAmount = Math.round(transportValue * 0.2 * 100) / 100;
+    const profitLedger = await db.walletTransaction.create({
+      data: {
+        walletId: hendraWallet.id, type: "TRANSPORT_PROFIT_SHARE", amount: ownerAmount, direction: "CREDIT",
+        balanceBefore: 0, balanceAfter: ownerAmount,
+        referenceType: "transport_settlement", referenceId: settledTransport.id,
+        businessRef: `TST-TRP-${settledTransport.id}`, status: "COMPLETED",
+        description: `Profit share transport TRP-2026-000002 (20% dari Rp500.000)`,
+        createdById: usersByHandle.owner.id, createdAt: daysAgo(4.5),
+      },
+    });
+    await db.wallet.update({ where: { id: hendraWallet.id }, data: { balance: ownerAmount } });
+    await db.transportSettlement.create({
+      data: {
+        settlementCode: "TST-000001", transportId: settledTransport.id,
+        vehicleId: vehicles["B 9102 KTA"], ownerId: hendraPartnerId,
+        transportValue, companyPercent: 80, ownerPercent: 20,
+        companyAmount: transportValue - ownerAmount, ownerAmount,
+        status: "FINALIZED", finalizedById: usersByHandle.owner.id, finalizedAt: daysAgo(4.5),
+        walletTransactionId: profitLedger.id, createdAt: daysAgo(4.5),
+      },
+    });
+
+    // ----- Revise.md demo: repair awaiting confirmation (§19–§22) ----------
+    // Rp25.000 ganti oli + servis rem — PENDING_CONFIRMATION: hendra confirms
+    // in his Repairs page, then Owner Company confirms → REPAIR_DEDUCTION.
+    await db.vehicleRepair.create({
+      data: {
+        repairCode: "REP-000001", vehicleId: vehicles["B 9102 KTA"], ownerId: hendraPartnerId,
+        description: "Ganti oli + servis rem depan", amount: 25000, repairDate: daysAgo(2),
+        workshopVendor: "Bengkel Amanah Jaya",
+        proofUrl: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNDAiIGhlaWdodD0iMTIwIj48cmVjdCB3aWR0aD0iMjQwIiBoZWlnaHQ9IjEyMCIgZmlsbD0iI2Y4ZjlmYSIvPjx0ZXh0IHg9IjEyIiB5PSI3MCIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTMiIGZpbGw9IiM2NDc0OGIiPk5vdGEgUmVwYWlyIC0gQnVrdGkgUmVzbWk8L3RleHQ+PC9zdmc+",
+        notes: "Bengkel menyerahkan nota asli ke kantor.",
+        status: "PENDING_CONFIRMATION", createdById: usersByHandle.siti.id,
+        createdAt: daysAgo(1),
+      },
+    });
+
+    // ----- Revise.md demo: pending withdrawal with reservation (§26/§27) ---
+    // hendra requests Rp30.000 — reserved out of his Rp100.000 balance
+    // (available becomes Rp70.000) until approved+completed or rejected.
+    await db.withdrawalRequest.create({
+      data: {
+        requestCode: "WDR-000001", partnerId: hendraPartnerId, amount: 30000, status: "PENDING",
+        bankName: "Bank Mandiri", bankAccountName: "Hendra Gunawan", bankAccountNumber: "9876543210",
+        partnerNote: "Untuk biaya operasional kendaraan", requestedById: usersByHandle.hendra.id,
+        createdAt: daysAgo(0.5),
+      },
+    });
+
+    // ----- Revise.md demo: Marketing wallet history (§10) ------------------
+    // budi's verified top-up Rp200.000 (with ledger) + one PENDING top-up in
+    // the verification workflow (Admin Kantor proof → Owner verify).
+    const budiWallet = await db.wallet.upsert({ where: { partnerId: budiPartnerId }, create: { partnerId: budiPartnerId }, update: {} });
+    const topUpAmount = 200000;
+    const verifiedTopUp = await db.topUpRequest.create({
+      data: {
+        requestCode: "TOP-000001", partnerId: budiPartnerId, amount: topUpAmount, status: "VERIFIED",
+        partnerNote: "Transfer via BCA mobile 08:30", requestedById: usersByHandle.budi.id,
+        submittedForVerificationAt: daysAgo(6), verifiedById: usersByHandle.owner.id, verifiedAt: daysAgo(5.8),
+        createdAt: daysAgo(6.2),
+      },
+    });
+    await db.walletTransaction.create({
+      data: {
+        walletId: budiWallet.id, type: "TOPUP", amount: topUpAmount, direction: "CREDIT",
+        balanceBefore: 0, balanceAfter: topUpAmount,
+        referenceType: "topup", referenceId: verifiedTopUp.id,
+        businessRef: `TOP-${verifiedTopUp.id}`, status: "COMPLETED",
+        description: "Top up TOP-000001 terverifikasi",
+        createdById: usersByHandle.owner.id, createdAt: daysAgo(5.8),
+      },
+    });
+    await db.wallet.update({ where: { id: budiWallet.id }, data: { balance: topUpAmount } });
+    // second top-up stuck mid-workflow: partner submitted proof, waiting for
+    // Admin Kantor to upload the official proof (PENDING_PAYMENT → …)
+    await db.topUpRequest.create({
+      data: {
+        requestCode: "TOP-000002", partnerId: budiPartnerId, amount: 150000, status: "PENDING_PAYMENT",
+        partnerNote: "Sudah transfer Rp150.000 via BCA — jam 07:15 pagi.",
+        requestedById: usersByHandle.budi.id,
+        createdAt: daysAgo(0.4),
+      },
     });
   }
 

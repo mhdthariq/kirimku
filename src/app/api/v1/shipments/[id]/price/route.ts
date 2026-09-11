@@ -48,6 +48,37 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     const r = computePricing(master.details, tariff);
+
+    // ----- Revise.md §6: Marketing-funded B2C discount -----------------------
+    // The company share keeps being calculated from the ORIGINAL price; the
+    // discount is absorbed by the Marketing partner's share. A discount that
+    // would push Marketing below zero is rejected (§6.2).
+    let discountAmount = num(body.discountAmount) ?? master.discountAmount ?? 0;
+    if (discountAmount < 0) discountAmount = 0;
+    const partner = master.createdByPartnerId
+      ? await db.partner.findUnique({ where: { id: master.createdByPartnerId } })
+      : null;
+    if (discountAmount > 0) {
+      if (discountAmount >= r.price) {
+        return fail(422, `Discount (Rp${discountAmount.toLocaleString("id-ID")}) harus lebih kecil dari harga shipment (Rp${r.price.toLocaleString("id-ID")}).`, {
+          discountAmount: ["Discount melebihi harga shipment."],
+        });
+      }
+      if (partner) {
+        const partnerShare = (r.price * partner.partnerPercent) / 100;
+        if (discountAmount > partnerShare + 0.001) {
+          return fail(
+            422,
+            `Discount Rp${discountAmount.toLocaleString("id-ID")} melebihi bagian Marketing (Rp${Math.round(partnerShare).toLocaleString("id-ID")} = ${partner.partnerPercent}% dari harga) — discount akan membuat bagian Marketing negatif (§6.2).`,
+            { discountAmount: ["Discount melebihi bagian Marketing."] },
+          );
+        }
+      }
+    }
+    // Auto-derived percentage (§6): discount% = discountAmount / price × 100
+    const discountPercentage = discountAmount > 0 ? Math.round((discountAmount / r.price) * 10000) / 100 : null;
+    const finalPriceAmount = Math.round((r.price - discountAmount) * 100) / 100;
+
     // persist the tariff used so the snapshot (and future re-calcs) is deterministic
     const updated = await db.masterShipment.update({
       where: { id: master.id },
@@ -57,6 +88,9 @@ export async function POST(req: NextRequest, { params }: Params) {
         ratePerKg: tariff.ratePerKg,
         priceAmount: r.price,
         pricedAt: new Date(),
+        discountAmount,
+        discountPercentage,
+        finalPriceAmount,
       },
     });
 

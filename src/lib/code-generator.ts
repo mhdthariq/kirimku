@@ -6,9 +6,9 @@ import { db } from "@/lib/db";
  * which collides when codes don't start at 1 or contain gaps).
  */
 export async function nextCode(
-  model: "pickup" | "transport" | "delivery" | "invoice" | "masterShipment" | "detailShipment" | "warehouse" | "customer" | "employee",
+  model: "pickup" | "transport" | "delivery" | "invoice" | "masterShipment" | "detailShipment" | "warehouse" | "customer" | "employee" | "topUpRequest" | "withdrawalRequest" | "vehicleRepair" | "transportSettlement" | "marketingCommission",
   prefix: string,
-  field: "pickupCode" | "transportCode" | "deliveryCode" | "invoiceNumber" | "masterCode" | "detailCode" | "code" | "employeeNumber" = "code",
+  field: "pickupCode" | "transportCode" | "deliveryCode" | "invoiceNumber" | "masterCode" | "detailCode" | "code" | "employeeNumber" | "requestCode" | "repairCode" | "settlementCode" | "commissionCode" = "code",
   fallbackStart = 1,
 ): Promise<string> {
    

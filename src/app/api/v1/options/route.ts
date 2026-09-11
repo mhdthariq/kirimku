@@ -6,7 +6,7 @@ import { guard, ok, handle } from "@/lib/api-helpers";
 export async function GET(req: NextRequest) {
   return handle(async () => {
     await guard(req);
-    const [employees, vehicles, routes, warehouses, customers, tariffs, permissions] = await Promise.all([
+    const [employees, vehicles, routes, warehouses, customers, tariffs, permissions, vehicleOwners, b2bShipments] = await Promise.all([
       db.employee.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true, position: true, warehouseId: true } }),
       db.vehicle.findMany({ where: { status: "ACTIVE" }, orderBy: { vehicleNumber: "asc" }, select: { id: true, vehicleNumber: true, name: true, maxWeightKg: true } }),
       db.route.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true, origin: true, destination: true } }),
@@ -18,8 +18,24 @@ export async function GET(req: NextRequest) {
         select: { id: true, origin: true, destination: true, customerType: true, ratePerKg: true, minChargeableKg: true, volumetricMultiplier: true, roundingMode: true, roundingUnitKg: true },
       }),
       db.permission.findMany({ orderBy: [{ module: "asc" }, { slug: "asc" }], select: { id: true, slug: true, module: true, description: true } }),
+      // Revise.md §13 — vehicle-owner partners for the vehicle ownership dropdown
+      db.partner.findMany({
+        where: { type: "VEHICLE_OWNER", isActive: true },
+        orderBy: { createdAt: "asc" },
+        select: { id: true, type: true, companyPercent: true, partnerPercent: true, user: { select: { name: true, username: true } } },
+      }),
+      // B2B shipments available for invoice line linking (§7.1)
+      db.masterShipment.findMany({
+        where: { customer: { type: "b2b" }, status: { not: "CANCELLED" } },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, masterCode: true, priceAmount: true, finalPriceAmount: true, customerId: true, createdByPartnerId: true, origin: true, destination: true },
+      }),
     ]);
     const company = { name: process.env.NEXT_PUBLIC_COMPANY_NAME ?? "KirimKu Logistics" };
-    return ok({ company, employees, vehicles, routes, warehouses, customers, tariffs, permissions });
+    return ok({
+      company, employees, vehicles, routes, warehouses, customers, tariffs, permissions,
+      vehicleOwners: vehicleOwners.map((p) => ({ id: p.id, name: p.user.name, username: p.user.username, profitShare: { company: p.companyPercent, partner: p.partnerPercent } })),
+      b2bShipments,
+    });
   });
 }

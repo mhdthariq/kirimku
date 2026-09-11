@@ -61,6 +61,7 @@ interface ShipmentForm {
   penerimaName: string;
   penerimaAddress: string;
   penerimaContact: string;
+  discountAmount: string;
 }
 
 interface DetailForm {
@@ -80,6 +81,7 @@ const EMPTY_SHIPMENT: ShipmentForm = {
   penerimaName: "",
   penerimaAddress: "",
   penerimaContact: "",
+  discountAmount: "",
 };
 const EMPTY_DETAIL: DetailForm = { description: "", quantity: "1", lengthCm: "", widthCm: "", heightCm: "", actualWeightKg: "" };
 
@@ -172,6 +174,8 @@ function ShipmentList() {
       originWarehouseId: form.originWarehouseId ? Number(form.originWarehouseId) : null,
       destinationWarehouseId: form.destinationWarehouseId ? Number(form.destinationWarehouseId) : null,
       penerimaName: form.penerimaName || null,
+      // Revise.md §6 — discount entered as AMOUNT; % derived by the backend
+      discountAmount: form.discountAmount ? Number(form.discountAmount) : 0,
       penerimaAddress: form.penerimaAddress || null,
       penerimaContact: form.penerimaContact || null,
     };
@@ -471,6 +475,25 @@ function ShipmentList() {
                   disabled={busy}
                 />
               </Field>
+              {/* Revise.md §6 — Marketing B2C discount: amount-only input; the
+                  percentage is always derived by the system (never typed). */}
+              {user?.partnerType === "MARKETING" && selectedCustomer?.type === "b2c" && (
+                <Field
+                  label="Discount (Rupiah)"
+                  htmlFor="s-discount"
+                  className="sm:col-span-2"
+                  hint="Ditanggung bagian Marketing Anda — persentase dihitung otomatis dari harga; maksimal sebesar bagian Marketing Anda (§6.2)."
+                >
+                  <NumberInput
+                    id="s-discount"
+                    value={form.discountAmount}
+                    onChange={(e) => setForm({ ...form, discountAmount: e.target.value })}
+                    placeholder="mis. 5000 (opsional)"
+                    min={0}
+                    disabled={busy}
+                  />
+                </Field>
+              )}
               <div className="sm:col-span-2">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Penerima (dicetak pada resi)</p>
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -1030,6 +1053,28 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
               <span className="text-xs font-semibold text-primary">{shipment.priceAmount != null ? "TOTAL HARGA" : "ESTIMASI HARGA"}</span>
               <span className="text-base font-bold text-primary">{formatRupiah(shipment.priceAmount ?? pricing?.estimatedPrice ?? null)}</span>
             </div>
+            {/* Revise.md §6 — Marketing-funded discount breakdown */}
+            {shipment.discountAmount > 0 && (
+              <div className="space-y-1.5 rounded-lg border border-chart-4/40 bg-chart-4/5 px-3 py-2.5 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Discount Marketing</span>
+                  <span className="font-semibold text-chart-4">− {formatRupiah(shipment.discountAmount)}</span>
+                </div>
+                {shipment.discountPercentage != null && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Persentase discount</span>
+                    <span className="font-medium">{shipment.discountPercentage}% (otomatis)</span>
+                  </div>
+                )}
+                <div className="flex justify-between border-t pt-1.5">
+                  <span className="font-semibold">Harga untuk customer</span>
+                  <span className="font-bold">{formatRupiah(shipment.finalPriceAmount ?? shipment.paymentSummary?.finalPriceAmount ?? null)}</span>
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Discount ditanggung bagian Marketing — bagian perusahaan tetap dihitung dari harga asli (§6.1).
+                </p>
+              </div>
+            )}
             {shipment.paymentSummary && shipment.priceAmount != null && (
               <div
                 className={cn(

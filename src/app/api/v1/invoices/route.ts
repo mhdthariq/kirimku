@@ -25,7 +25,12 @@ export async function GET(req: NextRequest) {
           : {}),
       },
       orderBy: { createdAt: "desc" },
-      include: { customer: true, lines: true, settlements: true },
+      include: {
+        customer: true,
+        lines: { include: { shipment: { select: { masterCode: true } } } },
+        settlements: true,
+        commission: { include: { partner: { include: { user: { select: { name: true } } } } } },
+      },
     });
     return ok(
       invoices.map((inv) => {
@@ -49,6 +54,15 @@ export async function GET(req: NextRequest) {
           remainingAmount: total - settled,
           isOverdue,
           createdAt: inv.createdAt,
+          // Revise.md §8 — commission status attached to the invoice
+          commission: inv.commission
+            ? {
+                status: inv.commission.status,
+                partnerName: inv.commission.partner.user.name,
+                commissionAmount: inv.commission.commissionAmount,
+                partnerPercent: inv.commission.partnerPercent,
+              }
+            : null,
         };
       }),
     );
@@ -71,14 +85,43 @@ export async function POST(req: NextRequest) {
 
     const lines = Array.isArray(body.lines) ? body.lines : [];
     const validLines = lines
-      .map((l: { description?: unknown; quantity?: unknown; unitPrice?: unknown }) => ({
+      .map((l: { description?: unknown; quantity?: unknown; unitPrice?: unknown; shipmentId?: unknown }) => ({
         description: str(l.description),
         quantity: num(l.quantity) ?? 1,
         unitPrice: num(l.unitPrice) ?? 0,
+        // Revise.md §7.1 — link the invoice line to the billed B2B shipment.
+        shipmentId: num(l.shipmentId),
       }))
       .filter((l: { description: string | null }) => l.description);
     if (validLines.length === 0) {
       return fail(422, "Minimal satu baris item wajib diisi.", { lines: ["Minimal satu baris item."] });
+    }
+
+    // Resolve & validate linked shipments — they must be B2B shipments of
+    // this customer. Collect the Marketing partner attribution (§7/§8) from
+    // the shipments' creators; all linked shipments must belong to the SAME
+    // Marketing partner (or none) so a single commission can be tracked.
+    const linkedPartnerIds = new Set<number>();
+    const resolvedLines: { description: string; quantity: number; unitPrice: number; shipmentId: number | null }[] = [];
+    for (const l of validLines as { description: string | null; quantity: number; unitPrice: number; shipmentId: number | null }[]) {
+      if (l.shipmentId == null) {
+        resolvedLines.push({ description: l.description ?? "", quantity: l.quantity, unitPrice: l.unitPrice, shipmentId: null });
+        continue;
+      }
+      const shipment = await db.masterShipment.findUnique({ where: { id: l.shipmentId } });
+      if (!shipment) return fail(404, `Shipment #${l.shipmentId} tidak ditemukan.`);
+      if (shipment.customerId !== customerId) {
+        return fail(422, `Shipment ${shipment.masterCode} bukan milik customer invoice ini.`, {
+          lines: ["Shipment terpilih tidak cocok dengan customer invoice."],
+        });
+      }
+      if (shipment.createdByPartnerId) linkedPartnerIds.add(shipment.createdByPartnerId);
+      resolvedLines.push({ description: l.description ?? "", quantity: l.quantity, unitPrice: l.unitPrice, shipmentId: shipment.id });
+    }
+    if (linkedPartnerIds.size > 1) {
+      return fail(422, "Shipment terpilih dibuat oleh lebih dari satu Marketing partner — pisahkan menjadi invoice terpisah per partner.", {
+        lines: ["Shipment dari beberapa Marketing partner tidak bisa digabung."],
+      });
     }
 
     const invoiceNumber = await nextCode("invoice", "INV-2026-", "invoiceNumber");
@@ -90,11 +133,38 @@ export async function POST(req: NextRequest) {
         issueDate: dateOrNull(body.issueDate),
         dueDate: dateOrNull(body.dueDate),
         notes: str(body.notes),
-        lines: { create: validLines.map((l: { description: string | null; quantity: number; unitPrice: number }) => ({ description: l.description ?? "", quantity: l.quantity, unitPrice: l.unitPrice })) },
+        lines: { create: resolvedLines },
       },
       include: { lines: true },
     });
-    await audit({ action: "created", entityType: "invoice", entityId: invoice.id, entityLabel: invoice.invoiceNumber, actor: user, after: { customer: customer.name, lines: validLines.length } });
-    return ok(invoice);
+
+    // Revise.md §8 — when the invoice bills Marketing-created B2B shipments,
+    // create the PENDING Marketing commission immediately (NO wallet credit
+    // yet — §2: the company owns the invoice and Marketing never finances it).
+    // The commission is released ONLY when the invoice becomes FULLY PAID (§9).
+    let commission: { id: number; commissionCode: string; commissionAmount: number; status: string } | null = null;
+    if (linkedPartnerIds.size === 1) {
+      const partnerId = Array.from(linkedPartnerIds)[0]!;
+      const partner = await db.partner.findUniqueOrThrow({ where: { id: partnerId } });
+      const total = resolvedLines.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0);
+      const commissionAmount = Math.round(total * (partner.partnerPercent / 100) * 100) / 100;
+      const commissionCode = await nextCode("marketingCommission", "COM-", "commissionCode");
+      const created = await db.marketingCommission.create({
+        data: {
+          commissionCode,
+          partnerId,
+          invoiceId: invoice.id,
+          invoiceAmount: total,
+          companyPercent: partner.companyPercent,
+          partnerPercent: partner.partnerPercent,
+          commissionAmount,
+          status: "PENDING",
+        },
+      });
+      commission = { id: created.id, commissionCode: created.commissionCode, commissionAmount: created.commissionAmount, status: created.status };
+    }
+
+    await audit({ action: "created", entityType: "invoice", entityId: invoice.id, entityLabel: invoice.invoiceNumber, actor: user, after: { customer: customer.name, lines: validLines.length, commission } });
+    return ok({ ...invoice, commission });
   });
 }

@@ -75,6 +75,8 @@ export async function GET(req: NextRequest) {
       const totals = computeTotals(s.details);
       const paid = paidPerMaster.get(s.id) ?? 0;
       const lastPickup = s.pickups[0] ?? null;
+      // Revise.md §6 — the customer owes the discounted FINAL price.
+      const finalPrice = s.finalPriceAmount ?? (s.priceAmount != null ? s.priceAmount - (s.discountAmount ?? 0) : null);
       return {
         id: s.id,
         masterCode: s.masterCode,
@@ -86,8 +88,8 @@ export async function GET(req: NextRequest) {
         destinationWarehouseId: s.destinationWarehouseId,
         priceAmount: s.priceAmount,
         paidAmount: paid,
-        remainingAmount: s.priceAmount != null ? Math.max(0, s.priceAmount - paid) : null,
-        dpOk: s.priceAmount == null || paid >= s.priceAmount / 2 - 0.01,
+        remainingAmount: finalPrice != null ? Math.max(0, finalPrice - paid) : null,
+        dpOk: finalPrice == null || paid >= finalPrice / 2 - 0.01,
         penerimaName: s.penerimaName,
         detailsCount: totals.totalPackages,
         totalWeightKg: totals.totalActualKg,
@@ -112,6 +114,7 @@ export async function GET(req: NextRequest) {
     const walkIns = walkInShipments
       .filter((s) => inScopeNow(s))
       .map((s) => {
+        const finalPrice = s.finalPriceAmount ?? (s.priceAmount != null ? s.priceAmount - (s.discountAmount ?? 0) : null);
         const totals = computeTotals(s.details);
         return {
           id: s.id,
@@ -123,6 +126,7 @@ export async function GET(req: NextRequest) {
           destinationWarehouseId: s.destinationWarehouseId,
           status: s.status,
           priceAmount: s.priceAmount,
+          finalPriceAmount: finalPrice,
           penerimaName: s.penerimaName,
           detailsCount: totals.totalPackages,
           totalWeightKg: totals.totalActualKg,
@@ -167,6 +171,7 @@ export async function GET(req: NextRequest) {
         const rows = shipments.map((s) => {
           const totals = computeTotals(s.details);
           const paid = heldPaid.get(s.id) ?? 0;
+          const finalPrice = s.finalPriceAmount ?? (s.priceAmount != null ? s.priceAmount - (s.discountAmount ?? 0) : null);
           return {
             id: s.id,
             masterCode: s.masterCode,
@@ -177,7 +182,7 @@ export async function GET(req: NextRequest) {
             weightKg: totals.totalActualKg,
             volumeM3: totals.totalVolumeM3,
             priceAmount: s.priceAmount,
-            remainingAmount: s.priceAmount != null ? Math.max(0, s.priceAmount - paid) : null,
+            remainingAmount: finalPrice != null ? Math.max(0, finalPrice - paid) : null,
             updatedAt: s.updatedAt,
           };
         });

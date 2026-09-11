@@ -69,6 +69,8 @@ export function TransportsPage({ historyMode = false }: { historyMode?: boolean 
     view: hasPermission(user, "transport.view"),
     create: hasPermission(user, "transport.create"),
     depart: hasPermission(user, "transport.depart"),
+    // Revise.md §14 — finalize partner transport settlements
+    settle: hasPermission(user, "transport.settle"),
   };
 
   const { data, loading, reload } = useApiData<Transport[]>(
@@ -282,6 +284,22 @@ export function TransportsPage({ historyMode = false }: { historyMode?: boolean 
         },
         { key: "status", header: "Status", render: (t) => <StatusBadge status={t.status} /> },
         {
+          key: "settlement",
+          header: "Settlement",
+          hideOnMobile: true,
+          render: (t) =>
+            t.settlement ? (
+              <div>
+                <p className="font-mono text-[11px] font-semibold">{t.settlement.settlementCode}</p>
+                <p className="text-[11px] text-primary">+{formatRupiah(t.settlement.ownerAmount)} ({t.settlement.ownerPercent}%)</p>
+              </div>
+            ) : t.vehicleOwnerId != null && t.status === "ARRIVED" ? (
+              <span className="text-[11px] font-medium text-chart-4">siap di-settle</span>
+            ) : (
+              <span className="text-[11px] text-muted-foreground">—</span>
+            ),
+        },
+        {
           key: "actions",
           header: "Aksi",
           render: (t) => (
@@ -294,6 +312,13 @@ export function TransportsPage({ historyMode = false }: { historyMode?: boolean 
               {t.status === "PLANNED" && can.depart && (
                 <Button size="sm" className="h-7" onClick={() => onDepart(t)}>
                   <Truck className="h-3.5 w-3.5" /> Depart
+                </Button>
+              )}
+              {/* Revise.md §14/§15 — settle ARRIVED partner transports (credits
+                  the Vehicle Owner wallet atomically) */}
+              {t.status === "ARRIVED" && t.vehicleOwnerId != null && !t.settlement && can.settle && (
+                <Button size="sm" variant="secondary" className="h-7" onClick={() => window.location.assign("#/settlements")}>
+                  <Coins className="h-3.5 w-3.5" /> Settle
                 </Button>
               )}
               {t.status === "PLANNED" && can.create && (

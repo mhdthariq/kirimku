@@ -19,6 +19,8 @@ interface DraftLine {
   description: string;
   quantity: string;
   unitPrice: string;
+  /** Revise.md §7.1 — optional link to the billed B2B shipment */
+  shipmentId: string;
 }
 
 interface InvoiceForm {
@@ -34,7 +36,7 @@ const EMPTY: InvoiceForm = {
   issueDate: new Date().toISOString().slice(0, 10),
   dueDate: "",
   notes: "",
-  lines: [{ description: "", quantity: "1", unitPrice: "" }],
+  lines: [{ description: "", quantity: "1", unitPrice: "", shipmentId: "" }],
 };
 
 export function InvoicesPage() {
@@ -87,7 +89,7 @@ export function InvoicesPage() {
   }
 
   function openCreate() {
-    setForm({ ...EMPTY, lines: [{ description: "", quantity: "1", unitPrice: "" }] });
+    setForm({ ...EMPTY, lines: [{ description: "", quantity: "1", unitPrice: "", shipmentId: "" }] });
     setCreateOpen(true);
   }
 
@@ -101,9 +103,16 @@ export function InvoicesPage() {
       notes: form.notes || null,
       lines: form.lines
         .filter((l) => l.description.trim() && Number(l.unitPrice) > 0)
-        .map((l) => ({ description: l.description, quantity: Number(l.quantity) || 1, unitPrice: Number(l.unitPrice) })),
+        .map((l) => ({
+          description: l.description,
+          quantity: Number(l.quantity) || 1,
+          unitPrice: Number(l.unitPrice),
+          // Revise.md §7.1 — link the line to its B2B shipment so the
+          // Marketing commission attaches to this invoice (§8).
+          shipmentId: l.shipmentId ? Number(l.shipmentId) : null,
+        })),
     };
-    const ok = await runAction(() => apiPost("/invoices", payload), { success: "Invoice draft dibuat." });
+    const ok = await runAction(() => apiPost("/invoices", payload), { success: "Invoice draft dibuat — komisi Marketing (bila ada) otomatis terlacak PENDING." });
     setBusy(false);
     if (ok) {
       setCreateOpen(false);
@@ -137,7 +146,12 @@ export function InvoicesPage() {
           method: settleMethod,
           reference: settleRef || null,
         }),
-      { success: "Settlement dicatat." },
+      {
+        success:
+          Number(settleAmount) >= (detail.remainingAmount ?? 0) - 0.01 && detail.commission
+            ? "Pelunasan dicatat — komisi Marketing dirilis ke wallet (atomic, §9)."
+            : "Settlement dicatat — pembayaran parsial, komisi tetap PENDING (§8.1).",
+      },
     );
     setBusy(false);
     if (ok) {
@@ -235,6 +249,11 @@ export function InvoicesPage() {
                   <div className="flex flex-col items-start gap-1">
                     <StatusBadge status={inv.status} />
                     {inv.isOverdue && <span className="text-[10px] font-semibold text-destructive">OVERDUE</span>}
+                    {inv.commission && (
+                      <span className="text-[10px] font-medium text-primary" title={`Komisi ${inv.commission.partnerName}`}>
+                        komisi {formatRupiah(inv.commission.commissionAmount)} · {inv.commission.status}
+                      </span>
+                    )}
                   </div>
                 ),
               },
@@ -316,50 +335,108 @@ export function InvoicesPage() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setForm((f) => ({ ...f, lines: [...f.lines, { description: "", quantity: "1", unitPrice: "" }] }))}
+                  onClick={() => setForm((f) => ({ ...f, lines: [...f.lines, { description: "", quantity: "1", unitPrice: "", shipmentId: "" }] }))}
                   disabled={busy}
                 >
                   <Plus className="h-3.5 w-3.5" /> Baris
                 </Button>
               </div>
-              <div className="space-y-2">
-                {form.lines.map((line, i) => (
-                  <div key={i} className="grid grid-cols-[1fr_80px_110px_36px] items-center gap-2">
-                    <Input
-                      value={line.description}
-                      onChange={(e) => setForm((f) => ({ ...f, lines: f.lines.map((l, idx) => (idx === i ? { ...l, description: e.target.value } : l)) }))}
-                      placeholder={`Deskripsi item ${i + 1}`}
-                      disabled={busy}
-                      aria-label={`Deskripsi item ${i + 1}`}
-                    />
-                    <NumberInput
-                      value={line.quantity}
-                      onChange={(e) => setForm((f) => ({ ...f, lines: f.lines.map((l, idx) => (idx === i ? { ...l, quantity: e.target.value } : l)) }))}
-                      placeholder="Qty"
-                      disabled={busy}
-                      aria-label={`Jumlah item ${i + 1}`}
-                    />
-                    <NumberInput
-                      value={line.unitPrice}
-                      onChange={(e) => setForm((f) => ({ ...f, lines: f.lines.map((l, idx) => (idx === i ? { ...l, unitPrice: e.target.value } : l)) }))}
-                      placeholder="Harga"
-                      disabled={busy}
-                      aria-label={`Harga item ${i + 1}`}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive"
-                      onClick={() => setForm((f) => ({ ...f, lines: f.lines.filter((_, idx) => idx !== i) }))}
-                      disabled={busy || form.lines.length === 1}
-                      aria-label="Hapus baris"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
+              {/* Revise.md §7.1 — pick the customer's B2B shipments to bill;
+                  linked Marketing shipments attach the commission (§8). */}
+              {(() => {
+                const customerShipments = (options?.b2bShipments ?? []).filter(
+                  (s) => !form.customerId || s.customerId === Number(form.customerId),
+                );
+                const linkedPartner = form.lines
+                  .map((l) => customerShipments.find((s) => String(s.id) === l.shipmentId)?.createdByPartnerId ?? null)
+                  .find((p) => p != null);
+                return (
+                  <>
+                    <div className="space-y-2">
+                      {form.lines.map((line, i) => (
+                        <div key={i} className="space-y-1.5 rounded-lg border p-2.5">
+                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_36px]">
+                            <select
+                              className="h-8 w-full rounded-md border border-input bg-transparent px-2 text-xs shadow-xs"
+                              value={line.shipmentId}
+                              onChange={(e) => {
+                                const shipmentId = e.target.value;
+                                const picked = customerShipments.find((s) => String(s.id) === shipmentId);
+                                setForm((f) => ({
+                                  ...f,
+                                  lines: f.lines.map((l, idx) =>
+                                    idx === i
+                                      ? {
+                                          ...l,
+                                          shipmentId,
+                                          ...(picked && !l.description
+                                            ? {
+                                                description: `${picked.masterCode} — pengiriman ${picked.origin} → ${picked.destination}`,
+                                                unitPrice: String(picked.priceAmount ?? ""),
+                                              }
+                                            : {}),
+                                        }
+                                      : l,
+                                  ),
+                                }));
+                              }}
+                              disabled={busy}
+                              aria-label={`Shipment baris ${i + 1}`}
+                            >
+                              <option value="">— tanpa link shipment —</option>
+                              {customerShipments.map((s) => (
+                                <option key={s.id} value={s.id}>
+                                  {s.masterCode} · {formatRupiah(s.priceAmount)}
+                                  {s.createdByPartnerId ? " · marketing" : ""}
+                                </option>
+                              ))}
+                            </select>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive"
+                              onClick={() => setForm((f) => ({ ...f, lines: f.lines.filter((_, idx) => idx !== i) }))}
+                              disabled={busy || form.lines.length === 1}
+                              aria-label="Hapus baris"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <div className="grid grid-cols-[1fr_70px_100px] items-center gap-2">
+                            <Input
+                              value={line.description}
+                              onChange={(e) => setForm((f) => ({ ...f, lines: f.lines.map((l, idx) => (idx === i ? { ...l, description: e.target.value } : l)) }))}
+                              placeholder={`Deskripsi item ${i + 1}`}
+                              disabled={busy}
+                              aria-label={`Deskripsi item ${i + 1}`}
+                            />
+                            <NumberInput
+                              value={line.quantity}
+                              onChange={(e) => setForm((f) => ({ ...f, lines: f.lines.map((l, idx) => (idx === i ? { ...l, quantity: e.target.value } : l)) }))}
+                              placeholder="Qty"
+                              disabled={busy}
+                              aria-label={`Jumlah item ${i + 1}`}
+                            />
+                            <NumberInput
+                              value={line.unitPrice}
+                              onChange={(e) => setForm((f) => ({ ...f, lines: f.lines.map((l, idx) => (idx === i ? { ...l, unitPrice: e.target.value } : l)) }))}
+                              placeholder="Harga"
+                              disabled={busy}
+                              aria-label={`Harga item ${i + 1}`}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {linkedPartner != null && (
+                      <p className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-[11px] text-primary">
+                        Invoice ini membawa shipment buatan Marketing — komisi partner akan tercatat <b>PENDING</b> dan hanya dirilis saat invoice <b>LUNAS penuh</b> (§8/§9).
+                      </p>
+                    )}
+                  </>
+                );
+              })()}
               <div className="flex items-center justify-end gap-2 rounded-lg bg-muted/60 px-3 py-2 text-sm">
                 <span className="text-muted-foreground">Total draft:</span>
                 <span className="font-bold text-foreground">{formatRupiah(draftLinesTotal)}</span>
@@ -424,6 +501,24 @@ export function InvoicesPage() {
                   <p className="text-sm font-bold text-destructive">{formatRupiah(detailWithLines.remainingAmount)}</p>
                 </div>
               </div>
+
+              {/* Revise.md §8 — commission panel attached to this invoice */}
+              {detailWithLines.commission && (
+                <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-primary">
+                      Komisi Marketing · {detailWithLines.commission.partnerName} ({detailWithLines.commission.partnerPercent}%)
+                    </span>
+                    <StatusBadge status={detailWithLines.commission.status} />
+                  </div>
+                  <p className="mt-1 text-muted-foreground">
+                    {formatRupiah(detailWithLines.commission.commissionAmount)} —{" "}
+                    {detailWithLines.commission.status === "RELEASED"
+                      ? "sudah dikredit ke wallet Marketing"
+                      : "dirilis ke wallet hanya setelah invoice LUNAS penuh (§9)"}
+                  </p>
+                </div>
+              )}
 
               {((detailWithLines as Invoice & { settlements?: { id: number; amount: number; method: string; settledAt: string }[] }).settlements?.length ?? 0) > 0 && (
                 <div>

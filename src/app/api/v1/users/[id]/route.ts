@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { hashPassword } from "@/lib/auth";
 import { guard, ok, handle, fail, str } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
+import { ensurePartnerProfile } from "@/lib/partner";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -28,15 +29,21 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
     if (Array.isArray(body.roleIds)) {
       await db.userRole.deleteMany({ where: { userId: existing.id } });
+      const assignedSlugs: string[] = [];
       for (const roleId of body.roleIds.map(Number).filter(Boolean)) {
         const role = await db.role.findUnique({ where: { id: roleId } });
-        if (role) await db.userRole.create({ data: { userId: existing.id, roleId } }).catch(() => undefined);
+        if (role) {
+          await db.userRole.create({ data: { userId: existing.id, roleId } }).catch(() => undefined);
+          assignedSlugs.push(role.slug);
+        }
       }
+      // Revise.md — granting a partner role provisions the partner + wallet.
+      await ensurePartnerProfile(existing.id, assignedSlugs);
     }
 
     await audit({ action: "updated", entityType: "user", entityId: updated.id, entityLabel: updated.username, actor: user, after: { name: updated.name, roles: body.roleIds } });
-    const full = await db.user.findUnique({ where: { id: updated.id }, include: { employee: true, roles: { include: { role: true } } } });
-    return ok({ ...full, passwordHash: undefined });
+    const full = await db.user.findUnique({ where: { id: updated.id }, include: { employee: true, roles: { include: { role: true } }, partner: true } });
+    return ok({ ...full, passwordHash: undefined, partnerId: full?.partner?.id ?? null, partnerType: full?.partner?.type ?? null });
   });
 }
 
