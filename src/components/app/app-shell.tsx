@@ -321,12 +321,12 @@ export function AppShell({
                     <Menu className="h-5 w-5" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="left" className="w-72 p-0">
+                <SheetContent side="left" className="flex w-72 flex-col p-0">
                   <SheetTitle className="sr-only">Menu navigasi</SheetTitle>
                   <div className="flex h-16 items-center border-b px-5">
                     <Logo />
                   </div>
-                  <nav className="space-y-5 overflow-y-auto px-3 py-4" aria-label="Navigasi utama (mobile)">
+                  <nav className="min-h-0 flex-1 space-y-5 overflow-y-auto px-3 py-4" aria-label="Navigasi utama (mobile)">
                     {visibleGroups.map((group) => (
                       <div key={group.title}>
                         <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/70">
@@ -345,7 +345,7 @@ export function AppShell({
                       </div>
                     ))}
                   </nav>
-                  <div className="absolute bottom-0 left-0 right-0 border-t p-3">
+                  <div className="shrink-0 border-t p-3">
                     <Button variant="outline" className="w-full" onClick={handleLogout}>
                       <LogOut className="h-4 w-4" /> Keluar
                     </Button>
