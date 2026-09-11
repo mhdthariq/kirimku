@@ -2,14 +2,13 @@
 
 import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-import { Bell, ChevronDown, MapPin, Pencil, Plus, Trash2, Warehouse as WarehouseIcon } from "lucide-react";
+import { ChevronDown, MapPin, Pencil, Plus, Trash2, Warehouse as WarehouseIcon } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type GudangWorkspace, type Warehouse } from "@/lib/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
 import { ActiveBadge } from "@/components/app/status-badge";
-import { NotifyMarketingDialog } from "@/components/app/notify-marketing-dialog";
 import { Field, Input, SubmitButton, Textarea, formatNumber, formatRupiah } from "@/components/app/form-parts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,7 +44,6 @@ export function GudangPage() {
     delete: hasPermission(user, "warehouse.delete"),
     // Isi Gudang tab is powered by the /gudang workspace API (shipment.view)
     contents: hasPermission(user, "shipment.view"),
-    notifyMarketing: hasPermission(user, "shipment.notify_marketing"),
   };
 
   const { data, loading, reload } = useApiData<Warehouse[]>(() => apiGet<Warehouse[]>("/warehouses?include_inactive=true"), []);
@@ -60,7 +58,6 @@ export function GudangPage() {
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<Warehouse | null>(null);
   const [expandedWarehouse, setExpandedWarehouse] = useState<number | null>(null);
-  const [notifyTask, setNotifyTask] = useState<{ id: number; masterCode: string; remaining: number } | null>(null);
 
   const rows = useMemo(() => {
     if (!data) return [];
@@ -279,11 +276,6 @@ export function GudangPage() {
                     {w.customerSupportContact && (
                       <p className="text-[11px] text-muted-foreground">CS Gudang: {w.customerSupportContact}</p>
                     )}
-                    {w.unpaidCount > 0 && (
-                      <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400">
-                        {w.unpaidCount} shipment masih ada sisa pembayaran
-                      </p>
-                    )}
                     <Button
                       variant="outline"
                       size="sm"
@@ -314,16 +306,6 @@ export function GudangPage() {
                                 <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">sisa {formatRupiah(s.remainingAmount)}</span>
                               ) : (
                                 <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">lunas</span>
-                              )}
-                              {can.notifyMarketing && s.remainingAmount != null && s.remainingAmount > 0 && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-6 px-2 text-[11px]"
-                                  onClick={() => setNotifyTask({ id: s.id, masterCode: s.masterCode, remaining: s.remainingAmount ?? 0 })}
-                                >
-                                  <Bell className="h-3 w-3" /> Notify Marketing
-                                </Button>
                               )}
                             </div>
                           </div>
@@ -424,13 +406,6 @@ export function GudangPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Notify marketing dialog (unpaid shipment held at a gudang) */}
-      <NotifyMarketingDialog
-        key={notifyTask ? `notify-${notifyTask.id}` : "notify-none"}
-        task={notifyTask}
-        onClose={() => setNotifyTask(null)}
-        onDone={reloadContents}
-      />
     </div>
   );
 }

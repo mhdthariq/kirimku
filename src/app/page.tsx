@@ -23,7 +23,6 @@ import { RoutesPage } from "@/components/app/pages/routes-page";
 import { CustomersPage } from "@/components/app/pages/customers-page";
 import { TariffsPage } from "@/components/app/pages/tariffs-page";
 import { InvoicesPage } from "@/components/app/pages/invoices-page";
-import { UnpaidPage } from "@/components/app/pages/unpaid-page";
 import { AccessPage } from "@/components/app/pages/access-page";
 import { AuditPage } from "@/components/app/pages/audit-page";
 // Revise.md — partner wallet financial system pages
@@ -110,8 +109,6 @@ function Router() {
         return <TariffsPage />;
       case "invoices":
         return <InvoicesPage />;
-      case "unpaid":
-        return <UnpaidPage />;
       case "access":
         return <AccessPage />;
       case "audit":

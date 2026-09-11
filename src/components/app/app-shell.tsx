@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ClipboardList,
-  Coins,
   History,
   Landmark,
   LayoutDashboard,
@@ -82,7 +81,6 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { href: "/customers", label: "Customers", icon: Users, anyPermissions: ["customer.view"] },
       { href: "/tariffs", label: "Tarif", icon: Tag, anyPermissions: ["tariff.view"] },
       { href: "/invoices", label: "Invoice", icon: Receipt, anyPermissions: ["invoice.view"] },
-      { href: "/unpaid", label: "B2C Belum Bayar", icon: Coins, anyPermissions: ["payment.unpaid.view"] },
     ],
   },
   {
