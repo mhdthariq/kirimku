@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Building2, Landmark, UserCircle2 } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 import { apiGet, apiPut, hasPermission, type ProfileData } from "@/lib/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader } from "@/components/app/data-table";
