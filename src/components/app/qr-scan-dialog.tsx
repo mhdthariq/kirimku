@@ -151,9 +151,9 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="w-[calc(100%-1rem)] max-h-[calc(100dvh-1rem)] gap-3 p-3 sm:max-w-lg sm:gap-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-start gap-2 pr-6 text-base leading-snug sm:text-lg">
             <QrCode className="h-5 w-5 text-primary" />
             {isPickup ? `Scan Paket — Pickup ${task?.code ?? ""}` : `Scan Paket — Delivery ${task?.code ?? ""}`}
           </DialogTitle>
@@ -192,7 +192,7 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
         )}
 
         {/* Package checklist — codes hidden, method badges visible (Riwayat Scan) */}
-        <div className="max-h-56 space-y-1.5 overflow-y-auto rounded-lg border p-2">
+        <div className="max-h-[28dvh] space-y-1.5 overflow-y-auto rounded-lg border p-2 sm:max-h-56">
           {progress?.details.map((d, i) => (
             <div
               key={d.id}

@@ -179,7 +179,7 @@ export function ScanConsole({ onScan, disabled, placeholder = "Arahkan QR ke kam
             </Button>
           </div>
         ) : (
-          <Button type="button" variant="outline" className="w-full" onClick={() => void startCamera()} disabled={disabled || busy}>
+          <Button type="button" variant="outline" className="min-h-11 w-full" onClick={() => void startCamera()} disabled={disabled || busy}>
             <Camera className="h-4 w-4" /> Scan dengan Kamera HP
           </Button>
         )}
@@ -197,7 +197,7 @@ export function ScanConsole({ onScan, disabled, placeholder = "Arahkan QR ke kam
           const typingDuration = startedAt != null ? Date.now() - startedAt : Infinity;
           void submit(code, code.length >= 4 && typingDuration < 300 ? "SCANNED" : "TYPED");
         }}
-        className="flex gap-2"
+        className="flex flex-col gap-2 sm:flex-row"
       >
         <div className="relative flex-1">
           <ScanLine className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -209,14 +209,14 @@ export function ScanConsole({ onScan, disabled, placeholder = "Arahkan QR ke kam
             onKeyDown={onKeyDown}
             onPaste={(e) => e.preventDefault()} // anti copy-paste: must read from physical label
             placeholder={placeholder}
-            className="pl-8 font-mono tracking-wider"
+            className="min-h-11 pl-8 font-mono tracking-wider"
             disabled={disabled || busy}
             autoComplete="off"
             spellCheck={false}
             inputMode="text"
           />
         </div>
-        <Button type="submit" disabled={disabled || busy || !value.trim()}>
+        <Button type="submit" className="min-h-11 w-full sm:w-auto" disabled={disabled || busy || !value.trim()}>
           <Keyboard className="h-4 w-4" />
           <span className="hidden sm:inline">Kirim</span>
         </Button>
