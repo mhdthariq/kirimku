@@ -104,8 +104,11 @@ export async function POST(req: NextRequest, { params }: Params) {
     const isFinalCheckpoint =
       transport.route != null &&
       checkpoint.sequence === Math.max(...transport.route.checkpoints.map((c) => c.sequence));
+    const isFirstCheckpoint =
+      transport.route != null &&
+      checkpoint.sequence === Math.min(...transport.route.checkpoints.map((c) => c.sequence));
+    const autoDeparted = transport.status === "PLANNED" && isFirstCheckpoint;
 
-    const autoDeparted = transport.status === "PLANNED";
     const record = await db.$transaction(async (tx) => {
       const created = await tx.checkpointRecord.create({
         data: {
@@ -119,6 +122,11 @@ export async function POST(req: NextRequest, { params }: Params) {
           recordedById: user.id,
           recordedAt: new Date(),
         },
+      });
+      // last known transport position (Part K)
+      await tx.transport.update({
+        where: { id: transport.id },
+        data: { currentLatitude: latitude, currentLongitude: longitude, lastLocationAt: new Date() },
       });
       if (autoDeparted) {
         await tx.transport.update({
@@ -139,12 +147,6 @@ export async function POST(req: NextRequest, { params }: Params) {
           });
         }
       }
-
-      // last known transport position (Part K)
-      await tx.transport.update({
-        where: { id: transport.id },
-        data: { currentLatitude: latitude, currentLongitude: longitude, lastLocationAt: new Date() },
-      });
       return created;
     });
 
@@ -165,7 +167,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         for (const s of transport.shipments) {
           const destIds = shipmentDestinationGudangIds(s.master, cityIdx);
           const arrivedWarehouseId = s.master.destinationWarehouseId ?? destIds[0] ?? null;
-          if (s.master.status === "IN_TRANSPORT" || (autoDeparted && s.master.status === "RECEIVED_AT_GUDANG")) {
+          if (s.master.status === "IN_TRANSPORT") {
             await tx.masterShipment.update({
               where: { id: s.shipmentId },
               data: { status: "ARRIVED_AT_GUDANG", arrivedWarehouseId },

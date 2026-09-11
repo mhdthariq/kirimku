@@ -11,6 +11,7 @@ import {
   Clock,
   MapPin,
   Package,
+  PackageCheck,
   PackageSearch,
   Route,
   Scale,
@@ -56,9 +57,8 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string;
  * info (photo evidence)  4. shipments with aggregate totals (Part L).
  * Part N: there is deliberately NO manual "Arrived" button — arrival is
  * auto-detected when the crew checks in inside the final checkpoint's radius.
- * Departure works the same way: checking in at the first checkpoint of a
- * PLANNED transport automatically marks it DEPARTED (no manual button needed
- * — the manual "Berangkat" action stays as an office-side override).
+ * Checking in at the first checkpoint of a PLANNED transport automatically
+ * marks it DEPARTED.
  */
 export function TransportDetailPage({ transportId }: { transportId: number }) {
   const { user } = useAuth();
@@ -69,7 +69,6 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
   const [checkinOpen, setCheckinOpen] = useState(false);
 
   const can = {
-    depart: hasPermission(user, "transport.depart"),
     checkin: hasPermission(user, "transport.checkin"),
   };
 
@@ -102,14 +101,6 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
       };
     });
   }, [transport]);
-
-  async function onDepart() {
-    if (!transport) return;
-    const ok = await runAction(() => apiPost(`/transports/${transport.id}/depart`), {
-      success: `${transport.transportCode} berangkat.`,
-    });
-    if (ok) reload();
-  }
 
   if (loading) {
     return (
@@ -155,11 +146,6 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={transport.status} />
-            {transport.status === "PLANNED" && can.depart && (
-              <Button size="sm" variant="outline" onClick={onDepart} title="Override manual: tandai berangkat tanpa menunggu check-in kru">
-                <Truck className="h-3.5 w-3.5" /> Tandai Berangkat
-              </Button>
-            )}
             {canCheckinNow && (
               <Button size="sm" onClick={() => setCheckinOpen(true)}>
                 <Camera className="h-3.5 w-3.5" /> Check-in Checkpoint
@@ -255,7 +241,7 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
                       </div>
                       {c.checkedIn ? (
                         <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                          <CheckCircle2 className="h-3 w-3" /> Checked In
+                          <PackageCheck className="h-3 w-3" /> Checked In
                         </span>
                       ) : (
                         <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">Belum</span>

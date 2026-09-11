@@ -20,7 +20,7 @@ export interface TransportCheckinPoint {
 /**
  * Transport position map (Revision Part K §2):
  * - route polyline + every checkpoint with its radius circle
- * - checkpoints already checked in are highlighted (green check)
+ * - checkpoints already checked in are highlighted with a green cargo marker
  * - the transport's current (last known) position marker
  * - zoom controls bottom-left, overlays inside an isolated stacking context
  *   (never covers the navbar — Revision Part F)
@@ -81,12 +81,13 @@ export function TransportMap({
 
       const icon = L.divIcon({
         className: "kirimku-tp",
-        html: `<div style="min-width:30px;height:30px;border-radius:9999px;display:flex;align-items:center;justify-content:center;font:700 12px/1 var(--font-geist-sans, sans-serif);background:${c.checkedIn ? "#0d9d70" : "#334155"};color:#fff;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35);padding:0 6px;">${c.checkedIn ? "✓" : c.sequence}</div>`,
-        iconSize: [30, 30],
-        iconAnchor: [15, 15],
+        html: `<div style="min-width:${c.checkedIn ? "38px" : "30px"};height:${c.checkedIn ? "38px" : "30px"};border-radius:9999px;display:flex;align-items:center;justify-content:center;font:700 ${c.checkedIn ? "17px" : "12px"}/1 var(--font-geist-sans, sans-serif);background:${c.checkedIn ? "#0d9d70" : "#334155"};color:#fff;border:${c.checkedIn ? "3px solid #86efac" : "3px solid #fff"};box-shadow:0 2px 8px rgba(0,0,0,.35);padding:0 6px;">${c.checkedIn ? "📦" : c.sequence}</div>`,
+        iconSize: c.checkedIn ? [38, 38] : [30, 30],
+        iconAnchor: c.checkedIn ? [19, 19] : [15, 15],
       });
       const label = `${c.sequence}. ${c.name}${c.checkedIn ? ` — check-in ${c.latestRecordAt ? new Date(c.latestRecordAt).toLocaleString("id-ID") : ""}${c.latestBy ? ` oleh ${c.latestBy}` : ""}` : ` · radius ${(c.radiusMeters / 1000).toFixed(2)} KM`}`;
-      L.marker([c.latitude, c.longitude], { icon }).addTo(layer).bindTooltip(label, { direction: "top", offset: [0, -12] });
+      const marker = L.marker([c.latitude, c.longitude], { icon }).addTo(layer).bindTooltip(label, { direction: "top", offset: [0, c.checkedIn ? -19 : -12] });
+      if (c.checkedIn) marker.openTooltip();
     });
 
     if (latlngs.length >= 2) {
