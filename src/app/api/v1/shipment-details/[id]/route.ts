@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { guard, ok, handle, fail, requireStr, num } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
+import { assertShipmentScope } from "@/lib/gudang-scope";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -11,6 +12,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const { id } = await params;
     const existing = await db.detailShipment.findUnique({ where: { id: Number(id) }, include: { master: true } });
     if (!existing) return fail(404, "Detail shipment tidak ditemukan.");
+    await assertShipmentScope(user, existing.master);
     if (!["CREATED", "READY_FOR_PICKUP"].includes(existing.master.status)) {
       return fail(422, "Detail hanya bisa diubah saat master masih CREATED atau READY_FOR_PICKUP.");
     }
@@ -33,6 +35,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     const { id } = await params;
     const existing = await db.detailShipment.findUnique({ where: { id: Number(id) }, include: { master: true } });
     if (!existing) return fail(404, "Detail shipment tidak ditemukan.");
+    await assertShipmentScope(user, existing.master);
     if (!["CREATED", "READY_FOR_PICKUP"].includes(existing.master.status)) {
       return fail(422, "Detail hanya bisa dihapus saat master masih CREATED atau READY_FOR_PICKUP.");
     }

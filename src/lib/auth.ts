@@ -47,12 +47,14 @@ const SESSION_HOURS = 12;
 export async function createSession(userId: number): Promise<{ token: string; expiresAt: Date }> {
   const token = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + SESSION_HOURS * 60 * 60 * 1000);
-  await db.sessionToken.create({ data: { token, userId, expiresAt } });
+  const tokenHash = createHash("sha256").update(token).digest("hex");
+  await db.sessionToken.create({ data: { token: tokenHash, userId, expiresAt } });
   return { token, expiresAt };
 }
 
 export async function destroySession(token: string): Promise<void> {
-  await db.sessionToken.deleteMany({ where: { token } });
+  const tokenHash = createHash("sha256").update(token).digest("hex");
+  await db.sessionToken.deleteMany({ where: { token: tokenHash } });
 }
 
 export function getTokenFromRequest(req: NextRequest): string | null {
@@ -65,9 +67,8 @@ export async function getAuthUser(req: NextRequest): Promise<AuthUser | null> {
   const token = getTokenFromRequest(req);
   if (!token) return null;
   const tokenHash = createHash("sha256").update(token).digest("hex");
-  void tokenHash;
   const session = await db.sessionToken.findUnique({
-    where: { token },
+    where: { token: tokenHash },
     include: {
       user: {
         include: {

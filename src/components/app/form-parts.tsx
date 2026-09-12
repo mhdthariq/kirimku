@@ -39,14 +39,16 @@ export function SubmitButton({
   children,
   className,
   form,
+  disabled,
 }: {
   busy?: boolean;
   children: React.ReactNode;
   className?: string;
   form?: string;
+  disabled?: boolean;
 }) {
   return (
-    <Button type="submit" disabled={busy} className={className} form={form}>
+    <Button type="submit" disabled={busy || disabled} className={className} form={form}>
       {busy && <Loader2 className="h-4 w-4 animate-spin" />}
       {children}
     </Button>

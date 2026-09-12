@@ -83,7 +83,7 @@ export async function POST(req: NextRequest, { params }: Params) {
             referenceId: transport.id,
             businessRef,
             status: "COMPLETED",
-            description: `Profit share transport ${transport.transportCode} (${owner.ownerPercent}% dari Rp${transportValue.toLocaleString("id-ID")})`,
+            description: `Profit share transport ${transport.transportCode} (${owner.partnerPercent}% dari Rp${transportValue.toLocaleString("id-ID")})`,
             createdById: user.id,
           },
         });

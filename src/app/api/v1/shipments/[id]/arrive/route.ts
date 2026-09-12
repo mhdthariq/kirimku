@@ -4,6 +4,7 @@ import { guard, ok, handle, fail, num, str } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
 import { canTransition } from "@/lib/shipment-flow";
 import { scanProgress } from "@/lib/scan-flow";
+import { assertShipmentScope } from "@/lib/gudang-scope";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -27,6 +28,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       include: { customer: { select: { name: true } }, details: { select: { id: true } } },
     });
     if (!master) return fail(404, "Shipment tidak ditemukan.");
+    await assertShipmentScope(user, master);
 
     const body = await req.json().catch(() => ({}));
     const mode = body.mode === "walk_in" ? "walk_in" : "scan";
@@ -34,6 +36,9 @@ export async function POST(req: NextRequest, { params }: Params) {
     const warehouse = warehouseId ? await db.warehouse.findUnique({ where: { id: warehouseId } }) : null;
     if (!warehouse || !warehouse.isActive) {
       return fail(422, "Gudang tujuan wajib dipilih.", { warehouseId: ["Gudang tujuan wajib dipilih."] });
+    }
+    if (!user.isOwner && user.warehouseId !== warehouse.id) {
+      return fail(403, "Anda hanya bisa mengonfirmasi arrival di gudang Anda sendiri.");
     }
     const notes = str(body.notes);
 
@@ -56,37 +61,32 @@ export async function POST(req: NextRequest, { params }: Params) {
       return fail(422, `Walk-in hanya untuk shipment CREATED / READY_FOR_PICKUP (saat ini: ${master.status}).`);
     }
 
-    const updated = await db.masterShipment.update({
-      where: { id: master.id },
-      data: {
-        status: "RECEIVED_AT_GUDANG",
-        arrivedWarehouseId: warehouse.id,
-        // walk-in packages start their journey at this gudang
-        originWarehouseId: master.originWarehouseId ?? warehouse.id,
-      },
-    });
-
-    // Revision Part A — pickup lifecycle: now that the package has physically
-    // ARRIVED at the gudang and the arrival workflow is successfully completed,
-    // the pickup task(s) that fetched it become COMPLETED. (Kurir confirmation
-    // only moved them to PICKED_UP earlier.)
-    await db.pickup.updateMany({
-      where: { masterId: master.id, status: { in: ["ASSIGNED", "IN_PROGRESS", "PICKED_UP"] } },
-      data: { status: "COMPLETED", completedAt: new Date() },
-    });
-
     const description =
       mode === "scan"
         ? `Paket diterima di ${warehouse.name} — ${master.details.length} paket terverifikasi scan${master.customer ? ` (kurir drop-off, shipment ${master.customer.name})` : ""}`
         : `Pelanggan ${master.customer?.name ?? ""} menyerahkan langsung di ${warehouse.name} (walk-in, tanpa scan)`;
-
-    await db.trackingEvent.create({
-      data: {
-        masterId: master.id,
-        event: "RECEIVED_AT_GUDANG",
-        description: notes ? `${description} — ${notes}` : description,
-        actorId: user.id,
-      },
+    const updated = await db.$transaction(async (tx) => {
+      const result = await tx.masterShipment.update({
+        where: { id: master.id },
+        data: {
+          status: "RECEIVED_AT_GUDANG",
+          arrivedWarehouseId: warehouse.id,
+          originWarehouseId: master.originWarehouseId ?? warehouse.id,
+        },
+      });
+      await tx.pickup.updateMany({
+        where: { masterId: master.id, status: { in: ["ASSIGNED", "IN_PROGRESS", "PICKED_UP"] } },
+        data: { status: "COMPLETED", completedAt: new Date() },
+      });
+      await tx.trackingEvent.create({
+        data: {
+          masterId: master.id,
+          event: "RECEIVED_AT_GUDANG",
+          description: notes ? `${description} — ${notes}` : description,
+          actorId: user.id,
+        },
+      });
+      return result;
     });
     await audit({
       action: "status_change",

@@ -3,12 +3,13 @@ import { db } from "@/lib/db";
 import { guard, ok, handle, fail, str, num } from "@/lib/api-helpers";
 import { audit, diffFields } from "@/lib/audit";
 import { scanProgress } from "@/lib/scan-flow";
+import { assertShipmentScope } from "@/lib/gudang-scope";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(req: NextRequest, { params }: Params) {
   return handle(async () => {
-    await guard(req, "delivery.view");
+    const user = await guard(req, "delivery.view");
     const { id } = await params;
     const delivery = await db.delivery.findUnique({
       where: { id: Number(id) },
@@ -18,6 +19,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       },
     });
     if (!delivery) return fail(404, "Delivery tidak ditemukan.");
+    await assertShipmentScope(user, delivery.master);
     const progress = await scanProgress({ deliveryId: delivery.id });
     return ok({ ...delivery, progress });
   });
@@ -27,8 +29,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
   return handle(async () => {
     const user = await guard(req, "delivery.assign_kurir");
     const { id } = await params;
-    const existing = await db.delivery.findUnique({ where: { id: Number(id) } });
+    const existing = await db.delivery.findUnique({ where: { id: Number(id) }, include: { master: true } });
     if (!existing) return fail(404, "Delivery tidak ditemukan.");
+    await assertShipmentScope(user, existing.master);
     if (["COMPLETED", "FAILED"].includes(existing.status)) {
       return fail(422, `Delivery dengan status ${existing.status} tidak bisa diubah.`);
     }
@@ -46,8 +49,9 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   return handle(async () => {
     const user = await guard(req, "delivery.assign_kurir");
     const { id } = await params;
-    const existing = await db.delivery.findUnique({ where: { id: Number(id) } });
+    const existing = await db.delivery.findUnique({ where: { id: Number(id) }, include: { master: true } });
     if (!existing) return fail(404, "Delivery tidak ditemukan.");
+    await assertShipmentScope(user, existing.master);
     if (existing.status === "COMPLETED") return fail(422, "Delivery yang sudah selesai tidak bisa dihapus.");
     await db.delivery.delete({ where: { id: existing.id } });
     await audit({ action: "deleted", entityType: "delivery", entityId: existing.id, entityLabel: existing.deliveryCode, actor: user, before: existing });

@@ -3,18 +3,20 @@ import { db } from "@/lib/db";
 import { guard, ok, handle, fail, str, num } from "@/lib/api-helpers";
 import { audit, diffFields } from "@/lib/audit";
 import { scanProgress, paymentSummary } from "@/lib/scan-flow";
+import { assertShipmentScope } from "@/lib/gudang-scope";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(req: NextRequest, { params }: Params) {
   return handle(async () => {
-    await guard(req, "pickup.view");
+    const user = await guard(req, "pickup.view");
     const { id } = await params;
     const pickup = await db.pickup.findUnique({
       where: { id: Number(id) },
       include: { master: { include: { customer: true, details: { orderBy: { id: "asc" } } } }, scans: { include: { scannedBy: true }, orderBy: { scannedAt: "desc" } } },
     });
     if (!pickup) return fail(404, "Pickup tidak ditemukan.");
+    await assertShipmentScope(user, pickup.master);
     const progress = await scanProgress({ pickupId: pickup.id });
     const payment = await paymentSummary(pickup.masterId);
     return ok({ ...pickup, progress, paymentSummary: payment });
@@ -25,8 +27,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
   return handle(async () => {
     const user = await guard(req, "pickup.assign_kurir");
     const { id } = await params;
-    const existing = await db.pickup.findUnique({ where: { id: Number(id) } });
+    const existing = await db.pickup.findUnique({ where: { id: Number(id) }, include: { master: true } });
     if (!existing) return fail(404, "Pickup tidak ditemukan.");
+    await assertShipmentScope(user, existing.master);
     if (["COMPLETED", "CANCELLED"].includes(existing.status)) {
       return fail(422, `Pickup dengan status ${existing.status} tidak bisa diubah.`);
     }

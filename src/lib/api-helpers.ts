@@ -47,6 +47,9 @@ export async function handle(fn: () => Promise<NextResponse>): Promise<NextRespo
     return await fn();
   } catch (error) {
     if (error instanceof HttpError) return fail(error.status, error.message, error.errors);
+    if (error instanceof Error && error.name === "PrismaClientValidationError") {
+      return fail(422, "Invalid request parameters.");
+    }
     console.error("[api] unhandled error", error);
     return fail(500, "Internal server error.");
   }

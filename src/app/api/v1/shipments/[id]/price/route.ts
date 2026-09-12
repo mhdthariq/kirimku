@@ -4,6 +4,7 @@ import { guard, ok, handle, fail, num } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
 import { resolveTariff, computePricing } from "@/lib/pricing";
 import { hasPermission } from "@/lib/auth";
+import { assertShipmentScope } from "@/lib/gudang-scope";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -26,6 +27,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       include: { customer: true, details: true },
     });
     if (!master) return fail(404, "Shipment tidak ditemukan.");
+    await assertShipmentScope(user, master);
     if (!["CREATED", "READY_FOR_PICKUP", "PICKED_UP"].includes(master.status)) {
       return fail(422, "Harga hanya bisa dihitung sebelum shipment masuk gudang.");
     }

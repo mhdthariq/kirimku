@@ -2,13 +2,17 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { guard, ok, handle, fail, requireStr, requireNum, str } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
+import { assertShipmentScope } from "@/lib/gudang-scope";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(req: NextRequest, { params }: Params) {
   return handle(async () => {
-    await guard(req, "payment.view");
+    const user = await guard(req, "payment.view");
     const { id } = await params;
+    const master = await db.masterShipment.findUnique({ where: { id: Number(id) } });
+    if (!master) return fail(404, "Shipment tidak ditemukan.");
+    await assertShipmentScope(user, master);
     const payments = await db.payment.findMany({
       where: { masterId: Number(id) },
       orderBy: { createdAt: "desc" },
@@ -24,6 +28,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const { id } = await params;
     const master = await db.masterShipment.findUnique({ where: { id: Number(id) } });
     if (!master) return fail(404, "Shipment tidak ditemukan.");
+    await assertShipmentScope(user, master);
     if (!master.priceAmount) return fail(422, "Hitung harga shipment terlebih dahulu sebelum mencatat pembayaran.");
 
     const body = await req.json().catch(() => ({}));

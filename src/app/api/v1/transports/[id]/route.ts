@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { guard, ok, handle, fail, num, str, dateOrNull } from "@/lib/api-helpers";
 import { audit, diffFields } from "@/lib/audit";
 import { aggregateTransport, detailAggregates, isExecutorOnly } from "@/lib/transport-totals";
+import { assertTransportScope } from "@/lib/gudang-scope";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -35,6 +36,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       },
     });
     if (!transport) return fail(404, "Transport tidak ditemukan.");
+    await assertTransportScope(user, transport.route ?? { origin: null, destination: null }, transport.shipments.map((s) => s.master));
 
     // Server-side assignment check (Part Y) — never rely on frontend hiding.
     if (isExecutorOnly(user)) {
@@ -126,8 +128,12 @@ export async function PUT(req: NextRequest, { params }: Params) {
   return handle(async () => {
     const user = await guard(req, "transport.create");
     const { id } = await params;
-    const existing = await db.transport.findUnique({ where: { id: Number(id) } });
+    const existing = await db.transport.findUnique({
+      where: { id: Number(id) },
+      include: { route: true, shipments: { include: { master: true } } },
+    });
     if (!existing) return fail(404, "Transport tidak ditemukan.");
+    await assertTransportScope(user, existing.route ?? { origin: null, destination: null }, existing.shipments.map((s) => s.master));
     if (["DEPARTED", "ARRIVED"].includes(existing.status)) {
       return fail(422, `Transport dengan status ${existing.status} tidak bisa diubah.`);
     }
@@ -160,8 +166,12 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   return handle(async () => {
     const user = await guard(req, "transport.create");
     const { id } = await params;
-    const existing = await db.transport.findUnique({ where: { id: Number(id) }, include: { shipments: { include: { master: true } } } });
+    const existing = await db.transport.findUnique({
+      where: { id: Number(id) },
+      include: { route: true, shipments: { include: { master: true } } },
+    });
     if (!existing) return fail(404, "Transport tidak ditemukan.");
+    await assertTransportScope(user, existing.route ?? { origin: null, destination: null }, existing.shipments.map((s) => s.master));
     if (existing.status !== "PLANNED") return fail(422, "Hanya transport PLANNED yang bisa dihapus.");
 
     await db.$transaction(async (tx) => {

@@ -4,6 +4,7 @@ import { guard, ok, handle, fail } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
 import { canTransition } from "@/lib/shipment-flow";
 import { hasPermission } from "@/lib/auth";
+import { assertShipmentScope } from "@/lib/gudang-scope";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -26,6 +27,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const { id } = await params;
     const master = await db.masterShipment.findUnique({ where: { id: Number(id) }, include: { details: true } });
     if (!master) return fail(404, "Shipment tidak ditemukan.");
+    await assertShipmentScope(user, master);
     if (!canTransition(master.status, "READY_FOR_PICKUP")) {
       return fail(422, `Shipment dengan status ${master.status} tidak bisa di-submit untuk pickup.`);
     }

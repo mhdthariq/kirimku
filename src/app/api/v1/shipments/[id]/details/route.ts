@@ -3,13 +3,17 @@ import { db } from "@/lib/db";
 import { guard, ok, handle, fail, requireStr, num } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
 import { nextDetailCodes } from "@/lib/code-generator";
+import { assertShipmentScope } from "@/lib/gudang-scope";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(req: NextRequest, { params }: Params) {
   return handle(async () => {
-    await guard(req, "shipment_detail.view");
+    const user = await guard(req, "shipment_detail.view");
     const { id } = await params;
+    const master = await db.masterShipment.findUnique({ where: { id: Number(id) } });
+    if (!master) return fail(404, "Shipment tidak ditemukan.");
+    await assertShipmentScope(user, master);
     const details = await db.detailShipment.findMany({ where: { masterId: Number(id) }, orderBy: { id: "asc" } });
     return ok(details);
   });
@@ -26,6 +30,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const { id } = await params;
     const master = await db.masterShipment.findUnique({ where: { id: Number(id) } });
     if (!master) return fail(404, "Shipment tidak ditemukan.");
+    await assertShipmentScope(user, master);
     if (!["CREATED", "READY_FOR_PICKUP"].includes(master.status)) {
       return fail(422, "Detail hanya bisa ditambah saat status CREATED atau READY_FOR_PICKUP.");
     }

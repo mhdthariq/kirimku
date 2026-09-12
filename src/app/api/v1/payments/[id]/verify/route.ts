@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { guard, ok, handle, fail } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
+import { assertShipmentScope } from "@/lib/gudang-scope";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -11,6 +12,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const { id } = await params;
     const payment = await db.payment.findUnique({ where: { id: Number(id) }, include: { master: true } });
     if (!payment) return fail(404, "Payment tidak ditemukan.");
+    await assertShipmentScope(user, payment.master);
     if (payment.status !== "RECORDED") return fail(422, `Payment berstatus ${payment.status}, hanya RECORDED yang bisa diverifikasi.`);
 
     const updated = await db.payment.update({

@@ -114,6 +114,12 @@ model SessionToken {
   createdAt DateTime @default(now())
 }
 
+model CodeSequence {
+  key       String   @id
+  nextValue Int
+  updatedAt DateTime @updatedAt
+}
+
 // ---------------------------------------------------------------------------
 // Partner wallet system — Revise.md "Partner Wallet, B2B & Vehicle Owner
 // Financial Rules"

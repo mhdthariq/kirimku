@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { guard, ok, handle } from "@/lib/api-helpers";
 import { hasPermission } from "@/lib/auth";
-import { cityIndex, inScope, scopeForUser, shipmentGudangIds, pickupGudangIds, deliveryGudangIds, transportGudangIds } from "@/lib/gudang-scope";
+import { cityIndex, filterAuditEntriesForScope, inScope, scopeForUser, shipmentGudangIds, pickupGudangIds, deliveryGudangIds, transportGudangIds } from "@/lib/gudang-scope";
 
 export async function GET(req: NextRequest) {
   return handle(async () => {
@@ -50,16 +50,23 @@ export async function GET(req: NextRequest) {
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
       .slice(0, 6);
 
-    const recentAudit = can("audit_log.view")
+    const auditRows = can("audit_log.view")
       ? await db.auditLog.findMany({
           orderBy: { createdAt: "desc" },
-          take: 8,
+          take: scope.unscoped ? 8 : 100,
           include: { actor: true },
         })
       : [];
+    const auditFlags = scope.unscoped ? [] : await filterAuditEntriesForScope(auditRows, scope);
+    const auditVisible = scope.unscoped ? auditRows : auditRows.filter((_, index) => auditFlags[index]);
+
+    const visibleShipmentIds = scopedShipments.map((s) => s.id);
 
     const revenueAgg = await db.payment.aggregate({
-      where: { status: "VERIFIED" },
+      where: {
+        status: "VERIFIED",
+        ...(scope.unscoped ? {} : { masterId: { in: visibleShipmentIds } }),
+      },
       _sum: { amount: true },
     });
 
@@ -88,7 +95,7 @@ export async function GET(req: NextRequest) {
         customerName: s.customer.name,
         createdAt: s.createdAt,
       })),
-      recentAudit: recentAudit.map((a) => ({
+      recentAudit: auditVisible.slice(0, 8).map((a) => ({
         id: a.id,
         action: a.action,
         entityType: a.entityType,

@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import type { AuthUser } from "@/lib/auth";
+import { HttpError } from "@/lib/api-helpers";
 
 // ---------------------------------------------------------------------------
 // Gudang data separation (revisi: pisah data antar gudang)
@@ -40,6 +41,36 @@ export function inScope(gudangIds: number[], scope: GudangScope): boolean {
   if (scope.unscoped) return true;
   if (scope.warehouseId == null) return false; // bound to no gudang → nothing
   return gudangIds.includes(scope.warehouseId);
+}
+
+/** Enforce shipment ownership and gudang visibility for ID-based endpoints. */
+export async function assertShipmentScope(
+  user: AuthUser,
+  shipment: ShipmentLike & { createdByPartnerId?: number | null },
+): Promise<void> {
+  if (user.isOwner || user.permissions.includes("*")) return;
+  if (user.partnerType === "MARKETING" && user.partnerId != null) {
+    if (shipment.createdByPartnerId !== user.partnerId) {
+      throw new HttpError(403, "Shipment ini bukan milik partner Anda.");
+    }
+    return;
+  }
+  const scope = await scopeForUser(user);
+  if (!inScope(shipmentGudangIds(shipment, await cityIndex()), scope)) {
+    throw new HttpError(403, "Shipment ini berada di gudang lain — data terpisah antar gudang.");
+  }
+}
+
+export async function assertTransportScope(
+  user: AuthUser,
+  route: { origin: string | null; destination: string | null },
+  shipments: ShipmentLike[],
+): Promise<void> {
+  if (user.isOwner || user.permissions.includes("*")) return;
+  const scope = await scopeForUser(user);
+  if (!inScope(transportGudangIds(route, shipments, await cityIndex()), scope)) {
+    throw new HttpError(403, "Transport ini berada di gudang lain — data terpisah antar gudang.");
+  }
 }
 
 // ---------------------------------------------------------------------------

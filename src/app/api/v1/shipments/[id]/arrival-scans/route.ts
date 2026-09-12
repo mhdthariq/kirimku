@@ -3,16 +3,18 @@ import { db } from "@/lib/db";
 import { guard, ok, handle, fail, requireStr } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
 import { normalizeMethod, scanProgress } from "@/lib/scan-flow";
+import { assertShipmentScope } from "@/lib/gudang-scope";
 
 type Params = { params: Promise<{ id: string }> };
 
 /** Arrival scan progress for a shipment (gudang_arrival context). */
 export async function GET(req: NextRequest, { params }: Params) {
   return handle(async () => {
-    await guard(req, "shipment.view");
+    const user = await guard(req, "shipment.view");
     const { id } = await params;
     const master = await db.masterShipment.findUnique({ where: { id: Number(id) } });
     if (!master) return fail(404, "Shipment tidak ditemukan.");
+    await assertShipmentScope(user, master);
     const progress = await scanProgress({ masterId: master.id, context: "gudang_arrival" });
     return ok({ progress });
   });
@@ -30,6 +32,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const { id } = await params;
     const master = await db.masterShipment.findUnique({ where: { id: Number(id) }, include: { details: true } });
     if (!master) return fail(404, "Shipment tidak ditemukan.");
+    await assertShipmentScope(user, master);
     if (master.status !== "PICKED_UP") {
       return fail(422, `Konfirmasi tiba di gudang hanya untuk shipment PICKED_UP (saat ini: ${master.status}).`);
     }

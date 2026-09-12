@@ -5,7 +5,7 @@ import { audit, diffFields } from "@/lib/audit";
 import { pricingPreview } from "@/lib/pricing";
 import { computeTotals } from "@/lib/shipment-totals";
 import { paymentSummary } from "@/lib/scan-flow";
-import { cityIndex, inScope, shipmentGudangIds, scopeForUser } from "@/lib/gudang-scope";
+import { assertShipmentScope } from "@/lib/gudang-scope";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -29,10 +29,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     if (!shipment) return fail(404, "Shipment tidak ditemukan.");
     // Gudang data separation: scoped users may only open shipments of their
     // own gudang (e.g. Bandung staff cannot open a Jakarta shipment by id).
-    const scope = await scopeForUser(user);
-    if (!inScope(shipmentGudangIds(shipment, await cityIndex()), scope)) {
-      return fail(403, "Shipment ini berada di gudang lain — data terpisah antar gudang.");
-    }
+    await assertShipmentScope(user, shipment);
     // Server-computed pricing preview (actual / volumetric / chargeable) so the
     // client never re-implements (or hardcodes) the volumetric formula.
     const preview = await pricingPreview(shipment);
@@ -49,6 +46,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const body = await req.json().catch(() => ({}));
     const existing = await db.masterShipment.findUnique({ where: { id: Number(id) } });
     if (!existing) return fail(404, "Shipment tidak ditemukan.");
+    await assertShipmentScope(user, existing);
     if (existing.status !== "CREATED") {
       return fail(422, "Shipment hanya bisa diubah saat status CREATED.");
     }
@@ -90,6 +88,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     const { id } = await params;
     const existing = await db.masterShipment.findUnique({ where: { id: Number(id) } });
     if (!existing) return fail(404, "Shipment tidak ditemukan.");
+    await assertShipmentScope(user, existing);
     if (existing.status !== "CREATED") {
       return fail(422, "Shipment hanya bisa dihapus saat status CREATED. Gunakan Cancel untuk shipment yang sudah berjalan.");
     }

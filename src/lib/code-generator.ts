@@ -11,7 +11,6 @@ export async function nextCode(
   field: "pickupCode" | "transportCode" | "deliveryCode" | "invoiceNumber" | "masterCode" | "detailCode" | "code" | "employeeNumber" | "requestCode" | "repairCode" | "settlementCode" | "commissionCode" = "code",
   fallbackStart = 1,
 ): Promise<string> {
-   
   const rows: { code: string }[] = await (db as any)[model].findMany({
     select: { [field]: true },
   }).then((list: Record<string, string>[]) => list.map((r) => ({ code: String(r[field]) })));
@@ -21,7 +20,13 @@ export async function nextCode(
     const match = row.code.match(/(\d+)\s*$/);
     if (match) max = Math.max(max, Number(match[1]));
   }
-  const seq = Math.max(max + 1, fallbackStart);
+  const key = `${model}:${field}:${prefix}`;
+  const sequence = await db.codeSequence.upsert({
+    where: { key },
+    create: { key, nextValue: Math.max(max + 2, fallbackStart + 1) },
+    update: { nextValue: { increment: 1 } },
+  });
+  const seq = sequence.nextValue - 1;
   return `${prefix}${String(seq).padStart(6, "0")}`;
 }
 

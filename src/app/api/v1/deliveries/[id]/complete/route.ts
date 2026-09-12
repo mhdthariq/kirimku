@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { guard, ok, handle, fail, requireStr, str } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
 import { assertKurirAssignment, scanProgress } from "@/lib/scan-flow";
+import { assertShipmentScope } from "@/lib/gudang-scope";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -21,6 +22,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       include: { master: { include: { details: true, customer: true } } },
     });
     if (!delivery) return fail(404, "Delivery tidak ditemukan.");
+    await assertShipmentScope(user, delivery.master);
     if (delivery.status === "COMPLETED") return fail(422, "Delivery sudah selesai.");
     if (delivery.status === "FAILED") return fail(422, "Delivery ditandai gagal — buat task baru bila perlu.");
 
@@ -45,20 +47,23 @@ export async function POST(req: NextRequest, { params }: Params) {
       : user.name;
     const customerName = delivery.master.customer.name;
 
-    const updated = await db.delivery.update({
-      where: { id: delivery.id },
-      data: { status: "COMPLETED", completedAt: new Date(), proofOfDelivery: proof, notes },
-    });
-    if (delivery.master.status !== "DELIVERED") {
-      await db.masterShipment.update({ where: { id: delivery.masterId }, data: { status: "DELIVERED" } });
-    }
-    await db.trackingEvent.create({
-      data: {
-        masterId: delivery.masterId,
-        event: "DELIVERED",
-        description: `Delivered to ${customerName} by ${kurirName} — received by: ${proof}`,
-        actorId: user.id,
-      },
+    const { updated } = await db.$transaction(async (tx) => {
+      const result = await tx.delivery.update({
+        where: { id: delivery.id },
+        data: { status: "COMPLETED", completedAt: new Date(), proofOfDelivery: proof, notes },
+      });
+      if (delivery.master.status !== "DELIVERED") {
+        await tx.masterShipment.update({ where: { id: delivery.masterId }, data: { status: "DELIVERED" } });
+      }
+      await tx.trackingEvent.create({
+        data: {
+          masterId: delivery.masterId,
+          event: "DELIVERED",
+          description: `Delivered to ${customerName} by ${kurirName} — received by: ${proof}`,
+          actorId: user.id,
+        },
+      });
+      return { updated: result };
     });
     await audit({
       action: "status_change",

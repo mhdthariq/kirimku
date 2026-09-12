@@ -113,52 +113,66 @@ export async function POST(req: NextRequest) {
     // users (owner/admin) create unattributed shipments.
     const createdByPartnerId = user.partnerType === "MARKETING" && user.partnerId ? user.partnerId : null;
 
-    const shipment = await db.masterShipment.create({
-      data: {
-        masterCode,
-        resi: masterCode,
-        customerId,
-        tariffId: tariff?.id ?? null,
-        status: "CREATED",
-        origin,
-        destination,
-        originWarehouseId: originWarehouseId ?? null,
-        destinationWarehouseId: destinationWarehouseId ?? null,
-        penerimaName: str(body.penerimaName),
-        penerimaAddress: str(body.penerimaAddress),
-        penerimaContact: str(body.penerimaContact),
-        discountAmount,
-        createdByPartnerId,
-      },
-    });
-
     // Optional inline details — quantity N expands into N package rows with unique codes
     const details = Array.isArray(body.details) ? body.details : [];
+    if (details.length > 100) {
+      return fail(422, "Maksimal 100 baris detail per shipment.");
+    }
     for (const d of details) {
-      const description = str(d.description);
-      if (!description) continue;
-      const qty = Math.max(1, Math.round(num(d.quantity) ?? 1));
-      const codes = await nextDetailCodes(shipment.id, masterCode, qty);
-      await db.detailShipment.createMany({
-        data: codes.map((detailCode) => ({
-          detailCode,
-          masterId: shipment.id,
-          description,
-          lengthCm: num(d.lengthCm),
-          widthCm: num(d.widthCm),
-          heightCm: num(d.heightCm),
-          actualWeightKg: num(d.actualWeightKg) ?? 0,
-        })),
-      });
+      const qty = Math.round(num(d.quantity) ?? 1);
+      if (!Number.isFinite(qty) || qty < 1 || qty > 500) {
+        return fail(422, "Jumlah paket setiap detail harus antara 1–500.", { quantity: ["Jumlah paket harus antara 1–500."] });
+      }
     }
 
-    await db.trackingEvent.create({
-      data: {
-        masterId: shipment.id,
-        event: "CREATED",
-        description: `Shipment ${masterCode} dibuat oleh ${user.name}`,
-        actorId: user.id,
-      },
+    const shipment = await db.$transaction(async (tx) => {
+      const created = await tx.masterShipment.create({
+        data: {
+          masterCode,
+          resi: masterCode,
+          customerId,
+          tariffId: tariff?.id ?? null,
+          status: "CREATED",
+          origin,
+          destination,
+          originWarehouseId: originWarehouseId ?? null,
+          destinationWarehouseId: destinationWarehouseId ?? null,
+          penerimaName: str(body.penerimaName),
+          penerimaAddress: str(body.penerimaAddress),
+          penerimaContact: str(body.penerimaContact),
+          discountAmount,
+          createdByPartnerId,
+        },
+      });
+
+      // Optional inline details — quantity N expands into N package rows with unique codes
+      for (const d of details) {
+        const description = str(d.description);
+        if (!description) continue;
+        const qty = Math.round(num(d.quantity) ?? 1);
+        const codes = await nextDetailCodes(created.id, masterCode, qty);
+        await tx.detailShipment.createMany({
+          data: codes.map((detailCode) => ({
+            detailCode,
+            masterId: created.id,
+            description,
+            lengthCm: num(d.lengthCm),
+            widthCm: num(d.widthCm),
+            heightCm: num(d.heightCm),
+            actualWeightKg: num(d.actualWeightKg) ?? 0,
+          })),
+        });
+      }
+
+      await tx.trackingEvent.create({
+        data: {
+          masterId: created.id,
+          event: "CREATED",
+          description: `Shipment ${masterCode} dibuat oleh ${user.name}`,
+          actorId: user.id,
+        },
+      });
+      return created;
     });
     await audit({ action: "created", entityType: "shipment", entityId: shipment.id, entityLabel: masterCode, actor: user, after: shipment });
     const full = await db.masterShipment.findUnique({ where: { id: shipment.id }, include: { customer: true, details: true } });
