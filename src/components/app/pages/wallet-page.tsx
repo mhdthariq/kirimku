@@ -42,6 +42,8 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
+const MIN_TOP_UP_AMOUNT = 10_000;
+
 /**
  * Partner Wallet (Revise.md §31 Marketing / §32 Vehicle Owner):
  * Balance · Top Up (Marketing only) · Transactions · Commissions (Marketing) ·
@@ -444,11 +446,16 @@ function TopUpDialog({
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [amountError, setAmountError] = useState("");
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     const amt = Number(amount);
-    if (!amt || amt <= 0) return;
+    if (!Number.isInteger(amt) || amt < MIN_TOP_UP_AMOUNT) {
+      setAmountError(`Minimal top up adalah Rp${MIN_TOP_UP_AMOUNT.toLocaleString("id-ID")}.`);
+      return;
+    }
+    setAmountError("");
     setBusy(true);
     const ok = await runAction(() => apiPost("/topups", { amount: amt, note: note || null }), {
       success: "Permintaan top up dibuat — transfer ke rekening perusahaan lalu submit bukti.",
@@ -456,6 +463,7 @@ function TopUpDialog({
     if (ok) {
       setAmount("");
       setNote("");
+      setAmountError("");
       onOpenChange(false);
       onDone();
     }
@@ -464,32 +472,44 @@ function TopUpDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-lg">
+        <DialogHeader className="shrink-0 px-7 pt-7 pb-5">
           <DialogTitle>Top Up Wallet</DialogTitle>
           <DialogDescription>
             Buat permintaan top up (PENDING_PAYMENT), transfer ke rekening perusahaan, lalu submit bukti transfer.
           </DialogDescription>
         </DialogHeader>
-        {bankInfo && (
-          <div className="rounded-lg border bg-muted/40 p-3 text-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Rekening Perusahaan</p>
-            <p className="mt-1 font-semibold">{bankInfo.accountName}</p>
-            <p className="font-mono">{bankInfo.accountNumber} · {bankInfo.bankName}</p>
-          </div>
-        )}
-        <form onSubmit={onSubmit} className="space-y-3">
-          <Field label="Jumlah Top Up (Rupiah)">
-            <NumberInput value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="200000" min={1} required />
-          </Field>
-          <Field label="Catatan (opsional)">
-            <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="mis. transfer via BCA mobile jam 08:30" rows={2} />
-          </Field>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Batal</Button>
-            <SubmitButton busy={busy}>Buat Permintaan</SubmitButton>
-          </DialogFooter>
-        </form>
+        <div className="min-h-0 flex-1 overflow-y-auto px-7 pb-7">
+          {bankInfo && (
+            <div className="rounded-lg border bg-muted/40 p-4 text-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Rekening Perusahaan</p>
+              <p className="mt-1 font-semibold">{bankInfo.accountName}</p>
+              <p className="font-mono">{bankInfo.accountNumber} · {bankInfo.bankName}</p>
+            </div>
+          )}
+          <form id="top-up-form" onSubmit={onSubmit} className="pt-6 space-y-5">
+            <Field label="Jumlah Top Up (Rupiah)" error={amountError}>
+              <NumberInput
+                value={amount}
+                onChange={(e) => {
+                  setAmount(e.target.value);
+                  if (amountError) setAmountError("");
+                }}
+                placeholder="200000"
+                min={MIN_TOP_UP_AMOUNT}
+                step={1000}
+                required
+              />
+            </Field>
+            <Field label="Catatan (opsional)">
+              <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="mis. transfer via BCA mobile jam 08:30" rows={3} />
+            </Field>
+          </form>
+        </div>
+        <DialogFooter className="mx-0 mb-0 shrink-0 px-7 pt-5 pb-7 sm:mx-0 sm:mb-0">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Batal</Button>
+          <SubmitButton busy={busy} form="top-up-form">Buat Permintaan</SubmitButton>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

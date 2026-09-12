@@ -5,6 +5,8 @@ import { requirePartner, financeAudit } from "@/lib/wallet";
 import { nextCode } from "@/lib/code-generator";
 import { COMPANY_BANK } from "@/lib/company";
 
+const MIN_TOP_UP_AMOUNT = 10_000;
+
 /**
  * Top Up workflow (§10/§11) — Marketing wallet deposits:
  *   Marketing creates request (PENDING_PAYMENT)
@@ -58,7 +60,7 @@ export async function POST(req: NextRequest) {
     const user = await guard(req, "wallet.topup.create");
     const partner = requirePartner(user, "MARKETING");
     const body = await req.json().catch(() => ({}));
-    const amount = requireNum(body.amount, "amount", 1);
+    const amount = requireNum(body.amount, "amount", MIN_TOP_UP_AMOUNT);
     const note = str(body.note);
 
     const requestCode = await nextCode("topUpRequest", "TOP-", "requestCode");

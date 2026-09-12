@@ -38,21 +38,39 @@ export function SubmitButton({
   busy,
   children,
   className,
+  form,
 }: {
   busy?: boolean;
   children: React.ReactNode;
   className?: string;
+  form?: string;
 }) {
   return (
-    <Button type="submit" disabled={busy} className={className}>
+    <Button type="submit" disabled={busy} className={className} form={form}>
       {busy && <Loader2 className="h-4 w-4 animate-spin" />}
       {children}
     </Button>
   );
 }
 
-export function NumberInput(props: React.ComponentProps<typeof Input>) {
-  return <Input type="number" step="any" {...props} />;
+export function NumberInput({ onKeyDown, onPaste, ...props }: React.ComponentProps<typeof Input>) {
+  function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "0" && event.currentTarget.value === "") {
+      event.preventDefault();
+      return;
+    }
+    onKeyDown?.(event);
+  }
+
+  function handlePaste(event: React.ClipboardEvent<HTMLInputElement>) {
+    if (event.currentTarget.value === "" && event.clipboardData.getData("text").startsWith("0")) {
+      event.preventDefault();
+      return;
+    }
+    onPaste?.(event);
+  }
+
+  return <Input type="number" step="any" {...props} onKeyDown={handleKeyDown} onPaste={handlePaste} />;
 }
 
 export function FormSelect({
