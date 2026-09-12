@@ -356,11 +356,9 @@ export function InvoicesPage() {
                       {form.lines.map((line, i) => (
                         <div key={i} className="space-y-1.5 rounded-lg border p-2.5">
                           <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_36px]">
-                            <select
-                              className="h-8 w-full rounded-md border border-input bg-transparent px-2 text-xs shadow-xs"
+                            <FormSelect
                               value={line.shipmentId}
-                              onChange={(e) => {
-                                const shipmentId = e.target.value;
+                              onValueChange={(shipmentId) => {
                                 const picked = customerShipments.find((s) => String(s.id) === shipmentId);
                                 setForm((f) => ({
                                   ...f,
@@ -380,17 +378,13 @@ export function InvoicesPage() {
                                   ),
                                 }));
                               }}
+                              placeholder="— tanpa link shipment —"
+                              options={customerShipments.map((s) => ({
+                                value: String(s.id),
+                                label: `${s.masterCode} · ${formatRupiah(s.priceAmount)}${s.createdByPartnerId ? " · marketing" : ""}`,
+                              }))}
                               disabled={busy}
-                              aria-label={`Shipment baris ${i + 1}`}
-                            >
-                              <option value="">— tanpa link shipment —</option>
-                              {customerShipments.map((s) => (
-                                <option key={s.id} value={s.id}>
-                                  {s.masterCode} · {formatRupiah(s.priceAmount)}
-                                  {s.createdByPartnerId ? " · marketing" : ""}
-                                </option>
-                              ))}
-                            </select>
+                            />
                             <Button
                               type="button"
                               variant="ghost"

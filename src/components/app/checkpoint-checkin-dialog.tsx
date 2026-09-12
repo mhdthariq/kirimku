@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { apiPost, type CheckinResponse, type Checkpoint } from "@/lib/client-api";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { formatNumber } from "@/components/app/form-parts";
+import { FormSelect, formatNumber } from "@/components/app/form-parts";
 
 export interface CheckinCheckpointInfo extends Checkpoint {
   checkedIn: boolean;
@@ -204,19 +204,13 @@ export function CheckpointCheckinDialog({ open, onOpenChange, transportId, trans
           {/* checkpoint picker */}
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-foreground">Checkpoint</label>
-            <select
-              className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
-              value={checkpointId ?? ""}
-              onChange={(e) => setCheckpointId(Number(e.target.value) || null)}
+            <FormSelect
+              value={checkpointId == null ? "" : String(checkpointId)}
+              onValueChange={(value) => setCheckpointId(Number(value) || null)}
+              placeholder={pending.length === 0 ? "Semua checkpoint sudah check-in" : "Pilih checkpoint…"}
+              options={pending.map((c) => ({ value: String(c.id), label: `#${c.sequence} · ${c.name}` }))}
               disabled={submitting || pending.length === 0}
-            >
-              {pending.length === 0 && <option value="">Semua checkpoint sudah check-in</option>}
-              {pending.map((c) => (
-                <option key={c.id} value={c.id}>
-                  #{c.sequence} · {c.name}
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
           {/* GPS */}
