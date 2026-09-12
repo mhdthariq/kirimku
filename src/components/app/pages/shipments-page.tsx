@@ -337,6 +337,11 @@ function ShipmentList() {
                     <p className="text-xs text-muted-foreground">
                       {s.origin} → {s.destination}
                     </p>
+                    {s.customer?.type === "b2b" && s.invoiceLines?.[0] && (
+                      <a href={`#/invoices/${s.invoiceLines[0].invoice.id}`} className="mt-1 inline-flex text-[10px] font-semibold text-amber-700 hover:underline dark:text-amber-300">
+                        Included in invoice {s.invoiceLines[0].invoice.invoiceNumber}
+                      </a>
+                    )}
                     {s.penerimaName && <p className="text-[11px] text-muted-foreground">penerima: {s.penerimaName}</p>}
                   </div>
                 ),
@@ -975,6 +980,11 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
         actions={
           <>
             <StatusBadge status={shipment.status} />
+            {shipment.customer?.type === "b2b" && shipment.invoiceLines?.[0] && (
+              <a href={`#/invoices/${shipment.invoiceLines[0].invoice.id}`} className="rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                Included in {shipment.invoiceLines[0].invoice.invoiceNumber}
+              </a>
+            )}
             {shipment.status === "CREATED" && can.submitPickup && (
               <Button onClick={submitForPickup} disabled={shipment.details.length === 0}>
                 <Send className="h-4 w-4" /> Submit for Pickup

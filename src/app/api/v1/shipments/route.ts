@@ -33,6 +33,7 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: "desc" },
       include: {
         customer: true,
+        invoiceLines: { select: { invoice: { select: { id: true, invoiceNumber: true, status: true } } } },
         _count: { select: { details: true, pickups: true, deliveries: true, payments: true } },
         ...(hasPermission(user, "shipment.view_tracking") ? { trackingEvents: { orderBy: { occurredAt: "desc" as const }, take: 1 } } : {}),
       },

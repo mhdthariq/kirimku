@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, Receipt, Send, Trash2, Wallet } from "lucide-react";
+import { Plus, Printer, Receipt, Send, Trash2, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { apiDelete, apiGet, apiPost, hasPermission, type Invoice, type InvoiceLine, type Options } from "@/lib/client-api";
@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { InvoicePrint } from "@/components/app/invoice-print";
 
 interface DraftLine {
   description: string;
@@ -62,6 +63,7 @@ export function InvoicesPage() {
   const [settleAmount, setSettleAmount] = useState("");
   const [settleMethod, setSettleMethod] = useState("TRANSFER");
   const [settleRef, setSettleRef] = useState("");
+  const [printOpen, setPrintOpen] = useState(false);
 
   const rows = useMemo(() => {
     if (!data) return [];
@@ -214,7 +216,7 @@ export function InvoicesPage() {
                 header: "Nomor",
                 primary: true,
                 render: (inv) => (
-                  <button onClick={() => loadDetail(inv)} className="font-mono text-xs font-semibold text-primary hover:underline">
+                  <button onClick={() => (window.location.hash = `#/invoices/${inv.id}`)} className="font-mono text-xs font-semibold text-primary hover:underline">
                     {inv.invoiceNumber}
                   </button>
                 ),
@@ -262,7 +264,7 @@ export function InvoicesPage() {
                 header: "Aksi",
                 render: (inv) => (
                   <div className="flex flex-wrap gap-1.5">
-                    <Button variant="outline" size="sm" className="h-7" onClick={() => loadDetail(inv)}>
+                    <Button variant="outline" size="sm" className="h-7" onClick={() => (window.location.hash = `#/invoices/${inv.id}`)}>
                       Detail
                     </Button>
                     {inv.status === "DRAFT" && can.send && (
@@ -344,9 +346,10 @@ export function InvoicesPage() {
               {/* Revise.md §7.1 — pick the customer's B2B shipments to bill;
                   linked Marketing shipments attach the commission (§8). */}
               {(() => {
-                const customerShipments = (options?.b2bShipments ?? []).filter(
+                const allCustomerShipments = (options?.b2bShipments ?? []).filter(
                   (s) => !form.customerId || s.customerId === Number(form.customerId),
                 );
+                const customerShipments = allCustomerShipments.filter((s) => s.invoiceLines.length === 0);
                 const linkedPartner = form.lines
                   .map((l) => customerShipments.find((s) => String(s.id) === l.shipmentId)?.createdByPartnerId ?? null)
                   .find((p) => p != null);
@@ -423,6 +426,11 @@ export function InvoicesPage() {
                         </div>
                       ))}
                     </div>
+                    {allCustomerShipments.some((s) => s.invoiceLines.length > 0) && (
+                      <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                        {allCustomerShipments.filter((s) => s.invoiceLines.length > 0).length} shipment sudah termasuk invoice dan tidak bisa ditagihkan ulang.
+                      </p>
+                    )}
                     {linkedPartner != null && (
                       <p className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-[11px] text-primary">
                         Invoice ini membawa shipment buatan Marketing — komisi partner akan tercatat <b>PENDING</b> dan hanya dirilis saat invoice <b>LUNAS penuh</b> (§8/§9).
@@ -449,22 +457,45 @@ export function InvoicesPage() {
 
       {/* Detail dialog */}
       <Dialog open={!!detailWithLines} onOpenChange={(open) => !open && setDetail(null)}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="font-mono">{detailWithLines?.invoiceNumber}</DialogTitle>
-            <DialogDescription>
-              {detailWithLines?.customerName} · {formatDate(detailWithLines?.issueDate)} — status {detailWithLines?.status}
-            </DialogDescription>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader className="border-b pb-4">
+            <div className="flex items-start justify-between gap-4 pr-4">
+              <div>
+                <DialogTitle className="font-mono text-xl tracking-tight">{detailWithLines?.invoiceNumber}</DialogTitle>
+                <DialogDescription className="mt-1">Invoice B2B · diterbitkan {formatDate(detailWithLines?.issueDate)}</DialogDescription>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                {detailWithLines && <StatusBadge status={detailWithLines.status} />}
+                <Button variant="outline" size="sm" onClick={() => setPrintOpen(true)} disabled={!detailWithLines || !("lines" in detailWithLines)}>
+                  <Printer className="h-4 w-4" /> Cetak
+                </Button>
+              </div>
+            </div>
           </DialogHeader>
           {detailWithLines && "lines" in detailWithLines && (
             <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-lg border bg-muted/20 p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Ditagihkan kepada</p>
+                  <p className="mt-1 font-semibold text-foreground">{(detailWithLines as Invoice & { customer?: { companyName?: string | null } }).customer?.companyName ?? detailWithLines.customerName}</p>
+                  <p className="text-xs text-muted-foreground">{detailWithLines.customerCode}</p>
+                  {(detailWithLines as Invoice & { customer?: { address?: string | null } }).customer?.address && <p className="mt-1 text-xs text-muted-foreground">{(detailWithLines as Invoice & { customer?: { address?: string | null } }).customer?.address}</p>}
+                </div>
+                <div className="rounded-lg border bg-muted/20 p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Tanggal pembayaran</p>
+                  <div className="mt-1 grid grid-cols-2 gap-3 text-xs">
+                    <div><p className="text-muted-foreground">Jatuh tempo</p><p className="font-semibold">{formatDate(detailWithLines.dueDate)}</p></div>
+                    <div><p className="text-muted-foreground">Status</p><p className={detailWithLines.isOverdue ? "font-semibold text-destructive" : "font-semibold"}>{detailWithLines.isOverdue ? "Terlambat" : detailWithLines.status === "SETTLED" ? "Lunas" : "Belum lunas"}</p></div>
+                  </div>
+                </div>
+              </div>
               <div className="overflow-x-auto rounded-lg border">
                 <table className="w-full min-w-[480px] text-sm">
                   <thead>
                     <tr className="border-b bg-muted/50 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
                       <th className="px-3 py-2 font-semibold">Deskripsi</th>
                       <th className="px-3 py-2 text-right font-semibold">Qty</th>
-                      <th className="px-3 py-2 text-right font-semibold">Harga</th>
+                      <th className="px-3 py-2 text-right font-semibold">Harga satuan</th>
                       <th className="px-3 py-2 text-right font-semibold">Subtotal</th>
                     </tr>
                   </thead>
@@ -482,19 +513,21 @@ export function InvoicesPage() {
               </div>
 
               <div className="grid grid-cols-1 gap-2 text-center sm:grid-cols-3">
-                <div className="rounded-lg bg-muted/60 p-2.5">
-                  <p className="text-[10px] uppercase text-muted-foreground">Total</p>
-                  <p className="text-sm font-bold">{formatRupiah(detailWithLines.totalAmount)}</p>
+                <div className="rounded-lg border bg-muted/30 p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Total tagihan</p>
+                  <p className="mt-1 text-base font-bold">{formatRupiah(detailWithLines.totalAmount)}</p>
                 </div>
-                <div className="rounded-lg bg-primary/10 p-2.5">
-                  <p className="text-[10px] uppercase text-primary">Dibayar</p>
-                  <p className="text-sm font-bold text-primary">{formatRupiah(detailWithLines.settledAmount)}</p>
+                <div className="rounded-lg border border-primary/25 bg-primary/5 p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">Sudah dibayar</p>
+                  <p className="mt-1 text-base font-bold text-primary">{formatRupiah(detailWithLines.settledAmount)}</p>
                 </div>
-                <div className="rounded-lg bg-destructive/10 p-2.5">
-                  <p className="text-[10px] uppercase text-destructive">Sisa</p>
-                  <p className="text-sm font-bold text-destructive">{formatRupiah(detailWithLines.remainingAmount)}</p>
+                <div className="rounded-lg border border-destructive/25 bg-destructive/5 p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-destructive">Sisa pembayaran</p>
+                  <p className="mt-1 text-base font-bold text-destructive">{formatRupiah(detailWithLines.remainingAmount)}</p>
                 </div>
               </div>
+
+              {detailWithLines.notes && <div className="rounded-lg border-l-2 border-primary bg-primary/5 px-3 py-2 text-xs"><p className="font-semibold text-primary">Catatan</p><p className="mt-0.5 text-muted-foreground">{detailWithLines.notes}</p></div>}
 
               {/* Revise.md §8 — commission panel attached to this invoice */}
               {detailWithLines.commission && (
@@ -533,6 +566,8 @@ export function InvoicesPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {printOpen && detailWithLines && "lines" in detailWithLines && <InvoicePrint invoice={detailWithLines as Invoice & { lines: InvoiceLine[] }} onClose={() => setPrintOpen(false)} />}
 
       {/* Settle dialog */}
       <Dialog open={settleOpen} onOpenChange={setSettleOpen}>

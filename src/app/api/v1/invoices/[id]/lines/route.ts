@@ -28,6 +28,11 @@ export async function POST(req: NextRequest, { params }: Params) {
       if (shipment.customerId !== invoice.customerId) {
         return fail(422, `Shipment ${shipment.masterCode} bukan milik customer invoice ini.`);
       }
+      const alreadyInvoiced = await db.invoiceLine.findFirst({
+        where: { shipmentId: shipment.id },
+        include: { invoice: { select: { invoiceNumber: true } } },
+      });
+      if (alreadyInvoiced) return fail(422, `Shipment ${shipment.masterCode} sudah termasuk dalam invoice ${alreadyInvoiced.invoice.invoiceNumber}.`);
       shipmentId = shipment.id;
     }
 

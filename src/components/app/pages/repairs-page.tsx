@@ -4,9 +4,11 @@ import { useMemo, useState } from "react";
 import {
   CheckCircle2,
   ExternalLink,
+  FileImage,
   Loader2,
   Plus,
   ShieldCheck,
+  Upload,
   Wrench,
   XCircle,
 } from "lucide-react";
@@ -206,7 +208,7 @@ export function RepairsPage() {
         ]}
       />
 
-      <CreateRepairDialog open={createOpen} onOpenChange={setCreateOpen} onDone={reload} />
+      <CreateRepairDialog key={createOpen ? "open" : "closed"} open={createOpen} onOpenChange={setCreateOpen} onDone={reload} />
       <RepairDetailDialog repair={detail} onOpenChange={(open) => !open && setDetail(null)} />
     </div>
   );
@@ -215,6 +217,8 @@ export function RepairsPage() {
 function CreateRepairDialog({ open, onOpenChange, onDone }: { open: boolean; onOpenChange: (open: boolean) => void; onDone: () => void }) {
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ vehicleId: "", description: "", amount: "", repairDate: "", workshopVendor: "", notes: "" });
+  const [proof, setProof] = useState<{ name: string; type: string; dataUrl: string } | null>(null);
+  const [proofError, setProofError] = useState("");
   // Only partner-owned vehicles are eligible (repairs deduct from the Vehicle
   // Owner's profit — company vehicles have no owner to charge).
   const { data: ownedVehicles } = useApiData<{ id: number; vehicleNumber: string; owner?: { id: number } | null }[]>(
@@ -222,6 +226,23 @@ function CreateRepairDialog({ open, onOpenChange, onDone }: { open: boolean; onO
     [open],
   );
   const vehicleOptions = (ownedVehicles ?? []).filter((v) => v.owner != null);
+
+  function onProofChange(file: File | undefined) {
+    setProofError("");
+    if (!file) return;
+    if (!file.type.startsWith("image/") && file.type !== "application/pdf") {
+      setProofError("Pilih file gambar atau PDF.");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setProofError("Ukuran file maksimal 8 MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setProof({ name: file.name, type: file.type, dataUrl: String(reader.result) });
+    reader.onerror = () => setProofError("File tidak bisa dibaca. Coba pilih file lain.");
+    reader.readAsDataURL(file);
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -235,14 +256,14 @@ function CreateRepairDialog({ open, onOpenChange, onDone }: { open: boolean; onO
           repairDate: form.repairDate || null,
           workshopVendor: form.workshopVendor || null,
           notes: form.notes || null,
-          // placeholder SVG proof — represents the required invoice/receipt (§19)
-          proofUrl:
-            "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNDAiIGhlaWdodD0iMTIwIj48cmVjdCB3aWR0aD0iMjQwIiBoZWlnaHQ9IjEyMCIgZmlsbD0iI2Y4ZjlmYSIvPjx0ZXh0IHg9IjEyIiB5PSI3MCIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTMiIGZpbGw9IiM2NDc0OGIiPk5vdGEgUmVwYWlyIC0gQnVrdGkgUmVzbWk8L3RleHQ+PC9zdmc+",
+          proofUrl: proof?.dataUrl,
         }),
       { success: "Repair diajukan — status PENDING_CONFIRMATION, wallet belum terdeduct." },
     );
     if (ok) {
       setForm({ vehicleId: "", description: "", amount: "", repairDate: "", workshopVendor: "", notes: "" });
+      setProof(null);
+      setProofError("");
       onOpenChange(false);
       onDone();
     }
@@ -290,9 +311,20 @@ function CreateRepairDialog({ open, onOpenChange, onDone }: { open: boolean; onO
           <Field label="Catatan">
             <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} />
           </Field>
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-foreground">Bukti Repair <span className="text-destructive">*</span></p>
+            <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-primary/40 bg-primary/5 px-3 py-3 text-sm hover:bg-primary/10">
+              <Upload className="h-4 w-4 text-primary" />
+              <span className="min-w-0 flex-1"><span className="block font-medium">{proof ? proof.name : "Pilih nota, invoice, atau foto"}</span><span className="block text-xs text-muted-foreground">JPG, PNG, WEBP, atau PDF · maksimal 8 MB</span></span>
+              <input type="file" accept="image/*,application/pdf" className="sr-only" onChange={(e) => onProofChange(e.target.files?.[0])} />
+            </label>
+            {proofError && <p className="text-xs text-destructive">{proofError}</p>}
+            {proof?.type.startsWith("image/") && <img src={proof.dataUrl} alt="Preview bukti repair" className="max-h-40 w-full rounded-lg border object-contain" />}
+            {proof?.type === "application/pdf" && <p className="rounded-lg border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">PDF siap diunggah dan dapat dibuka kembali dari detail repair.</p>}
+          </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Batal</Button>
-            <SubmitButton busy={busy}>Ajukan Repair</SubmitButton>
+            <SubmitButton busy={busy} disabled={!proof}>Ajukan Repair</SubmitButton>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -333,9 +365,13 @@ function RepairDetailDialog({ repair, onOpenChange }: { repair: VehicleRepairRow
             </div>
           </div>
           {repair.proofUrl && (
-            <a href={repair.proofUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline">
-              <ExternalLink className="h-3.5 w-3.5" /> Lihat Bukti (nota / foto)
-            </a>
+            <div className="space-y-2 rounded-lg border border-primary/25 bg-primary/5 p-3">
+              <p className="flex items-center gap-1.5 text-xs font-semibold text-primary"><FileImage className="h-3.5 w-3.5" /> Bukti Repair</p>
+              {repair.proofUrl.startsWith("data:image/") && <img src={repair.proofUrl} alt={`Bukti ${repair.repairCode}`} className="max-h-64 w-full rounded-md border bg-white object-contain" />}
+              <a href={repair.proofUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline">
+                <ExternalLink className="h-3.5 w-3.5" /> Buka bukti dalam tab baru
+              </a>
+            </div>
           )}
         </div>
       </DialogContent>

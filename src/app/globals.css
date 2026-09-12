@@ -191,12 +191,26 @@
   animation: pulse-dot 2s ease-in-out infinite;
 }
 
+/* Physical paper proportions used by the on-screen print previews. */
+.invoice-sheet {
+  box-sizing: border-box;
+  width: min(100%, 210mm);
+  max-width: 210mm;
+  min-height: 297mm;
+}
+.thermal-sheet {
+  box-sizing: border-box;
+  width: min(100%, 100mm);
+  max-width: 100mm;
+  min-height: 150mm;
+}
+
 /* ---------------------------------------------------------------------------
 Resi print — when the ResiPrint portal is open, only it is printed
 (1 Resi Shipment + N Resi Detail stickers, one per page).
 --------------------------------------------------------------------------- */
 @media print {
-  body > *:not(#resi-print-portal) {
+  body > *:not(#resi-print-portal):not(#invoice-print-portal) {
     display: none !important;
   }
   #resi-print-portal {
@@ -211,18 +225,52 @@ Resi print — when the ResiPrint portal is open, only it is printed
   #resi-print-portal > div:last-child {
     padding: 0 !important;
   }
+  #invoice-print-portal {
+    position: static !important;
+    inset: auto !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+  }
+  #invoice-print-portal > div:first-child {
+    display: none !important;
+  }
+  .invoice-sheet {
+    page: invoice-page;
+    margin: 0 auto !important;
+    max-width: none !important;
+    width: 100% !important;
+    box-shadow: none !important;
+  }
+  .invoice-sheet thead {
+    display: table-header-group;
+  }
+  .invoice-sheet tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
   .resi-sheet {
+    page: thermal-page;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
     break-after: page;
     page-break-after: always;
     box-shadow: none !important;
     border: 1px solid #d4d4d4 !important;
-    max-width: 100% !important;
   }
   .resi-sheet:last-child {
     break-after: auto;
     page-break-after: auto;
   }
   @page {
-    margin: 10mm;
+    margin: 12mm;
+  }
+  @page invoice-page {
+    size: A4 portrait;
+    margin: 12mm;
+  }
+  @page thermal-page {
+    size: 100mm 150mm;
+    margin: 0;
   }
 }

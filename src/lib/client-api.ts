@@ -195,6 +195,7 @@ export interface Shipment {
   finalPriceAmount: number | null;
   createdByPartnerId?: number | null;
   createdAt: string;
+  invoiceLines?: { invoice: { id: number; invoiceNumber: string; status: string } }[];
   details?: DetailShipment[];
   _count?: { details: number; pickups: number; deliveries: number; payments: number };
   trackingEvents?: { id: number; event: string; description: string | null; occurredAt: string; actor?: { name: string } | null }[];
@@ -620,7 +621,7 @@ export interface Options {
   /** Revise.md §13 — vehicle-owner partners (vehicle ownership dropdown) */
   vehicleOwners?: { id: number; name: string; username: string; profitShare: { company: number; partner: number } }[];
   /** Revise.md §7.1 — B2B shipments available for invoice line linking */
-  b2bShipments?: { id: number; masterCode: string; priceAmount: number | null; finalPriceAmount: number | null; customerId: number; createdByPartnerId: number | null; origin: string; destination: string }[];
+  b2bShipments?: { id: number; masterCode: string; priceAmount: number | null; finalPriceAmount: number | null; customerId: number; createdByPartnerId: number | null; origin: string; destination: string; invoiceLines: { invoice: { id: number; invoiceNumber: string; status: string } }[] }[];
 }
 
 // ---------------------------------------------------------------------------

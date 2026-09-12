@@ -28,7 +28,11 @@ export async function GET(req: NextRequest) {
       db.masterShipment.findMany({
         where: { customer: { type: "b2b" }, status: { not: "CANCELLED" } },
         orderBy: { createdAt: "desc" },
-        select: { id: true, masterCode: true, priceAmount: true, finalPriceAmount: true, customerId: true, createdByPartnerId: true, origin: true, destination: true },
+        select: {
+          id: true, masterCode: true, priceAmount: true, finalPriceAmount: true, customerId: true,
+          createdByPartnerId: true, origin: true, destination: true,
+          invoiceLines: { select: { invoice: { select: { id: true, invoiceNumber: true, status: true } } } },
+        },
       }),
     ]);
     const company = { name: process.env.NEXT_PUBLIC_COMPANY_NAME ?? "KirimKu Logistics" };

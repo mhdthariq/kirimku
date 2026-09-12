@@ -17,6 +17,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       where: { id: Number(id) },
       include: {
         customer: true,
+        invoiceLines: { select: { invoice: { select: { id: true, invoiceNumber: true, status: true } } } },
         tariff: true,
         details: { orderBy: { id: "asc" } },
         trackingEvents: { orderBy: { occurredAt: "desc" }, include: { actor: true } },

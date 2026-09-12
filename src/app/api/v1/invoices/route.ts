@@ -102,6 +102,7 @@ export async function POST(req: NextRequest) {
     // the shipments' creators; all linked shipments must belong to the SAME
     // Marketing partner (or none) so a single commission can be tracked.
     const linkedPartnerIds = new Set<number>();
+    const linkedShipmentIds = new Set<number>();
     const resolvedLines: { description: string; quantity: number; unitPrice: number; shipmentId: number | null }[] = [];
     for (const l of validLines as { description: string | null; quantity: number; unitPrice: number; shipmentId: number | null }[]) {
       if (l.shipmentId == null) {
@@ -115,6 +116,17 @@ export async function POST(req: NextRequest) {
           lines: ["Shipment terpilih tidak cocok dengan customer invoice."],
         });
       }
+      if (linkedShipmentIds.has(shipment.id)) return fail(422, `Shipment ${shipment.masterCode} hanya boleh muncul satu kali dalam invoice.`);
+      const alreadyInvoiced = await db.invoiceLine.findFirst({
+        where: { shipmentId: shipment.id },
+        include: { invoice: { select: { invoiceNumber: true } } },
+      });
+      if (alreadyInvoiced) {
+        return fail(422, `Shipment ${shipment.masterCode} sudah termasuk dalam invoice ${alreadyInvoiced.invoice.invoiceNumber}.`, {
+          lines: ["Shipment yang sudah ditagihkan tidak bisa dipakai lagi."],
+        });
+      }
+      linkedShipmentIds.add(shipment.id);
       if (shipment.createdByPartnerId) linkedPartnerIds.add(shipment.createdByPartnerId);
       resolvedLines.push({ description: l.description ?? "", quantity: l.quantity, unitPrice: l.unitPrice, shipmentId: shipment.id });
     }
