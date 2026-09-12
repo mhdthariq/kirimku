@@ -232,12 +232,23 @@ function ShipmentList() {
   // Route dropdown — only tariffs matching the selected customer's B2B/B2C label
   const selectedCustomer = (options?.customers ?? []).find((c) => String(c.id) === form.customerId) ?? null;
   const routeOptions = (options?.tariffs ?? [])
-    .filter((t) => !selectedCustomer || !t.customerType || t.customerType === selectedCustomer.type)
+    .filter((t) => {
+      const now = Date.now();
+      const startsAt = new Date(t.effectiveFrom).getTime();
+      const endsAt = t.effectiveTo ? new Date(t.effectiveTo).getTime() : Number.POSITIVE_INFINITY;
+      return (
+        startsAt <= now &&
+        endsAt >= now &&
+        (!selectedCustomer || !t.customerType || t.customerType === selectedCustomer.type)
+      );
+    })
     .map((t) => ({
       value: String(t.id),
       label: `${t.origin} → ${t.destination} · ${t.customerType ? t.customerType.toUpperCase() : "SEMUA"} · Rp${formatNumber(t.ratePerKg, 0)}/kg`,
     }));
   const selectedTariff = (options?.tariffs ?? []).find((t) => String(t.id) === form.tariffId) ?? null;
+  const canAddDiscount = user?.partnerType === "MARKETING" || can.confirmArrival;
+  const discountIsMarketingFunded = user?.partnerType === "MARKETING";
 
   return (
     <div className="space-y-4">
@@ -480,14 +491,17 @@ function ShipmentList() {
                   disabled={busy}
                 />
               </Field>
-              {/* Revise.md §6 — Marketing B2C discount: amount-only input; the
-                  percentage is always derived by the system (never typed). */}
-              {user?.partnerType === "MARKETING" && selectedCustomer?.type === "b2c" && (
+              {/* Discount is entered in Rupiah; the backend derives its percentage. */}
+              {canAddDiscount && (
                 <Field
-                  label="Discount (Rupiah)"
+                  label={discountIsMarketingFunded ? "Discount Marketing (Rupiah)" : "Discount Perusahaan (Rupiah)"}
                   htmlFor="s-discount"
                   className="sm:col-span-2"
-                  hint="Ditanggung bagian Marketing Anda — persentase dihitung otomatis dari harga; maksimal sebesar bagian Marketing Anda (§6.2)."
+                  hint={
+                    discountIsMarketingFunded
+                      ? "Dipotong dari profit sharing Marketing; maksimal sebesar bagian Marketing. Persentase dihitung otomatis dari harga."
+                      : "Dipotong dari profit perusahaan; persentase dihitung otomatis dari harga."
+                  }
                 >
                   <NumberInput
                     id="s-discount"
@@ -1065,12 +1079,21 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
               <span className="text-xs font-semibold text-primary">{shipment.priceAmount != null ? "TOTAL HARGA" : "ESTIMASI HARGA"}</span>
               <span className="text-base font-bold text-primary">{formatRupiah(shipment.priceAmount ?? pricing?.estimatedPrice ?? null)}</span>
             </div>
-            {/* Revise.md §6 — Marketing-funded discount breakdown */}
+            {/* Discount breakdown: funding source is snapshotted at creation. */}
             {shipment.discountAmount > 0 && (
-              <div className="space-y-1.5 rounded-lg border border-chart-4/40 bg-chart-4/5 px-3 py-2.5 text-xs">
+              <div className={cn(
+                "space-y-1.5 rounded-lg border px-3 py-2.5 text-xs",
+                (shipment.discountFundedBy === "MARKETING" || shipment.createdByPartnerId != null)
+                  ? "border-chart-4/40 bg-chart-4/5"
+                  : "border-sky-400/40 bg-sky-500/5",
+              )}>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Discount Marketing</span>
-                  <span className="font-semibold text-chart-4">− {formatRupiah(shipment.discountAmount)}</span>
+                  <span className="text-muted-foreground">
+                    {shipment.discountFundedBy === "MARKETING" || shipment.createdByPartnerId != null ? "Discount Marketing" : "Discount Perusahaan"}
+                  </span>
+                  <span className={cn("font-semibold", shipment.discountFundedBy === "MARKETING" || shipment.createdByPartnerId != null ? "text-chart-4" : "text-sky-600 dark:text-sky-400")}>
+                    − {formatRupiah(shipment.discountAmount)}
+                  </span>
                 </div>
                 {shipment.discountPercentage != null && (
                   <div className="flex justify-between">
@@ -1083,7 +1106,9 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
                   <span className="font-bold">{formatRupiah(shipment.finalPriceAmount ?? shipment.paymentSummary?.finalPriceAmount ?? null)}</span>
                 </div>
                 <p className="text-[10px] text-muted-foreground">
-                  Discount ditanggung bagian Marketing — bagian perusahaan tetap dihitung dari harga asli (§6.1).
+                  {shipment.discountFundedBy === "MARKETING" || shipment.createdByPartnerId != null
+                    ? "Discount ditanggung bagian Marketing; bagian perusahaan tetap dihitung dari harga asli."
+                    : "Discount ditanggung perusahaan dan mengurangi profit perusahaan."}
                 </p>
               </div>
             )}

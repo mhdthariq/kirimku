@@ -179,7 +179,7 @@ export const ROLE_TEMPLATES: { slug: string; name: string; description: string; 
       "checkpoint.view", "checkpoint.create", "checkpoint.update", "checkpoint.delete",
       "transport.view", "transport.create", "transport.depart", "transport.arrive",
       "shipment.view", "shipment.view_tracking", "shipment.confirm_arrival", "shipment.notify_marketing",
-      "shipment_detail.view",
+      "shipment.create", "shipment.update", "shipment_detail.view", "shipment_detail.create", "shipment_detail.update", "shipment_detail.delete",
       "delivery.view", "delivery.assign_kurir",
       "pickup.view", "pickup.create", "pickup.assign_kurir", "pickup.confirm",
       "payment.view",

@@ -113,6 +113,7 @@ export async function POST(req: NextRequest) {
     // created it (drives B2B commission + discount validation). Non-partner
     // users (owner/admin) create unattributed shipments.
     const createdByPartnerId = user.partnerType === "MARKETING" && user.partnerId ? user.partnerId : null;
+  const discountFundedBy = createdByPartnerId ? "MARKETING" : "COMPANY";
 
     // Optional inline details — quantity N expands into N package rows with unique codes
     const details = Array.isArray(body.details) ? body.details : [];
@@ -142,6 +143,7 @@ export async function POST(req: NextRequest) {
           penerimaAddress: str(body.penerimaAddress),
           penerimaContact: str(body.penerimaContact),
           discountAmount,
+          discountFundedBy,
           createdByPartnerId,
         },
       });

@@ -51,10 +51,8 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     const r = computePricing(master.details, tariff);
 
-    // ----- Revise.md §6: Marketing-funded B2C discount -----------------------
-    // The company share keeps being calculated from the ORIGINAL price; the
-    // discount is absorbed by the Marketing partner's share. A discount that
-    // would push Marketing below zero is rejected (§6.2).
+    // Marketing discounts are absorbed by the partner share; company-funded
+    // discounts reduce company profit. Both must remain below the original price.
     let discountAmount = num(body.discountAmount) ?? master.discountAmount ?? 0;
     if (discountAmount < 0) discountAmount = 0;
     const partner = master.createdByPartnerId
@@ -66,7 +64,7 @@ export async function POST(req: NextRequest, { params }: Params) {
           discountAmount: ["Discount melebihi harga shipment."],
         });
       }
-      if (partner) {
+      if ((master.discountFundedBy === "MARKETING" || master.createdByPartnerId != null) && partner) {
         const partnerShare = (r.price * partner.partnerPercent) / 100;
         if (discountAmount > partnerShare + 0.001) {
           return fail(

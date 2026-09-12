@@ -318,6 +318,7 @@ model MasterShipment {
   discountAmount         Float    @default(0)
   discountPercentage     Float?   // computed at pricing time
   finalPriceAmount       Float?   // priceAmount − discountAmount (customer pays)
+  discountFundedBy       String   @default("COMPANY") // MARKETING | COMPANY
   // partner (Marketing) that created this shipment — drives B2B commission
   createdByPartnerId     Int?
   createdByPartner       Partner? @relation("ShipmentCreatorPartner", fields: [createdByPartnerId], references: [id])

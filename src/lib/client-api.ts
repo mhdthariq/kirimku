@@ -193,6 +193,7 @@ export interface Shipment {
   discountAmount: number;
   discountPercentage: number | null;
   finalPriceAmount: number | null;
+  discountFundedBy: "MARKETING" | "COMPANY";
   createdByPartnerId?: number | null;
   createdAt: string;
   invoiceLines?: { invoice: { id: number; invoiceNumber: string; status: string } }[];
@@ -616,7 +617,7 @@ export interface Options {
   routes: { id: number; name: string; origin: string | null; destination: string | null }[];
   warehouses: { id: number; code: string; name: string; city: string | null; customerSupportContact?: string | null }[];
   customers: { id: number; code: string; name: string; type: string }[];
-  tariffs: { id: number; origin: string; destination: string; customerType: string | null; ratePerKg: number; minChargeableKg: number; volumetricMultiplier: number; roundingMode: string; roundingUnitKg: number }[];
+  tariffs: { id: number; origin: string; destination: string; customerType: string | null; ratePerKg: number; minChargeableKg: number; volumetricMultiplier: number; roundingMode: string; roundingUnitKg: number; effectiveFrom: string; effectiveTo: string | null }[];
   permissions: { id: number; slug: string; module: string; description: string | null }[];
   /** Revise.md §13 — vehicle-owner partners (vehicle ownership dropdown) */
   vehicleOwners?: { id: number; name: string; username: string; profitShare: { company: number; partner: number } }[];
