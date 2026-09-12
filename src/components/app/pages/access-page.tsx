@@ -45,11 +45,13 @@ export function AccessPage() {
       <Tabs defaultValue={can.userView ? "users" : can.employeeView ? "employees" : "roles"}>
         <TabsList>
           {can.userView && <TabsTrigger value="users">Users</TabsTrigger>}
+          {can.userView && <TabsTrigger value="partners">Partners</TabsTrigger>}
           {can.roleView && <TabsTrigger value="roles">Roles</TabsTrigger>}
           {can.employeeView && <TabsTrigger value="employees">Employees</TabsTrigger>}
           <TabsTrigger value="activity">Log Aktivitas</TabsTrigger>
         </TabsList>
         {can.userView && <TabsContent value="users" className="mt-3"><UsersTab can={can} /></TabsContent>}
+        {can.userView && <TabsContent value="partners" className="mt-3"><PartnersTab can={can} /></TabsContent>}
         {can.roleView && <TabsContent value="roles" className="mt-3"><RolesTab can={can} /></TabsContent>}
         {can.employeeView && <TabsContent value="employees" className="mt-3"><EmployeesTab can={can} /></TabsContent>}
         <TabsContent value="activity" className="mt-3">
@@ -57,6 +59,92 @@ export function AccessPage() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Partners
+// ---------------------------------------------------------------------------
+
+function PartnersTab({ can }: { can: { userCreate: boolean } }) {
+  const { data, loading, reload } = useApiData<UserAccount[]>(() => apiGet<UserAccount[]>('/users'), []);
+  const { data: roles } = useApiData<Role[]>(() => apiGet<Role[]>('/roles'), []);
+  const [search, setSearch] = useState('');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [form, setForm] = useState({ username: '', name: '', password: '', type: 'MARKETING' as 'MARKETING' | 'VEHICLE_OWNER' });
+  const [busy, setBusy] = useState(false);
+
+  const partnerRows = useMemo(() => {
+    const q = search.toLowerCase();
+    return (data ?? []).filter((u) =>
+      u.partnerType && (!q || u.name.toLowerCase().includes(q) || u.username.toLowerCase().includes(q)),
+    );
+  }, [data, search]);
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const role = roles?.find((r) => r.slug === (form.type === 'MARKETING' ? 'marketing' : 'vehicle-owner'));
+    if (!role) {
+      toast.error('Role partner belum tersedia.');
+      return;
+    }
+    setBusy(true);
+    const ok = await runAction(
+      () => apiPost('/users', { username: form.username, name: form.name, password: form.password, employeeId: null, roleIds: [role.id] }),
+      { success: `${form.type === 'MARKETING' ? 'Marketing' : 'Vehicle Owner'} dibuat.` },
+    );
+    setBusy(false);
+    if (ok) {
+      setDialogOpen(false);
+      setForm({ username: '', name: '', password: '', type: 'MARKETING' });
+      reload();
+    }
+  }
+
+  return (
+    <>
+      <DataTable
+        rows={partnerRows}
+        loading={loading}
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Cari nama / username…"
+        toolbar={can.userCreate && (
+          <Button size="sm" onClick={() => setDialogOpen(true)}><UserPlus className="h-4 w-4" /> Tambah Partner</Button>
+        )}
+        emptyMessage="Belum ada partner."
+        columns={[
+          { key: 'username', header: 'Username', primary: true, render: (u) => <span className="font-mono text-xs font-semibold">@{u.username}</span> },
+          { key: 'name', header: 'Nama', render: (u) => <span className="font-medium">{u.name}</span> },
+          { key: 'type', header: 'Tipe', render: (u) => <Badge variant={u.partnerType === 'MARKETING' ? 'secondary' : 'outline'}>{u.partnerType === 'MARKETING' ? 'Marketing' : 'Vehicle Owner'}</Badge> },
+          { key: 'employee', header: 'Employee', render: (u) => u.employeeId == null ? <span className="text-xs text-muted-foreground">Tidak terhubung</span> : <Badge variant="outline">terhubung</Badge> },
+          { key: 'status', header: 'Status', render: (u) => <ActiveBadge active={u.isActive} /> },
+        ]}
+      />
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Tambah Partner</DialogTitle>
+            <DialogDescription>Partner dibuat tanpa data employee dan langsung memiliki wallet.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={onSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field label="Username" htmlFor="p-username"><Input id="p-username" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} required disabled={busy} autoComplete="off" /></Field>
+              <Field label="Nama" htmlFor="p-name"><Input id="p-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required disabled={busy} /></Field>
+            </div>
+            <Field label="Tipe Partner" htmlFor="p-type">
+              <FormSelect value={form.type} onValueChange={(v) => setForm({ ...form, type: v as 'MARKETING' | 'VEHICLE_OWNER' })} options={[{ value: 'MARKETING', label: 'Marketing' }, { value: 'VEHICLE_OWNER', label: 'Vehicle Owner' }]} disabled={busy} />
+            </Field>
+            <Field label="Password (min. 8 karakter)" htmlFor="p-password"><Input id="p-password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required minLength={8} disabled={busy} autoComplete="new-password" /></Field>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} disabled={busy}>Batal</Button>
+              <SubmitButton busy={busy}>Buat Partner</SubmitButton>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -76,7 +164,10 @@ function EmployeesTab({ can }: { can: { employeeCreate: boolean; employeeUpdate:
   const rows = useMemo(() => {
     if (!data) return [];
     const q = search.toLowerCase();
-    return data.filter((e) => !q || e.name.toLowerCase().includes(q) || e.employeeNumber.toLowerCase().includes(q) || (e.position ?? "").toLowerCase().includes(q));
+    return data.filter((e) => {
+      const isPartner = e.user?.roles.some((r) => r.role.slug === "marketing" || r.role.slug === "vehicle-owner");
+      return !isPartner && (!q || e.name.toLowerCase().includes(q) || e.employeeNumber.toLowerCase().includes(q) || (e.position ?? "").toLowerCase().includes(q));
+    });
   }, [data, search]);
 
   async function onSubmit(e: React.FormEvent) {
@@ -208,10 +299,10 @@ function UsersTab({ can }: { can: { userCreate: boolean; userUpdate: boolean } }
   const rows = useMemo(() => {
     if (!data) return [];
     const q = search.toLowerCase();
-    return data.filter((u) => !q || u.name.toLowerCase().includes(q) || u.username.toLowerCase().includes(q));
+    return data.filter((u) => !u.partnerType && (!q || u.name.toLowerCase().includes(q) || u.username.toLowerCase().includes(q)));
   }, [data, search]);
 
-  const roleOptions = (roles ?? []).map((r) => ({ value: String(r.id), label: r.name }));
+  const employeeRoleOptions = (roles ?? []).filter((r) => r.slug !== "marketing" && r.slug !== "vehicle-owner");
   const unlinkedEmployees = (employees ?? []).filter((e) => !e.user && e.isActive);
 
   async function onSubmit(e: React.FormEvent) {
@@ -360,7 +451,7 @@ function UsersTab({ can }: { can: { userCreate: boolean; userUpdate: boolean } }
             <div className="space-y-2">
               <p className="text-sm font-medium text-foreground">Roles</p>
               <div className="max-h-40 space-y-1.5 overflow-y-auto rounded-lg border p-2.5">
-                {(roles ?? []).map((r) => (
+                {employeeRoleOptions.map((r) => (
                   <label key={r.id} className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm hover:bg-accent">
                     <input
                       type="checkbox"

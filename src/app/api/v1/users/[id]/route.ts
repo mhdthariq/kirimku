@@ -28,9 +28,14 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const updated = await db.user.update({ where: { id: existing.id }, data });
 
     if (Array.isArray(body.roleIds)) {
+      const roleIds = body.roleIds.map(Number).filter(Boolean);
+      const selectedRoles = roleIds.length > 0 ? await db.role.findMany({ where: { id: { in: roleIds } }, select: { slug: true } }) : [];
+      if (existing.employeeId && selectedRoles.some((role) => role.slug === "marketing" || role.slug === "vehicle-owner")) {
+        return fail(422, "Partner Marketing / Vehicle Owner tidak boleh terhubung ke employee.", { roleIds: ["Partner tidak boleh terhubung ke employee."] });
+      }
       await db.userRole.deleteMany({ where: { userId: existing.id } });
       const assignedSlugs: string[] = [];
-      for (const roleId of body.roleIds.map(Number).filter(Boolean)) {
+      for (const roleId of roleIds) {
         const role = await db.role.findUnique({ where: { id: roleId } });
         if (role) {
           await db.userRole.create({ data: { userId: existing.id, roleId } }).catch(() => undefined);

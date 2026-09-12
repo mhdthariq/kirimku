@@ -586,6 +586,8 @@ export interface UserAccount {
   isActive: boolean;
   employeeId: number | null;
   employee?: { name: string; employeeNumber: string } | null;
+  partnerId?: number | null;
+  partnerType?: "MARKETING" | "VEHICLE_OWNER" | null;
   roles: { role: { id: number; name: string; slug: string } }[];
 }
 

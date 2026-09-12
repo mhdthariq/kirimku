@@ -44,11 +44,16 @@ export async function POST(req: NextRequest) {
       if (linked) return fail(422, "Employee ini sudah memiliki akun user.", { employeeId: ["Employee sudah memiliki akun."] });
     }
 
+    const roleIds = Array.isArray(body.roleIds) ? body.roleIds.map(Number).filter(Boolean) : [];
+    const selectedRoles = roleIds.length > 0 ? await db.role.findMany({ where: { id: { in: roleIds } }, select: { slug: true } }) : [];
+    if (employeeId && selectedRoles.some((role) => role.slug === "marketing" || role.slug === "vehicle-owner")) {
+      return fail(422, "Partner Marketing / Vehicle Owner tidak boleh terhubung ke employee.", { employeeId: ["Partner tidak boleh terhubung ke employee."] });
+    }
+
     const created = await db.user.create({
       data: { username, name, passwordHash: hashPassword(password), employeeId, isActive: true },
     });
 
-    const roleIds = Array.isArray(body.roleIds) ? body.roleIds.map(Number).filter(Boolean) : [];
     const assignedSlugs: string[] = [];
     for (const roleId of roleIds) {
       const role = await db.role.findUnique({ where: { id: roleId } });
