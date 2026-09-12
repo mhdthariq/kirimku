@@ -107,7 +107,7 @@ The first request after a fresh `db:push` triggers `ensureSeed()` (RBAC + demo d
 
 ## Shipment details (packages)
 
-**Revision 3 — one row per package:** `POST /shipments/{id}/details` accepts `{description, quantity (1–500), lengthCm?, widthCm?, heightCm?, actualWeightKg}` and expands `quantity N` into **N package rows**, each with a unique `detailCode` (`DTL-…-01 … -NN`). Response: `{created: N, details: [...]}`. There is no per-row quantity — the grouped ("Ringkas") view in the UI is pure aggregation.
+**Revision 3 — one row per package:** `POST /shipments/{id}/details` accepts `{description, quantity (1–500), lengthCm?, widthCm?, heightCm?, actualWeightKg}` and expands `quantity N` into **N package rows**, each with a unique daily ordered `detailCode` (`DTL-YYYYMMDD-HHmmss-NNN`). Response: `{created: N, details: [...]}`. There is no per-row quantity — the grouped ("Ringkas") view in the UI is pure aggregation.
 
 | Method | Endpoint | Permission | Description |
 |---|---|---|---|

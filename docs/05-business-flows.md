@@ -52,7 +52,7 @@ A **server-computed preview** (`pricingPreview` block in `GET /shipments/{id}`) 
 
 ## Detail barang (package) model — Revision 3
 
-- One `DetailShipment` row = **one physical package** with its own unique `detailCode` (QR label). The create dialog's "Jumlah paket" N expands into N rows (`DTL-…-01 … DTL-…-NN`). There is **no `quantity` column** in the database — the quantity shown anywhere in the UI is a pure aggregation.
+- One `DetailShipment` row = **one physical package** with its own unique `detailCode` (QR label). The create dialog's "Jumlah paket" N expands into N rows (`DTL-YYYYMMDD-HHmmss-NNN`), with `NNN` ordered across all packages created that day. There is **no `quantity` column** in the database — the quantity shown anywhere in the UI is a pure aggregation.
 - The shipment detail page shows **two tabs**: `Semua` (every package: Kode | Deskripsi | Dimensi | Berat) and `Ringkas` (grouped by identical description + dimensions + weight: Deskripsi | Dimensi | Jumlah | Berat per paket | Total berat).
 - Shipment creation no longer types Kota Asal/Kota Tujuan by hand: a **route dropdown lists active tariffs filtered by the customer's B2B/B2C label** (plus generic tariffs); origin/destination are filled from the selected tariff.
 

@@ -73,7 +73,7 @@ The application is a **single Next.js 16 project** that contains both the fronte
 | `audit.ts` | `logAudit({action, entityType, entityId, entityLabel, before, after, actor})` — append-only, used by every mutating endpoint |
 | `shipment-flow.ts` | `SHIPMENT_STATUSES`, `VALID_TRANSITIONS`, `canTransition()`, `MIN_CHECKPOINTS = 3` — single source of truth shared by API **and** UI |
 | `scan-flow.ts` | QR handover scan domain logic: `scanProgress()` (per-package scan state for pickups & deliveries), `assertKurirAssignment()` (assigned kurir / supervisor / owner rule) |
-| `code-generator.ts` | `nextCode(prefix)` — collision-proof code generator (`MKT-000008`, `PICK-2026-000012`, …) based on max suffix in DB |
+| `code-generator.ts` | `nextCode(prefix)` for business identifiers plus daily package codes (`DTL-YYYYMMDD-HHmmss-NNN`), where `NNN` is the package order for that date |
 | `api-helpers.ts` | `{ok, fail}` response envelope, error codes, pagination params, `requireAuth`/`requirePermission` guards, `ensureSeed()` hook on first request |
 | `seed.ts` | The idempotent mock-up seeder (see `06-seeding-and-demo-accounts.md`) |
 | `client-api.ts` | Typed browser-side fetch wrapper (attaches bearer token, unwraps envelope) |

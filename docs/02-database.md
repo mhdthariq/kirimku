@@ -27,7 +27,7 @@
 |---|---|---|
 | `Customer` | Shipper master | `code @unique`, `type` = `"b2b" \| "b2c"` (drives tariff selection + invoice eligibility) |
 | `MasterShipment` | The shipment/booking | `masterCode @unique` (`MKT-000NNN`), `resi @unique`, `status` (lifecycle — see `05-business-flows.md`), `origin`/`destination` city names, `tariffId` (tariff selected from the route dropdown — Revision 3), FKs to origin/destination `Warehouse`, `arrivedWarehouseId` (gudang where arrival was confirmed — Revision 4), **Penerima**: `penerimaName`/`penerimaAddress`/`penerimaContact` (printed on both resi types — Revision 4), pricing snapshot: `chargeableWeightKg`, `ratePerKg`, `priceAmount`, `pricedAt` |
-| `DetailShipment` | **One row = one physical package** (Revision 3) | `detailCode @unique` (`DTL-…`), `description`, dims `lengthCm/widthCm/heightCm`, `actualWeightKg` — cascade delete with master. No `quantity` column: an input of N packages expands into N rows, each carrying its own QR label |
+| `DetailShipment` | **One row = one physical package** (Revision 3) | `detailCode @unique` (`DTL-YYYYMMDD-HHmmss-NNN`, with `NNN` as that day's package order), `description`, dims `lengthCm/widthCm/heightCm`, `actualWeightKg` — cascade delete with master. No `quantity` column: an input of N packages expands into N rows, each carrying its own QR label |
 | `TrackingEvent` | Immutable tracking timeline | `event`, `description`, optional `actorId` (User), `occurredAt` — cascade with master |
 
 ### Gudang (warehouses)
