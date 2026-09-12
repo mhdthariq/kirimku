@@ -14,9 +14,13 @@ export async function GET(req: NextRequest) {
     const search = str(params.get("search"))?.toLowerCase();
     const status = str(params.get("status"));
     const customerType = str(params.get("customerType"));
+    const marketingOwner = user.partnerType === "MARKETING" ? user.partnerId : null;
 
     const shipments = await db.masterShipment.findMany({
       where: {
+        ...(user.partnerType === "MARKETING"
+          ? { createdByPartnerId: marketingOwner ?? -1 }
+          : {}),
         ...(status ? { status } : {}),
         ...(customerType ? { customer: { type: customerType } } : {}),
         ...(search

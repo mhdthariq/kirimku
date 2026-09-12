@@ -5,7 +5,8 @@ import { guard, ok, handle } from "@/lib/api-helpers";
 /** Lightweight dropdown options for any authenticated user (ids + labels only). */
 export async function GET(req: NextRequest) {
   return handle(async () => {
-    await guard(req);
+    const user = await guard(req);
+    const marketingOwner = user.partnerType === "MARKETING" ? user.partnerId : null;
     const [employees, vehicles, routes, warehouses, customers, tariffs, permissions, vehicleOwners, b2bShipments] = await Promise.all([
       db.employee.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true, position: true, warehouseId: true } }),
       db.vehicle.findMany({ where: { status: "ACTIVE" }, orderBy: { vehicleNumber: "asc" }, select: { id: true, vehicleNumber: true, name: true, maxWeightKg: true } }),
@@ -30,7 +31,11 @@ export async function GET(req: NextRequest) {
       }),
       // B2B shipments available for invoice line linking (§7.1)
       db.masterShipment.findMany({
-        where: { customer: { type: "b2b" }, status: { not: "CANCELLED" } },
+        where: {
+          customer: { type: "b2b" },
+          status: { not: "CANCELLED" },
+          ...(user.partnerType === "MARKETING" ? { createdByPartnerId: marketingOwner ?? -1 } : {}),
+        },
         orderBy: { createdAt: "desc" },
         select: {
           id: true, masterCode: true, priceAmount: true, finalPriceAmount: true, customerId: true,

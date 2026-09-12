@@ -10,14 +10,12 @@ import {
   Plus,
   Printer,
   QrCode,
-  Receipt,
   ScanLine,
   Send,
   Trash2,
   Truck,
   UserCheck,
   UserRound,
-  Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -32,7 +30,6 @@ import {
   type GudangWalkInItem,
   type GudangWorkspace,
   type Options,
-  type Payment,
   type Shipment,
   type TrackingEvent,
 } from "@/lib/client-api";
@@ -744,15 +741,12 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
     detailUpdate: hasPermission(user, "shipment_detail.update"),
     detailDelete: hasPermission(user, "shipment_detail.delete"),
     track: hasPermission(user, "shipment.view_tracking"),
-    paymentView: hasPermission(user, "payment.view"),
-    paymentRecord: hasPermission(user, "payment.record"),
-    paymentVerify: hasPermission(user, "payment.verify"),
     // Walk-in arrival (customer hands the package over at the gudang counter) —
     // only visible/usable for users granted this permission (e.g. Admin Gudang).
     confirmArrival: hasPermission(user, "shipment.confirm_arrival"),
   };
 
-  const [shipment, setShipment] = useState<(Shipment & { details: DetailShipment[]; trackingEvents: TrackingEvent[]; payments: Payment[] }) | null>(null);
+  const [shipment, setShipment] = useState<(Shipment & { details: DetailShipment[]; trackingEvents: TrackingEvent[] }) | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -771,7 +765,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
     setLoading(true);
     setError(null);
     try {
-      const data = await apiGet<Shipment & { details: DetailShipment[]; trackingEvents: TrackingEvent[]; payments: Payment[] }>(`/shipments/${id}`);
+      const data = await apiGet<Shipment & { details: DetailShipment[]; trackingEvents: TrackingEvent[] }>(`/shipments/${id}`);
       setShipment(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal memuat shipment.");
@@ -788,8 +782,6 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
   const [editingDetail, setEditingDetail] = useState<DetailShipment | null>(null);
   const [detailForm, setDetailForm] = useState<DetailForm>(EMPTY_DETAIL);
   const [busy, setBusy] = useState(false);
-  const [paymentOpen, setPaymentOpen] = useState(false);
-  const [paymentForm, setPaymentForm] = useState({ method: "CASH", amount: "", reference: "" });
   const [confirmDeleteDetail, setConfirmDeleteDetail] = useState<DetailShipment | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
@@ -945,31 +937,6 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
     const target = confirmDeleteDetail;
     setConfirmDeleteDetail(null);
     const ok = await runAction(() => apiDelete(`/shipment-details/${target.id}`), { success: "Detail dihapus." });
-    if (ok) refresh();
-  }
-
-  async function onPayment(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    const ok = await runAction(
-      () =>
-        apiPost(`/shipments/${shipment!.id}/payments`, {
-          method: paymentForm.method,
-          amount: Number(paymentForm.amount),
-          reference: paymentForm.reference || null,
-        }),
-      { success: "Pembayaran dicatat." },
-    );
-    setBusy(false);
-    if (ok) {
-      setPaymentOpen(false);
-      setPaymentForm({ method: "CASH", amount: "", reference: "" });
-      refresh();
-    }
-  }
-
-  async function verifyPayment(p: Payment) {
-    const ok = await runAction(() => apiPost(`/payments/${p.id}/verify`), { success: "Pembayaran diverifikasi." });
     if (ok) refresh();
   }
 
@@ -1131,28 +1098,6 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
                 </p>
               </div>
             )}
-            {shipment.paymentSummary && shipment.priceAmount != null && (
-              <div
-                className={cn(
-                  "rounded-lg border px-3 py-2 text-xs",
-                  shipment.paymentSummary.remainingAmount <= 0
-                    ? "border-emerald-300 bg-emerald-50/60 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300"
-                    : shipment.paymentSummary.dpOk
-                      ? "border-sky-300 bg-sky-50/60 text-sky-700 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300"
-                      : "border-amber-300 bg-amber-50/60 text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300",
-                )}
-              >
-                <p className="font-semibold">
-                  Terbayar {formatRupiah(shipment.paymentSummary.paidAmount)}
-                  {shipment.paymentSummary.remainingAmount > 0 ? ` · sisa ${formatRupiah(shipment.paymentSummary.remainingAmount)}` : " · LUNAS"}
-                </p>
-                <p className="mt-0.5">
-                  {shipment.paymentSummary.dpOk
-                    ? "DP ≥ 50% terpenuhi — paket bisa dijemput kurir."
-                    : `DP minimal 50% (${formatRupiah(shipment.paymentSummary.dpRequirement)}) belum terpenuhi — catat pembayaran dulu.`}
-                </p>
-              </div>
-            )}
             {!pricing && (
               <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
                 Tidak ada tarif aktif untuk rute {shipment.origin} → {shipment.destination} — buat tarif di menu Tariffs agar harga bisa dihitung.
@@ -1311,60 +1256,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
         </CardContent>
       </Card>
 
-      {/* Payments */}
-      {can.paymentView && (
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Wallet className="h-4 w-4 text-primary" /> Pembayaran
-              </CardTitle>
-              {can.paymentRecord && shipment.priceAmount != null && shipment.status !== "CANCELLED" && (
-                <Button size="sm" onClick={() => setPaymentOpen(true)}>
-                  <Plus className="h-4 w-4" /> Catat Pembayaran
-                </Button>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent>
-            {shipment.payments.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">
-                {shipment.priceAmount == null ? "Hitung harga shipment terlebih dahulu." : "Belum ada pembayaran."}
-              </p>
-            ) : (
-              <DataTable
-                rows={shipment.payments}
-                emptyMessage="—"
-                columns={[
-                  { key: "method", header: "Metode", primary: true, render: (p) => p.method },
-                  { key: "amount", header: "Jumlah", render: (p) => <span className="font-semibold">{formatRupiah(p.amount)}</span> },
-                  { key: "ref", header: "Referensi", hideOnMobile: true, render: (p) => p.reference ?? "—" },
-                  { key: "recorded", header: "Dicatat", hideOnMobile: true, render: (p) => `${formatDate(p.createdAt, true)}${p.recordedBy ? ` · ${p.recordedBy.name}` : ""}` },
-                  {
-                    key: "status",
-                    header: "Status",
-                    render: (p) => <StatusBadge status={p.status} />,
-                  },
-                  {
-                    key: "actions",
-                    header: "Aksi",
-                    render: (p) =>
-                      p.status === "RECORDED" && can.paymentVerify ? (
-                        <Button size="sm" variant="secondary" className="h-7" onClick={() => verifyPayment(p)}>
-                          Verifikasi
-                        </Button>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">{p.verifiedBy ? `oleh ${p.verifiedBy.name}` : "—"}</span>
-                      ),
-                  },
-                ]}
-              />
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      <ActivityLogPanel entityTypes={["shipment", "shipment_detail", "payment", "pickup", "delivery", "transport"]} title="Log Aktivitas Shipment Ini" limit={20} />
+      <ActivityLogPanel entityTypes={["shipment", "shipment_detail", "pickup", "delivery", "transport"]} title="Log Aktivitas Shipment Ini" limit={20} />
 
       {/* Detail create/edit dialog */}
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
@@ -1407,40 +1299,6 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
                 Batal
               </Button>
               <SubmitButton busy={busy}>{editingDetail ? "Simpan Perubahan" : "Buat Paket"}</SubmitButton>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Payment dialog */}
-      <Dialog open={paymentOpen} onOpenChange={setPaymentOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Catat Pembayaran</DialogTitle>
-            <DialogDescription>Harga shipment: {formatRupiah(shipment.priceAmount)}. Pembayaran akan diverifikasi Admin Kantor.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={onPayment} className="space-y-4">
-            <Field label="Metode" htmlFor="pay-method">
-              <FormSelect
-                value={paymentForm.method}
-                onValueChange={(value) => setPaymentForm({ ...paymentForm, method: value })}
-                options={[{ value: "CASH", label: "Cash (diterima kurir)" }, { value: "TRANSFER", label: "Transfer bank" }]}
-                disabled={busy}
-              />
-            </Field>
-            <Field label="Jumlah (Rp)" htmlFor="pay-amount">
-              <NumberInput id="pay-amount" value={paymentForm.amount} onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} required disabled={busy} />
-            </Field>
-            <Field label="Referensi" htmlFor="pay-ref" hint="Opsional — no. transfer / kuitansi">
-              <Input id="pay-ref" value={paymentForm.reference} onChange={(e) => setPaymentForm({ ...paymentForm, reference: e.target.value })} disabled={busy} />
-            </Field>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setPaymentOpen(false)} disabled={busy}>
-                Batal
-              </Button>
-              <SubmitButton busy={busy}>
-                <Receipt className="h-4 w-4" /> Catat Pembayaran
-              </SubmitButton>
             </DialogFooter>
           </form>
         </DialogContent>
