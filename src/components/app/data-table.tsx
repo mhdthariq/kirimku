@@ -22,18 +22,18 @@ export function PageHeader({
 }) {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-      <div className="flex items-start gap-3">
+      <div className="flex min-w-0 items-start gap-3">
         {icon && (
           <div className="mt-0.5 hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary sm:flex">
             {icon}
           </div>
         )}
-        <div>
+        <div className="min-w-0">
           <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">{title}</h1>
           {subtitle && <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>}
         </div>
       </div>
-      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      {actions && <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">{actions}</div>}
     </div>
   );
 }
@@ -150,14 +150,14 @@ export function DataTable<T extends { id: number | string }>({
                 <div key={row.id} className="rounded-xl border bg-card p-3.5">
                   {primary && (
                     <div className="mb-2 flex items-center justify-between gap-2 border-b pb-2">
-                      <span className="font-semibold text-foreground">{primary.render(row)}</span>
+                      <span className="min-w-0 break-words font-semibold text-foreground">{primary.render(row)}</span>
                     </div>
                   )}
                   <dl className="space-y-1.5">
                     {rest.map((c) => (
                       <div key={c.key} className="flex items-start justify-between gap-3 text-sm">
                         <dt className="shrink-0 text-xs text-muted-foreground">{c.header}</dt>
-                        <dd className="text-right font-medium text-foreground">{c.render(row)}</dd>
+                        <dd className="min-w-0 break-words text-right font-medium text-foreground">{c.render(row)}</dd>
                       </div>
                     ))}
                   </dl>

@@ -76,7 +76,7 @@ export function DatePeriodFilter({
       <Button
         variant="outline"
         size="sm"
-        className="h-8"
+          className="h-8 max-w-full"
         onClick={() => {
           const t = todayStr();
           onChange(t, t);
@@ -91,8 +91,8 @@ export function DatePeriodFilter({
         <PopoverTrigger asChild>
           <Button variant="outline" size="sm" className="h-8">
             <CalendarDays className="h-3.5 w-3.5" />
-            {from === to ? formatLabel(from) : `${formatLabel(from)} → ${formatLabel(to)}`}
-            <span className="ml-1 rounded-full bg-primary/10 px-1.5 text-[10px] font-semibold text-primary">{days}h</span>
+            <span className="min-w-0 truncate">{from === to ? formatLabel(from) : `${formatLabel(from)} → ${formatLabel(to)}`}</span>
+            <span className="ml-1 shrink-0 rounded-full bg-primary/10 px-1.5 text-[10px] font-semibold text-primary">{days}h</span>
           </Button>
         </PopoverTrigger>
         <PopoverContent align="end" className="w-auto p-3">

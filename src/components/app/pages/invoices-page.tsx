@@ -487,7 +487,7 @@ export function InvoicesPage() {
                 </table>
               </div>
 
-              <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="grid grid-cols-1 gap-2 text-center sm:grid-cols-3">
                 <div className="rounded-lg bg-muted/60 p-2.5">
                   <p className="text-[10px] uppercase text-muted-foreground">Total</p>
                   <p className="text-sm font-bold">{formatRupiah(detailWithLines.totalAmount)}</p>
