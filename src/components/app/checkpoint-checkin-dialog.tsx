@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, CheckCircle2, Crosshair, Loader2, MapPin, RefreshCw, TriangleAlert, Upload } from "lucide-react";
+import { Camera, CheckCircle2, Crosshair, Loader2, MapPin, RefreshCw, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { apiPost, type CheckinResponse, type Checkpoint } from "@/lib/client-api";
 import { Button } from "@/components/ui/button";
@@ -33,10 +33,10 @@ function distanceMeters(lat1: number, lon1: number, lat2: number, lon2: number):
   return Math.round(2 * R * Math.asin(Math.sqrt(a)));
 }
 
-/** Compress a captured frame / file to a ~720px JPEG data URL. */
-function compressToJpeg(source: HTMLVideoElement | HTMLImageElement, maxSide = 720): string {
-  const w = source instanceof HTMLVideoElement ? source.videoWidth : source.naturalWidth;
-  const h = source instanceof HTMLVideoElement ? source.videoHeight : source.naturalHeight;
+/** Compress a captured camera frame to a ~720px JPEG data URL. */
+function compressToJpeg(source: HTMLVideoElement, maxSide = 720): string {
+  const w = source.videoWidth;
+  const h = source.videoHeight;
   const scale = Math.min(1, maxSide / Math.max(w, h) || 1);
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.round(w * scale));
@@ -51,7 +51,7 @@ function compressToJpeg(source: HTMLVideoElement | HTMLImageElement, maxSide = 7
  * Checkpoint selfie check-in dialog (Revision Part O).
  * - pick the checkpoint (unchecked ones only)
  * - capture GPS (live distance preview vs the checkpoint radius)
- * - take a selfie with the camera (getUserMedia; fallback: file capture)
+ * - take a selfie with the camera (getUserMedia only)
  * - submit → server validates the radius and stores photo + location + user
  */
 export function CheckpointCheckinDialog({ open, onOpenChange, transportId, transportCode, checkpoints, onDone }: CheckinDialogProps) {
@@ -65,8 +65,6 @@ export function CheckpointCheckinDialog({ open, onOpenChange, transportId, trans
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-
   const pending = checkpoints.filter((c) => !c.checkedIn);
   const selected = checkpoints.find((c) => c.id === checkpointId) ?? null;
 
@@ -110,7 +108,7 @@ export function CheckpointCheckinDialog({ open, onOpenChange, transportId, trans
         }
       });
     } catch {
-      setError("Kamera tidak dapat diakses — gunakan tombol “Unggah Foto” sebagai gantinya.");
+      setError("Kamera tidak dapat diakses — izin kamera wajib untuk check-in.");
     }
   }, []);
 
@@ -124,22 +122,6 @@ export function CheckpointCheckinDialog({ open, onOpenChange, transportId, trans
       setError("Gagal memproses foto — coba lagi.");
     }
   }, [stopCamera]);
-
-  const onPickFile = useCallback(async (file: File) => {
-    setError(null);
-    try {
-      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const url = URL.createObjectURL(file);
-        const image = new Image();
-        image.onload = () => resolve(image);
-        image.onerror = () => reject(new Error("bad image"));
-        image.src = url;
-      });
-      setPhoto(compressToJpeg(img));
-    } catch {
-      setError("File foto tidak dapat dibaca.");
-    }
-  }, []);
 
   const locate = useCallback(() => {
     setError(null);
@@ -284,7 +266,7 @@ export function CheckpointCheckinDialog({ open, onOpenChange, transportId, trans
                 { }
                 <img src={photo} alt="Bukti selfie check-in" className="h-44 w-full rounded-lg border object-cover" />
                 <Button type="button" variant="outline" size="sm" onClick={() => setPhoto(null)} disabled={submitting}>
-                  <Upload className="h-3.5 w-3.5" /> Ganti Foto
+                  <Camera className="h-3.5 w-3.5" /> Ambil Ulang
                 </Button>
               </div>
             ) : cameraOn ? (
@@ -303,21 +285,6 @@ export function CheckpointCheckinDialog({ open, onOpenChange, transportId, trans
               <div className="space-y-2">
                 <Button type="button" variant="outline" className="w-full" onClick={startCamera} disabled={submitting}>
                   <Camera className="h-4 w-4" /> Buka Kamera Selfie
-                </Button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  capture="user"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) void onPickFile(file);
-                    e.target.value = "";
-                  }}
-                />
-                <Button type="button" variant="ghost" className="w-full text-xs text-muted-foreground" onClick={() => fileInputRef.current?.click()} disabled={submitting}>
-                  atau unggah foto dari galeri
                 </Button>
               </div>
             )}
