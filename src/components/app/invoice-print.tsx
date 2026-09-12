@@ -23,7 +23,7 @@ export function InvoicePrint({ invoice, onClose }: { invoice: PrintableInvoice; 
     <div id="invoice-print-portal" className="fixed inset-0 z-[80] overflow-y-auto bg-neutral-200 dark:bg-neutral-900">
       <div className="sticky top-0 z-10 flex flex-col gap-3 border-b bg-white px-4 py-3 shadow-sm dark:bg-neutral-800 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0"><p className="text-sm font-bold text-foreground">Pratinjau Invoice</p><p className="truncate text-xs text-muted-foreground">{invoice.invoiceNumber} · siap dicetak atau disimpan sebagai PDF</p></div>
-        <div className="flex w-full flex-wrap gap-2 sm:w-auto"><Button variant="outline" className="flex-1 sm:flex-none" onClick={onClose}><X className="h-4 w-4" /> Tutup</Button><Button className="flex-1 sm:flex-none" onClick={() => window.print()}><Printer className="h-4 w-4" /> Cetak / Simpan PDF</Button></div>
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto"><Button type="button" variant="outline" className="flex-1 sm:flex-none" onClick={onClose}><X className="h-4 w-4" /> Tutup</Button><Button type="button" className="flex-1 sm:flex-none" onClick={() => window.print()}><Printer className="h-4 w-4" /> Cetak / Simpan PDF</Button></div>
       </div>
       <article className="invoice-sheet mx-auto my-6 bg-white px-8 py-10 text-neutral-900 shadow-xl sm:px-12" aria-label={`Invoice ${invoice.invoiceNumber}`}>
         <header className="flex flex-col justify-between gap-8 border-b-2 border-neutral-900 pb-7 sm:flex-row">

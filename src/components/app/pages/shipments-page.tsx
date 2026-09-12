@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   Ban,
@@ -761,16 +761,18 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
   const [confirmDeleteDetail, setConfirmDeleteDetail] = useState<DetailShipment | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
+  const autoPrintHandled = useRef(false);
   const [penerimaOpen, setPenerimaOpen] = useState(false);
   const [penerimaForm, setPenerimaForm] = useState({ name: "", address: "", contact: "" });
 
   // deep link #/shipments/{id}?print=1 — open the resi print preview
   useEffect(() => {
-    if (autoPrint && shipment && shipment.details.length > 0 && !printOpen) {
+    if (autoPrint && !autoPrintHandled.current && shipment && shipment.details.length > 0) {
+      autoPrintHandled.current = true;
       setPrintOpen(true);
       window.history.replaceState(null, "", `#/shipments/${id}`); // avoid re-trigger
     }
-  }, [autoPrint, shipment, printOpen, id]);
+  }, [autoPrint, shipment, id]);
 
   if (loading) {
     return (

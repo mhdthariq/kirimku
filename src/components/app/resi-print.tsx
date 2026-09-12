@@ -452,10 +452,10 @@ export function ResiPrint({ shipment, onClose }: ResiPrintProps) {
           </p>
         </div>
         <div className="flex w-full flex-wrap gap-2 sm:w-auto">
-          <Button variant="outline" className="flex-1 sm:flex-none" onClick={onClose}>
+          <Button type="button" variant="outline" className="flex-1 sm:flex-none" onClick={onClose}>
             <X className="h-4 w-4" /> Tutup
           </Button>
-          <Button className="flex-1 sm:flex-none" onClick={() => window.print()}>
+          <Button type="button" className="flex-1 sm:flex-none" onClick={() => window.print()}>
             <Printer className="h-4 w-4" /> Cetak / Simpan PDF
           </Button>
         </div>
