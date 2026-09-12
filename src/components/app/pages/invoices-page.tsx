@@ -549,16 +549,12 @@ export function InvoicesPage() {
             </Field>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Metode" htmlFor="st-method">
-                <select
-                  id="st-method"
-                  className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
+                <FormSelect
                   value={settleMethod}
-                  onChange={(e) => setSettleMethod(e.target.value)}
+                  onValueChange={setSettleMethod}
+                  options={[{ value: "TRANSFER", label: "Transfer" }, { value: "CASH", label: "Cash" }]}
                   disabled={busy}
-                >
-                  <option value="TRANSFER">Transfer</option>
-                  <option value="CASH">Cash</option>
-                </select>
+                />
               </Field>
               <Field label="Referensi" htmlFor="st-ref">
                 <Input id="st-ref" value={settleRef} onChange={(e) => setSettleRef(e.target.value)} placeholder="No. bukti transfer" disabled={busy} />

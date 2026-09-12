@@ -81,15 +81,17 @@ export function FormSelect({
   placeholder,
   options,
   disabled,
+  required,
 }: {
   value: string;
   onValueChange: (value: string) => void;
   placeholder?: string;
   options: { value: string; label: string }[];
   disabled?: boolean;
+  required?: boolean;
 }) {
   return (
-    <Select value={value} onValueChange={onValueChange} disabled={disabled}>
+    <Select value={value} onValueChange={onValueChange} disabled={disabled} required={required}>
       <SelectTrigger className="w-full">
         <SelectValue placeholder={placeholder ?? "Pilih…"} />
       </SelectTrigger>

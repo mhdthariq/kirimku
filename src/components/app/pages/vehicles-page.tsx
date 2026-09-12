@@ -230,17 +230,12 @@ export function VehiclesPage() {
                 <Input id="v-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="CDD 6 Ban" disabled={busy} />
               </Field>
               <Field label="Status" htmlFor="v-status">
-                <select
-                  id="v-status"
-                  className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
+                <FormSelect
                   value={form.status}
-                  onChange={(e) => setForm({ ...form, status: e.target.value })}
+                  onValueChange={(value) => setForm({ ...form, status: value })}
+                  options={[{ value: "ACTIVE", label: "Aktif" }, { value: "MAINTENANCE", label: "Maintenance" }, { value: "INACTIVE", label: "Nonaktif" }]}
                   disabled={busy}
-                >
-                  <option value="ACTIVE">Aktif</option>
-                  <option value="MAINTENANCE">Maintenance</option>
-                  <option value="INACTIVE">Nonaktif</option>
-                </select>
+                />
               </Field>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Max Berat (kg)" htmlFor="v-weight">

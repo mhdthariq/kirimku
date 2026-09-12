@@ -8,7 +8,7 @@ import { ScanConsole, type ScanMethod } from "@/components/app/scan-console";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
-import { Input, Textarea, NumberInput, formatRupiah } from "@/components/app/form-parts";
+import { FormSelect, Input, Textarea, NumberInput, formatRupiah } from "@/components/app/form-parts";
 import { cn } from "@/lib/utils";
 
 export interface ScanTaskInfo {
@@ -267,16 +267,12 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
                   <label htmlFor="balance-method" className="text-xs font-medium text-foreground">
                     Metode
                   </label>
-                  <select
-                    id="balance-method"
-                    className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
+                  <FormSelect
                     value={balanceMethod}
-                    onChange={(e) => setBalanceMethod(e.target.value)}
+                    onValueChange={setBalanceMethod}
+                    options={[{ value: "CASH", label: "Cash" }, { value: "TRANSFER", label: "Transfer" }]}
                     disabled={confirming}
-                  >
-                    <option value="CASH">Cash</option>
-                    <option value="TRANSFER">Transfer</option>
-                  </select>
+                  />
                 </div>
               </div>
             )}

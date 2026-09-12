@@ -6,7 +6,7 @@ import { apiGetWithMeta, type AuditResponse, type AuditEntry } from "@/lib/clien
 import { useAuth } from "@/hooks/use-auth";
 import { hasPermission } from "@/lib/client-api";
 import { PageHeader } from "@/components/app/data-table";
-import { formatDate } from "@/components/app/form-parts";
+import { FormSelect, formatDate } from "@/components/app/form-parts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -127,32 +127,18 @@ export function AuditPage() {
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input value={search} onChange={(e) => { setSearch(e.target.value); setOffset(0); }} placeholder="Cari label / aktor / aksi…" className="pl-9" />
         </div>
-        <select
+        <FormSelect
           value={entityFilter}
-          onChange={(e) => { setEntityFilter(e.target.value); setOffset(0); }}
-          className="h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
-          aria-label="Filter entitas"
-        >
-          <option value="all">Semua entitas</option>
-          {entityTypes.map((t) => (
-            <option key={t} value={t}>
-              {ENTITY_LABELS[t] ?? t}
-            </option>
-          ))}
-        </select>
-        <select
+          onValueChange={(value) => { setEntityFilter(value); setOffset(0); }}
+          placeholder="Semua entitas"
+          options={entityTypes.map((t) => ({ value: t, label: ENTITY_LABELS[t] ?? t }))}
+        />
+        <FormSelect
           value={actionFilter}
-          onChange={(e) => { setActionFilter(e.target.value); setOffset(0); }}
-          className="h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
-          aria-label="Filter aksi"
-        >
-          <option value="all">Semua aksi</option>
-          {actions.map((a) => (
-            <option key={a} value={a}>
-              {a}
-            </option>
-          ))}
-        </select>
+          onValueChange={(value) => { setActionFilter(value); setOffset(0); }}
+          placeholder="Semua aksi"
+          options={actions.map((a) => ({ value: a, label: a }))}
+        />
       </div>
 
       {/* Timeline */}

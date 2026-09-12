@@ -48,6 +48,7 @@
 }
 
 :root {
+  color-scheme: light;
   --radius: 0.625rem;
   --background: oklch(0.984 0.003 170);
   --foreground: oklch(0.216 0.02 165);
@@ -87,6 +88,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --background: oklch(0.184 0.015 170);
   --foreground: oklch(0.95 0.008 165);
   --card: oklch(0.228 0.017 170);
@@ -127,6 +129,12 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+  }
+  select,
+  select option,
+  select optgroup {
+    background-color: var(--popover);
+    color: var(--popover-foreground);
   }
   body {
     @apply bg-background text-foreground;

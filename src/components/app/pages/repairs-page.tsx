@@ -15,7 +15,7 @@ import { apiGet, apiPost, hasPermission, type VehicleRepairRow } from "@/lib/cli
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { StatusBadge } from "@/components/app/status-badge";
-import { Field, NumberInput, SubmitButton, formatRupiah, formatDate } from "@/components/app/form-parts";
+import { Field, FormSelect, NumberInput, SubmitButton, formatRupiah, formatDate } from "@/components/app/form-parts";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -260,17 +260,13 @@ function CreateRepairDialog({ open, onOpenChange, onDone }: { open: boolean; onO
         </DialogHeader>
         <form onSubmit={onSubmit} className="space-y-3">
           <Field label="Kendaraan">
-            <select
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
+            <FormSelect
               value={form.vehicleId}
-              onChange={(e) => setForm({ ...form, vehicleId: e.target.value })}
+              onValueChange={(value) => setForm({ ...form, vehicleId: value })}
+              placeholder="Pilih kendaraan…"
+              options={vehicleOptions.map((v) => ({ value: String(v.id), label: v.vehicleNumber }))}
               required
-            >
-              <option value="">Pilih kendaraan…</option>
-              {vehicleOptions.map((v) => (
-                <option key={v.id} value={v.id}>{v.vehicleNumber}</option>
-              ))}
-            </select>
+            />
           </Field>
           <Field label="Deskripsi Repair">
             <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="mis. Ganti oli + servis rem" rows={2} required />

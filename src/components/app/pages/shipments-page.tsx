@@ -1365,16 +1365,12 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
           </DialogHeader>
           <form onSubmit={onPayment} className="space-y-4">
             <Field label="Metode" htmlFor="pay-method">
-              <select
-                id="pay-method"
-                className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
+              <FormSelect
                 value={paymentForm.method}
-                onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value })}
+                onValueChange={(value) => setPaymentForm({ ...paymentForm, method: value })}
+                options={[{ value: "CASH", label: "Cash (diterima kurir)" }, { value: "TRANSFER", label: "Transfer bank" }]}
                 disabled={busy}
-              >
-                <option value="CASH">Cash (diterima kurir)</option>
-                <option value="TRANSFER">Transfer bank</option>
-              </select>
+              />
             </Field>
             <Field label="Jumlah (Rp)" htmlFor="pay-amount">
               <NumberInput id="pay-amount" value={paymentForm.amount} onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} required disabled={busy} />

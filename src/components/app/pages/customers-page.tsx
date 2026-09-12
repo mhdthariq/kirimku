@@ -9,7 +9,7 @@ import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
 import { ActiveBadge, TypeBadge } from "@/components/app/status-badge";
-import { Field, Input, SubmitButton, Textarea } from "@/components/app/form-parts";
+import { Field, FormSelect, Input, SubmitButton, Textarea } from "@/components/app/form-parts";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -214,16 +214,12 @@ export function CustomersPage() {
                 <Input id="c-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Nama lengkap / PIC" required disabled={busy} />
               </Field>
               <Field label="Tipe Customer" htmlFor="c-type">
-                <select
-                  id="c-type"
-                  className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
+                <FormSelect
                   value={form.type}
-                  onChange={(e) => setForm({ ...form, type: e.target.value as "b2b" | "b2c" })}
+                  onValueChange={(value) => setForm({ ...form, type: value as "b2b" | "b2c" })}
+                  options={[{ value: "b2c", label: "B2C — individu" }, { value: "b2b", label: "B2B — perusahaan" }]}
                   disabled={busy}
-                >
-                  <option value="b2c">B2C — individu</option>
-                  <option value="b2b">B2B — perusahaan</option>
-                </select>
+                />
               </Field>
               {form.type === "b2b" && (
                 <Field label="Nama Perusahaan" htmlFor="c-company">

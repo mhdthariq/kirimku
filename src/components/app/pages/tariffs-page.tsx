@@ -8,7 +8,7 @@ import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
 import { ActiveBadge } from "@/components/app/status-badge";
-import { Field, Input, NumberInput, SubmitButton, formatDate, formatNumber } from "@/components/app/form-parts";
+import { Field, FormSelect, Input, NumberInput, SubmitButton, formatDate, formatNumber } from "@/components/app/form-parts";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -229,17 +229,13 @@ export function TariffsPage() {
                 <Input id="tf-destination" value={form.destination} onChange={(e) => setForm({ ...form, destination: e.target.value })} placeholder="Bandung" required disabled={busy} />
               </Field>
               <Field label="Tipe Customer" htmlFor="tf-type">
-                <select
-                  id="tf-type"
-                  className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
+                <FormSelect
                   value={form.customerType}
-                  onChange={(e) => setForm({ ...form, customerType: e.target.value })}
+                  onValueChange={(value) => setForm({ ...form, customerType: value })}
+                  placeholder="Semua tipe"
+                  options={[{ value: "b2b", label: "B2B" }, { value: "b2c", label: "B2C" }]}
                   disabled={busy}
-                >
-                  <option value="">Semua tipe</option>
-                  <option value="b2b">B2B</option>
-                  <option value="b2c">B2C</option>
-                </select>
+                />
               </Field>
               <Field label="Tarif per kg (Rp)" htmlFor="tf-rate">
                 <NumberInput id="tf-rate" value={form.ratePerKg} onChange={(e) => setForm({ ...form, ratePerKg: e.target.value })} placeholder="4500" required disabled={busy} />
@@ -254,16 +250,12 @@ export function TariffsPage() {
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Pembulatan" htmlFor="tf-rounding">
-                  <select
-                    id="tf-rounding"
-                    className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
+                  <FormSelect
                     value={form.roundingMode}
-                    onChange={(e) => setForm({ ...form, roundingMode: e.target.value })}
+                    onValueChange={(value) => setForm({ ...form, roundingMode: value })}
+                    options={[{ value: "UP", label: "Round up" }, { value: "NEAREST", label: "Nearest" }]}
                     disabled={busy}
-                  >
-                    <option value="UP">Round up</option>
-                    <option value="NEAREST">Nearest</option>
-                  </select>
+                  />
                 </Field>
                 <Field label="Satuan (kg)" htmlFor="tf-unit">
                   <NumberInput id="tf-unit" value={form.roundingUnitKg} onChange={(e) => setForm({ ...form, roundingUnitKg: e.target.value })} disabled={busy} />
