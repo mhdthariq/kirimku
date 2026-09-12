@@ -19,6 +19,7 @@ import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type Transport, type
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
+import { ItemAuditDialog } from "@/components/app/item-audit-dialog";
 import { StatusBadge } from "@/components/app/status-badge";
 import { Field, FormSelect, SubmitButton, Textarea, formatDate, formatNumber, formatRupiah } from "@/components/app/form-parts";
 import { Button } from "@/components/ui/button";
@@ -304,6 +305,7 @@ export function TransportsPage({ historyMode = false }: { historyMode?: boolean 
           header: "Aksi",
           render: (t) => (
             <div className="flex flex-wrap gap-1.5">
+                <ItemAuditDialog entityType="transport" entityId={t.id} itemLabel={t.transportCode} />
               <Button asChild variant="outline" size="sm" className="h-7">
                 <a href={`#/transports/${t.id}`}>
                   <Route className="h-3.5 w-3.5" /> Detail

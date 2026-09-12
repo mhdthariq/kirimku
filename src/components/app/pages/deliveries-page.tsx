@@ -7,6 +7,7 @@ import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type DeliveryTask, t
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
+import { ItemAuditDialog } from "@/components/app/item-audit-dialog";
 import { StatusBadge } from "@/components/app/status-badge";
 import { Field, FormSelect, SubmitButton, Textarea, formatDate, formatRupiah } from "@/components/app/form-parts";
 import { QrScanDialog, type ScanTaskInfo } from "@/components/app/qr-scan-dialog";
@@ -234,6 +235,7 @@ export function DeliveriesPage() {
                 header: "Aksi",
                 render: (d) => (
                   <div className="flex flex-wrap gap-1.5">
+                    <ItemAuditDialog entityType="delivery" entityId={d.id} itemLabel={d.deliveryCode} />
                     {d.status !== "COMPLETED" && d.status !== "FAILED" && (can.confirm || can.scan) && (
                       <Button size="sm" className="h-7" onClick={() => openScan(d)}>
                         <QrCode className="h-3.5 w-3.5" /> {isExecutor ? "Antar / Scan QR" : "Selesaikan (Scan QR)"}

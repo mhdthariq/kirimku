@@ -7,6 +7,7 @@ import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type PickupTask, typ
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
+import { ItemAuditDialog } from "@/components/app/item-audit-dialog";
 import { StatusBadge } from "@/components/app/status-badge";
 import { Field, FormSelect, SubmitButton, Textarea, formatDate } from "@/components/app/form-parts";
 import { QrScanDialog, type ScanTaskInfo } from "@/components/app/qr-scan-dialog";
@@ -219,6 +220,7 @@ export function PickupsPage() {
           header: "Aksi",
           render: (p) => (
             <div className="flex flex-wrap gap-1.5">
+              <ItemAuditDialog entityType="pickup" entityId={p.id} itemLabel={p.pickupCode} />
               {p.status !== "COMPLETED" && p.status !== "CANCELLED" && (can.confirm || can.scan) && (
                 <Button size="sm" className="h-7" onClick={() => openScan(p)}>
                   <QrCode className="h-3.5 w-3.5" /> {isExecutor ? "Proses / Scan QR" : "Selesaikan (Scan QR)"}

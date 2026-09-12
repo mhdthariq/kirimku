@@ -16,6 +16,7 @@ export async function GET(req: NextRequest) {
     const scope = await scopeForUser(user);
     const params = req.nextUrl.searchParams;
     const entityType = str(params.get("entityType"));
+    const entityId = num(params.get("entityId"));
     const action = str(params.get("action"));
     const actorId = num(params.get("actorId"));
     const search = str(params.get("search"))?.toLowerCase();
@@ -24,6 +25,7 @@ export async function GET(req: NextRequest) {
 
     const where = {
       ...(entityType ? { entityType } : {}),
+      ...(entityId != null ? { entityId } : {}),
       ...(action ? { action } : {}),
       ...(actorId ? { actorId } : {}),
       ...(search

@@ -1,22 +1,23 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { guard, ok, handle, fail, requireNum, str } from "@/lib/api-helpers";
-import { requirePartner, financeAudit } from "@/lib/wallet";
+import { financeAudit } from "@/lib/wallet";
 import { nextCode } from "@/lib/code-generator";
 import { COMPANY_BANK } from "@/lib/company";
 
 const MIN_TOP_UP_AMOUNT = 10_000;
 
 /**
- * Top Up workflow (§10/§11) — Marketing wallet deposits:
- *   Marketing creates request (PENDING_PAYMENT)
+ * Top Up workflow (§10/§11) — Admin Kantor creates a request for a Marketing
+ * partner:
+ *   Admin Kantor creates request (PENDING_PAYMENT)
  *   → transfers to the company bank account
  *   → submits transfer info/proof (partnerProofUrl)
  *   → Admin Kantor uploads official proof → PENDING_VERIFICATION
  *   → Owner Company verifies → VERIFIED + atomic wallet credit
  *
- * Authority (§10.1): Marketing can never verify/credit own top-up;
- * Admin Kantor cannot finalize; only wallet.topup.verify (Owner) credits.
+ * Authority (§10.1): Marketing cannot create or verify top-ups; Admin Kantor
+ * cannot finalize; only wallet.topup.verify (Owner) credits.
  */
 export async function GET(req: NextRequest) {
   return handle(async () => {
@@ -54,12 +55,14 @@ export async function GET(req: NextRequest) {
   });
 }
 
-/** POST /api/v1/topups — Marketing creates a top-up request. */
+/** POST /api/v1/topups — Admin Kantor creates a top-up request for a Marketing partner. */
 export async function POST(req: NextRequest) {
   return handle(async () => {
     const user = await guard(req, "wallet.topup.create");
-    const partner = requirePartner(user, "MARKETING");
     const body = await req.json().catch(() => ({}));
+    const partnerId = requireNum(body.partnerId, "partnerId", 1);
+    const partner = await db.partner.findFirst({ where: { id: partnerId, type: "MARKETING", isActive: true } });
+    if (!partner) return fail(422, "Partner Marketing aktif wajib dipilih.", { partnerId: ["Partner Marketing tidak ditemukan atau tidak aktif."] });
     const amount = requireNum(body.amount, "amount", MIN_TOP_UP_AMOUNT);
     const note = str(body.note);
 

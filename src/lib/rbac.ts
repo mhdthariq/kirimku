@@ -89,7 +89,9 @@ export const PERMISSIONS: { slug: string; module: string; description: string }[
   { slug: "wallet.transaction.view_own", module: "Wallet", description: "View own wallet transaction history" },
   { slug: "wallet.withdrawal.create", module: "Wallet", description: "Create own withdrawal requests" },
   { slug: "wallet.withdrawal.view_own", module: "Wallet", description: "View own withdrawal requests" },
-  { slug: "wallet.topup.create", module: "Wallet", description: "Create own top-up requests (Marketing)" },
+  { slug: "wallet.topup.create", module: "Wallet", description: "Create top-up requests for Marketing partners" },
+  { slug: "wallet.topup.submit_proof", module: "Wallet", description: "Submit proof for own top-up requests" },
+  { slug: "wallet.topup.cancel", module: "Wallet", description: "Cancel own top-up requests" },
   // Admin Kantor finance
   { slug: "wallet.topup.view", module: "Wallet", description: "View all top-up requests" },
   { slug: "wallet.topup.proof.upload", module: "Wallet", description: "Upload transfer proof for top-ups / withdrawals" },
@@ -131,7 +133,7 @@ export const ROLE_TEMPLATES: { slug: string; name: string; description: string; 
       "customer.view", "customer.create", "customer.update",
       "shipment.view", "shipment.view_tracking",
       "tariff.view", "tariff.create", "tariff.update",
-      "payment.view", "payment.record", "payment.verify", "payment.unpaid.view",
+      "payment.view", "payment.record", "payment.verify", "payment.unpaid.view", "wallet.topup.create",
       "invoice.view", "invoice.create", "invoice.update", "invoice.send",
       "audit_log.view",
       // Revise.md §33 — finance menus
@@ -154,7 +156,7 @@ export const ROLE_TEMPLATES: { slug: string; name: string; description: string; 
       // Revise.md §31/§35.1 — own wallet financial self-service
       "wallet.view_own", "wallet.transaction.view_own",
       "wallet.withdrawal.create", "wallet.withdrawal.view_own",
-      "wallet.topup.create",
+      "wallet.topup.submit_proof", "wallet.topup.cancel",
     ],
   },
   {

@@ -11,7 +11,7 @@ type Params = { params: Promise<{ id: string }> };
  */
 export async function POST(req: NextRequest, { params }: Params) {
   return handle(async () => {
-    const user = await guard(req, "wallet.topup.create");
+    const user = await guard(req, "wallet.topup.cancel");
     const partner = requirePartner(user, "MARKETING");
     const { id } = await params;
     const topUp = await db.topUpRequest.findUnique({ where: { id: Number(id) } });

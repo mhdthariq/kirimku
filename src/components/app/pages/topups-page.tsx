@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Loader2, Receipt, Upload, XCircle } from "lucide-react";
+import { CheckCircle2, Loader2, Plus, Receipt, Upload, XCircle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { apiGet, apiPost, hasPermission, type TopUpRequest, type TopUpsResponse } from "@/lib/client-api";
+import { apiGet, apiPost, hasPermission, type PartnerRow, type TopUpRequest, type TopUpsResponse } from "@/lib/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { StatusBadge } from "@/components/app/status-badge";
-import { Field, SubmitButton, formatRupiah, formatDate } from "@/components/app/form-parts";
+import { Field, Input, NumberInput, SubmitButton, formatRupiah, formatDate } from "@/components/app/form-parts";
+import { ItemAuditDialog } from "@/components/app/item-audit-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,9 +26,12 @@ export function TopUpManagementPage() {
   const canView = hasPermission(user, "wallet.topup.view");
   const canUpload = hasPermission(user, "wallet.topup.proof.upload");
   const canVerify = hasPermission(user, "wallet.topup.verify");
+  const canCreate = hasPermission(user, "wallet.topup.create");
 
   const { data, loading, reload } = useApiData<TopUpsResponse>(() => apiGet<TopUpsResponse>("/topups"), []);
+  const { data: partners } = useApiData<PartnerRow[]>(() => (canCreate ? apiGet<PartnerRow[]>("/partners?type=MARKETING") : Promise.resolve([])), [canCreate]);
   const [uploadFor, setUploadFor] = useState<TopUpRequest | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
 
   const rows = (data?.topUps ?? []).filter((r) => statusFilter === "all" || r.status === statusFilter);
@@ -42,6 +46,7 @@ export function TopUpManagementPage() {
         title="Top Up Requests"
         subtitle="Marketing meminta top up → transfer ke rekening perusahaan → Admin Kantor unggah bukti → Owner memverifikasi (saldo bertambah atomik saat VERIFIED)."
         icon={<Receipt className="h-5 w-5" />}
+        actions={canCreate ? <Button onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4" /> Buat Top Up</Button> : undefined}
       />
 
       <div className="flex flex-wrap gap-2">
@@ -94,6 +99,7 @@ export function TopUpManagementPage() {
             header: "Aksi",
             render: (r) => (
               <div className="flex flex-wrap items-center gap-1.5">
+                <ItemAuditDialog entityType="topup" entityId={r.id} itemLabel={r.requestCode} />
                 {canUpload && r.status === "PENDING_PAYMENT" && (
                   <Button size="sm" variant="outline" className="h-7" onClick={() => setUploadFor(r)}>
                     <Upload className="h-3.5 w-3.5" /> Upload Bukti
@@ -118,6 +124,7 @@ export function TopUpManagementPage() {
       />
 
       <UploadProofDialog topUp={uploadFor} onOpenChange={(open) => !open && setUploadFor(null)} onDone={reload} />
+      <CreateTopUpDialog partners={partners ?? []} open={createOpen} onOpenChange={setCreateOpen} onDone={reload} />
     </div>
   );
 
@@ -134,6 +141,56 @@ export function TopUpManagementPage() {
     });
     if (ok) reload();
   }
+}
+
+function CreateTopUpDialog({ partners, open, onOpenChange, onDone }: { partners: PartnerRow[]; open: boolean; onOpenChange: (open: boolean) => void; onDone: () => void }) {
+  const [partnerId, setPartnerId] = useState("");
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    const ok = await runAction(() => apiPost("/topups", { partnerId: Number(partnerId), amount: Number(amount), note: note || null }), { success: "Top up dibuat." });
+    setBusy(false);
+    if (ok) {
+      setPartnerId("");
+      setAmount("");
+      setNote("");
+      onOpenChange(false);
+      onDone();
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Buat Top Up</DialogTitle>
+          <DialogDescription>Buat permintaan top up untuk partner Marketing. Owner tetap melakukan verifikasi akhir.</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={onSubmit} className="space-y-4">
+          <Field label="Partner Marketing" htmlFor="topup-partner">
+            <select id="topup-partner" className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={partnerId} onChange={(e) => setPartnerId(e.target.value)} required disabled={busy}>
+              <option value="">Pilih partner…</option>
+              {partners.filter((p) => p.isActive).map((p) => <option key={p.id} value={p.id}>{p.name} (@{p.username})</option>)}
+            </select>
+          </Field>
+          <Field label="Jumlah Top Up (Rupiah)" htmlFor="topup-amount">
+            <NumberInput id="topup-amount" value={amount} onChange={(e) => setAmount(e.target.value)} min={10000} step={1000} required disabled={busy} />
+          </Field>
+          <Field label="Catatan (opsional)" htmlFor="topup-note">
+            <Input id="topup-note" value={note} onChange={(e) => setNote(e.target.value)} disabled={busy} />
+          </Field>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Batal</Button>
+            <SubmitButton busy={busy}>Buat Top Up</SubmitButton>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 function UploadProofDialog({

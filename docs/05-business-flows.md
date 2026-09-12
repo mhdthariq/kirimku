@@ -150,6 +150,7 @@ ASSIGNED ──scan all customer packages──► (all scanned) ──complete 
 - Every mutating endpoint writes an `AuditLog` row: action, entityType, entityId/Label (human string like `MKT-000002 → PICKED_UP`), actor, optional before/after JSON.
 - **Global view**: `#/audit` — filter by entity, actor, action, date range; CSV export.
 - **Per-menu view**: each page's "Log Aktivitas" tab calls `GET /audit-logs?entityType=<module>` — e.g. Gudang shows only `warehouse` events.
+- **Per-item view**: shipment, pickup, delivery, transport, and top-up rows provide a permission-gated **Log** popup. It calls `GET /audit-logs?entityType=<type>&entityId=<id>` and shows CRUD/status operations for that item. The existing `audit_log.view` permission controls access; Owner bypasses it by default.
 - Logs are append-only; the API exposes no update/delete for audit rows.
 
 ## Gudang arrival workflow (Revision 4)

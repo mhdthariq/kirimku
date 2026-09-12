@@ -27,11 +27,13 @@ const ACTION_STYLES: Record<string, string> = {
  */
 export function ActivityLogPanel({
   entityTypes,
+  entityId,
   title = "Log Aktivitas",
   limit = 30,
   compact = false,
 }: {
   entityTypes: string[];
+  entityId?: number;
   title?: string;
   limit?: number;
   compact?: boolean;
@@ -45,9 +47,10 @@ export function ActivityLogPanel({
     setLoading(true);
     setError(null);
     try {
-      const query = entityTypes.map((t) => `entityType=${t}`).join("&");
+      const query = entityTypes.map((t) => `entityType=${encodeURIComponent(t)}`).join("&");
+      const entityQuery = entityId == null ? "" : `&entityId=${entityId}`;
       const res = await apiGetWithMeta<AuditResponse["data"]>(
-        `/audit-logs?${query}&limit=${limit}`,
+        `/audit-logs?${query}${entityQuery}&limit=${limit}`,
       );
       setEntries(res.data ?? []);
       setTotal(typeof res.meta?.total === "number" ? res.meta.total : (res.data ?? []).length);
@@ -56,7 +59,7 @@ export function ActivityLogPanel({
     } finally {
       setLoading(false);
     }
-  }, [entityTypes, limit]);
+  }, [entityTypes, entityId, limit]);
 
   useEffect(() => {
     load();

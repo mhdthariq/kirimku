@@ -36,6 +36,7 @@ import {
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
+import { ItemAuditDialog } from "@/components/app/item-audit-dialog";
 import { StatusBadge } from "@/components/app/status-badge";
 import { ResiPrint } from "@/components/app/resi-print";
 import { ArrivalScanDialog } from "@/components/app/arrival-scan-dialog";
@@ -395,6 +396,7 @@ function ShipmentList() {
                     <Button variant="outline" size="sm" className="h-7" onClick={() => (window.location.hash = `#/shipments/${s.id}`)}>
                       Detail
                     </Button>
+                    <ItemAuditDialog entityType="shipment" entityId={s.id} itemLabel={s.masterCode} />
                     {can.confirmArrival && s.status === "PICKED_UP" && (
                       <Button size="sm" className="h-7" onClick={() => openRowScan(s)} title="Scan paket & konfirmasi tiba di gudang">
                         <ScanLine className="h-3.5 w-3.5" /> Terima / Scan
@@ -981,6 +983,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
         actions={
           <>
             <StatusBadge status={shipment.status} />
+            <ItemAuditDialog entityType="shipment" entityId={shipment.id} itemLabel={shipment.masterCode} />
             {shipment.customer?.type === "b2b" && shipment.invoiceLines?.[0] && (
               <a href={`#/invoices/${shipment.invoiceLines[0].invoice.id}`} className="rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
                 Included in {shipment.invoiceLines[0].invoice.invoiceNumber}
