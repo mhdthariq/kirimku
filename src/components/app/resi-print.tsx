@@ -177,8 +177,8 @@ export function ResiPrint({ shipment, onClose }: ResiPrintProps) {
     phone: shipment.customer?.phone ?? "—",
   };
 
-  const originName = originGudang?.name ?? shipment.origin;
-  const destinationName = destGudang?.name ?? shipment.destination;
+  const originName = shipment.origin;
+  const destinationName = shipment.destination;
   const originSupport = originGudang?.customerSupportContact ?? "—";
   const destinationSupport = destGudang?.customerSupportContact ?? "—";
 
@@ -231,17 +231,20 @@ export function ResiPrint({ shipment, onClose }: ResiPrintProps) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 border-b border-black">
-          <div className="border-r border-black px-4 py-3">
-            <SmallCaps>Pengirim</SmallCaps>
-            <p className="mt-1 text-[12px] font-extrabold leading-tight">{pengirim.name}</p>
-            <p className="mt-1 text-[9px] leading-tight text-neutral-700">{pengirim.phone}</p>
+        <div className="grid grid-cols-2 border-b-[2px] border-black bg-neutral-50">
+          <div className="border-r border-black px-4 py-3.5">
+            <p className="text-[8px] font-extrabold uppercase tracking-[0.14em] text-neutral-500">Pengirim</p>
+            <p className="mt-1 text-[14px] font-extrabold leading-tight">{pengirim.name}</p>
+            <p className="mt-2 text-[7px] font-bold uppercase tracking-[0.1em] text-neutral-500">Kontak</p>
+            <p className="mt-0.5 text-[10px] font-semibold leading-tight text-neutral-800">{pengirim.phone}</p>
           </div>
-          <div className="px-4 py-3">
-            <SmallCaps>Penerima</SmallCaps>
-            <p className="mt-1 text-[12px] font-extrabold leading-tight">{penerima.name}</p>
-            <p className="mt-1 text-[9px] leading-tight text-neutral-700">{penerima.contact}</p>
-            <p className="mt-1 text-[9px] leading-tight text-neutral-700">{penerima.address}</p>
+          <div className="px-4 py-3.5">
+            <p className="text-[8px] font-extrabold uppercase tracking-[0.14em] text-neutral-500">Penerima</p>
+            <p className="mt-1 text-[14px] font-extrabold leading-tight">{penerima.name}</p>
+            <p className="mt-2 text-[7px] font-bold uppercase tracking-[0.1em] text-neutral-500">Kontak</p>
+            <p className="mt-0.5 text-[10px] font-semibold leading-tight text-neutral-800">{penerima.contact}</p>
+            <p className="mt-2 text-[7px] font-bold uppercase tracking-[0.1em] text-neutral-500">Alamat</p>
+            <p className="mt-0.5 text-[9px] leading-tight text-neutral-800">{penerima.address}</p>
           </div>
         </div>
 
