@@ -78,8 +78,8 @@ Shared by Pickups and Deliveries (props: `mode`, `task`, `onDone`). One dialog, 
 ┌─ Scan QR — Pickup PICK-2026-000006 ──────────────────┐
 │ Paket ter-scan: 2/2              SEMUA PAKET LENGKAP │  ← Progress bar + counter
 │ [ ▯ Tempel/scan QR code di sini…      ] [ Scan ]      │  ← auto-focus; Enter submits
-│ ✓ DTL-000001-01  Paket pakaian · oleh Rizky          │  ← green = scanned
-│ ▣ [QR] DTL-000001-02  Buku tulis                     │  ← QR image per unscanned pkg
+│ ✓ DTL-YYYYMMDD-HHmmss-001  Paket pakaian · oleh Rizky │  ← green = scanned
+│ ▣ [QR] DTL-YYYYMMDD-HHmmss-002  Buku tulis            │  ← QR image per unscanned pkg
 │ ── all scanned ──► [Catatan] [Konfirmasi Pickup …]   │  ← confirm gate unlocks
 └──────────────────────────────────────────────────────┘
 ```

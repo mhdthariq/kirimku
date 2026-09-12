@@ -309,6 +309,7 @@ async function runSeed(): Promise<void> {
     const priceByCode: Record<string, number> = {};
     const shipmentIdByCode: Record<string, number> = {};
     const detailRowsByCode: Record<string, { id: number; detailCode: string }[]> = {};
+    const packageSequenceByDate: Record<string, number> = {};
 
     for (const s of shipmentDefs) {
       const createdAt = daysAgo(s.createdDaysAgo);
@@ -338,12 +339,19 @@ async function runSeed(): Promise<void> {
       detailRowsByCode[s.masterCode] = [];
       // quantity N expands into N package rows — each with a unique detailCode (QR label)
       const pricedRows: { lengthCm: number | null; widthCm: number | null; heightCm: number | null; actualWeightKg: number }[] = [];
-      let detailSeq = 1;
+      const date = [createdAt.getFullYear(), createdAt.getMonth() + 1, createdAt.getDate()]
+        .map((part) => String(part).padStart(2, "0"))
+        .join("");
+      const time = [createdAt.getHours(), createdAt.getMinutes(), createdAt.getSeconds()]
+        .map((part) => String(part).padStart(2, "0"))
+        .join("");
+      packageSequenceByDate[date] ??= 0;
       for (const d of s.details) {
         for (let i = 0; i < d.quantity; i++) {
+          packageSequenceByDate[date] += 1;
           const row = await db.detailShipment.create({
             data: {
-              detailCode: `DTL-${s.masterCode.slice(-6)}-${String(detailSeq++).padStart(2, "0")}`,
+              detailCode: `DTL-${date}-${time}-${String(packageSequenceByDate[date]).padStart(3, "0")}`,
               masterId: shipment.id, description: d.description,
               actualWeightKg: d.weightKg, lengthCm: d.l, widthCm: d.w, heightCm: d.h,
               createdAt,
