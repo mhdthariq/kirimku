@@ -67,6 +67,15 @@ export function str(value: unknown): string | null {
   return s === "" ? null : s;
 }
 
+export function slugify(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 export function requireStr(value: unknown, field: string): string {
   const s = str(value);
   if (!s) throw new HttpError(422, `The ${field} field is required.`, { [field]: ["The " + field + " field is required."] });

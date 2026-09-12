@@ -62,7 +62,7 @@ export function LoginScreen() {
   return (
     <div className="min-h-screen bg-background lg:grid lg:grid-cols-[1.1fr_1fr]">
       {/* Brand panel */}
-      <div className="relative hidden overflow-hidden bg-primary lg:flex lg:flex-col lg:justify-between lg:p-10 xl:p-14">
+      <div className="relative hidden overflow-hidden bg-primary dark:bg-[#075740] lg:flex lg:flex-col lg:justify-between lg:p-10 xl:p-14">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 opacity-[0.16]"
@@ -81,9 +81,9 @@ export function LoginScreen() {
           </div>
           <div className="leading-none">
             <p className="text-xl font-bold tracking-tight text-white">
-              Kirim<span className="text-primary-foreground/70">Ku</span>
+              Kirim<span className="text-primary-foreground/90">Ku</span>
             </p>
-            <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.18em] text-white/60">
+            <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.18em] text-white/80">
               Shipment Management
             </p>
           </div>
@@ -93,7 +93,7 @@ export function LoginScreen() {
           <h1 className="text-[34px] font-bold leading-[1.15] tracking-tight text-white xl:text-[40px]">
             Kendalikan seluruh perjalanan kiriman Anda dari satu tempat.
           </h1>
-          <p className="mt-4 text-[15px] leading-relaxed text-white/70">
+          <p className="mt-4 text-[15px] leading-relaxed text-white/85">
             Dari pickup kurir, penyimpanan gudang, transport antar kota dengan checkpoint GPS,
             hingga delivery dan settlement — semuanya terlacak dan teraudit.
           </p>
@@ -105,8 +105,8 @@ export function LoginScreen() {
               { icon: ShieldCheck, label: "Audit trail penuh" },
             ].map((f) => (
               <div key={f.label} className="rounded-xl bg-white/10 p-3 backdrop-blur-sm">
-                <f.icon className="h-5 w-5 text-white/80" />
-                <p className="mt-2 text-[11px] font-semibold leading-tight text-white/80">{f.label}</p>
+                <f.icon className="h-5 w-5 text-white" />
+                <p className="mt-2 text-[11px] font-semibold leading-tight text-white/90">{f.label}</p>
               </div>
             ))}
           </div>
@@ -114,20 +114,20 @@ export function LoginScreen() {
           <div className="mt-10 flex items-center gap-6 border-t border-white/15 pt-6">
             <div>
               <p className="text-2xl font-bold text-white">6</p>
-              <p className="text-[11px] text-white/60">Status lifecycle</p>
+              <p className="text-[11px] text-white/80">Status lifecycle</p>
             </div>
             <div>
               <p className="text-2xl font-bold text-white">3+</p>
-              <p className="text-[11px] text-white/60">Checkpoint per rute</p>
+              <p className="text-[11px] text-white/80">Checkpoint per rute</p>
             </div>
             <div>
               <p className="text-2xl font-bold text-white">24/7</p>
-              <p className="text-[11px] text-white/60">Monitoring</p>
+              <p className="text-[11px] text-white/80">Monitoring</p>
             </div>
           </div>
         </div>
 
-        <p className="relative text-[11px] text-white/40">
+        <p className="relative text-[11px] text-white/65">
           © 2026 KirimKu · Sistem manajemen pengiriman internal
         </p>
       </div>
@@ -158,7 +158,7 @@ export function LoginScreen() {
             </div>
 
             <h2 className="text-2xl font-bold tracking-tight text-foreground">Masuk ke akun Anda</h2>
-            <p className="mt-1.5 text-sm text-muted-foreground">
+            <p className="mt-1.5 text-sm text-foreground/70">
               Gunakan username dan password Anda. Sesi berlaku 12 jam.
             </p>
 
@@ -172,7 +172,7 @@ export function LoginScreen() {
               <div className="space-y-2">
                 <Label htmlFor="username">Username</Label>
                 <div className="relative">
-                  <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/60" />
                   <Input
                     id="username"
                     className="pl-9"
@@ -189,7 +189,7 @@ export function LoginScreen() {
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <div className="relative">
-                  <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/60" />
                   <Input
                     id="password"
                     type="password"
@@ -213,7 +213,7 @@ export function LoginScreen() {
             <div className="mt-8">
               <div className="flex items-center gap-3">
                 <div className="h-px flex-1 bg-border" />
-                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                <span className="text-[11px] font-medium uppercase tracking-wider text-foreground/70">
                   Akun demo
                 </span>
                 <div className="h-px flex-1 bg-border" />
@@ -237,7 +237,7 @@ export function LoginScreen() {
                       )}
                       {acc.label}
                     </span>
-                    <span className="mt-0.5 block text-[10px] text-muted-foreground">{acc.hint}</span>
+                    <span className="mt-0.5 block text-[10px] text-foreground/70">{acc.hint}</span>
                   </button>
                 ))}
               </div>

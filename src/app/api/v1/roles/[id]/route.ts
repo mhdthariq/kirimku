@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { guard, ok, handle, fail, str } from "@/lib/api-helpers";
+import { guard, ok, handle, fail, slugify, str } from "@/lib/api-helpers";
 import { audit, diffFields } from "@/lib/audit";
 
 type Params = { params: Promise<{ id: string }> };
@@ -20,7 +20,15 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const body = await req.json().catch(() => ({}));
     const data: Record<string, unknown> = {};
     if (!editingSystem) {
-      if (body.name !== undefined) data.name = str(body.name) ?? existing.name;
+      if (body.name !== undefined) {
+        const name = str(body.name) ?? existing.name;
+        const slug = slugify(name);
+        if (!slug) return fail(422, "Nama role harus menghasilkan slug yang valid.", { name: ["Nama role harus menghasilkan slug yang valid."] });
+        const duplicate = await db.role.findFirst({ where: { slug, id: { not: existing.id } } });
+        if (duplicate) return fail(422, `Role slug "${slug}" sudah dipakai.`, { name: ["Nama role menghasilkan slug yang sudah dipakai."] });
+        data.name = name;
+        data.slug = slug;
+      }
       if (body.description !== undefined) data.description = str(body.description);
     } else if (body.description !== undefined) {
       data.description = str(body.description);

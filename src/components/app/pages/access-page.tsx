@@ -415,7 +415,7 @@ function RolesTab({ can }: { can: { roleCreate: boolean; roleUpdate: boolean } }
   const { data: options } = useApiData<Options>(() => apiGet<Options>("/options"), []);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Role | null>(null);
-  const [form, setForm] = useState({ name: "", slug: "", description: "", permissionIds: [] as string[] });
+  const [form, setForm] = useState({ name: "", description: "", permissionIds: [] as string[] });
   const [busy, setBusy] = useState(false);
   const [expanded, setExpanded] = useState<number | null>(null);
 
@@ -433,7 +433,6 @@ function RolesTab({ can }: { can: { roleCreate: boolean; roleUpdate: boolean } }
     setBusy(true);
     const payload = {
       name: form.name,
-      slug: form.slug,
       description: form.description || null,
       permissionIds: form.permissionIds.map(Number),
     };
@@ -485,7 +484,7 @@ function RolesTab({ can }: { can: { roleCreate: boolean; roleUpdate: boolean } }
                     className="h-8 w-8"
                     onClick={() => {
                       setEditing(r);
-                      setForm({ name: r.name, slug: r.slug, description: r.description ?? "", permissionIds: r.permissions.map((p) => String(p.permission.id)) });
+                      setForm({ name: r.name, description: r.description ?? "", permissionIds: r.permissions.map((p) => String(p.permission.id)) });
                       setDialogOpen(true);
                     }}
                     aria-label="Edit role"
@@ -503,7 +502,7 @@ function RolesTab({ can }: { can: { roleCreate: boolean; roleUpdate: boolean } }
         <Button
           variant="outline"
           size="sm"
-          onClick={() => { setEditing(null); setForm({ name: "", slug: "", description: "", permissionIds: [] }); setDialogOpen(true); }}
+          onClick={() => { setEditing(null); setForm({ name: "", description: "", permissionIds: [] }); setDialogOpen(true); }}
         >
           <Plus className="h-4 w-4" /> Tambah Role Custom
         </Button>
@@ -530,9 +529,6 @@ function RolesTab({ can }: { can: { roleCreate: boolean; roleUpdate: boolean } }
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="Nama Role" htmlFor="r-name">
                 <Input id="r-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required disabled={busy || !!editing?.isSystem} />
-              </Field>
-              <Field label="Slug" htmlFor="r-slug" hint="huruf kecil + tanda hubung">
-                <Input id="r-slug" value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} required disabled={busy || !!editing?.isSystem} placeholder="supervisor-gudang" />
               </Field>
             </div>
             <Field label="Deskripsi" htmlFor="r-desc">

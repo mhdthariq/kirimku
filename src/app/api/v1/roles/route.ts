@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { guard, ok, handle, fail, requireStr, str } from "@/lib/api-helpers";
+import { guard, ok, handle, fail, requireStr, slugify, str } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
 
 export async function GET(req: NextRequest) {
@@ -19,7 +19,8 @@ export async function POST(req: NextRequest) {
     const user = await guard(req, "role.create");
     const body = await req.json().catch(() => ({}));
     const name = requireStr(body.name, "name");
-    const slug = requireStr(body.slug, "slug").toLowerCase().replace(/[^a-z0-9-]+/g, "-");
+    const slug = slugify(name);
+    if (!slug) return fail(422, "Nama role harus menghasilkan slug yang valid.", { name: ["Nama role harus menghasilkan slug yang valid."] });
     const existing = await db.role.findUnique({ where: { slug } });
     if (existing) return fail(422, `Role slug "${slug}" sudah dipakai.`, { slug: ["Slug sudah dipakai."] });
 
