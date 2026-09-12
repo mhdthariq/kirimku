@@ -69,6 +69,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (body.destination !== undefined && data.destination === undefined) data.destination = str(body.destination) ?? existing.destination;
     if (body.originWarehouseId !== undefined) data.originWarehouseId = body.originWarehouseId ? Number(body.originWarehouseId) : null;
     if (body.destinationWarehouseId !== undefined) data.destinationWarehouseId = body.destinationWarehouseId ? Number(body.destinationWarehouseId) : null;
+    if (body.insuranceAmount !== undefined) data.insuranceAmount = Math.max(0, num(body.insuranceAmount) ?? 0);
     // Penerima (recipient) — printed on both resi types
     if (body.penerimaName !== undefined) data.penerimaName = str(body.penerimaName);
     if (body.penerimaAddress !== undefined) data.penerimaAddress = str(body.penerimaAddress);

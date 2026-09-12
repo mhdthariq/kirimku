@@ -309,6 +309,8 @@ model MasterShipment {
   ratePerKg              Float?
   priceAmount            Float?
   pricedAt               DateTime?
+  // Optional manually entered insurance amount in Rupiah.
+  insuranceAmount        Float    @default(0)
 
   // ----- Revise.md: Marketing B2C discount + partner attribution ----------
   // Marketing enters the discount as an AMOUNT (Rupiah); the percentage is

@@ -62,6 +62,7 @@ interface ShipmentForm {
   penerimaAddress: string;
   penerimaContact: string;
   discountAmount: string;
+  insuranceAmount: string;
 }
 
 interface DetailForm {
@@ -82,6 +83,7 @@ const EMPTY_SHIPMENT: ShipmentForm = {
   penerimaAddress: "",
   penerimaContact: "",
   discountAmount: "",
+  insuranceAmount: "",
 };
 const EMPTY_DETAIL: DetailForm = { description: "", quantity: "1", lengthCm: "", widthCm: "", heightCm: "", actualWeightKg: "" };
 
@@ -176,6 +178,7 @@ function ShipmentList() {
       penerimaName: form.penerimaName || null,
       // Revise.md §6 — discount entered as AMOUNT; % derived by the backend
       discountAmount: form.discountAmount ? Number(form.discountAmount) : 0,
+      insuranceAmount: form.insuranceAmount ? Number(form.insuranceAmount) : 0,
       penerimaAddress: form.penerimaAddress || null,
       penerimaContact: form.penerimaContact || null,
     };
@@ -513,6 +516,21 @@ function ShipmentList() {
                   />
                 </Field>
               )}
+              <Field
+                label="Asuransi (Rupiah)"
+                htmlFor="s-insurance"
+                className="sm:col-span-2"
+                hint="Opsional — masukkan nominal asuransi secara manual."
+              >
+                <NumberInput
+                  id="s-insurance"
+                  value={form.insuranceAmount}
+                  onChange={(e) => setForm({ ...form, insuranceAmount: e.target.value })}
+                  placeholder="mis. 10000"
+                  min={0}
+                  disabled={busy}
+                />
+              </Field>
               <div className="sm:col-span-2">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Penerima (dicetak pada resi)</p>
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -1075,6 +1093,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
                   : "—"
               }
             />
+            <Row label="Asuransi" value={formatRupiah(shipment.insuranceAmount)} />
             <div className="flex items-center justify-between rounded-lg bg-primary/10 px-3 py-2.5">
               <span className="text-xs font-semibold text-primary">{shipment.priceAmount != null ? "TOTAL HARGA" : "ESTIMASI HARGA"}</span>
               <span className="text-base font-bold text-primary">{formatRupiah(shipment.priceAmount ?? pricing?.estimatedPrice ?? null)}</span>

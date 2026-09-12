@@ -189,6 +189,7 @@ export interface Shipment {
   ratePerKg: number | null;
   priceAmount: number | null;
   pricedAt: string | null;
+  insuranceAmount: number;
   /** Revise.md §6 — Marketing-funded B2C discount */
   discountAmount: number;
   discountPercentage: number | null;

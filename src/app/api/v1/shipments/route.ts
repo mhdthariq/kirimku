@@ -70,6 +70,7 @@ export async function POST(req: NextRequest) {
     // Revise.md §6 — Marketing enters the discount as an AMOUNT in Rupiah.
     // The percentage is always derived by the system, never typed manually.
     const discountAmount = Math.max(0, num(body.discountAmount) ?? 0);
+    const insuranceAmount = Math.max(0, num(body.insuranceAmount) ?? 0);
 
     // Route comes from the tariff dropdown (Kota Asal/Tujuan no longer typed by hand).
     // Legacy clients may still send origin/destination directly.
@@ -139,6 +140,7 @@ export async function POST(req: NextRequest) {
           destination,
           originWarehouseId: originWarehouseId ?? null,
           destinationWarehouseId: destinationWarehouseId ?? null,
+          insuranceAmount,
           penerimaName: str(body.penerimaName),
           penerimaAddress: str(body.penerimaAddress),
           penerimaContact: str(body.penerimaContact),

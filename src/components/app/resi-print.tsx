@@ -295,6 +295,13 @@ export function ResiPrint({ shipment, onClose }: ResiPrintProps) {
           </div>
         )}
 
+        {shipment.insuranceAmount > 0 && (
+          <div className="flex items-center justify-between border-b border-black px-4 py-2.5">
+            <SmallCaps>Asuransi</SmallCaps>
+            <p className="text-[12px] font-extrabold">{formatRupiah(shipment.insuranceAmount)}</p>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 border-b border-black">
           <Field label="Gudang asal / CS" className="border-r border-black px-4 py-2.5">
             <p>{originName}</p>
