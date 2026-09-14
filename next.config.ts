@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
-  allowedDevOrigins: ["gully-crummy-footnote.ngrok-free.dev"],
+  allowedDevOrigins: ["gully-crummy-footnote.ngrok-free.dev", "100.83.151.31"],
 };
 
 export default nextConfig;
