@@ -25,6 +25,7 @@ export type WalletTxType =
   | "TRANSPORT_PROFIT_SHARE"
   | "REPAIR_DEDUCTION"
   | "WITHDRAWAL"
+  | "SHIPMENT_ESCROW"
   | "ADJUSTMENT";
 
 export const PARTNER_TYPES = ["MARKETING", "VEHICLE_OWNER"] as const;

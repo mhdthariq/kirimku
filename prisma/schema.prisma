@@ -179,7 +179,7 @@ model WalletTransaction {
   id             Int      @id @default(autoincrement())
   walletId       Int
   wallet         Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
-  // TOPUP | COMMISSION | TRANSPORT_PROFIT_SHARE | REPAIR_DEDUCTION | WITHDRAWAL | ADJUSTMENT
+  // TOPUP | COMMISSION | TRANSPORT_PROFIT_SHARE | REPAIR_DEDUCTION | WITHDRAWAL | SHIPMENT_ESCROW | ADJUSTMENT
   type           String
   amount         Float    // always positive; `direction` decides credit/debit
   direction      String   // CREDIT | DEBIT
