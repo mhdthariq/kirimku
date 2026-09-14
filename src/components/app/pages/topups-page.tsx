@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Loader2, Plus, Receipt, Upload, XCircle } from "lucide-react";
+import { CheckCircle2, FileImage, Plus, Receipt, XCircle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { apiGet, apiPost, hasPermission, type PartnerRow, type TopUpRequest, type TopUpsResponse } from "@/lib/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
@@ -11,12 +11,11 @@ import { Field, Input, NumberInput, SubmitButton, formatRupiah, formatDate } fro
 import { ItemAuditDialog } from "@/components/app/item-audit-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
 
 /**
  * Top Up management (Revise.md §10/§33/§34) — company side:
- *  · Admin Kantor (wallet.topup.proof.upload): uploads the official transfer
- *    proof and submits the request for verification.
+ *  · Admin Kantor (wallet.topup.create): creates the request with transfer
+ *    proof and submits it for verification.
  *  · Owner Company (wallet.topup.verify): final verification → VERIFIED +
  *    atomic wallet credit; or rejection.
  * Marketing can never verify their own top-up (server-enforced §10.1).
@@ -24,13 +23,12 @@ import { Textarea } from "@/components/ui/textarea";
 export function TopUpManagementPage() {
   const { user } = useAuth();
   const canView = hasPermission(user, "wallet.topup.view");
-  const canUpload = hasPermission(user, "wallet.topup.proof.upload");
   const canVerify = hasPermission(user, "wallet.topup.verify");
   const canCreate = hasPermission(user, "wallet.topup.create");
 
   const { data, loading, reload } = useApiData<TopUpsResponse>(() => apiGet<TopUpsResponse>("/topups"), []);
   const { data: partners } = useApiData<PartnerRow[]>(() => (canCreate ? apiGet<PartnerRow[]>("/partners?type=MARKETING") : Promise.resolve([])), [canCreate]);
-  const [uploadFor, setUploadFor] = useState<TopUpRequest | null>(null);
+  const [proofFor, setProofFor] = useState<TopUpRequest | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
 
@@ -44,7 +42,7 @@ export function TopUpManagementPage() {
     <div className="space-y-4">
       <PageHeader
         title="Top Up Requests"
-        subtitle="Marketing meminta top up → transfer ke rekening perusahaan → Admin Kantor unggah bukti → Owner memverifikasi (saldo bertambah atomik saat VERIFIED)."
+        subtitle="Marketing meminta top up dengan bukti transfer → Owner memeriksa dan memverifikasi (saldo bertambah atomik saat VERIFIED)."
         icon={<Receipt className="h-5 w-5" />}
         actions={canCreate ? <Button onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4" /> Buat Top Up</Button> : undefined}
       />
@@ -100,11 +98,7 @@ export function TopUpManagementPage() {
             render: (r) => (
               <div className="flex flex-wrap items-center gap-1.5">
                 <ItemAuditDialog entityType="topup" entityId={r.id} itemLabel={r.requestCode} />
-                {canUpload && r.status === "PENDING_PAYMENT" && (
-                  <Button size="sm" variant="outline" className="h-7" onClick={() => setUploadFor(r)}>
-                    <Upload className="h-3.5 w-3.5" /> Upload Bukti
-                  </Button>
-                )}
+                {r.proofUrl && <Button size="sm" variant="outline" className="h-7" onClick={() => setProofFor(r)}><FileImage className="h-3.5 w-3.5" /> Bukti</Button>}
                 {canVerify && r.status === "PENDING_VERIFICATION" && (
                   <>
                     <Button size="sm" className="h-7" onClick={() => verifyTopUp(r.id)}>
@@ -123,8 +117,8 @@ export function TopUpManagementPage() {
         ]}
       />
 
-      <UploadProofDialog topUp={uploadFor} onOpenChange={(open) => !open && setUploadFor(null)} onDone={reload} />
       <CreateTopUpDialog partners={partners ?? []} open={createOpen} onOpenChange={setCreateOpen} onDone={reload} />
+      <ProofDialog topUp={proofFor} onOpenChange={(open) => !open && setProofFor(null)} />
     </div>
   );
 
@@ -147,17 +141,38 @@ function CreateTopUpDialog({ partners, open, onOpenChange, onDone }: { partners:
   const [partnerId, setPartnerId] = useState("");
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
+  const [proof, setProof] = useState<{ type: string; dataUrl: string } | null>(null);
+  const [proofError, setProofError] = useState("");
   const [busy, setBusy] = useState(false);
+
+  function onProofChange(file: File | undefined) {
+    setProofError("");
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setProofError("Pilih file gambar.");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setProofError("Ukuran file maksimal 8 MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setProof({ type: file.type, dataUrl: String(reader.result) });
+    reader.onerror = () => setProofError("File tidak bisa dibaca. Coba pilih file lain.");
+    reader.readAsDataURL(file);
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
-    const ok = await runAction(() => apiPost("/topups", { partnerId: Number(partnerId), amount: Number(amount), note: note || null }), { success: "Top up dibuat." });
+    const ok = await runAction(() => apiPost("/topups", { partnerId: Number(partnerId), amount: Number(amount), note: note || null, proofUrl: proof?.dataUrl }), { success: "Top up dibuat dan dikirim untuk verifikasi Owner." });
     setBusy(false);
     if (ok) {
       setPartnerId("");
       setAmount("");
       setNote("");
+      setProof(null);
+      setProofError("");
       onOpenChange(false);
       onDone();
     }
@@ -168,7 +183,7 @@ function CreateTopUpDialog({ partners, open, onOpenChange, onDone }: { partners:
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Buat Top Up</DialogTitle>
-          <DialogDescription>Buat permintaan top up untuk partner Marketing. Owner tetap melakukan verifikasi akhir.</DialogDescription>
+          <DialogDescription>Unggah bukti transfer saat membuat permintaan. Owner akan memeriksa bukti dan melakukan verifikasi akhir.</DialogDescription>
         </DialogHeader>
         <form onSubmit={onSubmit} className="space-y-4">
           <Field label="Partner Marketing" htmlFor="topup-partner">
@@ -183,6 +198,10 @@ function CreateTopUpDialog({ partners, open, onOpenChange, onDone }: { partners:
           <Field label="Catatan (opsional)" htmlFor="topup-note">
             <Input id="topup-note" value={note} onChange={(e) => setNote(e.target.value)} disabled={busy} />
           </Field>
+          <Field label="Bukti Transfer" hint="Format gambar, maksimal 8 MB." error={proofError}>
+            <Input type="file" accept="image/*" onChange={(e) => onProofChange(e.target.files?.[0])} required disabled={busy} />
+            {proof?.type.startsWith("image/") && <img src={proof.dataUrl} alt="Preview bukti transfer" className="max-h-40 w-full rounded-lg border object-contain" />}
+          </Field>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Batal</Button>
             <SubmitButton busy={busy}>Buat Top Up</SubmitButton>
@@ -193,59 +212,15 @@ function CreateTopUpDialog({ partners, open, onOpenChange, onDone }: { partners:
   );
 }
 
-function UploadProofDialog({
-  topUp,
-  onOpenChange,
-  onDone,
-}: {
-  topUp: TopUpRequest | null;
-  onOpenChange: (open: boolean) => void;
-  onDone: () => void;
-}) {
-  const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!topUp) return;
-    setBusy(true);
-    const ok = await runAction(
-      () =>
-        apiPost(`/topups/${topUp.id}/upload-proof`, {
-          proofUrl:
-            "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNDAiIGhlaWdodD0iMTIwIj48cmVjdCB3aWR0aD0iMjQwIiBoZWlnaHQ9IjEyMCIgZmlsbD0iI2Y4ZjlmYSIvPjx0ZXh0IHg9IjEyIiB5PSI3MCIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTMiIGZpbGw9IiM2NDc0OGIiPkJ1a3RpIFRyYW5zZmVyIFJlc21pPC90ZXh0Pjwvc3ZnPg==",
-        }),
-      { success: "Bukti resmi diunggah — status PENDING_VERIFICATION, menunggu Owner Company." },
-    );
-    if (ok) {
-      setNote("");
-      onOpenChange(false);
-      onDone();
-    }
-    setBusy(false);
-  }
-
+function ProofDialog({ topUp, onOpenChange }: { topUp: TopUpRequest | null; onOpenChange: (open: boolean) => void }) {
   return (
     <Dialog open={!!topUp} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Upload Bukti Transfer Resmi</DialogTitle>
-          <DialogDescription>
-            Top up {topUp?.requestCode} · {topUp ? formatRupiah(topUp.amount) : ""} — {topUp?.partner?.user.name ?? ""}. Mengunggah bukti akan mengubah status menjadi PENDING_VERIFICATION untuk diverifikasi Owner Company.
-          </DialogDescription>
+          <DialogTitle>Bukti Transfer</DialogTitle>
+          <DialogDescription>{topUp?.requestCode} · {topUp ? formatRupiah(topUp.amount) : ""}</DialogDescription>
         </DialogHeader>
-        <form onSubmit={onSubmit} className="space-y-3">
-          <Field label="Catatan Verifikasi (opsional)">
-            <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="mis. sesuai mutasi rekening jam 08:35" />
-          </Field>
-          <div className="rounded-lg border border-dashed p-6 text-center text-xs text-muted-foreground">
-            Bukti transfer diwakilkan lampiran resmi perusahaan ( nota / mutasi ) — terunggah otomatis bersama catatan.
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Batal</Button>
-            <SubmitButton busy={busy}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Unggah & Submit</SubmitButton>
-          </DialogFooter>
-        </form>
+        {topUp?.proofUrl && <img src={topUp.proofUrl} alt={`Bukti ${topUp.requestCode}`} className="max-h-[60vh] w-full rounded-lg border bg-white object-contain" />}
       </DialogContent>
     </Dialog>
   );

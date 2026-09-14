@@ -10,10 +10,7 @@ const MIN_TOP_UP_AMOUNT = 10_000;
 /**
  * Top Up workflow (§10/§11) — Admin Kantor creates a request for a Marketing
  * partner:
- *   Admin Kantor creates request (PENDING_PAYMENT)
- *   → transfers to the company bank account
- *   → submits transfer info/proof (partnerProofUrl)
- *   → Admin Kantor uploads official proof → PENDING_VERIFICATION
+ *   Admin Kantor creates request with transfer proof → PENDING_VERIFICATION
  *   → Owner Company verifies → VERIFIED + atomic wallet credit
  *
  * Authority (§10.1): Marketing cannot create or verify top-ups; Admin Kantor
@@ -65,6 +62,8 @@ export async function POST(req: NextRequest) {
     if (!partner) return fail(422, "Partner Marketing aktif wajib dipilih.", { partnerId: ["Partner Marketing tidak ditemukan atau tidak aktif."] });
     const amount = requireNum(body.amount, "amount", MIN_TOP_UP_AMOUNT);
     const note = str(body.note);
+    const proofUrl = str(body.proofUrl);
+    if (!proofUrl) return fail(422, "Bukti transfer wajib diunggah saat membuat top up.", { proofUrl: ["Bukti wajib diunggah."] });
 
     const requestCode = await nextCode("topUpRequest", "TOP-", "requestCode");
     const topUp = await db.topUpRequest.create({
@@ -72,12 +71,14 @@ export async function POST(req: NextRequest) {
         requestCode,
         partnerId: partner.id,
         amount,
-        status: "PENDING_PAYMENT",
+        status: "PENDING_VERIFICATION",
         partnerNote: note,
+        proofUrl,
+        submittedForVerificationAt: new Date(),
         requestedById: user.id,
       },
     });
-    await financeAudit(user, "created", "topup", topUp.id, requestCode, { amount, status: "PENDING_PAYMENT" });
+    await financeAudit(user, "created", "topup", topUp.id, requestCode, { amount, status: "PENDING_VERIFICATION" });
     return ok({ topUp, bankInfo: COMPANY_BANK });
   });
 }
