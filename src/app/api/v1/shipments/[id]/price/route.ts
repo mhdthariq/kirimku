@@ -5,6 +5,7 @@ import { audit } from "@/lib/audit";
 import { resolveTariff, computePricing } from "@/lib/pricing";
 import { hasPermission } from "@/lib/auth";
 import { assertShipmentScope } from "@/lib/gudang-scope";
+import { walletSummary } from "@/lib/wallet";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -78,6 +79,32 @@ export async function POST(req: NextRequest, { params }: Params) {
     // Auto-derived percentage (§6): discount% = discountAmount / price × 100
     const discountPercentage = discountAmount > 0 ? Math.round((discountAmount / r.price) * 10000) / 100 : null;
     const finalPriceAmount = Math.round((r.price - discountAmount) * 100) / 100;
+
+    // Marketing wallet coverage rule — when a Marketing partner opens (prices)
+    // a shipment, their wallet must hold at least the COMPANY's share of the
+    // shipment total, derived from the partner's profit-sharing configuration.
+    // Example: 80:20 split (company 80% / marketing 20%), total Rp100.000 →
+    // marketing must have ≥ Rp80.000 available in their wallet. The available
+    // balance already deducts in-flight withdrawal reservations (§27).
+    if ((master.discountFundedBy === "MARKETING" || master.createdByPartnerId != null) && partner) {
+      const companyShare = Math.round(finalPriceAmount * (partner.companyPercent / 100) * 100) / 100;
+      if (companyShare > 0) {
+        const summary = await walletSummary(partner.id);
+        if (summary.available < companyShare - 0.001) {
+          return fail(
+            422,
+            `Saldo wallet Marketing tidak mencukupi untuk membuka shipment ini. ` +
+              `Diperlukan minimal Rp${Math.round(companyShare).toLocaleString("id-ID")} ` +
+              `(${partner.companyPercent}% bagian company dari total Rp${finalPriceAmount.toLocaleString("id-ID")}). ` +
+              `Saldo tersedia: Rp${summary.available.toLocaleString("id-ID")} ` +
+              `(dari Rp${summary.balance.toLocaleString("id-ID")}, ` +
+              `Rp${summary.reserved.toLocaleString("id-ID")} terreserve withdrawal aktif). ` +
+              `Silakan top-up wallet terlebih dahulu sebelum menghitung harga shipment.`,
+            { wallet: ["Saldo wallet tidak mencukupi untuk bagian company."] },
+          );
+        }
+      }
+    }
 
     // persist the tariff used so the snapshot (and future re-calcs) is deterministic
     const updated = await db.masterShipment.update({
