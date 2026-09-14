@@ -81,19 +81,28 @@ export async function POST(req: NextRequest, { params }: Params) {
     const finalPriceAmount = Math.round((r.price - discountAmount) * 100) / 100;
 
     // Marketing wallet coverage rule — when a Marketing partner opens (prices)
-    // a shipment, their wallet must hold at least the COMPANY's share of the
-    // shipment total, derived from the partner's profit-sharing configuration.
+    // a B2C shipment, their wallet must hold at least the COMPANY's share of
+    // the shipment total, derived from the partner's profit-sharing configuration.
     // Example: 80:20 split (company 80% / marketing 20%), total Rp100.000 →
     // marketing must have ≥ Rp80.000 available in their wallet. The available
     // balance already deducts in-flight withdrawal reservations (§27).
-    if ((master.discountFundedBy === "MARKETING" || master.createdByPartnerId != null) && partner) {
+    //
+    // NOTE: This rule applies to B2C shipments only. For B2B shipments the
+    // company owns the invoice and Marketing never finances it (commission is
+    // released only when the invoice is fully paid) — no wallet coverage is
+    // required at pricing time.
+    if (
+      master.customer.type === "b2c" &&
+      (master.discountFundedBy === "MARKETING" || master.createdByPartnerId != null) &&
+      partner
+    ) {
       const companyShare = Math.round(finalPriceAmount * (partner.companyPercent / 100) * 100) / 100;
       if (companyShare > 0) {
         const summary = await walletSummary(partner.id);
         if (summary.available < companyShare - 0.001) {
           return fail(
             422,
-            `Saldo wallet Marketing tidak mencukupi untuk membuka shipment ini. ` +
+            `Saldo wallet Marketing tidak mencukupi untuk membuka shipment B2C ini. ` +
               `Diperlukan minimal Rp${Math.round(companyShare).toLocaleString("id-ID")} ` +
               `(${partner.companyPercent}% bagian company dari total Rp${finalPriceAmount.toLocaleString("id-ID")}). ` +
               `Saldo tersedia: Rp${summary.available.toLocaleString("id-ID")} ` +
