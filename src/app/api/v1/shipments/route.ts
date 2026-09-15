@@ -148,6 +148,16 @@ export async function POST(req: NextRequest) {
           penerimaName: str(body.penerimaName),
           penerimaAddress: str(body.penerimaAddress),
           penerimaContact: str(body.penerimaContact),
+          // Pengirim — auto-filled from the Customer record on the client when
+          // the customer is selected, but kept here per-shipment so the user
+          // can override it (e.g. the drop-off person differs from the
+          // customer master contact). When the client omits these fields we
+          // fall back to the customer master so legacy callers still get a
+          // populated sender block on the resi.
+          pengirimName: str(body.pengirimName) ?? customer.name ?? null,
+          pengirimPhone: str(body.pengirimPhone) ?? customer.phone ?? null,
+          pengirimEmail: str(body.pengirimEmail) ?? customer.email ?? null,
+          pengirimAddress: str(body.pengirimAddress) ?? customer.address ?? null,
           discountAmount,
           discountFundedBy,
           createdByPartnerId,

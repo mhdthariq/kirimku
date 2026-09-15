@@ -180,6 +180,12 @@ export interface Shipment {
   penerimaName?: string | null;
   penerimaAddress?: string | null;
   penerimaContact?: string | null;
+  /** Sender (pengirim) — auto-filled from the Customer record at creation but
+   *  editable per-shipment so the resi can show a different contact. */
+  pengirimName?: string | null;
+  pengirimPhone?: string | null;
+  pengirimEmail?: string | null;
+  pengirimAddress?: string | null;
   tariffId?: number | null;
   tariff?: Tariff | null;
   pricingPreview?: PricingPreview | null;
@@ -617,7 +623,7 @@ export interface Options {
   vehicles: { id: number; vehicleNumber: string; name: string | null; maxWeightKg: number }[];
   routes: { id: number; name: string; origin: string | null; destination: string | null }[];
   warehouses: { id: number; code: string; name: string; city: string | null; customerSupportContact?: string | null }[];
-  customers: { id: number; code: string; name: string; type: string }[];
+  customers: { id: number; code: string; name: string; type: string; phone: string | null; email: string | null; address: string | null }[];
   tariffs: { id: number; origin: string; destination: string; customerType: string | null; ratePerKg: number; minChargeableKg: number; volumetricMultiplier: number; roundingMode: string; roundingUnitKg: number; effectiveFrom: string; effectiveTo: string | null }[];
   permissions: { id: number; slug: string; module: string; description: string | null }[];
   /** Revise.md §13 — vehicle-owner partners (vehicle ownership dropdown) */

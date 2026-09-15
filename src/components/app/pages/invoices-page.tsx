@@ -60,6 +60,7 @@ export function InvoicesPage() {
   const [confirmDelete, setConfirmDelete] = useState<Invoice | null>(null);
   const [detail, setDetail] = useState<Invoice | null>(null);
   const [settleOpen, setSettleOpen] = useState(false);
+  const [settleTarget, setSettleTarget] = useState<Invoice | null>(null);
   const [settleAmount, setSettleAmount] = useState("");
   const [settleMethod, setSettleMethod] = useState("TRANSFER");
   const [settleRef, setSettleRef] = useState("");
@@ -139,18 +140,33 @@ export function InvoicesPage() {
 
   async function onSettle(e: React.FormEvent) {
     e.preventDefault();
-    if (!detail) return;
+    // Use the invoice the user clicked on (settleTarget) — not the
+    // async-loaded `detail` — so the settle never silently no-ops while
+    // the detail fetch is in flight. This was the root cause of the
+    // "Settle doesn't work" bug: the dialog opened before `detail` was
+    // populated, and the early `if (!detail) return;` swallowed the
+    // submit without any user feedback.
+    const target = settleTarget ?? detail;
+    if (!target) {
+      toast.error("Pilih invoice yang akan di-settle.");
+      return;
+    }
+    const amount = Number(settleAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error("Jumlah settlement harus lebih dari 0.");
+      return;
+    }
     setBusy(true);
     const ok = await runAction(
       () =>
-        apiPost(`/invoices/${detail.id}/settlements`, {
-          amount: Number(settleAmount),
+        apiPost(`/invoices/${target.id}/settlements`, {
+          amount,
           method: settleMethod,
           reference: settleRef || null,
         }),
       {
         success:
-          Number(settleAmount) >= (detail.remainingAmount ?? 0) - 0.01 && detail.commission
+          amount >= (target.remainingAmount ?? 0) - 0.01 && target.commission
             ? "Pelunasan dicatat — komisi Marketing dirilis ke wallet (atomic, §9)."
             : "Settlement dicatat — pembayaran parsial, komisi tetap PENDING (§8.1).",
       },
@@ -158,10 +174,12 @@ export function InvoicesPage() {
     setBusy(false);
     if (ok) {
       setSettleOpen(false);
+      setSettleTarget(null);
       setSettleAmount("");
       setSettleRef("");
       reload();
-      loadDetail(detail);
+      // Refresh the detail dialog if it's open on this same invoice.
+      if (detail && detail.id === target.id) loadDetail(target);
     }
   }
 
@@ -278,7 +296,10 @@ export function InvoicesPage() {
                         variant="secondary"
                         className="h-7"
                         onClick={() => {
-                          loadDetail(inv);
+                          // Capture the invoice the user clicked on so the
+                          // settle action doesn't depend on the async detail
+                          // fetch (which previously caused silent no-ops).
+                          setSettleTarget(inv);
                           setSettleAmount(String(Math.round(inv.remainingAmount)));
                           setSettleOpen(true);
                         }}
@@ -573,9 +594,9 @@ export function InvoicesPage() {
       <Dialog open={settleOpen} onOpenChange={setSettleOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Settle {detailWithLines?.invoiceNumber ?? ""}</DialogTitle>
+            <DialogTitle>Settle {settleTarget?.invoiceNumber ?? detailWithLines?.invoiceNumber ?? ""}</DialogTitle>
             <DialogDescription>
-              Sisa tagihan: {formatRupiah(detailWithLines?.remainingAmount ?? 0)}. Jumlah tidak boleh melebihi sisa.
+              Sisa tagihan: {formatRupiah(settleTarget?.remainingAmount ?? detailWithLines?.remainingAmount ?? 0)}. Jumlah tidak boleh melebihi sisa.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={onSettle} className="space-y-4">

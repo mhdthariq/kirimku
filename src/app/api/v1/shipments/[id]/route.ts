@@ -74,6 +74,11 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (body.penerimaName !== undefined) data.penerimaName = str(body.penerimaName);
     if (body.penerimaAddress !== undefined) data.penerimaAddress = str(body.penerimaAddress);
     if (body.penerimaContact !== undefined) data.penerimaContact = str(body.penerimaContact);
+    // Pengirim (sender) — auto-filled from Customer at creation but editable
+    if (body.pengirimName !== undefined) data.pengirimName = str(body.pengirimName);
+    if (body.pengirimPhone !== undefined) data.pengirimPhone = str(body.pengirimPhone);
+    if (body.pengirimEmail !== undefined) data.pengirimEmail = str(body.pengirimEmail);
+    if (body.pengirimAddress !== undefined) data.pengirimAddress = str(body.pengirimAddress);
 
     const shipment = await db.masterShipment.update({ where: { id: existing.id }, data });
     await audit({

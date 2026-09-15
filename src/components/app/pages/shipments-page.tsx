@@ -59,6 +59,11 @@ interface ShipmentForm {
   penerimaName: string;
   penerimaAddress: string;
   penerimaContact: string;
+  // Pengirim (sender) — auto-filled from Customer but fully editable
+  pengirimName: string;
+  pengirimPhone: string;
+  pengirimEmail: string;
+  pengirimAddress: string;
   discountAmount: string;
   insuranceAmount: string;
 }
@@ -80,6 +85,10 @@ const EMPTY_SHIPMENT: ShipmentForm = {
   penerimaName: "",
   penerimaAddress: "",
   penerimaContact: "",
+  pengirimName: "",
+  pengirimPhone: "",
+  pengirimEmail: "",
+  pengirimAddress: "",
   discountAmount: "",
   insuranceAmount: "",
 };
@@ -179,6 +188,12 @@ function ShipmentList() {
       insuranceAmount: form.insuranceAmount ? Number(form.insuranceAmount) : 0,
       penerimaAddress: form.penerimaAddress || null,
       penerimaContact: form.penerimaContact || null,
+      // Pengirim (sender) — auto-filled from Customer on the client but
+      // still editable, so send the (possibly edited) values verbatim.
+      pengirimName: form.pengirimName || null,
+      pengirimPhone: form.pengirimPhone || null,
+      pengirimEmail: form.pengirimEmail || null,
+      pengirimAddress: form.pengirimAddress || null,
     };
     const ok = await runAction(() => apiPost("/shipments", payload), { success: "Shipment dibuat (CREATED). Tambahkan detail barang lalu submit untuk pickup." });
     setBusy(false);
@@ -441,7 +456,18 @@ function ShipmentList() {
                     const stillValid = (options?.tariffs ?? []).some(
                       (t) => String(t.id) === form.tariffId && (!cust || !t.customerType || t.customerType === cust.type),
                     );
-                    setForm({ ...form, customerId: v, ...(stillValid ? {} : { tariffId: "" }) });
+                    // Auto-fill Pengirim (sender) from the Customer master — the
+                    // values are placed into editable inputs below so the user can
+                    // tweak them per-shipment (e.g. drop-off person differs).
+                    setForm({
+                      ...form,
+                      customerId: v,
+                      ...(stillValid ? {} : { tariffId: "" }),
+                      pengirimName: cust?.name ?? "",
+                      pengirimPhone: cust?.phone ?? "",
+                      pengirimEmail: cust?.email ?? "",
+                      pengirimAddress: cust?.address ?? "",
+                    });
                   }}
                   placeholder="Pilih customer…"
                   options={(options?.customers ?? []).map((c) => ({ value: String(c.id), label: `${c.name} (${c.type.toUpperCase()} · ${c.code})` }))}
@@ -530,6 +556,57 @@ function ShipmentList() {
                   disabled={busy}
                 />
               </Field>
+              {/* Pengirim (sender) — auto-filled from Customer when the customer
+                  is picked, but every field is editable so the user can override
+                  the contact person / phone / email / address per-shipment. */}
+              <div className="sm:col-span-2">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pengirim (dicetak pada resi)</p>
+                  <span className="text-[10px] text-muted-foreground">
+                    {form.customerId ? "Data customer otomatis terisi — dapat diubah." : "Pilih customer untuk mengisi otomatis."}
+                  </span>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Nama Pengirim" htmlFor="s-pengirim-name" className="sm:col-span-2">
+                    <Input
+                      id="s-pengirim-name"
+                      value={form.pengirimName}
+                      onChange={(e) => setForm({ ...form, pengirimName: e.target.value })}
+                      placeholder="mis. Andi Wijaya"
+                      disabled={busy}
+                    />
+                  </Field>
+                  <Field label="Telepon Pengirim" htmlFor="s-pengirim-phone">
+                    <Input
+                      id="s-pengirim-phone"
+                      value={form.pengirimPhone}
+                      onChange={(e) => setForm({ ...form, pengirimPhone: e.target.value })}
+                      placeholder="0812-xxxx-xxxx"
+                      disabled={busy}
+                    />
+                  </Field>
+                  <Field label="Email Pengirim" htmlFor="s-pengirim-email" hint="Kosongkan bila tidak ada.">
+                    <Input
+                      id="s-pengirim-email"
+                      type="email"
+                      value={form.pengirimEmail}
+                      onChange={(e) => setForm({ ...form, pengirimEmail: e.target.value })}
+                      placeholder="pengirim@example.com"
+                      disabled={busy}
+                    />
+                  </Field>
+                  <Field label="Alamat Pengirim" htmlFor="s-pengirim-address" className="sm:col-span-2">
+                    <Textarea
+                      id="s-pengirim-address"
+                      value={form.pengirimAddress}
+                      onChange={(e) => setForm({ ...form, pengirimAddress: e.target.value })}
+                      placeholder="mis. Jl. Asia Afrika No. 8, Bandung"
+                      rows={2}
+                      disabled={busy}
+                    />
+                  </Field>
+                </div>
+              </div>
               <div className="sm:col-span-2">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Penerima (dicetak pada resi)</p>
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -790,6 +867,8 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
   const autoPrintHandled = useRef(false);
   const [penerimaOpen, setPenerimaOpen] = useState(false);
   const [penerimaForm, setPenerimaForm] = useState({ name: "", address: "", contact: "" });
+  const [pengirimOpen, setPengirimOpen] = useState(false);
+  const [pengirimForm, setPengirimForm] = useState({ name: "", phone: "", email: "", address: "" });
 
   // deep link #/shipments/{id}?print=1 — open the resi print preview
   useEffect(() => {
@@ -852,6 +931,37 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
       contact: shipment?.penerimaContact ?? "",
     });
     setPenerimaOpen(true);
+  }
+
+  function openPengirimEdit() {
+    setPengirimForm({
+      name: shipment?.pengirimName ?? shipment?.customer?.name ?? "",
+      phone: shipment?.pengirimPhone ?? shipment?.customer?.phone ?? "",
+      email: shipment?.pengirimEmail ?? shipment?.customer?.email ?? "",
+      address: shipment?.pengirimAddress ?? shipment?.customer?.address ?? "",
+    });
+    setPengirimOpen(true);
+  }
+
+  async function onPengirimSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!shipment) return;
+    setBusy(true);
+    const ok = await runAction(
+      () =>
+        apiPut(`/shipments/${shipment.id}`, {
+          pengirimName: pengirimForm.name || null,
+          pengirimPhone: pengirimForm.phone || null,
+          pengirimEmail: pengirimForm.email || null,
+          pengirimAddress: pengirimForm.address || null,
+        }),
+      { success: "Data Pengirim disimpan — akan dicetak pada resi." },
+    );
+    setBusy(false);
+    if (ok) {
+      setPengirimOpen(false);
+      refresh();
+    }
   }
 
   async function onPenerimaSubmit(e: React.FormEvent) {
@@ -1109,7 +1219,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
           </CardContent>
         </Card>
 
-        {/* Penerima & pengirim */}
+        {/* Penerima & Pengirim */}
         <Card className="lg:col-span-1">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between gap-2">
@@ -1128,8 +1238,9 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
             <Row label="Kontak" value={shipment.penerimaContact ?? "—"} />
             <p className="text-xs leading-relaxed text-muted-foreground">{shipment.penerimaAddress ?? "Alamat penerima belum diisi"}</p>
             <div className="border-t pt-2">
-              <Row label="Pengirim" value={shipment.customer?.name ?? "—"} />
-              <Row label="Telp. pengirim" value={shipment.customer?.phone ?? "—"} />
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Customer</p>
+              <Row label="Nama" value={shipment.customer?.name ?? "—"} />
+              <Row label="Telp." value={shipment.customer?.phone ?? "—"} />
             </div>
             <p className="text-[11px] leading-relaxed text-muted-foreground">
               Data Penerima &amp; CS Gudang dicetak pada Resi Shipment (customer) dan setiap Resi Detail (stiker paket).
@@ -1137,8 +1248,35 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
           </CardContent>
         </Card>
 
+        {/* Pengirim (sender) — was a tiny footer row in the Penerima card;
+            now its own card so the four editable fields have room to breathe
+            and the user can override them per-shipment. */}
+        <Card className="lg:col-span-1">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <UserRound className="h-4 w-4 text-primary" /> Pengirim
+              </CardTitle>
+              {shipment.status === "CREATED" && can.update && (
+                <Button size="sm" variant="ghost" className="h-7" onClick={openPengirimEdit}>
+                  <Pencil className="h-3.5 w-3.5" /> Edit
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <Row label="Nama" value={shipment.pengirimName ?? shipment.customer?.name ?? "—"} />
+            <Row label="Telepon" value={shipment.pengirimPhone ?? shipment.customer?.phone ?? "—"} />
+            <Row label="Email" value={shipment.pengirimEmail ?? shipment.customer?.email ?? "—"} />
+            <p className="text-xs leading-relaxed text-muted-foreground">{shipment.pengirimAddress ?? shipment.customer?.address ?? "Alamat pengirim belum diisi"}</p>
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              Diisi otomatis dari data customer saat shipment dibuat — dapat diubah per-shipment.
+            </p>
+          </CardContent>
+        </Card>
+
         {/* Tracking timeline */}
-        <Card className="lg:col-span-2">
+        <Card className="lg:col-span-2 lg:col-start-1">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <Truck className="h-4 w-4 text-primary" /> Riwayat Tracking
@@ -1364,6 +1502,40 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
                 Batal
               </Button>
               <SubmitButton busy={busy}>Simpan Penerima</SubmitButton>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Pengirim edit dialog */}
+      <Dialog open={pengirimOpen} onOpenChange={setPengirimOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserRound className="h-5 w-5 text-primary" /> Edit Pengirim
+            </DialogTitle>
+            <DialogDescription>
+              Diisi otomatis dari data customer — dapat diubah di sini untuk shipment ini saja (tanpa mengubah data customer).
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={onPengirimSubmit} className="space-y-4">
+            <Field label="Nama Pengirim" htmlFor="pg-name">
+              <Input id="pg-name" value={pengirimForm.name} onChange={(e) => setPengirimForm({ ...pengirimForm, name: e.target.value })} required disabled={busy} />
+            </Field>
+            <Field label="Telepon Pengirim" htmlFor="pg-phone">
+              <Input id="pg-phone" value={pengirimForm.phone} onChange={(e) => setPengirimForm({ ...pengirimForm, phone: e.target.value })} placeholder="0812-xxxx-xxxx" disabled={busy} />
+            </Field>
+            <Field label="Email Pengirim" htmlFor="pg-email" hint="Kosongkan bila tidak ada.">
+              <Input id="pg-email" type="email" value={pengirimForm.email} onChange={(e) => setPengirimForm({ ...pengirimForm, email: e.target.value })} placeholder="pengirim@example.com" disabled={busy} />
+            </Field>
+            <Field label="Alamat Pengirim" htmlFor="pg-address">
+              <Textarea id="pg-address" value={pengirimForm.address} onChange={(e) => setPengirimForm({ ...pengirimForm, address: e.target.value })} rows={2} disabled={busy} />
+            </Field>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setPengirimOpen(false)} disabled={busy}>
+                Batal
+              </Button>
+              <SubmitButton busy={busy}>Simpan Pengirim</SubmitButton>
             </DialogFooter>
           </form>
         </DialogContent>

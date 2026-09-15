@@ -308,6 +308,14 @@ model MasterShipment {
   penerimaName           String?
   penerimaAddress        String?
   penerimaContact        String?
+  // Pengirim (sender) — auto-filled from the Customer record at creation but
+  // fully editable per-shipment so the resi can show a different contact
+  // (e.g. drop-off person at the gudang counter, branch secretary, etc.).
+  // Kept on the shipment so it survives later edits to the Customer master.
+  pengirimName           String?
+  pengirimPhone          String?
+  pengirimEmail          String?
+  pengirimAddress        String?
   chargeableWeightKg     Float?
   ratePerKg              Float?
   priceAmount            Float?

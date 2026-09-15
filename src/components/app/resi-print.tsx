@@ -162,9 +162,15 @@ export function ResiPrint({
     contact: shipment.penerimaContact ?? "—",
   };
 
+  // Pengirim (sender) — auto-filled from the Customer record at shipment
+  // creation but editable per-shipment; fall back to the customer master
+  // data when the per-shipment field is empty (covers legacy shipments
+  // created before the editable Pengirim feature shipped).
   const pengirim = {
-    name: shipment.customer?.name ?? "—",
-    phone: shipment.customer?.phone ?? "—",
+    name: shipment.pengirimName ?? shipment.customer?.name ?? "—",
+    phone: shipment.pengirimPhone ?? shipment.customer?.phone ?? "—",
+    email: shipment.pengirimEmail ?? shipment.customer?.email ?? null,
+    address: shipment.pengirimAddress ?? shipment.customer?.address ?? null,
   };
 
   const originName =
