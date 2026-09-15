@@ -70,6 +70,24 @@ export async function POST(req: NextRequest) {
     await ensurePartnerProfile(created.id, assignedSlugs, { companyPercent, partnerPercent });
 
     await audit({ action: "created", entityType: "user", entityId: created.id, entityLabel: created.username, actor: user, after: { username, name } });
+
+    // When the created user is a Marketing / Vehicle Owner partner, also
+    // record an audit entry with entityType="partner" so the Partners tab has
+    // its own complete activity trail (creation + edits + disables).
+    if (assignedSlugs.includes("marketing") || assignedSlugs.includes("vehicle-owner")) {
+      const partnerProfile = await db.partner.findUnique({ where: { userId: created.id }, select: { id: true, type: true } });
+      if (partnerProfile) {
+        await audit({
+          action: "created",
+          entityType: "partner",
+          entityId: partnerProfile.id,
+          entityLabel: created.username,
+          actor: user,
+          after: { name, type: partnerProfile.type, username },
+        });
+      }
+    }
+
     const full = await db.user.findUnique({ where: { id: created.id }, include: { employee: true, roles: { include: { role: true } }, partner: true } });
     return ok({ ...full, passwordHash: undefined, partnerId: full?.partner?.id ?? null, partnerType: full?.partner?.type ?? null });
   });

@@ -22,9 +22,11 @@ export function AccessPage() {
     employeeView: hasPermission(user, "employee.view"),
     employeeCreate: hasPermission(user, "employee.create"),
     employeeUpdate: hasPermission(user, "employee.update"),
+    employeeDisable: hasPermission(user, "employee.disable"),
     userView: hasPermission(user, "user.view"),
     userCreate: hasPermission(user, "user.create"),
     userUpdate: hasPermission(user, "user.update"),
+    userDisable: hasPermission(user, "user.disable"),
     roleView: hasPermission(user, "role.view"),
     roleCreate: hasPermission(user, "role.create"),
     roleUpdate: hasPermission(user, "role.update"),
@@ -55,7 +57,7 @@ export function AccessPage() {
         {can.roleView && <TabsContent value="roles" className="mt-3"><RolesTab can={can} /></TabsContent>}
         {can.employeeView && <TabsContent value="employees" className="mt-3"><EmployeesTab can={can} /></TabsContent>}
         <TabsContent value="activity" className="mt-3">
-          <ActivityLogPanel entityTypes={["user", "role", "employee", "auth"]} />
+          <ActivityLogPanel entityTypes={["user", "role", "employee", "partner", "auth"]} />
         </TabsContent>
       </Tabs>
     </div>
@@ -66,12 +68,15 @@ export function AccessPage() {
 // Partners
 // ---------------------------------------------------------------------------
 
-function PartnersTab({ can }: { can: { userCreate: boolean } }) {
+function PartnersTab({ can }: { can: { userCreate: boolean; userUpdate: boolean; userDisable: boolean } }) {
   const { data, loading, reload } = useApiData<UserAccount[]>(() => apiGet<UserAccount[]>('/users'), []);
   const { data: roles } = useApiData<Role[]>(() => apiGet<Role[]>('/roles'), []);
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [form, setForm] = useState({ username: '', name: '', password: '', type: 'MARKETING' as 'MARKETING' | 'VEHICLE_OWNER' });
+  const [editFor, setEditFor] = useState<UserAccount | null>(null);
+  const [confirmDisable, setConfirmDisable] = useState<UserAccount | null>(null);
+  const [createForm, setCreateForm] = useState({ username: '', name: '', password: '', type: 'MARKETING' as 'MARKETING' | 'VEHICLE_OWNER' });
+  const [editForm, setEditForm] = useState({ name: '', password: '', isActive: true });
   const [busy, setBusy] = useState(false);
 
   const partnerRows = useMemo(() => {
@@ -81,24 +86,57 @@ function PartnersTab({ can }: { can: { userCreate: boolean } }) {
     );
   }, [data, search]);
 
-  async function onSubmit(e: React.FormEvent) {
+  async function onCreate(e: React.FormEvent) {
     e.preventDefault();
-    const role = roles?.find((r) => r.slug === (form.type === 'MARKETING' ? 'marketing' : 'vehicle-owner'));
+    const role = roles?.find((r) => r.slug === (createForm.type === 'MARKETING' ? 'marketing' : 'vehicle-owner'));
     if (!role) {
       toast.error('Role partner belum tersedia.');
       return;
     }
     setBusy(true);
     const ok = await runAction(
-      () => apiPost('/users', { username: form.username, name: form.name, password: form.password, employeeId: null, roleIds: [role.id] }),
-      { success: `${form.type === 'MARKETING' ? 'Marketing' : 'Vehicle Owner'} dibuat.` },
+      () => apiPost('/users', { username: createForm.username, name: createForm.name, password: createForm.password, employeeId: null, roleIds: [role.id] }),
+      { success: `${createForm.type === 'MARKETING' ? 'Marketing' : 'Vehicle Owner'} dibuat.` },
     );
     setBusy(false);
     if (ok) {
       setDialogOpen(false);
-      setForm({ username: '', name: '', password: '', type: 'MARKETING' });
+      setCreateForm({ username: '', name: '', password: '', type: 'MARKETING' });
       reload();
     }
+  }
+
+  function openEdit(u: UserAccount) {
+    setEditFor(u);
+    setEditForm({ name: u.name, password: '', isActive: u.isActive });
+  }
+
+  async function onEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editFor?.partnerId) return;
+    setBusy(true);
+    const payload: Record<string, unknown> = { name: editForm.name, isActive: editForm.isActive };
+    if (editForm.password) payload.password = editForm.password;
+    const ok = await runAction(
+      () => apiPut(`/partners/${editFor.partnerId}/profile`, payload),
+      { success: 'Profil partner diperbarui.' },
+    );
+    setBusy(false);
+    if (ok) {
+      setEditFor(null);
+      reload();
+    }
+  }
+
+  async function onDisable() {
+    if (!confirmDisable?.partnerId) return;
+    const target = confirmDisable;
+    setConfirmDisable(null);
+    const ok = await runAction(
+      () => apiDelete(`/partners/${target.partnerId}/profile`),
+      { success: `Partner @${target.username} dinonaktifkan.` },
+    );
+    if (ok) reload();
   }
 
   return (
@@ -117,26 +155,46 @@ function PartnersTab({ can }: { can: { userCreate: boolean } }) {
           { key: 'username', header: 'Username', primary: true, render: (u) => <span className="font-mono text-xs font-semibold">@{u.username}</span> },
           { key: 'name', header: 'Nama', render: (u) => <span className="font-medium">{u.name}</span> },
           { key: 'type', header: 'Tipe', render: (u) => <Badge variant={u.partnerType === 'MARKETING' ? 'secondary' : 'outline'}>{u.partnerType === 'MARKETING' ? 'Marketing' : 'Vehicle Owner'}</Badge> },
-          { key: 'employee', header: 'Employee', render: (u) => u.employeeId == null ? <span className="text-xs text-muted-foreground">Tidak terhubung</span> : <Badge variant="outline">terhubung</Badge> },
           { key: 'status', header: 'Status', render: (u) => <ActiveBadge active={u.isActive} /> },
+          ...(can.userUpdate || can.userDisable
+            ? [{
+                key: 'actions',
+                header: 'Aksi',
+                render: (u: UserAccount) => (
+                  <div className="flex gap-1.5">
+                    {can.userUpdate && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(u)} aria-label="Edit partner">
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {can.userDisable && !u.isOwner && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setConfirmDisable(u)} aria-label="Nonaktifkan partner">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                ),
+              }]
+            : []),
         ]}
       />
 
+      {/* Create partner dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Tambah Partner</DialogTitle>
-            <DialogDescription>Partner dibuat tanpa data employee dan langsung memiliki wallet.</DialogDescription>
+            <DialogDescription>Partner (Marketing / Vehicle Owner) dibuat tanpa data employee dan langsung memiliki wallet.</DialogDescription>
           </DialogHeader>
-          <form onSubmit={onSubmit} className="space-y-4">
+          <form onSubmit={onCreate} className="space-y-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field label="Username" htmlFor="p-username"><Input id="p-username" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} required disabled={busy} autoComplete="off" /></Field>
-              <Field label="Nama" htmlFor="p-name"><Input id="p-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required disabled={busy} /></Field>
+              <Field label="Username" htmlFor="p-username"><Input id="p-username" value={createForm.username} onChange={(e) => setCreateForm({ ...createForm, username: e.target.value })} required disabled={busy} autoComplete="off" /></Field>
+              <Field label="Nama" htmlFor="p-name"><Input id="p-name" value={createForm.name} onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })} required disabled={busy} /></Field>
             </div>
             <Field label="Tipe Partner" htmlFor="p-type">
-              <FormSelect value={form.type} onValueChange={(v) => setForm({ ...form, type: v as 'MARKETING' | 'VEHICLE_OWNER' })} options={[{ value: 'MARKETING', label: 'Marketing' }, { value: 'VEHICLE_OWNER', label: 'Vehicle Owner' }]} disabled={busy} />
+              <FormSelect value={createForm.type} onValueChange={(v) => setCreateForm({ ...createForm, type: v as 'MARKETING' | 'VEHICLE_OWNER' })} options={[{ value: 'MARKETING', label: 'Marketing' }, { value: 'VEHICLE_OWNER', label: 'Vehicle Owner' }]} disabled={busy} />
             </Field>
-            <Field label="Password (min. 8 karakter)" htmlFor="p-password"><Input id="p-password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required minLength={8} disabled={busy} autoComplete="new-password" /></Field>
+            <Field label="Password (min. 8 karakter)" htmlFor="p-password"><Input id="p-password" type="password" value={createForm.password} onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })} required minLength={8} disabled={busy} autoComplete="new-password" /></Field>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} disabled={busy}>Batal</Button>
               <SubmitButton busy={busy}>Buat Partner</SubmitButton>
@@ -144,6 +202,52 @@ function PartnersTab({ can }: { can: { userCreate: boolean } }) {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Edit partner profile dialog */}
+      <Dialog open={!!editFor} onOpenChange={(open) => !open && setEditFor(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Partner — @{editFor?.username}</DialogTitle>
+            <DialogDescription>
+              Ubah nama atau password partner. Kosongkan password jika tidak ingin mengganti.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={onEdit} className="space-y-4">
+            <Field label="Nama" htmlFor="ep-name">
+              <Input id="ep-name" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required disabled={busy} />
+            </Field>
+            <Field label="Password baru (opsional, min. 8 karakter)" htmlFor="ep-password">
+              <Input id="ep-password" type="password" value={editForm.password} onChange={(e) => setEditForm({ ...editForm, password: e.target.value })} disabled={busy} minLength={8} autoComplete="new-password" placeholder="••••••••" />
+            </Field>
+            <label className="flex items-center gap-2.5 rounded-lg border p-2.5 text-sm">
+              <input type="checkbox" checked={editForm.isActive} onChange={(e) => setEditForm({ ...editForm, isActive: e.target.checked })} className="h-4 w-4 accent-primary" disabled={busy} />
+              <span>Akun aktif (login diizinkan)</span>
+            </label>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditFor(null)} disabled={busy}>Batal</Button>
+              <SubmitButton busy={busy}>Simpan Perubahan</SubmitButton>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Disable confirm */}
+      <AlertDialog open={!!confirmDisable} onOpenChange={(open) => !open && setConfirmDisable(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Nonaktifkan partner @{confirmDisable?.username}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Sesi aktif partner akan dihapus dan akun tidak bisa login. Profil partner & wallet tetap utuh untuk data historis. Bisa diaktifkan kembali lewat edit partner.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={onDisable}>Ya, nonaktifkan</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <ActivityLogPanel entityTypes={["partner"]} title="Log Aktivitas Partner" />
     </>
   );
 }
@@ -152,12 +256,13 @@ function PartnersTab({ can }: { can: { userCreate: boolean } }) {
 // Employees
 // ---------------------------------------------------------------------------
 
-function EmployeesTab({ can }: { can: { employeeCreate: boolean; employeeUpdate: boolean } }) {
+function EmployeesTab({ can }: { can: { employeeCreate: boolean; employeeUpdate: boolean; employeeDisable: boolean } }) {
   const { data, loading, reload } = useApiData<Employee[]>(() => apiGet<Employee[]>("/employees"), []);
   const { data: options } = useApiData<Options>(() => apiGet<Options>("/options"), []);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Employee | null>(null);
+  const [confirmDisable, setConfirmDisable] = useState<Employee | null>(null);
   const [form, setForm] = useState({ name: "", phone: "", position: "", warehouseId: "" });
   const [busy, setBusy] = useState(false);
 
@@ -183,6 +288,17 @@ function EmployeesTab({ can }: { can: { employeeCreate: boolean; employeeUpdate:
       setDialogOpen(false);
       reload();
     }
+  }
+
+  async function onDisable() {
+    if (!confirmDisable) return;
+    const target = confirmDisable;
+    setConfirmDisable(null);
+    const ok = await runAction(
+      () => apiDelete(`/employees/${target.id}`),
+      { success: `Employee ${target.name} dinonaktifkan.` },
+    );
+    if (ok) reload();
   }
 
   return (
@@ -227,15 +343,24 @@ function EmployeesTab({ can }: { can: { employeeCreate: boolean; employeeUpdate:
               ),
           },
           { key: "status", header: "Status", render: (e) => <ActiveBadge active={e.isActive} /> },
-          ...(can.employeeUpdate
+          ...(can.employeeUpdate || can.employeeDisable
             ? [
                 {
                   key: "actions",
                   header: "Aksi",
                   render: (e: Employee) => (
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditing(e); setForm({ name: e.name, phone: e.phone ?? "", position: e.position ?? "", warehouseId: e.warehouseId != null ? String(e.warehouseId) : "" }); setDialogOpen(true); }} aria-label="Edit employee">
-                      <Pencil className="h-4 w-4" />
-                    </Button>
+                    <div className="flex gap-1.5">
+                      {can.employeeUpdate && (
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditing(e); setForm({ name: e.name, phone: e.phone ?? "", position: e.position ?? "", warehouseId: e.warehouseId != null ? String(e.warehouseId) : "" }); setDialogOpen(true); }} aria-label="Edit employee">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {can.employeeDisable && e.isActive && (
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setConfirmDisable(e)} aria-label="Nonaktifkan employee">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   ),
                 },
               ]
@@ -277,6 +402,23 @@ function EmployeesTab({ can }: { can: { employeeCreate: boolean; employeeUpdate:
           </form>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!confirmDisable} onOpenChange={(open) => !open && setConfirmDisable(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Nonaktifkan employee {confirmDisable?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Employee akan dinonaktifkan. Jika memiliki akun user terhubung, akun tersebut juga dinonaktifkan dan sesi aktifnya dihapus. Data historis tetap utuh.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={onDisable}>Ya, nonaktifkan</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <ActivityLogPanel entityTypes={["employee"]} title="Log Aktivitas Employee" />
     </>
   );
 }
@@ -491,6 +633,8 @@ function UsersTab({ can }: { can: { userCreate: boolean; userUpdate: boolean } }
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ActivityLogPanel entityTypes={["user"]} title="Log Aktivitas User" />
     </>
   );
 }
