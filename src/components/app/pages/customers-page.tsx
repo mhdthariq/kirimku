@@ -1,10 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Pencil, Plus, Trash2, Users } from "lucide-react";
+import { Pencil, Plus, Trash2, UserRoundCheck, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
-import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type Customer } from "@/lib/client-api";
+import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type Customer, type Options } from "@/lib/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
@@ -22,9 +22,10 @@ interface CustomerForm {
   phone: string;
   email: string;
   address: string;
+  marketingPartnerId: string;
 }
 
-const EMPTY: CustomerForm = { name: "", type: "b2c", companyName: "", phone: "", email: "", address: "" };
+const EMPTY: CustomerForm = { name: "", type: "b2c", companyName: "", phone: "", email: "", address: "", marketingPartnerId: "none" };
 
 export function CustomersPage() {
   const { user } = useAuth();
@@ -34,8 +35,12 @@ export function CustomersPage() {
     update: hasPermission(user, "customer.update"),
     delete: hasPermission(user, "customer.delete"),
   };
+  // Marketing partners live in their own bubble: the API already returns only
+  // THEIR customers — the UI reflects that and hides the PIC controls.
+  const isMarketing = user?.partnerType === "MARKETING";
 
   const { data, loading, reload } = useApiData<Customer[]>(() => apiGet<Customer[]>("/customers"), []);
+  const { data: options } = useApiData<Options>(() => apiGet<Options>("/options"), []);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
@@ -53,7 +58,8 @@ export function CustomersPage() {
         c.name.toLowerCase().includes(q) ||
         c.code.toLowerCase().includes(q) ||
         (c.companyName ?? "").toLowerCase().includes(q) ||
-        (c.phone ?? "").includes(q),
+        (c.phone ?? "").includes(q) ||
+        (c.marketingPartnerName ?? "").toLowerCase().includes(q),
     );
   }, [data, search]);
 
@@ -73,6 +79,7 @@ export function CustomersPage() {
       phone: c.phone ?? "",
       email: c.email ?? "",
       address: c.address ?? "",
+      marketingPartnerId: c.marketingPartnerId != null ? String(c.marketingPartnerId) : "none",
     });
     setFieldErrors({});
     setDialogOpen(true);
@@ -88,6 +95,9 @@ export function CustomersPage() {
       phone: form.phone || null,
       email: form.email || null,
       address: form.address || null,
+      // PIC assignment is admin/owner-only — Marketing users create customers
+      // that are automatically connected to themselves (handled server-side).
+      ...(isMarketing ? {} : { marketingPartnerId: form.marketingPartnerId !== "none" ? Number(form.marketingPartnerId) : null }),
     };
     const ok = await runAction(
       () => (editing ? apiPut(`/customers/${editing.id}`, payload) : apiPost("/customers", payload)),
@@ -119,11 +129,21 @@ export function CustomersPage() {
     return <PageHeader title="Customers" subtitle="Anda tidak memiliki izin melihat customer." />;
   }
 
+  const marketingPartnerOptions = [
+    // "none" sentinel — Radix Select forbids empty-string item values
+    { value: "none", label: "— Belum terhubung (umum) —" },
+    ...(options?.marketingPartners ?? []).map((p) => ({ value: String(p.id), label: p.name })),
+  ];
+
   return (
     <div className="space-y-4">
       <PageHeader
         title="Customers"
-        subtitle="Master data pelanggan B2B dan B2C."
+        subtitle={
+          isMarketing
+            ? "Customer Anda sendiri — setiap marketing hanya melihat customer yang terhubung dengannya."
+            : "Master data pelanggan B2B dan B2C beserta Marketing pengelolanya (PIC)."
+        }
         icon={<Users className="h-5 w-5" />}
         actions={
           can.create && (
@@ -133,6 +153,12 @@ export function CustomersPage() {
           )
         }
       />
+
+      {isMarketing && (
+        <p className="rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-2 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300">
+          Customer yang Anda buat otomatis terhubung ke Anda. Customer milik marketing lain tidak terlihat di sini.
+        </p>
+      )}
 
       <Tabs defaultValue="list">
         <TabsList>
@@ -145,8 +171,8 @@ export function CustomersPage() {
             loading={loading}
             search={search}
             onSearchChange={setSearch}
-            searchPlaceholder="Cari nama / kode / telp…"
-            emptyMessage="Belum ada customer. Klik “Tambah Customer” untuk membuat."
+            searchPlaceholder="Cari nama / kode / telp / marketing…"
+            emptyMessage={isMarketing ? "Belum ada customer Anda. Klik “Tambah Customer” untuk membuat." : "Belum ada customer. Klik “Tambah Customer” untuk membuat."}
             columns={[
               { key: "code", header: "Kode", primary: true, render: (c) => <span className="font-mono text-xs">{c.code}</span> },
               {
@@ -160,6 +186,18 @@ export function CustomersPage() {
                 ),
               },
               { key: "type", header: "Tipe", render: (c) => <TypeBadge type={c.type} /> },
+              {
+                key: "marketing",
+                header: "Marketing (PIC)",
+                render: (c) =>
+                  c.marketingPartnerName ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                      <UserRoundCheck className="h-3.5 w-3.5" /> {c.marketingPartnerName}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">— umum —</span>
+                  ),
+              },
               { key: "phone", header: "Telepon", hideOnMobile: true, render: (c) => c.phone ?? "—" },
               { key: "email", header: "Email", hideOnMobile: true, render: (c) => c.email ?? "—" },
               { key: "status", header: "Status", render: (c) => <ActiveBadge active={c.isActive} /> },
@@ -224,6 +262,24 @@ export function CustomersPage() {
               {form.type === "b2b" && (
                 <Field label="Nama Perusahaan" htmlFor="c-company">
                   <Input id="c-company" value={form.companyName} onChange={(e) => setForm({ ...form, companyName: e.target.value })} placeholder="PT / CV" disabled={busy} />
+                </Field>
+              )}
+              {/* Marketing (PIC) — "customer connected to who". Admin/owner only:
+                  a Marketing user's customers are always connected to themselves. */}
+              {!isMarketing && (
+                <Field
+                  label="Marketing (PIC)"
+                  htmlFor="c-marketing"
+                  className="sm:col-span-2"
+                  hint="Customer hanya terlihat oleh marketing ini — khususnya penting untuk B2B."
+                >
+                  <FormSelect
+                    value={form.marketingPartnerId}
+                    onValueChange={(v) => setForm({ ...form, marketingPartnerId: v })}
+                    placeholder="Pilih marketing pengelola…"
+                    options={marketingPartnerOptions}
+                    disabled={busy}
+                  />
                 </Field>
               )}
               <Field label="Telepon" htmlFor="c-phone">

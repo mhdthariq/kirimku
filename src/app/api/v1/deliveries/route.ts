@@ -49,6 +49,8 @@ export async function GET(req: NextRequest) {
     // gudang's tasks. Each row carries gudangIds for the owner's tabs.
     const scope = await scopeForUser(user);
     const cityIdx = await cityIndex();
+    const whRows = await db.warehouse.findMany({ select: { id: true, name: true } });
+    const whName = (id: number | null | undefined) => (id == null ? null : whRows.find((w) => w.id === id)?.name ?? null);
     const withGudang = deliveries.map((d) => ({
       d,
       gudangIds: deliveryGudangIds(d.master, cityIdx),
@@ -70,6 +72,10 @@ export async function GET(req: NextRequest) {
           masterCode: d.master.masterCode,
           masterStatus: d.master.status,
           destination: d.master.destination,
+          // where this shipment came from ("shipment dari Gudang A") — shown
+          // to the destination gudang's kurir / Admin Gudang
+          originWarehouseId: d.master.originWarehouseId,
+          originWarehouseName: whName(d.master.originWarehouseId),
           address: d.master.customer.address,
           customerName: d.master.customer.name,
           customerPhone: d.master.customer.phone,
@@ -99,6 +105,12 @@ export async function POST(req: NextRequest) {
     if (!master) return fail(422, "Shipment wajib dipilih.", { masterId: ["Shipment wajib dipilih."] });
     if (!["ARRIVED_AT_GUDANG", "RECEIVED_AT_GUDANG"].includes(master.status)) {
       return fail(422, `Shipment harus tiba di gudang terlebih dahulu (saat ini: ${master.status}).`);
+    }
+    // Transport drop-off gate: a shipment that reached ANOTHER gudang must be
+    // scanned in & received by Admin Gudang of that gudang (destReceivedAt)
+    // before a kurir can be assigned to deliver it.
+    if (master.status === "ARRIVED_AT_GUDANG" && master.destReceivedAt == null) {
+      return fail(422, "Shipment dari gudang lain belum discan / diterima Admin Gudang — scan paketnya dulu di menu Shipments (status Arrived at Another Gudang).");
     }
     const kurirId = num(body.kurirId);
     if (!kurirId) return fail(422, "Kurir wajib dipilih.", { kurirId: ["Kurir wajib dipilih."] });

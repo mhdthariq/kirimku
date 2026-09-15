@@ -17,18 +17,33 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (transport.status !== "DEPARTED") return fail(422, `Transport berstatus ${transport.status}, hanya DEPARTED yang bisa arrive.`);
 
     const cityIdx = await cityIndex();
+    // gudang names for the tracking description ("dari Gudang A ke Gudang B")
+    const warehouses = await db.warehouse.findMany({ where: { isActive: true }, select: { id: true, name: true, city: true } });
+    const whName = (id: number | null | undefined) => (id == null ? null : warehouses.find((w) => w.id === id)?.name ?? null);
+    const whNameByCity = (city: string | null | undefined) => {
+      const key = (city ?? "").trim().toLowerCase();
+      return key ? warehouses.find((w) => (w.city ?? "").trim().toLowerCase() === key)?.name ?? null : null;
+    };
+    const originGudangName = whName(transport.shipments[0]?.master.originWarehouseId) ?? whNameByCity(transport.origin) ?? whNameByCity(transport.route?.origin);
+    const destGudangName = whName(transport.shipments[0]?.master.destinationWarehouseId) ?? whNameByCity(transport.destination) ?? whNameByCity(transport.route?.destination);
+
     const updated = await db.$transaction(async (tx) => {
       const result = await tx.transport.update({ where: { id: transport.id }, data: { status: "ARRIVED", arrivedAt: new Date() } });
       for (const s of transport.shipments) {
         const destIds = shipmentDestinationGudangIds(s.master, cityIdx);
         const arrivedWarehouseId = s.master.destinationWarehouseId ?? destIds[0] ?? null;
         if (s.master.status === "IN_TRANSPORT") {
-          await tx.masterShipment.update({ where: { id: s.shipmentId }, data: { status: "ARRIVED_AT_GUDANG", arrivedWarehouseId } });
+          // The package reached ANOTHER gudang (the destination branch).
+          // destReceivedAt stays null until Admin Gudang of that gudang scans
+          // every package in (transport drop-off verification).
+          await tx.masterShipment.update({ where: { id: s.shipmentId }, data: { status: "ARRIVED_AT_GUDANG", arrivedWarehouseId, destReceivedAt: null } });
         }
+        const fromTo = `${originGudangName ? ` dari ${originGudangName}` : ""}${destGudangName ? ` ke ${destGudangName}` : ""}`;
         await tx.trackingEvent.create({
           data: {
-            masterId: s.shipmentId, event: "ARRIVED_AT_GUDANG",
-            description: `Transport ${transport.transportCode} tiba di gudang tujuan`,
+            masterId: s.shipmentId,
+            event: "ARRIVED_AT_GUDANG",
+            description: `Transport ${transport.transportCode} tiba di gudang tujuan${fromTo} — menunggu scan penerimaan Admin Gudang`,
             actorId: user.id,
           },
         });

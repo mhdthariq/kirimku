@@ -302,6 +302,19 @@ export function GudangPage() {
                               {s.customerName} · {s.packages} paket · {formatNumber(s.weightKg)} kg · {s.volumeM3.toFixed(3)} m³
                             </p>
                             <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                {/* "This shipment is from Gudang X" — destination-stage rows */}
+                                {s.stage === "destination" && s.originWarehouseName && (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-sky-100/70 px-1.5 py-0.5 text-[10px] font-semibold text-sky-800 dark:bg-sky-950/60 dark:text-sky-300">
+                                    dari {s.originWarehouseName}
+                                  </span>
+                                )}
+                                {s.stage === "destination" && s.destReceivedAt == null && (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-100/80 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+                                    menunggu scan Admin Gudang
+                                  </span>
+                                )}
+                              </div>
                               {s.remainingAmount != null && s.remainingAmount > 0 ? (
                                 <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">sisa {formatRupiah(s.remainingAmount)}</span>
                               ) : (

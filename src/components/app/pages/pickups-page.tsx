@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Pencil, Plus, QrCode, Truck, XCircle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type PickupTask, type Options, type Shipment } from "@/lib/client-api";
+import { apiDelete, apiGet, apiPost, apiPut, hasPermission, employeesByPosition, type PickupTask, type Options, type Shipment } from "@/lib/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
@@ -132,7 +132,10 @@ export function PickupsPage() {
     return <PageHeader title="Pickups" subtitle="Anda tidak memiliki izin melihat pickup." />;
   }
 
-  const kurirOptions = (options?.employees ?? []).map((e) => ({ value: String(e.id), label: `${e.name}${e.position ? ` — ${e.position}` : ""}` }));
+  // Kurir dropdown — only employees with the Kurir position (never marketing,
+  // drivers, admin kantor, …). Falls back to the full list only when no
+  // employee has a position set (legacy data).
+  const kurirOptions = employeesByPosition(options?.employees ?? [], "Kurir").map((e) => ({ value: String(e.id), label: e.name }));
   const shipmentOptions = readyShipments.map((s) => ({
     value: String(s.id),
     label: `${s.masterCode} · ${s.customer?.name ?? ""} (${s.details?.length ?? s._count?.details ?? 0} detail)`,

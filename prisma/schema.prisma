@@ -155,6 +155,9 @@ model Partner {
   repairs            VehicleRepair[]
   commissions        MarketingCommission[]
   shipmentsCreated   MasterShipment[]  @relation("ShipmentCreatorPartner")
+  // customers acquired / handled by this Marketing partner — drives the
+  // "marketing only knows their own customers" data separation (B2B esp.)
+  customers          Customer[]       @relation("CustomerMarketingOwner")
 }
 
 // Ledger-based wallet: the cached `balance` is ONLY mutated inside atomic
@@ -281,6 +284,11 @@ model Customer {
   email       String?
   address     String?
   isActive    Boolean  @default(true)
+  // Marketing partner this customer is connected to ("customer connected to
+  // who"). null = unassigned / house account. Marketing partners only ever
+  // see their own customers; admins can (re)assign this in the Customers UI.
+  marketingPartnerId Int?
+  marketingPartner   Partner? @relation("CustomerMarketingOwner", fields: [marketingPartnerId], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -304,6 +312,10 @@ model MasterShipment {
   // gudang where the package physically arrived (set when Admin Gudang confirms
   // arrival — via kurir drop-off scan or walk-in)
   arrivedWarehouseId     Int?
+  // when Admin Gudang scan-verified receipt of this shipment at the DESTINATION
+  // gudang (transport drop-off). null = arrived at another gudang but not yet
+  // scanned/received by Admin Gudang — delivery assignment is blocked until set.
+  destReceivedAt         DateTime?
   // Penerima (recipient) — typed manually, printed on both resi types
   penerimaName           String?
   penerimaAddress        String?
@@ -568,8 +580,8 @@ model HandoverScan {
   pickup      Pickup?  @relation(fields: [pickupId], references: [id], onDelete: Cascade)
   deliveryId  Int?
   delivery    Delivery? @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
-  context     String   @default("pickup") // pickup | delivery | gudang_arrival
-  masterId    Int?     // set for gudang_arrival scans (no pickup/delivery task)
+  context     String   @default("pickup") // pickup | delivery | gudang_arrival | transport_arrival
+  masterId    Int?     // set for gudang_arrival / transport_arrival scans (no pickup/delivery task)
   scanLevel   String   // master | detail
   detailId    Int?     // set when the payload matched a detail barang
   payload     String

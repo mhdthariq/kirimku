@@ -10,12 +10,14 @@ import {
   Plus,
   Printer,
   QrCode,
+  Route as RouteIcon,
   ScanLine,
   Send,
   Trash2,
   Truck,
   UserCheck,
   UserRound,
+  Warehouse,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -27,6 +29,7 @@ import {
   hasPermission,
   type DetailShipment,
   type GudangArrivalQueueItem,
+  type GudangTransportArrivalItem,
   type GudangWalkInItem,
   type GudangWorkspace,
   type Options,
@@ -139,6 +142,7 @@ function ShipmentList() {
   const [confirmDelete, setConfirmDelete] = useState<Shipment | null>(null);
   const [scanPickerOpen, setScanPickerOpen] = useState(false);
   const [rowScanTask, setRowScanTask] = useState<GudangArrivalQueueItem | null>(null);
+  const [rowTransportTask, setRowTransportTask] = useState<GudangTransportArrivalItem | null>(null);
 
   // Owner per-gudang tabs (Daftar | Gudang A | Gudang B | … | Log Aktivitas):
   // filter the fetched rows to the selected gudang. Non-owner users only
@@ -152,10 +156,7 @@ function ShipmentList() {
     const q = search.toLowerCase();
     return data.filter(
       (s) =>
-        (statusFilter === "all" ||
-          (statusFilter === "GUDANG"
-            ? s.status === "RECEIVED_AT_GUDANG" || s.status === "ARRIVED_AT_GUDANG"
-            : s.status === statusFilter)) &&
+        (statusFilter === "all" || s.status === statusFilter) &&
         (activeGudangId == null || (s.gudangIds ?? []).includes(activeGudangId)) &&
         (!q ||
           s.masterCode.toLowerCase().includes(q) ||
@@ -211,7 +212,7 @@ function ShipmentList() {
     if (ok) reload();
   }
 
-  /** Open the arrival-scan dialog straight from a PICKED_UP row. */
+  /** Open the arrival-scan dialog straight from a PICKED_UP row (kurir drop-off). */
   function openRowScan(s: Shipment) {
     const live = gudang?.arrivals.find((a) => a.id === s.id);
     setRowScanTask(
@@ -236,6 +237,35 @@ function ShipmentList() {
         scannedByMethod: { SCANNED: 0, TYPED: 0 },
         pickupCode: null,
         kurirName: null,
+        updatedAt: s.createdAt,
+      },
+    );
+  }
+
+  /** Open the transport-arrival scan dialog straight from an ARRIVED_AT_GUDANG
+   *  row (driver drop-off from another gudang — awaiting Admin Gudang scan). */
+  function openRowTransportScan(s: Shipment) {
+    const live = gudang?.transportArrivals.find((a) => a.id === s.id);
+    setRowTransportTask(
+      live ?? {
+        id: s.id,
+        masterCode: s.masterCode,
+        customerName: s.customer?.name ?? "—",
+        customerPhone: s.customer?.phone ?? null,
+        origin: s.origin,
+        destination: s.destination,
+        originWarehouseId: s.originWarehouseId ?? null,
+        destinationWarehouseId: s.destinationWarehouseId ?? null,
+        arrivedWarehouseId: s.arrivedWarehouseId ?? null,
+        originWarehouseName: s.originWarehouseName ?? null,
+        transportCode: null,
+        driverName: null,
+        kenekName: null,
+        penerimaName: s.penerimaName ?? null,
+        detailsCount: s.totals?.totalPackages ?? s._count?.details ?? 0,
+        totalWeightKg: s.totals?.totalActualKg ?? 0,
+        totalVolumeM3: s.totals?.totalVolumeM3 ?? 0,
+        scannedCount: 0,
         updatedAt: s.createdAt,
       },
     );
@@ -306,6 +336,12 @@ function ShipmentList() {
                   (kamera / reader / manual) lalu konfirmasi <b>Tiba di Gudang</b>.
                 </p>
               )}
+              {statusFilter === "ARRIVED_AT_GUDANG" && can.confirmArrival && (
+                <p className="rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-2 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300">
+                  Shipment <b>ARRIVED AT ANOTHER GUDANG</b> sudah tiba di gudang Anda dari gudang lain via transport — klik <b>Terima / Scan</b>{" "}
+                  untuk scan tiap paketnya sebelum bisa ditugaskan ke kurir untuk delivery.
+                </p>
+              )}
               <DataTable
             rows={rows}
             loading={loading}
@@ -319,8 +355,9 @@ function ShipmentList() {
                   { key: "CREATED", label: "Created" },
                   { key: "READY_FOR_PICKUP", label: "Ready for Pickup" },
                   { key: "PICKED_UP", label: "Picked Up" },
-                  { key: "GUDANG", label: "Arrive at Gudang" },
+                  { key: "RECEIVED_AT_GUDANG", label: "At Origin Gudang" },
                   { key: "IN_TRANSPORT", label: "In Transport" },
+                  { key: "ARRIVED_AT_GUDANG", label: "From Another Gudang" },
                   { key: "DELIVERED", label: "Delivered" },
                   { key: "CANCELLED", label: "Cancelled" },
                 ].map((t) => (
@@ -333,11 +370,7 @@ function ShipmentList() {
                   >
                     {t.label}
                     {t.key !== "all" && (
-                      <span className="ml-1 opacity-70">
-                        {t.key === "GUDANG"
-                          ? data?.filter((s) => s.status === "RECEIVED_AT_GUDANG" || s.status === "ARRIVED_AT_GUDANG").length ?? 0
-                          : data?.filter((s) => s.status === t.key).length ?? 0}
-                      </span>
+                      <span className="ml-1 opacity-70">{data?.filter((s) => s.status === t.key).length ?? 0}</span>
                     )}
                   </Button>
                 ))}
@@ -364,6 +397,18 @@ function ShipmentList() {
                     <p className="text-xs text-muted-foreground">
                       {s.origin} → {s.destination}
                     </p>
+                    {/* "This shipment is from Gudang X" — shown once the package
+                        reached the destination side (another gudang) */}
+                    {["ARRIVED_AT_GUDANG", "DELIVERED"].includes(s.status) && (s.originWarehouseName ?? s.originWarehouseId) && (
+                      <p className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-sky-100/70 px-1.5 py-0.5 text-[10px] font-semibold text-sky-800 dark:bg-sky-950/60 dark:text-sky-300">
+                        <Warehouse className="h-3 w-3" /> dari {s.originWarehouseName ?? `Gudang #${s.originWarehouseId}`}
+                      </p>
+                    )}
+                    {s.status === "ARRIVED_AT_GUDANG" && s.destReceivedAt == null && (
+                      <p className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-amber-100/80 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+                        <ScanLine className="h-3 w-3" /> menunggu scan Admin Gudang
+                      </p>
+                    )}
                     {s.customer?.type === "b2b" && s.invoiceLines?.[0] && (
                       <a href={`#/invoices/${s.invoiceLines[0].invoice.id}`} className="mt-1 inline-flex text-[10px] font-semibold text-amber-700 hover:underline dark:text-amber-300">
                         Included in invoice {s.invoiceLines[0].invoice.invoiceNumber}
@@ -414,6 +459,11 @@ function ShipmentList() {
                     <ItemAuditDialog entityType="shipment" entityId={s.id} itemLabel={s.masterCode} />
                     {can.confirmArrival && s.status === "PICKED_UP" && (
                       <Button size="sm" className="h-7" onClick={() => openRowScan(s)} title="Scan paket & konfirmasi tiba di gudang">
+                        <ScanLine className="h-3.5 w-3.5" /> Terima / Scan
+                      </Button>
+                    )}
+                    {can.confirmArrival && s.status === "ARRIVED_AT_GUDANG" && s.destReceivedAt == null && (
+                      <Button size="sm" className="h-7" onClick={() => openRowTransportScan(s)} title="Scan paket dari transport & konfirmasi penerimaan">
                         <ScanLine className="h-3.5 w-3.5" /> Terima / Scan
                       </Button>
                     )}
@@ -674,9 +724,27 @@ function ShipmentList() {
         <ArrivalScanDialog
           key={rowScanTask ? `row-arr-${rowScanTask.id}` : "row-arr-none"}
           task={rowScanTask}
+          mode="kurir"
           warehouses={(options?.warehouses ?? []).map((w) => ({ id: w.id, name: w.name }))}
           scopedWarehouseId={gudang?.scope?.scoped ? gudang.scope.warehouseId : null}
           onClose={() => setRowScanTask(null)}
+          onDone={() => {
+            reload();
+            reloadGudang();
+          }}
+        />
+      )}
+
+      {/* Per-row transport arrival scan — opens straight from an
+          ARRIVED_AT_GUDANG row ("From Another Gudang" tab) */}
+      {can.confirmArrival && (
+        <ArrivalScanDialog
+          key={rowTransportTask ? `row-tarr-${rowTransportTask.id}` : "row-tarr-none"}
+          task={rowTransportTask}
+          mode="transport"
+          warehouses={(options?.warehouses ?? []).map((w) => ({ id: w.id, name: w.name }))}
+          scopedWarehouseId={gudang?.scope?.scoped ? gudang.scope.warehouseId : null}
+          onClose={() => setRowTransportTask(null)}
           onDone={() => {
             reload();
             reloadGudang();
@@ -689,8 +757,10 @@ function ShipmentList() {
 
 // ---------------------------------------------------------------------------
 // Scan Kedatangan — quick-access picker beside "Buat Shipment": lists every
-// shipment currently PICKED_UP (kurir bringing it back to the gudang) and
-// opens the same camera/reader/manual scan flow used in the Gudang menu.
+// shipment waiting to be received by Admin Gudang:
+//  - PICKED_UP — kurir bringing it back to the origin gudang
+//  - ARRIVED_AT_GUDANG — transport driver unloaded it from ANOTHER gudang
+// Opens the same camera/reader/manual scan flow used in the Gudang menu.
 // Only shows for users with shipment.confirm_arrival (Admin Gudang & co).
 // ---------------------------------------------------------------------------
 
@@ -707,22 +777,32 @@ function ScanArrivalPickerDialog({
   const { data: options } = useApiData<Options>(() => apiGet<Options>("/options"), []);
   const [search, setSearch] = useState("");
   const [task, setTask] = useState<GudangArrivalQueueItem | null>(null);
+  const [transportTask, setTransportTask] = useState<GudangTransportArrivalItem | null>(null);
 
   // Refresh the queue every time the picker is (re)opened.
   useEffect(() => {
     if (open) reload();
   }, [open, reload]);
 
+  const matches = (q: string, ...fields: (string | null | undefined)[]) =>
+    !q || fields.some((f) => (f ?? "").toLowerCase().includes(q));
+
   const arrivals = useMemo(() => {
     const list = data?.arrivals ?? [];
     const q = search.trim().toLowerCase();
-    if (!q) return list;
     return list.filter(
-      (a) =>
-        a.masterCode.toLowerCase().includes(q) ||
-        a.customerName.toLowerCase().includes(q) ||
-        (a.kurirName ?? "").toLowerCase().includes(q),
+      (a) => matches(q, a.masterCode, a.customerName, a.kurirName),
     );
+     
+  }, [data, search]);
+
+  const transportArrivals = useMemo(() => {
+    const list = data?.transportArrivals ?? [];
+    const q = search.trim().toLowerCase();
+    return list.filter(
+      (a) => matches(q, a.masterCode, a.customerName, a.originWarehouseName, a.origin, a.driverName, a.transportCode),
+    );
+     
   }, [data, search]);
 
   const warehouses = (options?.warehouses ?? []).map((w) => ({ id: w.id, name: w.name }));
@@ -737,56 +817,107 @@ function ScanArrivalPickerDialog({
               <QrCode className="h-5 w-5 text-primary" /> Scan Kedatangan
             </DialogTitle>
             <DialogDescription>
-              Semua shipment berstatus <b>PICKED UP</b> — sedang dibawa kurir kembali ke gudang. Pilih satu untuk scan tiap paketnya (kamera HP
-              / reader tool / ketik manual), lalu konfirmasi <b>Tiba di Gudang</b> setelah semua paket lengkap.
+              Shipment yang menunggu diterima gudang: <b>PICKED UP</b> (dibawa kurir kembali ke gudang) dan <b>ARRIVED AT ANOTHER GUDANG</b>{" "}
+              (dibongkar muat driver transport dari gudang lain). Pilih satu untuk scan tiap paketnya (kamera HP / reader tool / ketik
+              manual), lalu konfirmasi penerimaannya setelah semua paket lengkap.
             </DialogDescription>
           </DialogHeader>
 
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Cari resi / customer / kurir…"
+            placeholder="Cari resi / customer / kurir / gudang asal…"
             className="w-full"
           />
 
-          <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-0.5">
+          <div className="max-h-[55vh] space-y-4 overflow-y-auto pr-0.5">
             {loading && <p className="px-2 py-6 text-center text-sm text-muted-foreground">Memuat…</p>}
-            {!loading && arrivals.length === 0 && (
+            {!loading && arrivals.length === 0 && transportArrivals.length === 0 && (
               <p className="px-2 py-8 text-center text-sm text-muted-foreground">
-                Tidak ada shipment PICKED_UP menunggu diterima gudang saat ini.
+                Tidak ada shipment menunggu diterima gudang saat ini.
               </p>
             )}
-            {arrivals.map((a) => {
-              const pct = a.detailsCount ? Math.round((a.scannedCount / a.detailsCount) * 100) : 0;
-              return (
-                <button
-                  key={a.id}
-                  type="button"
-                  onClick={() => setTask(a)}
-                  className="flex w-full flex-col gap-2 rounded-xl border bg-card p-3 text-left transition-colors hover:bg-accent"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-mono text-xs font-semibold text-primary">{a.masterCode}</p>
-                      <p className="truncate text-sm font-medium text-foreground">{a.customerName}</p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {a.origin} → {a.destination}
-                        {a.kurirName ? ` · kurir: ${a.kurirName}` : ""}
-                      </p>
-                    </div>
-                    <Button size="sm" className="h-7 shrink-0">
-                      <ScanLine className="h-3.5 w-3.5" /> Scan
-                    </Button>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Progress value={pct} className="h-1.5 flex-1" />
-                    <span className={cn("shrink-0 font-mono text-[11px] font-semibold", a.scannedCount === a.detailsCount ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground")}>
-                      {a.scannedCount}/{a.detailsCount}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
+
+            {/* --- Kurir drop-off queue (PICKED_UP) --- */}
+            {arrivals.length > 0 && (
+              <div className="space-y-2">
+                <p className="flex items-center gap-1.5 px-1 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                  <Truck className="h-3.5 w-3.5" /> Kurir Drop-off · PICKED UP ({arrivals.length})
+                </p>
+                {arrivals.map((a) => {
+                  const pct = a.detailsCount ? Math.round((a.scannedCount / a.detailsCount) * 100) : 0;
+                  return (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() => setTask(a)}
+                      className="flex w-full flex-col gap-2 rounded-xl border bg-card p-3 text-left transition-colors hover:bg-accent"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-mono text-xs font-semibold text-primary">{a.masterCode}</p>
+                          <p className="truncate text-sm font-medium text-foreground">{a.customerName}</p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {a.origin} → {a.destination}
+                            {a.kurirName ? ` · kurir: ${a.kurirName}` : ""}
+                          </p>
+                        </div>
+                        <Button size="sm" className="h-7 shrink-0">
+                          <ScanLine className="h-3.5 w-3.5" /> Scan
+                        </Button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Progress value={pct} className="h-1.5 flex-1" />
+                        <span className={cn("shrink-0 font-mono text-[11px] font-semibold", a.scannedCount === a.detailsCount ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground")}>
+                          {a.scannedCount}/{a.detailsCount}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* --- Transport drop-off queue (ARRIVED_AT_GUDANG, from another gudang) --- */}
+            {transportArrivals.length > 0 && (
+              <div className="space-y-2">
+                <p className="flex items-center gap-1.5 px-1 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                  <RouteIcon className="h-3.5 w-3.5" /> Transport Drop-off · Dari Gudang Lain ({transportArrivals.length})
+                </p>
+                {transportArrivals.map((a) => {
+                  const pct = a.detailsCount ? Math.round((a.scannedCount / a.detailsCount) * 100) : 0;
+                  return (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() => setTransportTask(a)}
+                      className="flex w-full flex-col gap-2 rounded-xl border border-sky-200/70 bg-sky-50/40 p-3 text-left transition-colors hover:bg-sky-50 dark:border-sky-900/60 dark:bg-sky-950/20 dark:hover:bg-sky-950/40"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-mono text-xs font-semibold text-primary">{a.masterCode}</p>
+                          <p className="truncate text-sm font-medium text-foreground">{a.customerName}</p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            <span className="font-semibold text-sky-700 dark:text-sky-300">dari {a.originWarehouseName ?? a.origin}</span> → {a.destination}
+                            {a.transportCode ? ` · ${a.transportCode}` : ""}
+                            {a.driverName ? ` · driver: ${a.driverName}` : ""}
+                          </p>
+                        </div>
+                        <Button size="sm" className="h-7 shrink-0">
+                          <ScanLine className="h-3.5 w-3.5" /> Scan
+                        </Button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Progress value={pct} className="h-1.5 flex-1" />
+                        <span className={cn("shrink-0 font-mono text-[11px] font-semibold", a.scannedCount === a.detailsCount ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground")}>
+                          {a.scannedCount}/{a.detailsCount}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
@@ -794,9 +925,23 @@ function ScanArrivalPickerDialog({
       <ArrivalScanDialog
         key={task ? `arr-${task.id}` : "arr-none"}
         task={task}
+        mode="kurir"
         warehouses={warehouses}
         scopedWarehouseId={scopedWarehouseId}
         onClose={() => setTask(null)}
+        onDone={() => {
+          reload();
+          onDone();
+        }}
+      />
+
+      <ArrivalScanDialog
+        key={transportTask ? `tarr-${transportTask.id}` : "tarr-none"}
+        task={transportTask}
+        mode="transport"
+        warehouses={warehouses}
+        scopedWarehouseId={scopedWarehouseId}
+        onClose={() => setTransportTask(null)}
         onDone={() => {
           reload();
           onDone();
@@ -1129,6 +1274,23 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
           </>
         }
       />
+
+      {/* Where is this shipment from? — origin gudang banner for shipments that
+          reached another gudang (destination side). Admin Gudang of the
+          destination branch sees at a glance where the package came from. */}
+      {["ARRIVED_AT_GUDANG", "DELIVERED"].includes(shipment.status) && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-2 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300">
+          <Warehouse className="h-4 w-4 shrink-0" />
+          <p>
+            Shipment ini <b>dari {shipment.originWarehouseName ?? options?.warehouses?.find((w) => w.id === shipment.originWarehouseId)?.name ?? shipment.origin}</b> —{" "}
+            {shipment.status === "ARRIVED_AT_GUDANG"
+              ? shipment.destReceivedAt != null
+                ? <>sudah diterima & diverifikasi scan Admin Gudang di <b>{shipment.arrivedWarehouseName ?? options?.warehouses?.find((w) => w.id === shipment.arrivedWarehouseId)?.name ?? shipment.destination}</b> pada {formatDate(shipment.destReceivedAt, true)}.</>
+                : <>menunggu scan penerimaan Admin Gudang di <b>{shipment.arrivedWarehouseName ?? options?.warehouses?.find((w) => w.id === shipment.arrivedWarehouseId)?.name ?? shipment.destination}</b> — scan semua paket sebelum menugaskan kurir delivery.</>
+              : <>sudah selesai dikirim ke penerima.</>}
+          </p>
+        </div>
+      )}
 
       {/* Pickup submission checklist — price must be counted + penerima filled */}
       {shipment.status === "CREATED" && can.submitPickup && (shipment.priceAmount == null || !shipment.penerimaName) && (

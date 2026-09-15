@@ -31,12 +31,23 @@ export async function GET(req: NextRequest, { params }: Params) {
     // Gudang data separation: scoped users may only open shipments of their
     // own gudang (e.g. Bandung staff cannot open a Jakarta shipment by id).
     await assertShipmentScope(user, shipment);
+    // Warehouse names — power the "shipment dari Gudang X" banner in the detail view
+    const whRows = await db.warehouse.findMany({ select: { id: true, name: true } });
+    const whName = (id: number | null | undefined) => (id == null ? null : whRows.find((w) => w.id === id)?.name ?? null);
     // Server-computed pricing preview (actual / volumetric / chargeable) so the
     // client never re-implements (or hardcodes) the volumetric formula.
     const preview = await pricingPreview(shipment);
     const totals = computeTotals(shipment.details);
     const payment = await paymentSummary(shipment.id);
-    return ok({ ...shipment, pricingPreview: preview, totals, paymentSummary: payment });
+    return ok({
+      ...shipment,
+      originWarehouseName: whName(shipment.originWarehouseId),
+      destinationWarehouseName: whName(shipment.destinationWarehouseId),
+      arrivedWarehouseName: whName(shipment.arrivedWarehouseId),
+      pricingPreview: preview,
+      totals,
+      paymentSummary: payment,
+    });
   });
 }
 

@@ -8,9 +8,12 @@ const STATUS_MAP: Record<string, { label: string; variant: "default" | "secondar
   CREATED: { label: "Created", variant: "outline" },
   READY_FOR_PICKUP: { label: "Ready for Pickup", variant: "secondary" },
   PICKED_UP: { label: "Picked Up", variant: "secondary" },
-  RECEIVED_AT_GUDANG: { label: "At Gudang", variant: "secondary" },
+  // Origin-side intake (kurir drop-off scan / walk-in at the journey's first gudang)
+  RECEIVED_AT_GUDANG: { label: "Arrived at Origin Gudang", variant: "secondary" },
   IN_TRANSPORT: { label: "In Transport", variant: "default", pulse: true },
-  ARRIVED_AT_GUDANG: { label: "Arrived", variant: "secondary" },
+  // Reached ANOTHER gudang (destination branch) via transport — Admin Gudang
+  // of that gudang must scan the packages in before delivery can be assigned.
+  ARRIVED_AT_GUDANG: { label: "Arrived at Another Gudang", variant: "default", pulse: true },
   DELIVERED: { label: "Delivered", variant: "default" },
   CANCELLED: { label: "Cancelled", variant: "destructive" },
   // Tasks

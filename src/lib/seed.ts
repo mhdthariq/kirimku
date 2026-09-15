@@ -13,6 +13,154 @@ const DEMO_PROOF_DATA_URL =
 let seedPromise: Promise<void> | null = null;
 
 /**
+ * Idempotent demo backfill — safe to run on EVERY boot (fresh or seeded DB):
+ *  1. connects the demo customers to the Marketing partner budi (only when
+ *     still unassigned, so manual owner assignments always win) — powers the
+ *     "marketing only knows their customers" data separation;
+ *  2. creates the "arrived at ANOTHER gudang" demo shipment MKT-000007 —
+ *     physically at Gudang Bandung with destReceivedAt still null, awaiting
+ *     the Admin Gudang (ratna) transport drop-off scan.
+ */
+async function seedBackfill(): Promise<void> {
+  try {
+    // --- 1. customer ↔ marketing linkage ------------------------------------
+    const budiUser = await db.user.findUnique({ where: { username: "budi" }, select: { id: true } });
+    const budiPartner = budiUser
+      ? await db.partner.findFirst({ where: { userId: budiUser.id, type: "MARKETING", isActive: true } })
+      : null;
+    if (budiPartner) {
+      await db.customer.updateMany({
+        where: {
+          code: { in: ["CUS-000001", "CUS-000002", "CUS-000003", "CUS-000004", "CUS-000005"] },
+          marketingPartnerId: null,
+        },
+        data: { marketingPartnerId: budiPartner.id },
+      });
+    }
+
+    // --- 2. MKT-000007 — arrived at another gudang, awaiting scan ------------
+    if (await db.masterShipment.findUnique({ where: { masterCode: "MKT-000007" } })) return;
+    const [sari, jakarta, bandung, tariffRow] = await Promise.all([
+      db.customer.findUnique({ where: { code: "CUS-000005" } }),
+      db.warehouse.findFirst({ where: { city: "Jakarta Pusat" } }),
+      db.warehouse.findFirst({ where: { city: "Bandung" } }),
+      db.tariff.findFirst({ where: { origin: "Jakarta Pusat", destination: "Bandung", customerType: "b2c", isActive: true } }),
+    ]);
+    if (!sari || !jakarta || !bandung) return;
+
+    const actorId = async (username: string) =>
+      (await db.user.findUnique({ where: { username }, select: { id: true } }))?.id ?? null;
+    const [budiId, dewiId, agusId, jokoId] = await Promise.all([actorId("budi"), actorId("dewi"), actorId("agus"), actorId("joko")]);
+
+    const now = new Date();
+    const daysAgo = (d: number) => new Date(now.getTime() - d * 24 * 60 * 60 * 1000);
+    const createdAt = daysAgo(1.6);
+
+    const shipment = await db.masterShipment.create({
+      data: {
+        masterCode: "MKT-000007",
+        resi: "MKT-000007",
+        customerId: sari.id,
+        tariffId: tariffRow?.id ?? null,
+        status: "ARRIVED_AT_GUDANG",
+        origin: "Jakarta Pusat",
+        destination: "Bandung",
+        originWarehouseId: jakarta.id,
+        destinationWarehouseId: bandung.id,
+        arrivedWarehouseId: bandung.id, // physically at the destination gudang
+        destReceivedAt: null, // NOT yet scan-verified by Admin Gudang Bandung
+        penerimaName: "Sari Indah",
+        penerimaAddress: "Jl. Anggrek No. 3, Bandung",
+        penerimaContact: "0812-3456-0005",
+        pengirimName: sari.name,
+        pengirimPhone: sari.phone,
+        createdByPartnerId: budiPartner?.id ?? null,
+        createdAt,
+        updatedAt: daysAgo(0.8),
+      },
+    });
+
+    const detailDefs = [
+      { description: "Paket elektronik", weightKg: 2.5, l: 30, w: 22, h: 14 },
+      { description: "Kemasan kue kering", weightKg: 1.5, l: 25, w: 20, h: 10 },
+    ];
+    const date = [createdAt.getFullYear(), createdAt.getMonth() + 1, createdAt.getDate()]
+      .map((part) => String(part).padStart(2, "0"))
+      .join("");
+    const detailRows: { id: number; lengthCm: number | null; widthCm: number | null; heightCm: number | null; actualWeightKg: number }[] = [];
+    for (const [i, d] of detailDefs.entries()) {
+      const row = await db.detailShipment.create({
+        data: {
+          detailCode: `DTL-${date}-ARR-${String(i + 1).padStart(3, "0")}`,
+          masterId: shipment.id,
+          description: d.description,
+          actualWeightKg: d.weightKg,
+          lengthCm: d.l,
+          widthCm: d.w,
+          heightCm: d.h,
+          createdAt,
+        },
+      });
+      detailRows.push(row);
+    }
+    if (tariffRow) {
+      const r = computePricing(detailRows, tariffRow);
+      await db.masterShipment.update({
+        where: { id: shipment.id },
+        data: { chargeableWeightKg: r.chargeableKg, ratePerKg: tariffRow.ratePerKg, priceAmount: r.price, pricedAt: createdAt },
+      });
+      await db.payment.create({
+        data: {
+          masterId: shipment.id, method: "TRANSFER", amount: r.price, status: "VERIFIED",
+          reference: "PAY-MKT000007", recordedById: dewiId, createdAt,
+          verifiedById: agusId, verifiedAt: daysAgo(1.4),
+        },
+      });
+    }
+
+    const events: { event: string; description: string; daysAgo: number; actorId: number | null }[] = [
+      { event: "CREATED", description: "Shipment MKT-000007 dibuat", daysAgo: 1.6, actorId: budiId },
+      { event: "READY_FOR_PICKUP", description: "Menunggu penjemputan kurir", daysAgo: 1.5, actorId: budiId },
+      { event: "PICKED_UP", description: "Picked-up by Dewi Lestari", daysAgo: 1.45, actorId: dewiId },
+      { event: "RECEIVED_AT_GUDANG", description: "Diterima di Gudang Jakarta Pusat", daysAgo: 1.4, actorId: agusId },
+      { event: "IN_TRANSPORT", description: "Berangkat via transport TRP-2026-000003", daysAgo: 1.3, actorId: jokoId },
+      { event: "ARRIVED_AT_GUDANG", description: `Transport TRP-2026-000003 tiba di gudang tujuan dari ${jakarta.name} — menunggu scan penerimaan Admin Gudang`, daysAgo: 0.8, actorId: jokoId },
+    ];
+    for (const ev of events) {
+      await db.trackingEvent.create({
+        data: { masterId: shipment.id, event: ev.event, description: ev.description, actorId: ev.actorId, occurredAt: daysAgo(ev.daysAgo) },
+      });
+    }
+
+    // The arrived linehaul that carried it (JKT → BDG, crew joko + andi)
+    const [vehicle, driverEmp, kenekEmp] = await Promise.all([
+      db.vehicle.findFirst({ where: { vehicleNumber: "B 9455 KTB" } }),
+      db.employee.findFirst({ where: { position: "Driver" } }),
+      db.employee.findFirst({ where: { position: "Kenek" } }),
+    ]);
+    if (vehicle) {
+      const transport = await db.transport.create({
+        data: {
+          transportCode: "TRP-2026-000003",
+          vehicleId: vehicle.id,
+          driverId: driverEmp?.id ?? null,
+          kenekId: kenekEmp?.id ?? null,
+          status: "ARRIVED",
+          origin: "Jakarta Pusat",
+          destination: "Bandung",
+          departedAt: daysAgo(1.3),
+          arrivedAt: daysAgo(0.8),
+          createdAt: daysAgo(1.5),
+        },
+      });
+      await db.transportShipment.create({ data: { transportId: transport.id, shipmentId: shipment.id } });
+    }
+  } catch {
+    // backfill is best-effort — never block boot
+  }
+}
+
+/**
  * Idempotent demo seeding. Runs automatically on the first API request
  * (mirrors the docker "migrate + seed on boot" behaviour) and is a no-op
  * once the demo dataset exists.
@@ -52,7 +200,13 @@ async function runSeed(): Promise<void> {
 
   const ownerExists = await db.user.findFirst({ where: { username: "owner" } });
   const shipmentCount = await db.masterShipment.count();
-  if (ownerExists && shipmentCount >= 6) return; // already seeded
+  if (ownerExists && shipmentCount >= 6) {
+    // Already seeded — still run the idempotent backfill (customer ↔ marketing
+    // linkage + the transport-arrival demo shipment) so upgraded DBs get the
+    // new demo data without touching existing rows.
+    await seedBackfill();
+    return;
+  }
 
   const now = new Date();
   const daysAgo = (d: number) => new Date(now.getTime() - d * 24 * 60 * 60 * 1000);
@@ -698,4 +852,8 @@ async function runSeed(): Promise<void> {
       });
     }
   }
+
+  // fresh seed finished — run the same idempotent backfill (customer ↔
+  // marketing linkage + the transport-arrival demo shipment)
+  await seedBackfill();
 }

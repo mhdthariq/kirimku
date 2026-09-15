@@ -50,12 +50,20 @@ export async function GET(req: NextRequest) {
     const cityIdx = await cityIndex();
     const visible = shipments.filter((s) => inScope(shipmentGudangIds(s, cityIdx), scope));
 
+    // Warehouse names so the UI can show "this shipment is from Gudang X"
+    // (origin branch) without a second round-trip to /options.
+    const whRows = await db.warehouse.findMany({ select: { id: true, name: true } });
+    const whName = (id: number | null | undefined) => (id == null ? null : whRows.find((w) => w.id === id)?.name ?? null);
+
     // Physical totals (volume m³ + weight kg) for the list columns
     const totals = await totalsByMaster(visible.map((s) => s.id));
     return ok(
       visible.map((s) => ({
         ...s,
         gudangIds: shipmentGudangIds(s, cityIdx),
+        originWarehouseName: whName(s.originWarehouseId),
+        destinationWarehouseName: whName(s.destinationWarehouseId),
+        arrivedWarehouseName: whName(s.arrivedWarehouseId),
         totals: totals.get(s.id) ?? { totalPackages: 0, totalActualKg: 0, totalVolumeM3: 0 },
       })),
     );
@@ -70,6 +78,13 @@ export async function POST(req: NextRequest) {
     if (!customerId) return fail(422, "Customer wajib dipilih.", { customerId: ["Customer wajib dipilih."] });
     const customer = await db.customer.findUnique({ where: { id: customerId } });
     if (!customer) return fail(422, "Customer tidak ditemukan.", { customerId: ["Customer tidak ditemukan."] });
+    // Marketing data separation: a Marketing partner may only create shipments
+    // for customers connected to them ("marketing only knew their customer").
+    if (user.partnerType === "MARKETING" && user.partnerId != null && customer.marketingPartnerId !== user.partnerId) {
+      return fail(403, "Customer ini bukan milik Anda — Marketing hanya bisa membuat shipment untuk customer sendiri.", {
+        customerId: ["Customer ini bukan milik Anda."],
+      });
+    }
 
     // Revise.md §6 — Marketing enters the discount as an AMOUNT in Rupiah.
     // The percentage is always derived by the system, never typed manually.

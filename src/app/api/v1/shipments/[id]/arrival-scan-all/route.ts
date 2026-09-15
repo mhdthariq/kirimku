@@ -2,15 +2,17 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { guard, ok, handle, fail } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
-import { scanProgress } from "@/lib/scan-flow";
+import { arrivalScanContext, scanProgress } from "@/lib/scan-flow";
 import { assertShipmentScope } from "@/lib/gudang-scope";
 
 type Params = { params: Promise<{ id: string }> };
 
 /**
  * "Scan all" bulk action for Admin Gudang: mark every not-yet-scanned package
- * of a PICKED_UP shipment as scanned (reader-tool batch mode) so the arrival
- * confirmation unlocks in one click.
+ * of an arrival-scan shipment as scanned (reader-tool batch mode) so the
+ * arrival confirmation unlocks in one click. Works for BOTH arrival paths:
+ *  - PICKED_UP (kurir drop-off at the origin gudang)
+ *  - ARRIVED_AT_GUDANG (transport drop-off at the destination gudang)
  */
 export async function POST(req: NextRequest, { params }: Params) {
   return handle(async () => {
@@ -19,11 +21,13 @@ export async function POST(req: NextRequest, { params }: Params) {
     const master = await db.masterShipment.findUnique({ where: { id: Number(id) }, include: { details: true } });
     if (!master) return fail(404, "Shipment tidak ditemukan.");
     await assertShipmentScope(user, master);
-    if (master.status !== "PICKED_UP") {
-      return fail(422, `Scan semua hanya untuk shipment PICKED_UP (saat ini: ${master.status}).`);
+
+    const context = arrivalScanContext(master.status);
+    if (!context) {
+      return fail(422, `Scan semua hanya untuk shipment PICKED_UP / ARRIVED_AT_GUDANG (saat ini: ${master.status}).`);
     }
 
-    const progressBefore = await scanProgress({ masterId: master.id, context: "gudang_arrival" });
+    const progressBefore = await scanProgress({ masterId: master.id, context });
     if (progressBefore.details.length === 0) {
       return fail(422, "Shipment belum punya detail barang.");
     }
@@ -35,7 +39,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     await db.handoverScan.createMany({
       data: pending.map((d) => ({
         masterId: master.id,
-        context: "gudang_arrival",
+        context,
         scanLevel: "detail",
         detailId: d.id,
         payload: d.detailCode,
@@ -51,11 +55,14 @@ export async function POST(req: NextRequest, { params }: Params) {
       entityLabel: `${master.masterCode} · scan-all (${pending.length} paket)`,
       actor: user,
     });
-    const progress = await scanProgress({ masterId: master.id, context: "gudang_arrival" });
+    const progress = await scanProgress({ masterId: master.id, context });
     return ok({
       created: pending.length,
       progress,
-      message: `${pending.length} paket ditandai ter-scan (mode reader). Semua paket lengkap — siap konfirmasi tiba di gudang.`,
+      message:
+        context === "transport_arrival"
+          ? `${pending.length} paket ditandai ter-scan (mode reader). Semua paket lengkap — siap konfirmasi penerimaan dari transport.`
+          : `${pending.length} paket ditandai ter-scan (mode reader). Semua paket lengkap — siap konfirmasi tiba di gudang.`,
     });
   });
 }

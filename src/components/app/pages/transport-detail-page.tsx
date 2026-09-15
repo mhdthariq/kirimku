@@ -118,8 +118,8 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
     return (
       <div className="space-y-4">
         <PageHeader title="Transport tidak ditemukan" subtitle="Mungkin dihapus atau Anda tidak memiliki akses." icon={<Route className="h-5 w-5" />} />
-        <Button variant="outline" onClick={() => (window.location.hash = "#/transports")}>
-          <ArrowLeft className="h-4 w-4" /> Kembali ke daftar transport
+        <Button variant="outline" onClick={() => (window.location.hash = user?.partnerType === "VEHICLE_OWNER" ? "#/vo-transport-history" : "#/transports")}>
+          <ArrowLeft className="h-4 w-4" /> Kembali
         </Button>
       </div>
     );
@@ -133,10 +133,15 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
   const canCheckinNow =
     can.checkin && isCrew && (transport.status === "PLANNED" || transport.status === "DEPARTED") && pendingCheckpoints.length > 0;
 
+  // Vehicle Owners arrive from their own Transport History page — send them
+  // back there instead of the staff transports list.
+  const backHref = user?.partnerType === "VEHICLE_OWNER" ? "#/vo-transport-history" : "#/transports";
+  const backLabel = user?.partnerType === "VEHICLE_OWNER" ? "Riwayat transport saya" : "Semua transport";
+
   return (
     <div className="space-y-4">
-      <Button variant="ghost" size="sm" onClick={() => (window.location.hash = "#/transports")} className="-ml-2">
-        <ArrowLeft className="h-4 w-4" /> Semua transport
+      <Button variant="ghost" size="sm" onClick={() => (window.location.hash = backHref)} className="-ml-2">
+        <ArrowLeft className="h-4 w-4" /> {backLabel}
       </Button>
 
       <PageHeader

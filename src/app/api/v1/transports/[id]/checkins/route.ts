@@ -164,20 +164,27 @@ export async function POST(req: NextRequest, { params }: Params) {
           data: { status: "ARRIVED", arrivedAt: new Date() },
         });
         const cityIdx = await cityIndex();
+        // gudang names for the tracking description ("dari Gudang A ke Gudang B")
+        const warehouses = await tx.warehouse.findMany({ where: { isActive: true }, select: { id: true, name: true, city: true } });
+        const whName = (id: number | null | undefined) => (id == null ? null : warehouses.find((w) => w.id === id)?.name ?? null);
+        const originGudangName = whName(transport.shipments[0]?.master.originWarehouseId);
         for (const s of transport.shipments) {
           const destIds = shipmentDestinationGudangIds(s.master, cityIdx);
           const arrivedWarehouseId = s.master.destinationWarehouseId ?? destIds[0] ?? null;
           if (s.master.status === "IN_TRANSPORT") {
+            // The package reached ANOTHER gudang (the destination branch).
+            // destReceivedAt stays null until Admin Gudang of that gudang
+            // scans every package in (transport drop-off verification).
             await tx.masterShipment.update({
               where: { id: s.shipmentId },
-              data: { status: "ARRIVED_AT_GUDANG", arrivedWarehouseId },
+              data: { status: "ARRIVED_AT_GUDANG", arrivedWarehouseId, destReceivedAt: null },
             });
           }
           await tx.trackingEvent.create({
             data: {
               masterId: s.shipmentId,
               event: "ARRIVED_AT_GUDANG",
-              description: `Transport ${transport.transportCode} tiba di gudang tujuan (check-in ${checkpoint.name} oleh ${user.name})`,
+              description: `Transport ${transport.transportCode} tiba di gudang tujuan${originGudangName ? ` dari ${originGudangName}` : ""} (check-in ${checkpoint.name} oleh ${user.name}) — menunggu scan penerimaan Admin Gudang`,
               actorId: user.id,
             },
           });

@@ -8,6 +8,10 @@ import { computeTotals } from "@/lib/shipment-totals";
  * Gudang operations workspace:
  * - arrivals: shipments with status PICKED_UP that a kurir is bringing back to
  *   the gudang — Admin Gudang must scan every package before confirming arrival
+ * - transportArrivals: shipments that reached THIS gudang from ANOTHER gudang
+ *   via transport (ARRIVED_AT_GUDANG, not yet scan-verified) — Admin Gudang
+ *   must scan every package before the shipment can be assigned for delivery.
+ *   Each row shows where the shipment came from (origin gudang).
  * - walkIns: shipments a customer can hand over directly at the gudang
  *   (Admin Gudang confirms "Arrive at Gudang" without scanning)
  * - warehouses: per-gudang contents — what packages are currently held at each
@@ -134,6 +138,81 @@ export async function GET(req: NextRequest) {
         };
       });
 
+    // --- Transport arrivals: shipments that reached THIS gudang from another
+    //     gudang via transport and still await the Admin Gudang scan-in -------
+    const transportArrivalRows = await db.masterShipment.findMany({
+      where: { status: "ARRIVED_AT_GUDANG", destReceivedAt: null },
+      orderBy: { updatedAt: "asc" },
+      include: {
+        customer: { select: { id: true, name: true, type: true, phone: true } },
+        details: { select: { id: true, actualWeightKg: true, lengthCm: true, widthCm: true, heightCm: true } },
+        transportItems: {
+          select: {
+            transport: {
+              select: { id: true, transportCode: true, createdAt: true, driver: { select: { name: true } }, kenek: { select: { name: true } } },
+            },
+          },
+        },
+      },
+    });
+    // only shipments whose DESTINATION side matches the user's scope gudang
+    const scopedTransportArrivals = transportArrivalRows.filter((s) => {
+      if (scope.unscoped) return true;
+      if (scope.warehouseId == null) return false;
+      if (s.arrivedWarehouseId != null) return s.arrivedWarehouseId === scope.warehouseId;
+      if (s.destinationWarehouseId != null) return s.destinationWarehouseId === scope.warehouseId;
+      const wh = warehouses.find((w) => w.id === scope.warehouseId);
+      return !!wh && (s.destination ?? "").toLowerCase() === (wh.city ?? "").toLowerCase();
+    });
+    const transportArrivalIds = scopedTransportArrivals.map((s) => s.id);
+    const transportArrivalScanRows = transportArrivalIds.length
+      ? await db.handoverScan.findMany({
+          where: { context: "transport_arrival", masterId: { in: transportArrivalIds }, result: { in: ["ok", "duplicate"] } },
+          select: { detailId: true, method: true },
+        })
+      : [];
+    const transportArrivalDetailMaster = new Map<number, number>();
+    for (const s of scopedTransportArrivals) for (const d of s.details) transportArrivalDetailMaster.set(d.id, s.id);
+    const transportArrivalScanned = new Map<number, number>();
+    for (const scan of transportArrivalScanRows) {
+      if (scan.detailId == null) continue;
+      const mid = transportArrivalDetailMaster.get(scan.detailId);
+      if (mid == null) continue;
+      transportArrivalScanned.set(mid, (transportArrivalScanned.get(mid) ?? 0) + 1);
+    }
+    const transportArrivals = scopedTransportArrivals.map((s) => {
+      const totals = computeTotals(s.details);
+      // latest transport that carried this shipment to the destination gudang
+      const sorted = [...s.transportItems].sort(
+        (a, b) => new Date(b.transport.createdAt).getTime() - new Date(a.transport.createdAt).getTime(),
+      );
+      const lastTransport = sorted[0]?.transport ?? null;
+      // where did this shipment come from? (the origin branch)
+      const originWarehouseName =
+        (s.originWarehouseId != null ? warehouses.find((w) => w.id === s.originWarehouseId)?.name : null) ?? null;
+      return {
+        id: s.id,
+        masterCode: s.masterCode,
+        customerName: s.customer.name,
+        customerPhone: s.customer.phone,
+        origin: s.origin,
+        destination: s.destination,
+        originWarehouseId: s.originWarehouseId,
+        destinationWarehouseId: s.destinationWarehouseId,
+        arrivedWarehouseId: s.arrivedWarehouseId,
+        originWarehouseName,
+        transportCode: lastTransport?.transportCode ?? null,
+        driverName: lastTransport?.driver?.name ?? null,
+        kenekName: lastTransport?.kenek?.name ?? null,
+        penerimaName: s.penerimaName,
+        detailsCount: totals.totalPackages,
+        totalWeightKg: totals.totalActualKg,
+        totalVolumeM3: totals.totalVolumeM3,
+        scannedCount: transportArrivalScanned.get(s.id) ?? 0,
+        updatedAt: s.updatedAt,
+      };
+    });
+
     // --- Per-gudang contents: what is physically held at each gudang ---------
     const heldShipments = await db.masterShipment.findMany({
       where: { status: { in: ["RECEIVED_AT_GUDANG", "ARRIVED_AT_GUDANG"] } },
@@ -172,12 +251,19 @@ export async function GET(req: NextRequest) {
           const totals = computeTotals(s.details);
           const paid = heldPaid.get(s.id) ?? 0;
           const finalPrice = s.finalPriceAmount ?? (s.priceAmount != null ? s.priceAmount - (s.discountAmount ?? 0) : null);
+          // destination-stage rows carry "where this shipment came from"
+          const originWarehouseName =
+            s.status === "ARRIVED_AT_GUDANG" && s.originWarehouseId != null
+              ? warehouses.find((x) => x.id === s.originWarehouseId)?.name ?? null
+              : null;
           return {
             id: s.id,
             masterCode: s.masterCode,
             customerName: s.customer.name,
             status: s.status,
             stage: s.status === "RECEIVED_AT_GUDANG" ? "origin" : "destination",
+            originWarehouseName,
+            destReceivedAt: s.destReceivedAt,
             packages: totals.totalPackages,
             weightKg: totals.totalActualKg,
             volumeM3: totals.totalVolumeM3,
@@ -206,6 +292,7 @@ export async function GET(req: NextRequest) {
         ? { warehouseId: scopeWarehouse.id, warehouseName: scopeWarehouse.name, scoped: true }
         : { warehouseId: null, warehouseName: null, scoped: false },
       arrivals,
+      transportArrivals,
       walkIns,
       warehouses: warehouseContents,
     });
