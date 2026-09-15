@@ -69,6 +69,16 @@ export function ResiPrint({
   const [qrMap, setQrMap] = useState<Record<string, string>>({});
   const [options, setOptions] = useState<Options | null>(null);
 
+  // Lock the page scroll behind the portal — exactly ONE scrollbar (the
+  // portal's own) stays visible, matching the invoice detail print view.
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, []);
+
   useEffect(() => {
     apiGet<Options>("/options")
       .then(setOptions)

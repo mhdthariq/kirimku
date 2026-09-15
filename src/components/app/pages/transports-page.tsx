@@ -15,7 +15,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type Transport, type Options, type Shipment } from "@/lib/client-api";
+import { apiDelete, apiGet, apiPost, apiPut, hasPermission, employeesByPosition, type Transport, type Options, type Shipment } from "@/lib/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
@@ -183,7 +183,11 @@ export function TransportsPage({ historyMode = false }: { historyMode?: boolean 
     return <PageHeader title="Transport" subtitle="Anda tidak memiliki izin melihat transport." />;
   }
 
-  const employeeOptions = (options?.employees ?? []).map((e) => ({ value: String(e.id), label: `${e.name}${e.position ? ` — ${e.position}` : ""}` }));
+  // Position-filtered crew dropdowns: the Driver select lists ONLY drivers and
+  // the Kenek select ONLY keneks (never kurir / marketing / admin kantor).
+  // Falls back to the full list only when no employee has a position set.
+  const driverOptions = employeesByPosition(options?.employees ?? [], "Driver").map((e) => ({ value: String(e.id), label: e.name }));
+  const kenekOptions = employeesByPosition(options?.employees ?? [], "Kenek").map((e) => ({ value: String(e.id), label: e.name }));
   const routeOptions = (options?.routes ?? []).map((r) => ({ value: String(r.id), label: r.name }));
 
   // auto-fill origin/destination from the selected route (still editable)
@@ -420,10 +424,10 @@ export function TransportsPage({ historyMode = false }: { historyMode?: boolean 
                 />
               </Field>
               <Field label="Driver" htmlFor="t-driver">
-                <FormSelect value={form.driverId} onValueChange={(v) => setForm({ ...form, driverId: v })} placeholder="Pilih driver" options={employeeOptions} disabled={busy} />
+                <FormSelect value={form.driverId} onValueChange={(v) => setForm({ ...form, driverId: v })} placeholder="Pilih driver" options={driverOptions} disabled={busy} />
               </Field>
               <Field label="Kenek (opsional)" htmlFor="t-kenek">
-                <FormSelect value={form.kenekId} onValueChange={(v) => setForm({ ...form, kenekId: v })} placeholder="Pilih kenek" options={employeeOptions} disabled={busy} />
+                <FormSelect value={form.kenekId} onValueChange={(v) => setForm({ ...form, kenekId: v })} placeholder="Pilih kenek" options={kenekOptions} disabled={busy} />
               </Field>
               <Field label="Asal (Origin)" htmlFor="t-origin">
                 <input

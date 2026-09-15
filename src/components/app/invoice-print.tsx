@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Printer, X } from "lucide-react";
 import { COMPANY_NAME, COMPANY_TAGLINE } from "@/lib/company";
@@ -14,6 +15,16 @@ type PrintableInvoice = Invoice & {
 };
 
 export function InvoicePrint({ invoice, onClose }: { invoice: PrintableInvoice; onClose: () => void }) {
+  // Lock the page scroll behind the portal — exactly ONE scrollbar (the
+  // portal's own) stays visible, even when opened from a long list page.
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, []);
+
   if (typeof document === "undefined") return null;
   const customer = invoice.customer;
   const companyName = customer?.companyName ?? invoice.customerName;

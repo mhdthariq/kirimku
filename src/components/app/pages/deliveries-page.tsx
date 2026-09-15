@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ClipboardList, PackageCheck, Pencil, Plus, QrCode, XCircle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type DeliveryTask, type Options, type Shipment } from "@/lib/client-api";
+import { apiDelete, apiGet, apiPost, apiPut, hasPermission, employeesByPosition, type DeliveryTask, type Options, type Shipment } from "@/lib/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
@@ -123,11 +123,19 @@ export function DeliveriesPage() {
     return <PageHeader title="Deliveries" subtitle="Anda tidak memiliki izin melihat delivery." />;
   }
 
-  const kurirOptions = (options?.employees ?? []).map((emp) => ({ value: String(emp.id), label: `${emp.name}${emp.position ? ` — ${emp.position}` : ""}` }));
-  const shipmentOptions = readyShipments.map((s) => ({
-    value: String(s.id),
-    label: `${s.masterCode} · ${s.customer?.name ?? ""} → ${s.destination}`,
-  }));
+  // Kurir dropdown — only employees with the Kurir position (never marketing,
+  // drivers, admin kantor, …). Falls back to the full list only when no
+  // employee has a position set (legacy data).
+  const kurirOptions = employeesByPosition(options?.employees ?? [], "Kurir").map((emp) => ({ value: String(emp.id), label: emp.name }));
+  // Ready-to-deliver shipments — shipments from ANOTHER gudang must have been
+  // scan-verified by Admin Gudang (destReceivedAt) before they appear here.
+  const shipmentOptions = readyShipments
+    .filter((s) => s.status !== "ARRIVED_AT_GUDANG" || s.destReceivedAt != null)
+    .map((s) => ({
+      value: String(s.id),
+      label: `${s.masterCode} · ${s.customer?.name ?? ""} → ${s.destination}${s.status === "ARRIVED_AT_GUDANG" && s.originWarehouseName ? ` (dari ${s.originWarehouseName})` : ""}`,
+    }));
+  const pendingScanCount = readyShipments.filter((s) => s.status === "ARRIVED_AT_GUDANG" && s.destReceivedAt == null).length;
 
   return (
     <div className="space-y-4">
@@ -152,6 +160,15 @@ export function DeliveriesPage() {
           </>
         }
       />
+
+      {/* Shipments from another gudang still awaiting the Admin Gudang scan-in —
+          they cannot be assigned for delivery until scanned. */}
+      {pendingScanCount > 0 && (
+        <p className="rounded-lg border border-amber-300 bg-amber-50/70 px-3 py-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
+          {pendingScanCount} shipment dari gudang lain menunggu scan penerimaan Admin Gudang — buka menu <b>Shipments</b> (status From Another
+          Gudang) untuk scan paketnya sebelum menugaskan kurir delivery.
+        </p>
+      )}
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
@@ -199,6 +216,13 @@ export function DeliveriesPage() {
                   <div>
                     <p className="text-sm font-medium text-foreground">{d.customerName}</p>
                     <p className="text-xs text-muted-foreground">{d.address ?? d.destination}</p>
+                    {/* "This shipment is from Gudang X" — the destination-side
+                        crew sees at a glance where the package started */}
+                    {d.originWarehouseName && (
+                      <p className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-sky-100/70 px-1.5 py-0.5 text-[10px] font-semibold text-sky-800 dark:bg-sky-950/60 dark:text-sky-300">
+                        dari {d.originWarehouseName}
+                      </p>
+                    )}
                   </div>
                 ),
               },

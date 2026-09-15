@@ -2,7 +2,6 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { guard, ok, handle, fail, num, str } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
-import { canTransition } from "@/lib/shipment-flow";
 import { scanProgress } from "@/lib/scan-flow";
 import { assertShipmentScope } from "@/lib/gudang-scope";
 
@@ -12,12 +11,17 @@ type Params = { params: Promise<{ id: string }> };
  * Confirm that a shipment has arrived at the gudang (permission:
  * shipment.confirm_arrival — Admin Gudang / Staff Gudang).
  *
- * Body: { warehouseId, mode: "scan" | "walk_in", notes? }
- * - mode "scan":    shipment PICKED_UP (kurir brought the packages back) —
- *                   every package must have been scanned first.
- * - mode "walk_in": customer handed the package over at the gudang counter —
- *                   no scanning needed, allowed straight from CREATED /
- *                   READY_FOR_PICKUP.
+ * Body: { warehouseId, mode: "scan" | "walk_in" | "transport", notes? }
+ * - mode "scan":      shipment PICKED_UP (kurir brought the packages back) —
+ *                     every package must have been scanned first.
+ * - mode "walk_in":   customer handed the package over at the gudang counter —
+ *                     no scanning needed, allowed straight from CREATED /
+ *                     READY_FOR_PICKUP.
+ * - mode "transport": shipment ARRIVED_AT_GUDANG (transport driver unloaded
+ *                     the packages at the DESTINATION gudang) — every package
+ *                     must have been scanned (transport_arrival context)
+ *                     first; stamps destReceivedAt so the shipment counts as
+ *                     fully received and can be assigned for delivery.
  */
 export async function POST(req: NextRequest, { params }: Params) {
   return handle(async () => {
@@ -31,7 +35,69 @@ export async function POST(req: NextRequest, { params }: Params) {
     await assertShipmentScope(user, master);
 
     const body = await req.json().catch(() => ({}));
-    const mode = body.mode === "walk_in" ? "walk_in" : "scan";
+    const mode = ["walk_in", "transport"].includes(body.mode) ? body.mode : "scan";
+    const notes = str(body.notes);
+
+    if (mode === "transport") {
+      // ------------------------------------------------------------------
+      // Transport drop-off at the destination gudang: the shipment already
+      // reached ANOTHER gudang (ARRIVED_AT_GUDANG). Admin Gudang of that
+      // gudang scans every package and confirms receipt here.
+      // ------------------------------------------------------------------
+      if (master.status !== "ARRIVED_AT_GUDANG") {
+        return fail(422, `Mode transport hanya untuk shipment ARRIVED_AT_GUDANG (saat ini: ${master.status}).`);
+      }
+      if (master.destReceivedAt != null) {
+        return fail(422, "Shipment ini sudah diterima & diverifikasi scan di gudang tujuan.");
+      }
+      if (master.details.length === 0) {
+        return fail(422, "Shipment belum punya detail barang.");
+      }
+      // receiving gudang = where the transport unloaded the packages
+      const warehouseId = master.arrivedWarehouseId ?? master.destinationWarehouseId;
+      const warehouse = warehouseId ? await db.warehouse.findUnique({ where: { id: warehouseId } }) : null;
+      if (!warehouse || !warehouse.isActive) {
+        return fail(422, "Gudang tujuan shipment belum jelas — hubungi admin untuk memperbaiki data.");
+      }
+      if (!user.isOwner && user.warehouseId !== warehouse.id) {
+        return fail(403, "Anda hanya bisa menerima paket transport di gudang Anda sendiri.");
+      }
+      const progress = await scanProgress({ masterId: master.id, context: "transport_arrival" });
+      if (!progress.allScanned) {
+        return fail(422, `Belum semua paket discan (${progress.scanned}/${progress.total}) — scan semua paket atau gunakan tombol "Scan Semua Paket".`);
+      }
+
+      // which gudang did this shipment come from? (the origin branch)
+      const originWarehouse = master.originWarehouseId
+        ? await db.warehouse.findUnique({ where: { id: master.originWarehouseId }, select: { name: true } })
+        : null;
+      const description = `Paket diterima di ${warehouse.name} dari transport${originWarehouse ? ` (asal ${originWarehouse.name})` : ""} — ${master.details.length} paket terverifikasi scan`;
+      const updated = await db.$transaction(async (tx) => {
+        const result = await tx.masterShipment.update({
+          where: { id: master.id },
+          data: { destReceivedAt: new Date() },
+        });
+        await tx.trackingEvent.create({
+          data: {
+            masterId: master.id,
+            event: "RECEIVED_FROM_TRANSPORT",
+            description: notes ? `${description} — ${notes}` : description,
+            actorId: user.id,
+          },
+        });
+        return result;
+      });
+      await audit({
+        action: "status_change",
+        entityType: "shipment",
+        entityId: master.id,
+        entityLabel: `${master.masterCode} → received @ ${warehouse.name} (transport drop-off)`,
+        actor: user,
+        after: { mode, warehouse: warehouse.name, packages: master.details.length },
+      });
+      return ok({ ...updated, warehouseName: warehouse.name, mode });
+    }
+
     const warehouseId = num(body.warehouseId);
     const warehouse = warehouseId ? await db.warehouse.findUnique({ where: { id: warehouseId } }) : null;
     if (!warehouse || !warehouse.isActive) {
@@ -40,9 +106,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (!user.isOwner && user.warehouseId !== warehouse.id) {
       return fail(403, "Anda hanya bisa mengonfirmasi arrival di gudang Anda sendiri.");
     }
-    const notes = str(body.notes);
 
-    if (!canTransition(master.status, "RECEIVED_AT_GUDANG")) {
+    if (master.status !== "CREATED" && master.status !== "READY_FOR_PICKUP" && master.status !== "PICKED_UP") {
       return fail(422, `Shipment dengan status ${master.status} tidak bisa dikonfirmasi tiba di gudang.`);
     }
 

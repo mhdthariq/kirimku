@@ -7,12 +7,21 @@ export async function GET(req: NextRequest) {
   return handle(async () => {
     const user = await guard(req);
     const marketingOwner = user.partnerType === "MARKETING" ? user.partnerId : null;
-    const [employees, vehicles, routes, warehouses, customers, tariffs, permissions, vehicleOwners, b2bShipments] = await Promise.all([
+    const [employees, vehicles, routes, warehouses, customers, tariffs, permissions, vehicleOwners, marketingPartners, b2bShipments] = await Promise.all([
       db.employee.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true, position: true, warehouseId: true } }),
       db.vehicle.findMany({ where: { status: "ACTIVE" }, orderBy: { vehicleNumber: "asc" }, select: { id: true, vehicleNumber: true, name: true, maxWeightKg: true } }),
       db.route.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true, origin: true, destination: true } }),
       db.warehouse.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, code: true, name: true, city: true, customerSupportContact: true } }),
-      db.customer.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, code: true, name: true, type: true, phone: true, email: true, address: true } }),
+      // Marketing data separation: a Marketing partner only gets THEIR customers
+      // in every dropdown (shipment creation, invoice lines, …).
+      db.customer.findMany({
+        where: {
+          isActive: true,
+          ...(marketingOwner != null ? { marketingPartnerId: marketingOwner } : {}),
+        },
+        orderBy: { name: "asc" },
+        select: { id: true, code: true, name: true, type: true, phone: true, email: true, address: true, marketingPartnerId: true },
+      }),
       db.tariff.findMany({
         where: {
           isActive: true,
@@ -28,6 +37,13 @@ export async function GET(req: NextRequest) {
         where: { type: "VEHICLE_OWNER", isActive: true },
         orderBy: { createdAt: "asc" },
         select: { id: true, type: true, companyPercent: true, partnerPercent: true, user: { select: { name: true, username: true } } },
+      }),
+      // Marketing partners for the customer ↔ marketing linkage dropdown
+      // ("customer connected to who") — only marketing partners, nothing else.
+      db.partner.findMany({
+        where: { type: "MARKETING", isActive: true },
+        orderBy: { createdAt: "asc" },
+        select: { id: true, type: true, user: { select: { name: true, username: true } } },
       }),
       // B2B shipments available for invoice line linking (§7.1)
       db.masterShipment.findMany({
@@ -48,6 +64,8 @@ export async function GET(req: NextRequest) {
     return ok({
       company, employees, vehicles, routes, warehouses, customers, tariffs, permissions,
       vehicleOwners: vehicleOwners.map((p) => ({ id: p.id, name: p.user.name, username: p.user.username, profitShare: { company: p.companyPercent, partner: p.partnerPercent } })),
+      // Marketing partners — used by the Customers page "Marketing (PIC)" dropdown
+      marketingPartners: marketingPartners.map((p) => ({ id: p.id, name: p.user.name, username: p.user.username })),
       b2bShipments,
     });
   });

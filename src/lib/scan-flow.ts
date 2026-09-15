@@ -19,16 +19,31 @@ export interface ScanProgress {
   details: ScanDetailState[];
 }
 
-export type ScanContext = "pickup" | "delivery" | "gudang_arrival";
+export type ScanContext = "pickup" | "delivery" | "gudang_arrival" | "transport_arrival";
 
 /** Normalize a scan method sent by clients ("SCANNED" camera/reader, "TYPED" manual). */
 export function normalizeMethod(value: unknown): "SCANNED" | "TYPED" {
   return value === "SCANNED" ? "SCANNED" : "TYPED";
 }
 
+/** Resolve the arrival-scan context for a shipment:
+ *  - PICKED_UP          → "gudang_arrival"  (kurir drops the packages off at
+ *                                             the origin gudang counter)
+ *  - ARRIVED_AT_GUDANG   → "transport_arrival" (transport driver dropped the
+ *                                             packages at the DESTINATION
+ *                                             gudang — Admin Gudang scans
+ *                                             them in before delivery)
+ *  Returns null when the shipment is in no arrival-scan state. */
+export function arrivalScanContext(status: string): ScanContext | null {
+  if (status === "PICKED_UP") return "gudang_arrival";
+  if (status === "ARRIVED_AT_GUDANG") return "transport_arrival";
+  return null;
+}
+
 /**
- * Compute detail-level scan progress for a pickup, a delivery, or a gudang
- * arrival (context + masterId). A detail counts as scanned when it has a
+ * Compute detail-level scan progress for a pickup, a delivery, a gudang
+ * arrival (kurir drop-off) or a transport arrival (driver drop-off at the
+ * destination gudang). A detail counts as scanned when it has a
  * HandoverScan with result "ok" (or "duplicate" — a repeated confirmation of
  * the same package).
  */

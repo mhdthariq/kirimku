@@ -1,13 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { History, TrendingUp } from "lucide-react";
+import { Eye, History, TrendingUp } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { apiGet, hasPermission, type VOTransportRow } from "@/lib/client-api";
 import { useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { StatusBadge } from "@/components/app/status-badge";
 import { formatRupiah, formatDate } from "@/components/app/form-parts";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 /**
@@ -112,6 +113,21 @@ export function VOTransportHistoryPage({ initialTab = "history" }: { initialTab?
                   ),
               },
               { key: "date", header: "Tanggal", hideOnMobile: true, render: (r) => formatDate(r.departedAt ?? r.createdAt) },
+              {
+                key: "actions",
+                header: "Aksi",
+                render: (r) => (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7"
+                    onClick={() => (window.location.hash = `#/transports/${r.id}`)}
+                    title="Lihat detail transport — muatan kendaraan Anda & posisinya"
+                  >
+                    <Eye className="h-3.5 w-3.5" /> Detail
+                  </Button>
+                ),
+              },
             ]}
           />
         </TabsContent>

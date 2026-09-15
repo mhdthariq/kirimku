@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, PackageCheck, QrCode, Zap } from "lucide-react";
+import { CheckCircle2, PackageCheck, QrCode, Warehouse, Zap } from "lucide-react";
 import {
   apiGet,
   apiPost,
   type GudangArrivalQueueItem,
+  type GudangTransportArrivalItem,
   type ScanProgress,
   type ScanResponse,
 } from "@/lib/client-api";
@@ -19,11 +20,22 @@ import { cn } from "@/lib/utils";
 
 type Feedback = { kind: "ok" | "warn" | "info"; text: string } | null;
 
+/** Either arrival queue shape — the dialog adapts to the arrival mode. */
+type ArrivalTask = GudangArrivalQueueItem | GudangTransportArrivalItem;
+
 /**
  * Arrival scan dialog — Admin Gudang (or anyone with `shipment.confirm_arrival`)
- * scans every package of a PICKED_UP shipment (camera / reader tool / manual —
+ * scans every package of an arriving shipment (camera / reader tool / manual —
  * codes hidden, anti copy-paste) and, once all packages are accounted for,
- * confirms "Tiba di Gudang" which flips the shipment to RECEIVED_AT_GUDANG.
+ * confirms receipt:
+ *
+ * - mode "kurir":     shipment PICKED_UP — the kurir brings the packages back
+ *                     to the ORIGIN gudang. Confirming flips the shipment to
+ *                     RECEIVED_AT_GUDANG.
+ * - mode "transport": shipment ARRIVED_AT_GUDANG — a transport driver unloaded
+ *                     packages from ANOTHER gudang at this (destination)
+ *                     gudang. Confirming stamps destReceivedAt so the shipment
+ *                     can be assigned for delivery.
  *
  * Shared by:
  * - Gudang → Kedatangan tab (per-row "Terima / Scan" button)
@@ -31,17 +43,23 @@ type Feedback = { kind: "ok" | "warn" | "info"; text: string } | null;
  */
 export function ArrivalScanDialog({
   task,
+  mode = "kurir",
   warehouses,
   scopedWarehouseId,
   onClose,
   onDone,
 }: {
-  task: GudangArrivalQueueItem | null;
+  task: ArrivalTask | null;
+  /** "kurir" = kurir drop-off at the origin gudang; "transport" = driver drop-off at the destination gudang */
+  mode?: "kurir" | "transport";
   warehouses: { id: number; name: string }[];
   scopedWarehouseId: number | null;
   onClose: () => void;
   onDone: () => void;
 }) {
+  const isTransport = mode === "transport";
+  // normalize the union for convenient field access
+  const t = task as (GudangArrivalQueueItem & Partial<GudangTransportArrivalItem>) | null;
   const [progress, setProgress] = useState<ScanProgress | null>(null);
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [busy, setBusy] = useState(false);
@@ -50,7 +68,7 @@ export function ArrivalScanDialog({
   // default receiving gudang: own scope → shipment origin gudang → first listed
   const [warehouseId, setWarehouseId] = useState<string>(() => {
     if (scopedWarehouseId != null) return String(scopedWarehouseId);
-    const origin = warehouses.find((w) => w.id === task?.originWarehouseId);
+    const origin = warehouses.find((w) => w.id === t?.originWarehouseId);
     return String(origin?.id ?? warehouses[0]?.id ?? "");
   });
   const [notes, setNotes] = useState("");
@@ -92,7 +110,12 @@ export function ArrivalScanDialog({
       try {
         const d = await apiGet<{ progress: ScanProgress }>(`/shipments/${task.id}/arrival-scans`);
         setProgress(d.progress);
-        setFeedback({ kind: "ok", text: "Semua paket ter-scan (mode reader) — siap konfirmasi tiba di gudang." });
+        setFeedback({
+          kind: "ok",
+          text: isTransport
+            ? "Semua paket ter-scan (mode reader) — siap konfirmasi penerimaan dari transport."
+            : "Semua paket ter-scan (mode reader) — siap konfirmasi tiba di gudang.",
+        });
       } catch {
         /* ignore */
       }
@@ -101,11 +124,21 @@ export function ArrivalScanDialog({
   }
 
   async function onConfirmArrival() {
-    if (!task || !warehouseId) return;
+    if (!task) return;
+    if (!isTransport && !warehouseId) return;
     setConfirming(true);
     const ok = await runAction(
-      () => apiPost(`/shipments/${task.id}/arrive`, { mode: "scan", warehouseId: Number(warehouseId), notes: notes || null }),
-      { success: `Paket ${task.masterCode} diterima di gudang.` },
+      () =>
+        apiPost(`/shipments/${task.id}/arrive`, {
+          mode: isTransport ? "transport" : "scan",
+          ...(isTransport ? {} : { warehouseId: Number(warehouseId) }),
+          notes: notes || null,
+        }),
+      {
+        success: isTransport
+          ? `Paket ${task.masterCode} diterima dari transport & terverifikasi scan.`
+          : `Paket ${task.masterCode} diterima di gudang.`,
+      },
     );
     setConfirming(false);
     if (ok) {
@@ -116,18 +149,51 @@ export function ArrivalScanDialog({
 
   const pct = progress && progress.total > 0 ? Math.round((progress.scanned / progress.total) * 100) : 0;
 
+  const whoLabel = isTransport
+    ? [t?.driverName, t?.kenekName].filter(Boolean).join(" & ") || "driver transport"
+    : t?.kurirName ?? "";
+
   return (
     <Dialog open={!!task} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <QrCode className="h-5 w-5 text-primary" /> Terima Paket — {task?.masterCode ?? ""}
+            <QrCode className="h-5 w-5 text-primary" />
+            {isTransport ? "Terima Paket dari Transport" : "Terima Paket"} — {t?.masterCode ?? ""}
           </DialogTitle>
           <DialogDescription>
-            Scan setiap paket yang dibawa kurir {task?.kurirName ?? ""} ({task?.detailsCount ?? 0} paket). Kode tidak ditampilkan — baca dari
-            label fisik paket.
+            {isTransport ? (
+              <>
+                Scan setiap paket yang dibawa <b>{whoLabel}</b> dari <b>{t?.originWarehouseName ?? t?.origin ?? "gudang asal"}</b> (
+                {t?.detailsCount ?? 0} paket). Kode tidak ditampilkan — baca dari label fisik paket.
+              </>
+            ) : (
+              <>
+                Scan setiap paket yang dibawa kurir {t?.kurirName ?? ""} ({t?.detailsCount ?? 0} paket). Kode tidak ditampilkan — baca dari
+                label fisik paket.
+              </>
+            )}
           </DialogDescription>
         </DialogHeader>
+
+        {isTransport && (
+          <div className="flex items-start gap-2.5 rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-2.5 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300">
+            <Warehouse className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <p>
+                Shipment ini <b>dari {t?.originWarehouseName ?? t?.origin ?? "gudang lain"}</b>
+                {t?.transportCode ? (
+                  <>
+                    {" "}
+                    via transport <span className="font-mono font-semibold">{t.transportCode}</span>
+                  </>
+                ) : null}
+                . Scan semua paket untuk menerimanya di gudang Anda — setelah diterima, shipment bisa ditugaskan ke kurir untuk
+                dikirim ke penerima.
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
@@ -200,8 +266,10 @@ export function ArrivalScanDialog({
 
           {progress?.allScanned && (
             <div className="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 dark:border-emerald-900 dark:bg-emerald-950/40">
-              <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">Semua paket ter-scan — konfirmasi tiba di gudang.</p>
-              {scopedWarehouseId == null && (
+              <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                {isTransport ? "Semua paket ter-scan — konfirmasi penerimaan dari transport." : "Semua paket ter-scan — konfirmasi tiba di gudang."}
+              </p>
+              {!isTransport && scopedWarehouseId == null && (
                 <Field label="Gudang Penerima" htmlFor="arr-warehouse">
                   <FormSelect
                     value={warehouseId}
@@ -215,9 +283,13 @@ export function ArrivalScanDialog({
               <Field label="Catatan (opsional)" htmlFor="arr-notes">
                 <Textarea id="arr-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Kondisi paket, info tambahan…" disabled={confirming} />
               </Field>
-              <Button className="w-full" onClick={onConfirmArrival} disabled={confirming || !warehouseId}>
+              <Button className="w-full" onClick={onConfirmArrival} disabled={confirming || (!isTransport && !warehouseId)}>
                 <PackageCheck className="h-4 w-4" />
-                {confirming ? "Memproses…" : "Konfirmasi Tiba di Gudang"}
+                {confirming
+                  ? "Memproses…"
+                  : isTransport
+                    ? "Konfirmasi Terima dari Transport"
+                    : "Konfirmasi Tiba di Gudang"}
               </Button>
             </div>
           )}

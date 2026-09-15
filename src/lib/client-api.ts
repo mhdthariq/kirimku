@@ -136,6 +136,10 @@ export interface Customer {
   email: string | null;
   address: string | null;
   isActive: boolean;
+  /** Marketing partner this customer is connected to ("customer connected
+   *  to who") — drives the marketing data separation. */
+  marketingPartnerId?: number | null;
+  marketingPartnerName?: string | null;
 }
 
 export interface DetailShipment {
@@ -175,6 +179,13 @@ export interface Shipment {
   originWarehouseId?: number | null;
   destinationWarehouseId?: number | null;
   arrivedWarehouseId?: number | null;
+  /** warehouse display names — power the "shipment dari Gudang X" chips */
+  originWarehouseName?: string | null;
+  destinationWarehouseName?: string | null;
+  arrivedWarehouseName?: string | null;
+  /** when Admin Gudang scan-verified receipt at the destination gudang
+   *  (transport drop-off). null + ARRIVED_AT_GUDANG = awaiting scan-in. */
+  destReceivedAt?: string | null;
   /** gudang(s) this shipment currently belongs to — drives the owner's per-gudang tabs */
   gudangIds?: number[];
   penerimaName?: string | null;
@@ -303,6 +314,9 @@ export interface DeliveryTask {
   masterCode: string;
   masterStatus: string;
   destination: string;
+  /** where this shipment came from ("shipment dari Gudang A") */
+  originWarehouseId?: number | null;
+  originWarehouseName?: string | null;
   address: string | null;
   customerName: string;
   customerPhone: string | null;
@@ -623,13 +637,29 @@ export interface Options {
   vehicles: { id: number; vehicleNumber: string; name: string | null; maxWeightKg: number }[];
   routes: { id: number; name: string; origin: string | null; destination: string | null }[];
   warehouses: { id: number; code: string; name: string; city: string | null; customerSupportContact?: string | null }[];
-  customers: { id: number; code: string; name: string; type: string; phone: string | null; email: string | null; address: string | null }[];
+  customers: { id: number; code: string; name: string; type: string; phone: string | null; email: string | null; address: string | null; marketingPartnerId?: number | null }[];
   tariffs: { id: number; origin: string; destination: string; customerType: string | null; ratePerKg: number; minChargeableKg: number; volumetricMultiplier: number; roundingMode: string; roundingUnitKg: number; effectiveFrom: string; effectiveTo: string | null }[];
   permissions: { id: number; slug: string; module: string; description: string | null }[];
   /** Revise.md §13 — vehicle-owner partners (vehicle ownership dropdown) */
   vehicleOwners?: { id: number; name: string; username: string; profitShare: { company: number; partner: number } }[];
+  /** Marketing partners — "customer connected to who" dropdown (Customers page) */
+  marketingPartners?: { id: number; name: string; username: string }[];
   /** Revise.md §7.1 — B2B shipments available for invoice line linking */
   b2bShipments?: { id: number; masterCode: string; priceAmount: number | null; finalPriceAmount: number | null; customerId: number; createdByPartnerId: number | null; origin: string; destination: string; invoiceLines: { invoice: { id: number; invoiceNumber: string; status: string } }[] }[];
+}
+
+/** Filter employees for a role-specific dropdown (Kurir / Driver / Kenek …).
+ *  Falls back to the full list when no employee matches the position (legacy
+ *  datasets without positions) so the dropdown never ends up empty. */
+export function employeesByPosition(
+  employees: { id: number; name: string; position: string | null; warehouseId: number | null }[],
+  position: string,
+): { id: number; name: string; position: string | null; warehouseId: number | null }[] {
+  const needle = position.trim().toLowerCase();
+  const matched = employees.filter(
+    (e) => (e.position ?? "").trim().toLowerCase() === needle || (e.position ?? "").trim().toLowerCase().includes(needle),
+  );
+  return matched.length > 0 ? matched : employees;
 }
 
 // ---------------------------------------------------------------------------
@@ -676,12 +706,41 @@ export interface GudangWalkInItem {
   totalVolumeM3: number;
 }
 
+/** Shipment that reached THIS gudang from ANOTHER gudang via transport and
+ *  still awaits the Admin Gudang scan-in (destReceivedAt is null). */
+export interface GudangTransportArrivalItem {
+  id: number;
+  masterCode: string;
+  customerName: string;
+  customerPhone: string | null;
+  origin: string;
+  destination: string;
+  originWarehouseId: number | null;
+  destinationWarehouseId: number | null;
+  arrivedWarehouseId: number | null;
+  /** "This shipment is from Gudang X" — the origin branch it departed from */
+  originWarehouseName: string | null;
+  transportCode: string | null;
+  driverName: string | null;
+  kenekName: string | null;
+  penerimaName: string | null;
+  detailsCount: number;
+  totalWeightKg: number;
+  totalVolumeM3: number;
+  scannedCount: number;
+  updatedAt: string;
+}
+
 export interface GudangContentShipment {
   id: number;
   masterCode: string;
   customerName: string;
   status: string;
   stage: string;
+  /** destination-stage rows: the origin gudang this shipment came from */
+  originWarehouseName?: string | null;
+  /** scan-verified receipt time at the destination gudang (transport drop-off) */
+  destReceivedAt?: string | null;
   packages: number;
   weightKg: number;
   volumeM3: number;
@@ -693,6 +752,7 @@ export interface GudangContentShipment {
 export interface GudangWorkspace {
   scope: { warehouseId: number | null; warehouseName: string | null; scoped: boolean };
   arrivals: GudangArrivalQueueItem[];
+  transportArrivals: GudangTransportArrivalItem[];
   walkIns: GudangWalkInItem[];
   warehouses: {
     id: number;

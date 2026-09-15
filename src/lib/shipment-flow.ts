@@ -33,9 +33,14 @@ export const STATUS_LABELS: Record<string, string> = {
   CREATED: "Created",
   READY_FOR_PICKUP: "Ready for Pickup",
   PICKED_UP: "Picked Up",
-  RECEIVED_AT_GUDANG: "Arrive at Gudang",
+  // Origin-side intake: the package entered the gudang where its journey
+  // starts (kurir drop-off scan / walk-in).
+  RECEIVED_AT_GUDANG: "Arrived at Origin Gudang",
   IN_TRANSPORT: "In Transport",
-  ARRIVED_AT_GUDANG: "Arrive at Gudang (Dest.)",
+  // Destination-side arrival: the package reached ANOTHER gudang (the
+  // destination branch) via transport — distinct status so the destination
+  // Admin Gudang knows it came from elsewhere and must scan it in.
+  ARRIVED_AT_GUDANG: "Arrived at Another Gudang",
   DELIVERED: "Delivered",
   CANCELLED: "Cancelled",
   // pickups — Revision Part A lifecycle: ASSIGNED → PICKED_UP (kurir fetches

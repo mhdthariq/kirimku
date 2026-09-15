@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { guard, ok, handle, fail, num, str, dateOrNull } from "@/lib/api-helpers";
+import { hasPermission } from "@/lib/auth";
 import { audit, diffFields } from "@/lib/audit";
 import { aggregateTransport, detailAggregates, isExecutorOnly } from "@/lib/transport-totals";
 import { assertTransportScope } from "@/lib/gudang-scope";
@@ -14,12 +15,17 @@ type Params = { params: Promise<{ id: string }> };
  * - assigned shipments with per-shipment weight/volume/price
  * - aggregate totals (Revision Part L)
  *
- * Revision Part Y — authorization: an executor-only user (driver / kenek
- * without planning permissions) may only open a transport assigned to them.
+ * Authorization:
+ * - transport.view holders (gudang-scoped) see transports of their gudang;
+ * - Revision Part Y — an executor-only user (driver / kenek without planning
+ *   permissions) may only open a transport assigned to them;
+ * - Vehicle Owner partners may open transports performed with THEIR vehicles
+ *   (Revise.md §16 — "know what's inside their vehicle and where") without
+ *   needing gudang scope.
  */
 export async function GET(req: NextRequest, { params }: Params) {
   return handle(async () => {
-    const user = await guard(req, "transport.view");
+    const user = await guard(req);
     const { id } = await params;
     const transport = await db.transport.findUnique({
       where: { id: Number(id) },
@@ -36,15 +42,29 @@ export async function GET(req: NextRequest, { params }: Params) {
       },
     });
     if (!transport) return fail(404, "Transport tidak ditemukan.");
-    await assertTransportScope(user, transport.route ?? { origin: null, destination: null }, transport.shipments.map((s) => s.master));
 
-    // Server-side assignment check (Part Y) — never rely on frontend hiding.
-    if (isExecutorOnly(user)) {
-      const mine =
-        user.employeeId != null &&
-        (transport.driverId === user.employeeId || transport.kenekId === user.employeeId);
-      if (!mine) {
-        return fail(403, "Transport ini tidak ditugaskan kepada Anda.");
+    const canViewAll = hasPermission(user, "transport.view");
+    // Vehicle Owner fallback: allowed only when the transport uses THEIR vehicle
+    const isVehicleOwnerOfTransport =
+      !canViewAll &&
+      user.partnerType === "VEHICLE_OWNER" &&
+      user.partnerId != null &&
+      transport.vehicle.ownerId === user.partnerId;
+    if (!canViewAll && !isVehicleOwnerOfTransport) {
+      return fail(403, "Missing permission: transport.view");
+    }
+
+    if (canViewAll) {
+      await assertTransportScope(user, transport.route ?? { origin: null, destination: null }, transport.shipments.map((s) => s.master));
+
+      // Server-side assignment check (Part Y) — never rely on frontend hiding.
+      if (isExecutorOnly(user)) {
+        const mine =
+          user.employeeId != null &&
+          (transport.driverId === user.employeeId || transport.kenekId === user.employeeId);
+        if (!mine) {
+          return fail(403, "Transport ini tidak ditugaskan kepada Anda.");
+        }
       }
     }
 
