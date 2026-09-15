@@ -88,7 +88,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     items: [
       // Revise.md §33/§34 — company-side financial management (permission-based)
       { href: "/finance", label: "Finance Dashboard", icon: Landmark, anyPermissions: ["financial.report.view"] },
-      { href: "/topups", label: "Top Up Requests", icon: Receipt, anyPermissions: ["wallet.topup.view"] },
+      { href: "/topups", label: "Top Up", icon: Receipt, anyPermissions: ["wallet.topup.view"] },
       { href: "/withdrawals", label: "Withdrawal Requests", icon: Landmark, anyPermissions: ["wallet.withdrawal.view"] },
       { href: "/settlements", label: "Partner Settlements", icon: TrendingUp, anyPermissions: ["transport.settle", "invoice.view"] },
       { href: "/repairs", label: "Repair Verification", icon: Wrench, anyPermissions: ["repair.view", "repair.create"] },

@@ -197,21 +197,24 @@ model WalletTransaction {
   @@index([walletId, createdAt])
 }
 
-// Marketing wallet top-up workflow (Revise.md §10):
-//   PENDING_PAYMENT → PENDING_VERIFICATION → VERIFIED (atomic wallet credit)
+// Marketing wallet top-up workflow (simplified §10):
+//   PENDING_VERIFICATION → VERIFIED (atomic wallet credit)
 //   (or REJECTED / CANCELLED at the appropriate stages)
+// The proof image is attached AT CREATION by Admin Kantor / Owner — there is
+// no separate "waiting for payment" stage.
 model TopUpRequest {
   id            Int      @id @default(autoincrement())
   requestCode   String   @unique
   partnerId     Int
   partner       Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
   amount        Float
-  // PENDING_PAYMENT | PENDING_VERIFICATION | VERIFIED | REJECTED | CANCELLED
-  status        String   @default("PENDING_PAYMENT")
+  // PENDING_VERIFICATION | VERIFIED | REJECTED | CANCELLED
+  status        String   @default("PENDING_VERIFICATION")
   // partner-submitted transfer information / proof (data URL image + note)
   partnerNote   String?
   partnerProofUrl String?
-  // Admin Kantor-uploaded official transfer proof (data URL image)
+  // Admin Kantor-uploaded official transfer proof (data URL image), attached
+  // when the top-up is created
   proofUrl      String?
   // rejection / cancellation reason
   rejectReason  String?

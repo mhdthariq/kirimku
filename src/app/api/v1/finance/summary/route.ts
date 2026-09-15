@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
         orderBy: { createdAt: "asc" },
       }),
       db.topUpRequest.findMany({
-        where: { status: { in: ["PENDING_PAYMENT", "PENDING_VERIFICATION"] } },
+        where: { status: "PENDING_VERIFICATION" },
         orderBy: { createdAt: "desc" },
         include: { partner: { include: { user: { select: { name: true } } } } },
       }),

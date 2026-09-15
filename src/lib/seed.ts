@@ -3,6 +3,13 @@ import { hashPassword } from "@/lib/auth";
 import { ensureRbac } from "@/lib/rbac";
 import { computePricing } from "@/lib/pricing";
 
+// Small placeholder transfer-proof image for demo top-ups (inline SVG data URL).
+const DEMO_PROOF_DATA_URL =
+  "data:image/svg+xml;base64," +
+  Buffer.from(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="160"><rect width="320" height="160" fill="#f8f9fa"/><text x="20" y="70" font-family="sans-serif" font-size="14" fill="#334155">Bukti Transfer — BCA</text><text x="20" y="100" font-family="sans-serif" font-size="12" fill="#64748b">Demo: bukti top up marketing partner</text></svg>',
+  ).toString("base64");
+
 let seedPromise: Promise<void> | null = null;
 
 /**
@@ -627,14 +634,14 @@ async function runSeed(): Promise<void> {
     });
 
     // ----- Revise.md demo: Marketing wallet history (§10) ------------------
-    // budi's verified top-up Rp200.000 (with ledger) + one PENDING top-up in
-    // the verification workflow (Admin Kantor proof → Owner verify).
+    // budi's verified top-up Rp200.000 (with ledger) + one PENDING_VERIFICATION
+    // top-up with proof attached, waiting for Owner to verify.
     const budiWallet = await db.wallet.upsert({ where: { partnerId: budiPartnerId }, create: { partnerId: budiPartnerId }, update: {} });
     const topUpAmount = 200000;
     const verifiedTopUp = await db.topUpRequest.create({
       data: {
         requestCode: "TOP-000001", partnerId: budiPartnerId, amount: topUpAmount, status: "VERIFIED",
-        partnerNote: "Transfer via BCA mobile 08:30", requestedById: usersByHandle.budi.id,
+        partnerNote: "Transfer via BCA mobile 08:30", requestedById: usersByHandle.siti.id,
         submittedForVerificationAt: daysAgo(6), verifiedById: usersByHandle.owner.id, verifiedAt: daysAgo(5.8),
         createdAt: daysAgo(6.2),
       },
@@ -650,13 +657,15 @@ async function runSeed(): Promise<void> {
       },
     });
     await db.wallet.update({ where: { id: budiWallet.id }, data: { balance: topUpAmount } });
-    // second top-up stuck mid-workflow: partner submitted proof, waiting for
-    // Admin Kantor to upload the official proof (PENDING_PAYMENT → …)
+    // second top-up stuck mid-workflow: Admin Kantor created it with the
+    // transfer proof attached, waiting for Owner verification
     await db.topUpRequest.create({
       data: {
-        requestCode: "TOP-000002", partnerId: budiPartnerId, amount: 150000, status: "PENDING_PAYMENT",
-        partnerNote: "Sudah transfer Rp150.000 via BCA — jam 07:15 pagi.",
-        requestedById: usersByHandle.budi.id,
+        requestCode: "TOP-000002", partnerId: budiPartnerId, amount: 150000, status: "PENDING_VERIFICATION",
+        partnerNote: "Transfer Rp150.000 via BCA — jam 07:15 pagi.",
+        proofUrl: DEMO_PROOF_DATA_URL,
+        requestedById: usersByHandle.siti.id,
+        submittedForVerificationAt: daysAgo(0.3),
         createdAt: daysAgo(0.4),
       },
     });

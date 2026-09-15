@@ -776,7 +776,7 @@ export interface TopUpRequest {
   requestCode: string;
   partnerId: number;
   amount: number;
-  status: "PENDING_PAYMENT" | "PENDING_VERIFICATION" | "VERIFIED" | "REJECTED" | "CANCELLED";
+  status: "PENDING_VERIFICATION" | "VERIFIED" | "REJECTED" | "CANCELLED";
   partnerNote: string | null;
   partnerProofUrl: string | null;
   proofUrl: string | null;

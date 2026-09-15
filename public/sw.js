@@ -5,7 +5,7 @@
  * - everything else (/, /_next/*, api) → network-first with cache fallback,
  *   updates bypass the cache (updateViaCache: "none" on registration).
  */
-const CACHE = "kirimku-v2";
+const CACHE = "kirimku-v3";
 const PRECACHE = [
   "/manifest.webmanifest",
   "/logo.svg",

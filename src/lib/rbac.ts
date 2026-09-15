@@ -89,12 +89,10 @@ export const PERMISSIONS: { slug: string; module: string; description: string }[
   { slug: "wallet.transaction.view_own", module: "Wallet", description: "View own wallet transaction history" },
   { slug: "wallet.withdrawal.create", module: "Wallet", description: "Create own withdrawal requests" },
   { slug: "wallet.withdrawal.view_own", module: "Wallet", description: "View own withdrawal requests" },
-  { slug: "wallet.topup.create", module: "Wallet", description: "Create top-up requests for Marketing partners" },
-  { slug: "wallet.topup.submit_proof", module: "Wallet", description: "Submit proof for own top-up requests" },
-  { slug: "wallet.topup.cancel", module: "Wallet", description: "Cancel own top-up requests" },
+  { slug: "wallet.topup.create", module: "Wallet", description: "Create top-up requests with transfer proof for Marketing partners" },
+  { slug: "wallet.topup.cancel", module: "Wallet", description: "Cancel pending top-up requests" },
   // Admin Kantor finance
   { slug: "wallet.topup.view", module: "Wallet", description: "View all top-up requests" },
-  { slug: "wallet.topup.proof.upload", module: "Wallet", description: "Upload transfer proof for top-ups / withdrawals" },
   { slug: "wallet.withdrawal.view", module: "Wallet", description: "View all withdrawal requests" },
   { slug: "wallet.withdrawal.review", module: "Wallet", description: "Review withdrawal requests" },
   { slug: "wallet.withdrawal.process", module: "Wallet", description: "Process / complete withdrawals with bank transfer" },
@@ -136,8 +134,8 @@ export const ROLE_TEMPLATES: { slug: string; name: string; description: string; 
       "payment.view", "payment.record", "payment.verify", "payment.unpaid.view", "wallet.topup.create",
       "invoice.view", "invoice.create", "invoice.update", "invoice.send",
       "audit_log.view",
-      // Revise.md §33 — finance menus
-      "wallet.topup.view", "wallet.topup.proof.upload",
+      // Top Up menu — Admin Kantor creates top-ups with proof, Owner verifies
+      "wallet.topup.view", "wallet.topup.cancel",
       "wallet.withdrawal.view", "wallet.withdrawal.review", "wallet.withdrawal.process",
       "partner.view", "transport.settle",
       "repair.view", "repair.create",
@@ -154,9 +152,11 @@ export const ROLE_TEMPLATES: { slug: string; name: string; description: string; 
       "shipment_detail.view", "shipment_detail.create", "shipment_detail.update", "shipment_detail.delete",
       "pickup.view", "pickup.create", "pickup.assign_kurir",
       // Revise.md §31/§35.1 — own wallet financial self-service
+      // NOTE: Marketing has NO Top Up menu access — top-ups are created by
+      // Admin Kantor / Owner with the transfer proof attached (marketing only
+      // sees the resulting history inside their own wallet page).
       "wallet.view_own", "wallet.transaction.view_own",
       "wallet.withdrawal.create", "wallet.withdrawal.view_own",
-      "wallet.topup.submit_proof", "wallet.topup.cancel",
     ],
   },
   {

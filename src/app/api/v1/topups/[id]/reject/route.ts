@@ -16,7 +16,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const topUp = await db.topUpRequest.findUnique({ where: { id: Number(id) } });
     if (!topUp) return fail(404, "Top up tidak ditemukan.");
     if (topUp.status === "VERIFIED") return fail(422, "Top up sudah terverifikasi — tidak bisa ditolak.");
-    if (!["PENDING_PAYMENT", "PENDING_VERIFICATION"].includes(topUp.status)) {
+    if (topUp.status !== "PENDING_VERIFICATION") {
       return fail(422, `Top up berstatus ${topUp.status} tidak bisa ditolak.`);
     }
 

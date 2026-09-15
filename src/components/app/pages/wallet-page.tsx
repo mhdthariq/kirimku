@@ -7,8 +7,6 @@ import {
   Banknote,
   CheckCircle2,
   Loader2,
-  Plus,
-  Receipt,
   ShieldQuestion,
   Wallet as WalletIcon,
   XCircle,
@@ -19,7 +17,6 @@ import {
   apiPost,
   hasPermission,
   type CommissionRow,
-  type TopUpRequest,
   type TopUpsResponse,
   type WalletSummaryData,
   type WalletTransaction,
@@ -42,11 +39,10 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
-const MIN_TOP_UP_AMOUNT = 10_000;
-
 /**
  * Partner Wallet (Revise.md §31 Marketing / §32 Vehicle Owner):
- * Balance · Top Up (Marketing only) · Transactions · Commissions (Marketing) ·
+ * Balance · Top Up history (Marketing only, read-only — top-ups are created
+ * by Admin Kantor/Owner with proof) · Transactions · Commissions (Marketing) ·
  * Withdrawals. A partner only ever sees their OWN financial data (§39).
  */
 export function WalletPage() {
@@ -63,9 +59,7 @@ export function WalletPage() {
   const { data: withdrawals, reload: reloadWd } = useApiData<WithdrawalRequest[]>(() => apiGet<WithdrawalRequest[]>("/withdrawals"), []);
   const { data: commissions, reload: reloadComm } = useApiData<CommissionRow[]>(() => apiGet<CommissionRow[]>("/commissions"), []);
 
-  const [topUpOpen, setTopUpOpen] = useState(false);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
-  const [submitProofFor, setSubmitProofFor] = useState<TopUpRequest | null>(null);
 
   if (!isMarketing && !isVehicleOwner) {
     return (
@@ -100,11 +94,6 @@ export function WalletPage() {
         icon={<WalletIcon className="h-5 w-5" />}
         actions={
           <>
-            {isMarketing && hasPermission(user, "wallet.topup.create") && (
-              <Button onClick={() => setTopUpOpen(true)}>
-                <Plus className="h-4 w-4" /> Top Up
-              </Button>
-            )}
             {hasPermission(user, "wallet.withdrawal.create") && (
               <Button variant="outline" onClick={() => setWithdrawOpen(true)}>
                 <Banknote className="h-4 w-4" /> Withdraw
@@ -188,21 +177,21 @@ export function WalletPage() {
 
         {isMarketing && (
           <TabsContent value="topup" className="mt-3">
+            <p className="mb-3 rounded-lg border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+              Top up diajukan oleh Admin Kantor / Owner beserta bukti transfer — saldo bertambah otomatis setelah Owner memverifikasi (§10/§11).
+            </p>
             {topUpsData && (
               <div className="mb-3 rounded-xl border bg-primary/5 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-primary">Transfer ke rekening perusahaan</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-primary">Rekening perusahaan (tujuan transfer top up)</p>
                 <p className="mt-1 text-sm font-semibold">{topUpsData.bankInfo.accountName}</p>
                 <p className="font-mono text-sm">{topUpsData.bankInfo.accountNumber}</p>
                 <p className="text-xs text-muted-foreground">{topUpsData.bankInfo.bankName}</p>
-                <p className="mt-2 text-[11px] text-muted-foreground">
-                  Setelah transfer, submit keterangan bukti di sini. Admin Kantor mengunggah bukti resmi, lalu Owner memverifikasi — saldo bertambah hanya saat VERIFIED (§10/§11).
-                </p>
               </div>
             )}
             <DataTable
               rows={topUpsData?.topUps ?? []}
               loading={!topUpsData}
-              emptyMessage="Belum ada permintaan top up."
+              emptyMessage="Belum ada riwayat top up."
               columns={[
                 {
                   key: "code",
@@ -223,11 +212,7 @@ export function WalletPage() {
                   key: "actions",
                   header: "Aksi",
                   render: (r) =>
-                    r.status === "PENDING_PAYMENT" ? (
-                      <Button size="sm" variant="outline" className="h-7" onClick={() => setSubmitProofFor(r)}>
-                        <Receipt className="h-3.5 w-3.5" /> Submit Bukti
-                      </Button>
-                    ) : r.verifiedAt ? (
+                    r.verifiedAt ? (
                       <span className="text-xs text-muted-foreground">✓ {formatDate(r.verifiedAt, true)}</span>
                     ) : (
                       "—"
@@ -366,24 +351,11 @@ export function WalletPage() {
       </Tabs>
 
       {/* Dialogs */}
-      {isMarketing && (
-        <TopUpDialog
-          open={topUpOpen}
-          onOpenChange={setTopUpOpen}
-          bankInfo={topUpsData?.bankInfo}
-          onDone={reloadAll}
-        />
-      )}
       <WithdrawDialog
         open={withdrawOpen}
         onOpenChange={setWithdrawOpen}
         available={wallet?.available ?? 0}
         hasBank={!!wallet?.bank?.bankAccountNumber}
-        onDone={reloadAll}
-      />
-      <SubmitProofDialog
-        topUp={submitProofFor}
-        onOpenChange={(open) => !open && setSubmitProofFor(null)}
         onDone={reloadAll}
       />
     </div>
@@ -429,139 +401,6 @@ function CancelButton({ requestId, onDone }: { requestId: number; onDone: () => 
     >
       {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />} Batal
     </Button>
-  );
-}
-
-function TopUpDialog({
-  open,
-  onOpenChange,
-  bankInfo,
-  onDone,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  bankInfo?: { bankName: string; accountNumber: string; accountName: string };
-  onDone: () => void;
-}) {
-  const [amount, setAmount] = useState("");
-  const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [amountError, setAmountError] = useState("");
-
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const amt = Number(amount);
-    if (!Number.isInteger(amt) || amt < MIN_TOP_UP_AMOUNT) {
-      setAmountError(`Minimal top up adalah Rp${MIN_TOP_UP_AMOUNT.toLocaleString("id-ID")}.`);
-      return;
-    }
-    setAmountError("");
-    setBusy(true);
-    const ok = await runAction(() => apiPost("/topups", { amount: amt, note: note || null }), {
-      success: "Permintaan top up dibuat — transfer ke rekening perusahaan lalu submit bukti.",
-    });
-    if (ok) {
-      setAmount("");
-      setNote("");
-      setAmountError("");
-      onOpenChange(false);
-      onDone();
-    }
-    setBusy(false);
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-lg">
-        <DialogHeader className="shrink-0 px-7 pt-7 pb-5">
-          <DialogTitle>Top Up Wallet</DialogTitle>
-          <DialogDescription>
-            Buat permintaan top up (PENDING_PAYMENT), transfer ke rekening perusahaan, lalu submit bukti transfer.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto px-7 pb-7">
-          {bankInfo && (
-            <div className="rounded-lg border bg-muted/40 p-4 text-sm">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Rekening Perusahaan</p>
-              <p className="mt-1 font-semibold">{bankInfo.accountName}</p>
-              <p className="font-mono">{bankInfo.accountNumber} · {bankInfo.bankName}</p>
-            </div>
-          )}
-          <form id="top-up-form" onSubmit={onSubmit} className="pt-6 space-y-5">
-            <Field label="Jumlah Top Up (Rupiah)" error={amountError}>
-              <NumberInput
-                value={amount}
-                onChange={(e) => {
-                  setAmount(e.target.value);
-                  if (amountError) setAmountError("");
-                }}
-                placeholder="200000"
-                min={MIN_TOP_UP_AMOUNT}
-                step={1000}
-                required
-              />
-            </Field>
-            <Field label="Catatan (opsional)">
-              <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="mis. transfer via BCA mobile jam 08:30" rows={3} />
-            </Field>
-          </form>
-        </div>
-        <DialogFooter className="mx-0 mb-0 shrink-0 px-7 pt-5 pb-7 sm:mx-0 sm:mb-0">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Batal</Button>
-          <SubmitButton busy={busy} form="top-up-form">Buat Permintaan</SubmitButton>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function SubmitProofDialog({
-  topUp,
-  onOpenChange,
-  onDone,
-}: {
-  topUp: TopUpRequest | null;
-  onOpenChange: (open: boolean) => void;
-  onDone: () => void;
-}) {
-  const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!topUp) return;
-    setBusy(true);
-    const ok = await runAction(() => apiPost(`/topups/${topUp.id}/submit-proof`, { note }), {
-      success: "Keterangan transfer dikirim — Admin Kantor akan mengunggah bukti resmi.",
-    });
-    if (ok) {
-      setNote("");
-      onOpenChange(false);
-      onDone();
-    }
-    setBusy(false);
-  }
-
-  return (
-    <Dialog open={!!topUp} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Submit Keterangan Transfer</DialogTitle>
-          <DialogDescription>
-            Top up {topUp?.requestCode} · {topUp ? formatRupiah(topUp.amount) : ""} — sampaikan keterangan transfer Anda untuk Admin Kantor.
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={onSubmit} className="space-y-3">
-          <Field label="Keterangan Transfer" hint="mis. jam transfer, nama pengirim, bank asal">
-            <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} required />
-          </Field>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Batal</Button>
-            <SubmitButton busy={busy}>Kirim</SubmitButton>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 }
 

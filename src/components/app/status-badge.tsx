@@ -37,7 +37,6 @@ const STATUS_MAP: Record<string, { label: string; variant: "default" | "secondar
   MAINTENANCE: { label: "Maintenance", variant: "secondary" },
   INACTIVE: { label: "Inactive", variant: "destructive" },
   // Revise.md — partner wallet financial statuses
-  PENDING_PAYMENT: { label: "Menunggu Bayar", variant: "secondary" },
   PENDING_VERIFICATION: { label: "Menunggu Verifikasi", variant: "default", pulse: true },
   PENDING: { label: "Pending", variant: "secondary" },
   APPROVED: { label: "Disetujui", variant: "default" },
