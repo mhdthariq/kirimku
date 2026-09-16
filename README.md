@@ -1,223 +1,520 @@
-# Shipment & Logistics Management System
+# Kirimku: Shipment & Logistics Management System
 
-Aplikasi manajemen logistik pengiriman (shipment management) yang dibangun ulang dengan standar UI/UX modern: responsif penuh (desktop / tablet / ponsel), mode terang & gelap, CRUD berbasis modal, peta Leaflet untuk checkpoint, RBAC, audit trail, **pemisahan data antar gudang** (setiap karyawan hanya melihat data gudangnya; hanya Owner yang melihat semua gudang), dan **database seeder mock-up lengkap**.
+Web-based application for managing shipments and day-to-day logistics operations.
 
-Dibangun dengan **Next.js 16 + TypeScript + Tailwind CSS 4 + shadcn/ui + Prisma (SQLite)** — siap dialihkan ke **Supabase Postgres** (lihat `.env.example` dan `docs/02-database.md`).
+The project covers shipment creation, pickup and delivery, warehouse operations, transport, routes and checkpoints, pricing, payments, invoices, user access, and activity logs. Data is scoped by warehouse so staff only work with the operational data assigned to their warehouse, while the Owner can access all warehouses.
 
-> 📚 **Dokumentasi lengkap ada di folder [`docs/`](docs/)** — arsitektur, skema database, referensi API, frontend, alur bisnis, seeder, dan deployment.
+## Tech Stack
+
+- Next.js 16
+- TypeScript
+- Tailwind CSS 4
+- shadcn/ui
+- Prisma
+- SQLite (default)
+- Leaflet
+- Bun (recommended)
+
+The database can be moved to Supabase Postgres when needed. See `.env.example` and `docs/02-database.md`.
+
+More detailed documentation is available in [`docs/`](docs/).
 
 ---
 
-## ⚡ Quick Start (dengan Bun)
+## Getting Started
+
+### Requirements
+
+Make sure you have:
+
+- Bun installed
+- Node.js installed if you prefer npm instead of Bun
+
+### 1. Install dependencies
 
 ```bash
-# 1. Install dependensi
 bun install
+```
 
-# 2. Buat database dari schema Prisma (otomatis membuat db/custom.db)
+### 2. Create the database
+
+```bash
 bun run db:push
+```
 
-# 3. (Opsional) Jalankan seeder mock-up secara eksplisit
+This creates the local SQLite database at `db/custom.db`.
+
+### 3. Add demo data
+
+```bash
 bun run db:seed
+```
 
-# 4. Jalankan aplikasi
+The seed command is optional. The application can seed an empty database automatically when the API is first used.
+
+### 4. Start the development server
+
+```bash
 bun run dev
 ```
 
-> **Catatan:** langkah 3 opsional — aplikasi **menyimpan data otomatis pada request API pertama** setelah database dibuat (perilaku *migrate + seed on boot*). `db:seed` tersedia jika ingin menjalankan seeder secara manual/CI.
+Then open:
 
-> 🛡️ **Prisma Client selalu segar:** script `dev` dan `postinstall` otomatis menjalankan `prisma generate` — client Prisma selalu dibuat ulang dari `prisma/schema.prisma` terbaru, sehingga error seperti `Unknown field "driver" for include statement` (client Prisma basi dari versi lama) **tidak akan terjadi lagi**.
-
-### Konfigurasi environment
-
-Salin `.env.example` → `.env` bila ingin mengubah database:
-
-```bash
-cp .env.example .env
+```text
+http://localhost:3000
 ```
 
-Default: SQLite lokal (`db/custom.db`, zero-config). Ingin memakai **Supabase Postgres**? Semua varian connection string (direct / session pooler / transaction pooler) sudah disiapkan di `.env.example` — panduan langkah-demi-langkah ada di **[docs/02-database.md](docs/02-database.md)**.
-
-Buka http://localhost:3000 lalu login dengan salah satu akun demo di bawah.
-
-### Alternatif tanpa Bun (npm / Node)
+### Using npm instead
 
 ```bash
 npm install
 npx prisma db push --accept-data-loss
-npx tsx prisma/seed.ts        # butuh: npm i -D tsx (opsional — auto-seed berjalan otomatis)
+npx tsx prisma/seed.ts
 npm run dev
 ```
 
 ---
 
-## 🔄 Upgrade dari Versi Sebelumnya (WAJIB BACA)
+## Environment
 
-Pernah menjalankan versi lama project ini di folder yang sama? Error seperti **`Unknown field 'driver' for include statement on model 'VehicleAssignment'`** atau **`Unknown field 'master' ... on model 'TransportShipment'`** berarti Prisma Client dan database Anda masih memakai schema lama. Schema terbaru menambahkan relasi `driver`/`kenek` (Employee) pada `VehicleAssignment` & `Transport`, mengganti nama relasi `TransportShipment.shipment` → `master`, dan menambah tabel `HandoverScan` untuk alur QR.
-
-Lakukan urutan ini di folder project Anda:
+Copy the example environment file if you need to change the default configuration:
 
 ```bash
-# 1. Matikan dev server, lalu bersihkan hasil build & client lama
-#    (Windows PowerShell: Remove-Item -Recurse -Force .next, node_modules\.prisma)
+cp .env.example .env
+```
+
+By default, the application uses:
+
+```text
+db/custom.db
+```
+
+For Supabase Postgres configuration, see:
+
+- `.env.example`
+- [`docs/02-database.md`](docs/02-database.md)
+
+---
+
+## Updating an Existing Installation
+
+If you have already run an older version of the project, update the generated Prisma Client and database before starting the application.
+
+Some older versions used different Prisma relations, including:
+
+- `VehicleAssignment.driver`
+- `Transport.kenek`
+- `TransportShipment.master`
+- `HandoverScan` for QR handover records
+
+If you see errors such as `Unknown field "driver"` or `Unknown field "master"`, clean the old generated files and sync the current schema.
+
+```bash
+# Stop the development server first
+
 rm -rf .next
 rm -rf node_modules/.prisma
 
-# 2. Install ulang + regenerasi client (postinstall menjalankan prisma generate)
-bun install            # atau: npm install
-
-# 3. Sinkronkan schema baru ke database + seed ulang (idempoten)
-bun run db:push        # atau: npx prisma db push --accept-data-loss
-bun run db:seed        # atau: npx tsx prisma/seed.ts
-
-# 4. Jalankan ulang
+bun install
+bun run db:push
+bun run db:seed
 bun run dev
 ```
 
-> Alternatif paling bersih: **ekstrak zip terbaru ke folder baru** dan ikuti Quick Start dari awal — database lama tidak dibawa serta (zip tidak menyertakan `db/custom.db`), sehingga tidak ada sisa schema lama.
+On Windows PowerShell, you can remove the directories with:
+
+```powershell
+Remove-Item -Recurse -Force .next
+Remove-Item -Recurse -Force node_modules\.prisma
+```
+
+For a completely clean setup, use a fresh copy of the project and follow the Getting Started section above.
+
+> The project does not include `db/custom.db` in the repository, so a fresh copy starts with a new local database.
 
 ---
 
-## 🌱 Database Seeder (Mock-up Data)
+## Demo Accounts
 
-Seeder berada di **`prisma/seed.ts`** (entry CLI) dan **`src/lib/seed.ts`** (rutin yang sama, dipanggil otomatis oleh API saat database kosong). Seeder bersifat **idempoten** — aman dijalankan berulang kali tanpa menduplikasi data.
+The seed data includes the following accounts:
 
-Data mock-up yang dibuat:
+| Username | Password | Role | Scope |
+|---|---|---|---|
+| `owner` | `ChangeMeOwner#2026` | Owner | All warehouses |
+| `siti` | `Demo#Pass2026` | Admin Kantor | Gudang Jakarta |
+| `budi` | `Demo#Pass2026` | Marketing | Gudang Jakarta |
+| `agus` | `Demo#Pass2026` | Admin Gudang | Gudang Jakarta |
+| `ratna` | `Demo#Pass2026` | Admin Gudang | Gudang Bandung |
+| `wawan` | `Demo#Pass2026` | Staff Gudang | Gudang Jakarta Pusat |
+| `dewi` | `Demo#Pass2026` | Kurir | Gudang Jakarta |
+| `rizky` | `Demo#Pass2026` | Kurir | Gudang Jakarta |
+| `joko` | `Demo#Pass2026` | Driver | Gudang Jakarta |
+| `andi` | `Demo#Pass2026` | Kenek | Gudang Jakarta |
 
-| Entitas | Jumlah | Keterangan |
-|---|---|---|
-| Users | 9 | 1 owner + 8 staff dengan role berbeda (termasuk Admin Gudang Bandung) |
-| Employees | 9 | Lengkap dengan posisi, nomor pegawai & **penempatan gudang** |
-| Gudang | 3 | Jakarta Pusat, Bandung, Surabaya (tanpa field `type`) |
-| Vehicles | 3 | Engkel Box, CDD, Fuso (1 status MAINTENANCE) |
-| Routes | 2 | JKT–BDG, JKT–SBY |
-| Checkpoints | 6 | 3 per rute, dengan koordinat + radius |
-| Tariffs | 4 | Kombinasi rute × tipe customer (b2b/b2c) |
-| Customers | 5 | Campuran b2b & b2c |
-| Shipments | 6 | Melintasi seluruh lifecycle status |
-| Shipment Details | 8 | Item barang dengan berat/dimensi |
-| Pickups | 4 | Kurir Dewi Lestari |
-| Deliveries | 1 | Completed dengan proof of delivery |
-| Transports | 1 | Status DEPARTED + assignment vehicle |
-| Invoices | 1 | Dengan 2 baris tagihan |
-| Payments | 4 | Berbagai metode & status |
-| Audit Logs | 12 | Riwayat aktivitas lintas modul |
+> These accounts are for local/demo use only. Change the passwords before using the application outside a development environment.
 
-Perintah seeder & database:
+---
+
+## Warehouse Data Scope
+
+Each employee is assigned to a warehouse through `Employee.warehouseId`.
+
+Operational data is filtered using that warehouse assignment:
+
+- Shipments
+- Pickups
+- Deliveries
+- Transports
+- Warehouse operations
+
+Staff cannot access another warehouse's operational shipment data, including by opening a shipment directly through its URL. The API enforces the warehouse scope.
+
+The Owner can access all warehouses and switch between warehouse views.
+
+Some master data remains available across warehouses because it is not tied to a single warehouse, including:
+
+- Customers
+- Tariffs
+- Invoices
+- Vehicles
+- Routes
+
+The exact data-access rules are documented in the project documentation.
+
+---
+
+## Main Features
+
+### Shipment
+
+- Shipment master and package/detail records
+- Shipment lifecycle tracking
+- Customer and recipient information
+- Weight and volume calculation
+- Configurable volumetric multiplier
+- Pricing calculated by the server
+- Shipment cancellation
+- Shipment tracking timeline
+
+Shipment status flow:
+
+```text
+CREATED
+  → READY_FOR_PICKUP
+  → PICKED_UP
+  → RECEIVED_AT_GUDANG
+  → IN_TRANSPORT
+  → ARRIVED_AT_GUDANG
+  → DELIVERED
+```
+
+### Pickup and Delivery
+
+- Pickup assignment to couriers
+- QR-based package handover
+- Package-by-package scanning
+- Pickup status remains `PICKED_UP` until the package reaches the warehouse
+- Delivery proof with photo and location
+- Remaining payment can be recorded during pickup
+
+### Warehouse Operations
+
+- Queue for packages picked up by couriers
+- QR scanning using a phone camera
+- Keyboard-wedge reader support
+- Manual code entry
+- Walk-in package receiving
+- Warehouse package overview
+- Notification for shipments that still need payment
+
+For security and operational reasons, package QR/code values are not displayed directly in the scanning interface.
+
+### Routes and Checkpoints
+
+- Route management
+- Checkpoint management
+- Leaflet-based map editor
+- Configurable checkpoint radius
+- At least three checkpoints per route
+- Location and photo records for checkpoint activity
+
+### Pricing
+
+The volumetric weight calculation is configurable per tariff:
+
+```text
+L × W × H / 1,000,000 × multiplier
+```
+
+The application uses the server-calculated price when creating a shipment.
+
+Routes are selected from active tariffs instead of manually entering origin and destination cities. Available tariffs are filtered by customer type.
+
+### QR and Shipment Printing
+
+The application supports QR-based shipment handover and printing.
+
+Printed documents include:
+
+- Shipment receipt
+- Individual package/detail receipt
+- QR code
+- Recipient information
+- Weight
+- Volume
+- Package count
+- Sender and contact information
+- Warehouse customer-service contact
+
+### Access Control
+
+The application uses role-based access control with granular permissions.
+
+The Owner can manage permissions for system roles from:
+
+```text
+Access Control → Roles
+```
+
+Employees are also assigned to warehouses through:
+
+```text
+Access Control → Employees
+```
+
+### Audit Logs
+
+Activity logs are available for supported modules and can be filtered by entity type.
+
+API endpoint:
+
+```text
+GET /audit-logs?entityType=...
+```
+
+### Responsive UI
+
+The interface is designed for:
+
+- Desktop
+- Laptop
+- Tablet
+- Mobile
+
+It also supports light and dark themes.
+
+### PWA
+
+The application includes PWA support:
+
+- Web app manifest
+- Application icons
+- Service worker
+- Install option
+- iOS Add to Home Screen instructions
+
+---
+
+## Database Seeder
+
+Seed data is defined in:
+
+```text
+prisma/seed.ts
+src/lib/seed.ts
+```
+
+The seed data is intended for development and testing.
+
+It includes:
+
+| Entity | Count |
+|---|---:|
+| Users | 9 |
+| Employees | 9 |
+| Warehouses | 3 |
+| Vehicles | 3 |
+| Routes | 2 |
+| Checkpoints | 6 |
+| Tariffs | 4 |
+| Customers | 5 |
+| Shipments | 6 |
+| Shipment Details | 8 |
+| Pickups | 4 |
+| Deliveries | 1 |
+| Transports | 1 |
+| Invoices | 1 |
+| Payments | 4 |
+| Audit Logs | 12 |
+
+Useful database commands:
 
 ```bash
-bun run db:push     # sinkronkan schema ke database (SQLite)
-bun run db:seed     # jalankan seeder mock-up manual
-bunx prisma studio  # Inspect database lewat browser
+bun run db:push
+bun run db:seed
+bunx prisma studio
 ```
 
-Reset total (hapus db lama mulai dari nol): hapus file `db/custom.db` → `bun run db:push` → `bun run db:seed`.
+To start with a completely empty SQLite database, remove:
 
----
-
-## 🔑 Akun Demo
-
-| Username | Password | Role | Akses |
-|---|---|---|---|
-| `owner` | `ChangeMeOwner#2026` | Owner | Semua menu & permission — **satu-satunya yang melihat data SEMUA gudang** + tab per-gudang |
-| `siti` | `Demo#Pass2026` | Admin Kantor | Operasional kantor, pembayaran, invoice — data Gudang Jakarta |
-| `budi` | `Demo#Pass2026` | Marketing | Customer & shipment — data Gudang Jakarta |
-| `agus` | `Demo#Pass2026` | Admin Gudang | Route, transport, scan kedatangan — data Gudang Jakarta |
-| `ratna` | `Demo#Pass2026` | Admin Gudang | Data **Gudang Bandung** saja — untuk demo isolasi data antar gudang |
-| `wawan` | `Demo#Pass2026` | Staff Gudang | Data Gudang Jakarta Pusat saja (scoped) |
-| `dewi` | `Demo#Pass2026` | Kurir | Pickup & delivery — data Gudang Jakarta |
-| `rizky` | `Demo#Pass2026` | Kurir | Pickup & delivery — data Gudang Jakarta |
-| `joko` | `Demo#Pass2026` | Driver | Transport — data Gudang Jakarta |
-| `andi` | `Demo#Pass2026` | Kenek | Transport — data Gudang Jakarta |
-
-Semua password staff menggunakan `Demo#Pass2026`.
-
----
-
-## 🏭 Pemisahan Data Antar Gudang
-
-Setiap **karyawan** (employee) ditugaskan ke **satu gudang** lewat field `Employee.warehouseId` — kolom **Gudang Penempatan** di halaman Access Control → Employees. Semua data operasional dipisah berdasarkan gudang tersebut:
-
-- **Shipments, Pickups, Deliveries, Transports** — hanya menampilkan data gudang sendiri. Staff di Jakarta tidak bisa melihat data Gudang Bandung (demikian juga sebaliknya), termasuk saat membuka detail shipment lewat URL (API menolak dengan 403).
-- **Hanya Owner** yang melihat data semua gudang. Di menu Shipments / Pickups / Deliveries / Transports, Owner mendapat tab **`Daftar | Gudang A | Gudang B | Gudang C | … | Log Aktivitas`** — satu tab per gudang untuk menelusuri data masing-masing.
-- **Role lain** tetap memakai layout `Daftar | Log Aktivitas` — datanya otomatis dibatasi ke gudang tempat karyawan bertugas (badge "Data gudang Anda: …" tampil di header halaman).
-- **Dashboard, Log Aktivitas, B2C Belum Bayar** juga mengikuti scope gudang. Data master kantor (customer, tarif, invoice, kendaraan, rute) tetap lintas gudang karena bukan data operasional gudang.
-- **Menu Gudang** (master gudang + Isi Gudang) hanya tampil untuk Owner. Staff Gudang bekerja lewat menu Shipments (tombol Terima / Scan).
-- Karyawan tanpa gudang tidak melihat data operasional apa pun — pastikan setiap employee diberi gudang.
-
-Aturan kepemilikan data mengikuti lokasi fisik paket pada lifecycle: status sebelum transport milik gudang asal; `IN_TRANSPORT` terlihat oleh kedua gudang ujung rute; setelah tiba/terkirim milik gudang tujuan. Transport linehaul terlihat oleh gudang asal & tujuan rutenya.
-
----
-
-## ✨ Fitur Utama
-
-1. **Responsif penuh** — sidebar desktop, drawer tablet, bottom navigation + layout kartu di ponsel.
-2. **Mode terang & gelap** — toggle tema persisten (next-themes).
-3. **Logo & branding** — logo mock-up di kiri atas.
-4. **CRUD lengkap dengan modal** — Pickup, Delivery, Tarif, Invoice, Transport, Vehicle, Gudang, Route, Checkpoint, Customer, Access Control: tombol "Tambah" membuka dialog form (bukan form inline di bawah tabel).
-5. **Editor checkpoint Leaflet** — klik peta untuk menempatkan titik, atur radius (minimum 3 checkpoint per rute, tanpa batas maksimum).
-6. **Audit log per menu** — timeline global + tab "Log Aktivitas" di setiap modul.
-7. **Gudang tanpa istilah "Gateway" / field `type`** — schema database bersih.
-8. **Login page modern** — panel brand + quick-fill akun demo.
-9. **RBAC** — 6 role sistem dengan permission granular; **owner bisa mengedit permission role sistem apa pun langsung dari UI** (Access Control → Roles) tanpa perlu membuat role baru.
-10. **Lifecycle shipment lengkap** — CREATED → READY_FOR_PICKUP → PICKED_UP → RECEIVED_AT_GUDANG → IN_TRANSPORT → ARRIVED_AT_GUDANG → DELIVERED, plus pricing, pembayaran, tracking timeline.
-11. **Alur QR scan handover** — kurir hanya melihat task yang ditugaskan padanya (`?mine=true`); tombol aksi membuka dialog **scan QR per detail barang** (paket) — semua paket harus ter-scan sebelum konfirmasi; tracking otomatis menampilkan **"Picked-up by [Nama Kurir]"** dan **"Delivered to [Customer] by [Kurir] — received by: [PoD]"**. Dialog juga me-render QR per paket sehingga bisa dites dengan kamera ponsel.
-12. **Perhitungan harga dengan multiplier configurable (Rev. 3)** — formula volumetrik `L × W × H / 1.000.000 × multiplier` (kg/m³, diatur per tarif di menu Tariffs); UI memakai **pratinjau harga terhitung server** (tidak ada angka hardcode lagi); tombol **"Hitung Ulang Harga"** tersedia untuk memperbaiki snapshot lama.
-13. **Rute dari dropdown tarif (Rev. 3)** — membuat shipment tidak lagi mengetik Kota Asal/Tujuan; pilih rute dari daftar tarif aktif yang **otomatis difilter sesuai tipe customer (B2B hanya melihat rute B2B, B2C hanya B2C)**; kota asal/tujuan + aturan tarif terisi otomatis.
-14. **1 baris = 1 paket dengan kode unik (Rev. 3)** — input "Karton Tulis" jumlah 10 → dibuat 10 baris dengan 10 kode unik (`DTL-…-01` s/d `-10`); halaman detail punya tab **Semua** (semua paket) dan **Ringkas** (digabung per deskripsi & dimensi — murni tampilan, database tetap 1 baris per paket).
-15. **Alur kedatangan gudang (Rev. 4)** — menu **Gudang** (antara Pickups & Shipments): antrean paket PICKED_UP yang dibawa kurir; Admin Gudang scan tiap paket / tombol **Scan Semua** (mode reader) / **walk-in** (customer serah langsung, tanpa scan); halaman **Isi Gudang** menghitung paket per gudang + **Notify Marketing** untuk kiriman belum lunas.
-16. **Scan kamera / reader / ketik — kode disembunyikan (Rev. 4)** — scan pakai **kamera HP** (jsQR) atau **reader tool** (keyboard-wedge, auto-terdeteksi) atau **ketik manual**; kode paket & QR **tidak pernah ditampilkan** dan paste diblokir; kamera & reader tercatat **Scanned**, ketik manual tercatat **Typed** di Riwayat Scan.
-17. **Cetak Resi (Rev. 4)** — **Resi Shipment** (untuk customer: no. resi + QR + kode, Penerima, Berat, Volume, jumlah Detail) + **Resi Detail per paket** (QR + kode, Penerima, berat & volume per paket, pcs `001/004`, Pengirim + telp) — nama perusahaan di bagian atas keduanya + CS tiap gudang; otomatis terbuka saat **Submit for Pickup**.
-18. **Penerima & kolom Volume/Berat (Rev. 4)** — data Penerima (nama/alamat/kontak) per shipment; tabel shipment kini: Resi · Customer & Rute · Detail · Harga · **Volume** · **Berat** · Dibuat · Status · Aksi; tab status lengkap (All/Created/Ready/Picked/**Arrive at Gudang**/In Transport/Delivered/Cancelled).
-19. **Aturan DP & gate pickup (Rev. 4)** — shipment **tidak bisa di-submit untuk pickup sebelum harga dihitung**; paket hanya boleh dijemput setelah **DP ≥ 50%**; kurir bisa mencatat **sisa pembayaran saat pickup**; cancel shipment selalu dengan **dialog konfirmasi**.
-20. **PWA — bisa di-install (Rev. 4)** — manifest + icon + service worker; item "Install App" di menu akun (iOS: instruksi Add to Home Screen); layout responsif terverifikasi desktop/laptop/tablet/ponsel.
-
----
-
-## 📁 Struktur Project
-
+```text
+db/custom.db
 ```
-├── db/                     # Database SQLite (dibuat oleh db:push)
-├── docs/                   # 📚 Dokumentasi lengkap (7 dokumen)
+
+Then run:
+
+```bash
+bun run db:push
+bun run db:seed
+```
+
+---
+
+## Project Structure
+
+```text
+.
+├── db/
+│   └── custom.db
+├── docs/
 ├── prisma/
-│   ├── schema.prisma       # 21 model — domain logistik lengkap
-│   └── seed.ts             # Seeder CLI (mock-up data)
+│   ├── schema.prisma
+│   └── seed.ts
 ├── public/
-│   └── logo.svg            # Logo mock-up
+│   └── logo.svg
 ├── src/
 │   ├── app/
-│   │   ├── api/v1/         # REST API (auth, shipments, pickups, dst.)
+│   │   ├── api/v1/
 │   │   ├── layout.tsx
-│   │   └── page.tsx        # Aplikasi SPA (hash-routed)
-│   ├── components/         # UI components (shadcn/ui + AppShell)
+│   │   └── page.tsx
+│   ├── components/
 │   ├── hooks/
-│   └── lib/                # auth, rbac, audit, seed, api-helpers, dll.
-├── .env.example            # Template environment (SQLite / Supabase Postgres)
+│   └── lib/
+├── .env.example
 └── package.json
 ```
 
-## 🔌 Ringkasan API (`/api/v1`)
+The main API is under:
 
-Autentikasi bearer-token (12 jam). Endpoint utama:
+```text
+src/app/api/v1/
+```
 
-- `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`
-- `GET /dashboard` — statistik + grafik lifecycle
-- `GET /options` — dropdown options (gudang, vehicle, route, customer, tariff)
-- CRUD: `/customers`, `/shipments` (+ `/tracking`, `/price`, `/ready`, `/cancel`, `/payments`), `/pickups` (+ `/confirm`), `/deliveries` (+ `/complete`), `/transports` (+ `/depart`, `/arrive`), `/vehicles`, `/warehouses`, `/routes`, `/checkpoints`, `/tariffs`, `/invoices` (+ `/lines`, `/send`, `/settlements`), `/payments` (+ `/verify`, `/reject`)
-- `GET /unpaid` — daftar B2C belum dibayar
-- `/users`, `/roles`, `/employees` — access control
-- `GET /audit-logs?entityType=...` — audit trail dengan filter per modul
+The application logic and shared helpers are under:
 
-Response standar: `{ "data": ... }` atau `{ "error": { "code", "message" } }`.
+```text
+src/lib/
+```
 
-## 🧰 Scripts
+---
 
-| Perintah | Fungsi |
+## API
+
+The API uses bearer-token authentication.
+
+Authentication:
+
+```text
+POST /api/v1/auth/login
+POST /api/v1/auth/logout
+GET  /api/v1/auth/me
+```
+
+Other main endpoints include:
+
+```text
+GET /api/v1/dashboard
+GET /api/v1/options
+
+/customers
+/shipments
+/pickups
+/deliveries
+/transports
+/vehicles
+/warehouses
+/routes
+/checkpoints
+/tariffs
+/invoices
+/payments
+/users
+/roles
+/employees
+```
+
+Shipment operations include:
+
+```text
+/shipments/:id/tracking
+/shipments/:id/price
+/shipments/:id/ready
+/shipments/:id/cancel
+/shipments/:id/payments
+```
+
+Other operational actions include:
+
+```text
+/pickups/:id/confirm
+/deliveries/:id/complete
+/transports/:id/depart
+/transports/:id/arrive
+/payments/:id/verify
+/payments/:id/reject
+```
+
+B2C unpaid shipments:
+
+```text
+GET /api/v1/unpaid
+```
+
+API responses use a simple structure:
+
+```json
+{
+  "data": {}
+}
+```
+
+or:
+
+```json
+{
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "Error message"
+  }
+}
+```
+
+---
+
+## Scripts
+
+| Command | Purpose |
 |---|---|
-| `bun run dev` | Development server (port 3000) |
-| `bun run build` | Production build |
-| `bun run start` | Jalankan production build |
-| `bun run lint` | ESLint |
-| `bun run db:push` | Sinkronkan schema Prisma → SQLite |
-| `bun run db:seed` | Jalankan seeder mock-up |
-| `bun run db:generate` | Generate ulang Prisma Client |
+| `bun run dev` | Start the development server |
+| `bun run build` | Create a production build |
+| `bun run start` | Start the production build |
+| `bun run lint` | Run ESLint |
+| `bun run db:push` | Sync Prisma schema to SQLite |
+| `bun run db:seed` | Seed development data |
+| `bun run db:generate` | Generate Prisma Client |
+
+---
+
+## Documentation
+
+Project documentation is kept in [`docs/`](docs/).
+
+The documentation covers:
+
+- Application architecture
+- Database schema
+- API reference
+- Frontend structure
+- Business workflows
+- Seeder and test data
+- Deployment
