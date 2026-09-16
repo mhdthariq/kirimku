@@ -128,7 +128,9 @@ export function WalletPage() {
       </div>
 
       <Tabs defaultValue="balance">
-        <TabsList className="w-full justify-start overflow-x-auto">
+        {/* justify-start at every breakpoint — this list stays w-full and can
+            overflow on desktop too; centered overflow would clip the left tab. */}
+        <TabsList className="w-full justify-start overflow-x-auto sm:justify-start">
           <TabsTrigger value="balance">Ringkasan</TabsTrigger>
           {isMarketing && <TabsTrigger value="topup">Top Up</TabsTrigger>}
           <TabsTrigger value="transactions">Transaksi</TabsTrigger>

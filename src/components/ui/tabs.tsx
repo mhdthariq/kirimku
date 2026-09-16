@@ -26,7 +26,14 @@ function TabsList({
     <TabsPrimitive.List
       data-slot="tabs-list"
       className={cn(
-        "bg-muted text-muted-foreground inline-flex h-9 w-full max-w-full items-center justify-center gap-1 overflow-x-auto rounded-lg p-[3px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:w-fit",
+        // Mobile (<sm): justify-start — when the tabs overflow the viewport,
+        // centered flex content overflows BOTH sides, and Chrome/Android can
+        // only scroll to the right-side overflow, clipping the first tab in
+        // the left corner (iOS Safari hides this by also allowing leftward
+        // scroll). Left-aligned content always keeps the first tab reachable.
+        // Desktop (≥sm): w-fit keeps the list content-sized (no overflow), so
+        // centering is safe there.
+        "bg-muted text-muted-foreground inline-flex h-9 w-full max-w-full items-center justify-start gap-1 overflow-x-auto rounded-lg p-[3px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:w-fit sm:justify-center",
         className
       )}
       {...props}

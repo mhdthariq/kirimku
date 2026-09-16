@@ -63,8 +63,9 @@ import { cn } from "@/lib/utils";
  * TWO LOGS are always visible:
  *  1. Per-item log — inside each repair's detail dialog (when it was created
  *     and every change made to it, field by field).
- *  2. Activity log — panel below the list: when records are created, changed,
- *     or deleted (deleted records survive here with their snapshots).
+ *  2. Activity log — "Log Aksi" tab next to the list tab: when records are
+ *     created, changed, or deleted (deleted records survive here with their
+ *     snapshots).
  */
 export function RepairsPage() {
   const { user } = useAuth();
@@ -75,6 +76,7 @@ export function RepairsPage() {
   const canDelete = hasPermission(user, "repair.delete");
 
   const { data, loading, reload } = useApiData<VehicleRepairRow[]>(() => apiGet<VehicleRepairRow[]>("/repairs"), []);
+  const [tab, setTab] = useState("list");
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<VehicleRepairRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<VehicleRepairRow | null>(null);
@@ -132,75 +134,88 @@ export function RepairsPage() {
         }
       />
 
-      <DataTable
-        rows={rows}
-        loading={loading}
-        emptyMessage="Belum ada record repair."
-        columns={[
-          {
-            key: "code",
-            header: "Kode",
-            primary: true,
-            render: (r) => (
-              <div>
-                <p className="font-mono text-xs font-semibold">{r.repairCode}</p>
-                <p className="text-xs text-muted-foreground">{r.vehicle.vehicleNumber}</p>
-              </div>
-            ),
-          },
-          {
-            key: "desc",
-            header: "Repair",
-            render: (r) => (
-              <div>
-                <p className="text-sm font-medium">{r.description}</p>
-                <p className="text-xs text-muted-foreground">{r.workshopVendor ?? "—"} · {formatDate(r.repairDate)}</p>
-              </div>
-            ),
-          },
-          { key: "amount", header: "Biaya (Deducted)", render: (r) => (
-            <div>
-              <span className="font-semibold text-destructive">{formatRupiah(r.amount)}</span>
-              <p className="text-[10px] text-muted-foreground">dari wallet owner</p>
-            </div>
-          ) },
-          { key: "status", header: "Status", render: (r) => <StatusBadge status={r.status} /> },
-          ...(isVehicleOwner
-            ? []
-            : [
-                {
-                  key: "owner",
-                  header: "Vehicle Owner",
-                  hideOnMobile: true,
-                  render: (r: VehicleRepairRow) => <span className="text-sm">{r.owner?.user?.name ?? "—"}</span>,
-                } as const,
-              ]),
-          {
-            key: "actions",
-            header: "Aksi",
-            render: (r) => (
-              <div className="flex flex-wrap items-center gap-1.5">
-                <Button size="sm" variant="ghost" className="h-7" onClick={() => setDetail(r)}>
-                  Detail
-                </Button>
-                {canEdit && (
-                  <Button size="sm" variant="outline" className="h-7" onClick={() => setEditTarget(r)}>
-                    <Pencil className="h-3.5 w-3.5" /> Edit
-                  </Button>
-                )}
-                {canDelete && (
-                  <Button size="sm" variant="outline" className="h-7 text-destructive" onClick={() => setDeleteTarget(r)}>
-                    <Trash2 className="h-3.5 w-3.5" /> Hapus
-                  </Button>
-                )}
-              </div>
-            ),
-          },
-        ]}
-      />
-
-      {/* LOG #2 — global activity log below the list (created / changed / deleted) */}
-      <RepairActivityLogPanel version={logVersion} />
+      {/* List + activity log share the page via tabs (same pattern as
+          Shipments/Pickups "Daftar | Log Aktivitas") — the log is no longer
+          stacked below the list. */}
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList>
+          <TabsTrigger value="list">Daftar</TabsTrigger>
+          <TabsTrigger value="log">Log Aksi</TabsTrigger>
+        </TabsList>
+        <TabsContent value="list" className="mt-3">
+          <DataTable
+            rows={rows}
+            loading={loading}
+            emptyMessage="Belum ada record repair."
+            columns={[
+              {
+                key: "code",
+                header: "Kode",
+                primary: true,
+                render: (r) => (
+                  <div>
+                    <p className="font-mono text-xs font-semibold">{r.repairCode}</p>
+                    <p className="text-xs text-muted-foreground">{r.vehicle.vehicleNumber}</p>
+                  </div>
+                ),
+              },
+              {
+                key: "desc",
+                header: "Repair",
+                render: (r) => (
+                  <div>
+                    <p className="text-sm font-medium">{r.description}</p>
+                    <p className="text-xs text-muted-foreground">{r.workshopVendor ?? "—"} · {formatDate(r.repairDate)}</p>
+                  </div>
+                ),
+              },
+              { key: "amount", header: "Biaya (Deducted)", render: (r) => (
+                <div>
+                  <span className="font-semibold text-destructive">{formatRupiah(r.amount)}</span>
+                  <p className="text-[10px] text-muted-foreground">dari wallet owner</p>
+                </div>
+              ) },
+              { key: "status", header: "Status", render: (r) => <StatusBadge status={r.status} /> },
+              ...(isVehicleOwner
+                ? []
+                : [
+                    {
+                      key: "owner",
+                      header: "Vehicle Owner",
+                      hideOnMobile: true,
+                      render: (r: VehicleRepairRow) => <span className="text-sm">{r.owner?.user?.name ?? "—"}</span>,
+                    } as const,
+                  ]),
+              {
+                key: "actions",
+                header: "Aksi",
+                render: (r) => (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Button size="sm" variant="ghost" className="h-7" onClick={() => setDetail(r)}>
+                      Detail
+                    </Button>
+                    {canEdit && (
+                      <Button size="sm" variant="outline" className="h-7" onClick={() => setEditTarget(r)}>
+                        <Pencil className="h-3.5 w-3.5" /> Edit
+                      </Button>
+                    )}
+                    {canDelete && (
+                      <Button size="sm" variant="outline" className="h-7 text-destructive" onClick={() => setDeleteTarget(r)}>
+                        <Trash2 className="h-3.5 w-3.5" /> Hapus
+                      </Button>
+                    )}
+                  </div>
+                ),
+              },
+            ]}
+          />
+        </TabsContent>
+        <TabsContent value="log" className="mt-3">
+          {/* LOG #2 — global activity log (created / changed / deleted), now a
+              tab instead of a panel below the list. */}
+          <RepairActivityLogPanel version={logVersion} />
+        </TabsContent>
+      </Tabs>
 
       <CreateRepairDialog
         key={createOpen ? "open" : "closed"}
