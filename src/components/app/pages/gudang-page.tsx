@@ -241,7 +241,7 @@ export function GudangPage() {
         {can.contents && (
           <TabsContent value="contents" className="mt-3 space-y-4">
             <p className="rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-2 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300">
-              Kiriman yang <b>sedang tersimpan</b> di tiap gudang — paket RECEIVED_AT_GUDANG (gudang asal) dan ARRIVED_AT_GUDANG (gudang
+              Kiriman yang <b>sedang tersimpan</b> di tiap gudang — paket RECEIVED_AT_GUDANG (gudang asal) serta TIBA DI GUDANG TUJUAN / ARRIVED_AT_GUDANG (gudang
               tujuan). {workspace?.scope?.scoped ? "Akses Anda dibatasi ke gudang Anda sendiri." : "Admin Gudang melihat semua gudang."}
             </p>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

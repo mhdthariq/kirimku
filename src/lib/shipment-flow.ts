@@ -7,6 +7,7 @@ export const SHIPMENT_STATUSES = [
   "PICKED_UP",
   "RECEIVED_AT_GUDANG",
   "IN_TRANSPORT",
+  "AT_DEST_GUDANG",
   "ARRIVED_AT_GUDANG",
   "DELIVERED",
   "CANCELLED",
@@ -19,7 +20,12 @@ export const VALID_TRANSITIONS: Record<string, string[]> = {
   READY_FOR_PICKUP: ["PICKED_UP", "RECEIVED_AT_GUDANG", "CANCELLED"],
   PICKED_UP: ["RECEIVED_AT_GUDANG", "CANCELLED"],
   RECEIVED_AT_GUDANG: ["IN_TRANSPORT", "CANCELLED"],
-  IN_TRANSPORT: ["ARRIVED_AT_GUDANG", "CANCELLED"],
+  IN_TRANSPORT: ["AT_DEST_GUDANG", "ARRIVED_AT_GUDANG", "CANCELLED"],
+  // Driver checked in at the LAST checkpoint (Gudang Tujuan) but Admin Gudang
+  // has not scan-verified the packages yet.
+  AT_DEST_GUDANG: ["ARRIVED_AT_GUDANG", "CANCELLED"],
+  // Packages scan-verified & received by Admin Gudang of the destination
+  // gudang (destReceivedAt stamped) — ready for delivery assignment.
   ARRIVED_AT_GUDANG: ["DELIVERED", "CANCELLED"],
   DELIVERED: [],
   CANCELLED: [],
@@ -37,19 +43,23 @@ export const STATUS_LABELS: Record<string, string> = {
   // starts (kurir drop-off scan / walk-in).
   RECEIVED_AT_GUDANG: "Arrived at Origin Gudang",
   IN_TRANSPORT: "In Transport",
-  // Destination-side arrival: the package reached ANOTHER gudang (the
-  // destination branch) via transport — distinct status so the destination
-  // Admin Gudang knows it came from elsewhere and must scan it in.
-  ARRIVED_AT_GUDANG: "Arrived at Another Gudang",
+  // The transport driver checked in at the LAST checkpoint (Gudang Tujuan) —
+  // the packages are physically at the destination branch but Admin Gudang
+  // has NOT scan-verified them yet (destReceivedAt still null).
+  AT_DEST_GUDANG: "Tiba di Gudang Tujuan",
+  // Destination-side arrival: Admin Gudang of the destination gudang has
+  // scan-verified & received the packages (destReceivedAt stamped). The UI
+  // renders this dynamically as "Arrived at {Gudang Name}" (e.g. "Arrived at
+  // Gudang Jakarta Pusat").
+  ARRIVED_AT_GUDANG: "Arrived at Gudang Tujuan",
   DELIVERED: "Delivered",
   CANCELLED: "Cancelled",
   // pickups — Revision Part A lifecycle: ASSIGNED → PICKED_UP (kurir fetches
   // the package) → the package arrives at the gudang (shipment RECEIVED_AT_
   // GUDANG via the arrival scan workflow) → COMPLETED. The kurir never
-  // completes the pickup manually.
+  // completes the pickup manually. (PICKED_UP is already defined above.)
   ASSIGNED: "Assigned",
   IN_PROGRESS: "In Progress",
-  PICKED_UP: "Picked Up",
   COMPLETED: "Completed",
   FAILED: "Failed",
   // transports

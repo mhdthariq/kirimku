@@ -50,4 +50,4 @@ export async function totalsByMaster(masterIds: number[]): Promise<Map<number, S
 }
 
 /** Statuses counted as "Arrive at Gudang" in the shipments tab filter. */
-export const GUDANG_ARRIVAL_STATUSES: ShipmentStatus[] = ["RECEIVED_AT_GUDANG", "ARRIVED_AT_GUDANG"];
+export const GUDANG_ARRIVAL_STATUSES: ShipmentStatus[] = ["RECEIVED_AT_GUDANG", "AT_DEST_GUDANG", "ARRIVED_AT_GUDANG"];

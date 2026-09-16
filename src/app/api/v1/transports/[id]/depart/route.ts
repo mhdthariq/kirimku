@@ -20,6 +20,14 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (!transport) return fail(404, "Transport tidak ditemukan.");
     if (transport.status !== "PLANNED") return fail(422, `Transport berstatus ${transport.status}, hanya PLANNED yang bisa depart.`);
     if (transport.shipments.length === 0) return fail(422, "Transport belum memiliki shipment.");
+    // Complete plan required before departure: Rute + Rencana Berangkat +
+    // Rencana Tiba must all be filled ("before we can confirm").
+    if (transport.routeId == null) {
+      return fail(422, "Rute wajib dipilih sebelum transport berangkat — lengkapi data transport terlebih dahulu.");
+    }
+    if (transport.plannedDepartureAt == null || transport.plannedArrivalAt == null) {
+      return fail(422, "Rencana Berangkat & Rencana Tiba wajib diisi sebelum transport berangkat — lengkapi jadwal transport terlebih dahulu.");
+    }
     const firstCheckpoint = transport.route?.checkpoints[0];
     const checkedInAtFirst = firstCheckpoint && transport.checkpointRecords.some((record) => record.checkpointId === firstCheckpoint.id);
     if (!firstCheckpoint || !checkedInAtFirst) {

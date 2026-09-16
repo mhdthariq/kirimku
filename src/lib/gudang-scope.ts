@@ -123,7 +123,7 @@ export function shipmentDestinationGudangIds(s: ShipmentLike, index: Map<string,
 }
 
 // Statuses where the package sits at the destination gudang
-const DEST_SIDE = new Set(["ARRIVED_AT_GUDANG", "DELIVERED"]);
+const DEST_SIDE = new Set(["AT_DEST_GUDANG", "ARRIVED_AT_GUDANG", "DELIVERED"]);
 
 /**
  * Gudang(s) a shipment currently belongs to — its physical location in the
@@ -131,7 +131,7 @@ const DEST_SIDE = new Set(["ARRIVED_AT_GUDANG", "DELIVERED"]);
  * - CREATED → RECEIVED_AT_GUDANG: origin side (arrivedWarehouseId is the
  *   origin gudang once arrival is confirmed)
  * - IN_TRANSPORT: both endpoints (origin dispatched it, destination expects it)
- * - ARRIVED_AT_GUDANG / DELIVERED: destination side
+ * - AT_DEST_GUDANG / ARRIVED_AT_GUDANG / DELIVERED: destination side
  */
 export function shipmentGudangIds(s: ShipmentLike, index: Map<string, number[]>): number[] {
   const origin = shipmentOriginGudangIds(s, index);

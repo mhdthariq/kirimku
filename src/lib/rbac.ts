@@ -18,6 +18,10 @@ export const PERMISSIONS: { slug: string; module: string; description: string }[
   { slug: "shipment.view_tracking", module: "Shipments", description: "View tracking history" },
   { slug: "shipment.confirm_arrival", module: "Shipments", description: "Confirm package arrival at gudang (scan packages / walk-in / scan-all)" },
   { slug: "shipment.notify_marketing", module: "Shipments", description: "Notify marketing about unpaid shipments at gudang" },
+  // Cetak resi is deliberately permission-gated — not everyone may print the
+  // Shipment Resi / Detail Resi stickers. Granted to Admin Gudang (and the
+  // Owner bypasses permissions); Marketing & others do NOT get it by default.
+  { slug: "shipment.print_resi", module: "Shipments", description: "Cetak resi shipment & label paket (Admin Gudang & Owner)" },
   { slug: "shipment_detail.view", module: "Shipments", description: "View detail shipments" },
   { slug: "shipment_detail.create", module: "Shipments", description: "Add detail shipments" },
   { slug: "shipment_detail.update", module: "Shipments", description: "Update detail shipments" },
@@ -185,6 +189,8 @@ export const ROLE_TEMPLATES: { slug: string; name: string; description: string; 
       "transport.view", "transport.create", "transport.depart", "transport.arrive",
       "shipment.view", "shipment.view_tracking", "shipment.confirm_arrival", "shipment.notify_marketing",
       "shipment.create", "shipment.update", "shipment_detail.view", "shipment_detail.create", "shipment_detail.update", "shipment_detail.delete",
+      // Admin Gudang may print resi (Owner always may via the owner bypass)
+      "shipment.print_resi",
       "delivery.view", "delivery.assign_kurir",
       "pickup.view", "pickup.create", "pickup.assign_kurir", "pickup.confirm",
       "payment.view",

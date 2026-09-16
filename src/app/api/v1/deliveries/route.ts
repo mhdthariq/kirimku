@@ -103,6 +103,9 @@ export async function POST(req: NextRequest) {
     const masterId = num(body.masterId);
     const master = masterId ? await db.masterShipment.findUnique({ where: { id: masterId }, include: { customer: true } }) : null;
     if (!master) return fail(422, "Shipment wajib dipilih.", { masterId: ["Shipment wajib dipilih."] });
+    if (master.status === "AT_DEST_GUDANG") {
+      return fail(422, "Driver baru check-in di gudang tujuan — paket belum discan / diterima Admin Gudang. Scan paketnya dulu di menu Shipments (status Tiba di Gudang Tujuan).");
+    }
     if (!["ARRIVED_AT_GUDANG", "RECEIVED_AT_GUDANG"].includes(master.status)) {
       return fail(422, `Shipment harus tiba di gudang terlebih dahulu (saat ini: ${master.status}).`);
     }
@@ -110,7 +113,7 @@ export async function POST(req: NextRequest) {
     // scanned in & received by Admin Gudang of that gudang (destReceivedAt)
     // before a kurir can be assigned to deliver it.
     if (master.status === "ARRIVED_AT_GUDANG" && master.destReceivedAt == null) {
-      return fail(422, "Shipment dari gudang lain belum discan / diterima Admin Gudang — scan paketnya dulu di menu Shipments (status Arrived at Another Gudang).");
+      return fail(422, "Shipment dari gudang lain belum discan / diterima Admin Gudang — scan paketnya dulu di menu Shipments (status Tiba di Gudang Tujuan).");
     }
     const kurirId = num(body.kurirId);
     if (!kurirId) return fail(422, "Kurir wajib dipilih.", { kurirId: ["Kurir wajib dipilih."] });

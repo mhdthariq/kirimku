@@ -9,7 +9,7 @@ CREATED ──► READY_FOR_PICKUP ──► PICKED_UP ──► RECEIVED_AT_GUD
    │              │                  │                │                   │
    └──► CANCELLED ◄┴──────────────────┴────────────────┴──────────────────┘
                                                                         
-IN_TRANSPORT ──► ARRIVED_AT_GUDANG ──► DELIVERED   (terminal)
+IN_TRANSPORT ──► AT_DEST_GUDANG ──► ARRIVED_AT_GUDANG ──► DELIVERED   (terminal)
 ```
 
 | Status | Meaning | Who moves it forward |
@@ -19,7 +19,8 @@ IN_TRANSPORT ──► ARRIVED_AT_GUDANG ──► DELIVERED   (terminal)
 | `PICKED_UP` | Kurir confirmed handover | `POST /pickups/{id}/confirm` |
 | `RECEIVED_AT_GUDANG` | Goods scanned into origin gudang | gudang staff (tracking event) |
 | `IN_TRANSPORT` | Loaded on a linehaul transport | `POST /transports/{id}/depart` |
-| `ARRIVED_AT_GUDANG` | Transport arrived at destination | `POST /transports/{id}/arrive` |
+| `AT_DEST_GUDANG` | Driver checked in at the LAST checkpoint (Gudang Tujuan) — packages physically at the destination branch, NOT yet scan-verified | final-checkpoint check-in (`POST /transports/{id}/checkins`) or `POST /transports/{id}/arrive` |
+| `ARRIVED_AT_GUDANG` | Admin Gudang of the destination gudang scan-verified & received every package (`destReceivedAt` stamped) — shown as "Arrived at {Gudang Name}" | `POST /shipments/{id}/arrive` (mode `transport`) |
 | `DELIVERED` | Last-mile delivery completed | `POST /deliveries/{id}/complete` |
 | `CANCELLED` | Cancelled (blocked once priced & paid) | `POST /shipments/{id}/cancel` |
 
@@ -34,7 +35,9 @@ Every transition appends a `TrackingEvent` (with the acting user) and an `AuditL
 4. GUDANG IN     Received at origin gudang; price computed from tariff
 5. TRANSPORT     Admin gudang builds transport (route + vehicle + crew + shipments) → depart
 6. CHECKPOINTS   (future: geo check-ins recorded as CheckpointRecord, withinRadius flag)
-7. GUDANG OUT    Transport arrives at destination gudang → ARRIVED_AT_GUDANG
+7. GUDANG OUT    Driver checks in at the LAST checkpoint (Gudang Tujuan) → AT_DEST_GUDANG;
+                Admin Gudang of that gudang scans every package in → ARRIVED_AT_GUDANG
+                ("Arrived at {Gudang Name}")
 8. DELIVERY      Assign kurir → kurir QR-scans all packages → complete with proof of delivery
 9. SETTLE        Payment verified (b2c) or invoice settled (b2b)
 ```
@@ -89,7 +92,7 @@ PLANNED ──depart──► DEPARTED ──arrive──► ARRIVED      (CANCE
 
 - A transport bundles: **route** (with its checkpoints), **vehicle** (must be `ACTIVE`), **crew** (driver + optional kenek, from employees), and **shipments** (M:N).
 - `depart` stamps `departedAt` and flips every carried shipment to `IN_TRANSPORT`.
-- `arrive` stamps `arrivedAt` and flips shipments to `ARRIVED_AT_GUDANG` — which unlocks delivery assignment.
+- `arrive` stamps `arrivedAt` and flips shipments to `AT_DEST_GUDANG` (driver physically at the destination gudang, awaiting the Admin Gudang reception scan). The shipment only becomes `ARRIVED_AT_GUDANG` ("Arrived at {Gudang Name}") after Admin Gudang of the destination gudang scans every package and confirms receipt (`POST /shipments/{id}/arrive` mode `transport`) — which unlocks delivery assignment.
 
 ## Checkpoint rule (requirement #10)
 
@@ -167,7 +170,7 @@ CREATED ──(submit for pickup¹)──▶ READY_FOR_PICKUP ──(kurir scans
                                             or "Scan Semua", then confirm)
                                             │
                                             ▼ (loaded into transport + depart)
-                                         IN_TRANSPORT ──▶ ARRIVED_AT_GUDANG ──▶ DELIVERED
+                                         IN_TRANSPORT ──▶ AT_DEST_GUDANG ──▶ ARRIVED_AT_GUDANG ──▶ DELIVERED
 ```
 
 ¹ Submit-for-pickup gates: the **price must be counted** first ("Hitung Harga") and **Penerima must be filled** — both are printed on the resi. Submitting the pickup request automatically opens the **Resi print preview** (1 Resi Shipment + N Resi Detail stickers).

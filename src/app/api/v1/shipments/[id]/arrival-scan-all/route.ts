@@ -12,7 +12,7 @@ type Params = { params: Promise<{ id: string }> };
  * of an arrival-scan shipment as scanned (reader-tool batch mode) so the
  * arrival confirmation unlocks in one click. Works for BOTH arrival paths:
  *  - PICKED_UP (kurir drop-off at the origin gudang)
- *  - ARRIVED_AT_GUDANG (transport drop-off at the destination gudang)
+ *  - AT_DEST_GUDANG (transport drop-off at the destination gudang)
  */
 export async function POST(req: NextRequest, { params }: Params) {
   return handle(async () => {
@@ -22,9 +22,9 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (!master) return fail(404, "Shipment tidak ditemukan.");
     await assertShipmentScope(user, master);
 
-    const context = arrivalScanContext(master.status);
+    const context = arrivalScanContext(master.status, master.destReceivedAt);
     if (!context) {
-      return fail(422, `Scan semua hanya untuk shipment PICKED_UP / ARRIVED_AT_GUDANG (saat ini: ${master.status}).`);
+      return fail(422, `Scan semua hanya untuk shipment PICKED_UP / AT_DEST_GUDANG (saat ini: ${master.status}).`);
     }
 
     const progressBefore = await scanProgress({ masterId: master.id, context });

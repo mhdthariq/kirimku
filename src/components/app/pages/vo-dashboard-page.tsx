@@ -117,7 +117,8 @@ export function VehicleOwnerDashboard() {
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-bold text-primary">+{formatRupiah(s.ownerAmount)}</p>
+                  {/* settled earnings → GREEN */}
+                  <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">+{formatRupiah(s.ownerAmount)}</p>
                   <p className="text-[10px] text-muted-foreground">{s.ownerPercent}% · {formatDate(s.finalizedAt)}</p>
                 </div>
               </div>

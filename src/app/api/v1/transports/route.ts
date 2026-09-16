@@ -167,12 +167,24 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Planning fields — endpoints default to the route's, schedule optional.
+    // Planning fields — endpoints default to the route's. Rencana Berangkat &
+    // Rencana Tiba are REQUIRED (the schedule must be complete before the
+    // transport can be planned / confirmed).
     const origin = str(body.origin) ?? route.origin ?? null;
     const destination = str(body.destination) ?? route.destination ?? null;
     const plannedDepartureAt = dateOrNull(body.plannedDepartureAt);
     const plannedArrivalAt = dateOrNull(body.plannedArrivalAt);
-    if (plannedDepartureAt && plannedArrivalAt && plannedArrivalAt < plannedDepartureAt) {
+    if (!plannedDepartureAt) {
+      return fail(422, "Rencana Berangkat wajib diisi.", {
+        plannedDepartureAt: ["Rencana Berangkat wajib diisi."],
+      });
+    }
+    if (!plannedArrivalAt) {
+      return fail(422, "Rencana Tiba wajib diisi.", {
+        plannedArrivalAt: ["Rencana Tiba wajib diisi."],
+      });
+    }
+    if (plannedArrivalAt < plannedDepartureAt) {
       return fail(422, "Rencana tiba tidak boleh lebih awal dari rencana berangkat.", {
         plannedArrivalAt: ["Rencana tiba harus setelah rencana berangkat."],
       });

@@ -139,9 +139,17 @@ export async function GET(req: NextRequest) {
       });
 
     // --- Transport arrivals: shipments that reached THIS gudang from another
-    //     gudang via transport and still await the Admin Gudang scan-in -------
+    //     gudang via transport and still await the Admin Gudang scan-in.
+    //     AT_DEST_GUDANG = driver checked in at the LAST checkpoint (the new
+    //     flow); ARRIVED_AT_GUDANG + destReceivedAt null = legacy rows from
+    //     before the split. ---------------------------------------------------
     const transportArrivalRows = await db.masterShipment.findMany({
-      where: { status: "ARRIVED_AT_GUDANG", destReceivedAt: null },
+      where: {
+        OR: [
+          { status: "AT_DEST_GUDANG" },
+          { status: "ARRIVED_AT_GUDANG", destReceivedAt: null },
+        ],
+      },
       orderBy: { updatedAt: "asc" },
       include: {
         customer: { select: { id: true, name: true, type: true, phone: true } },
@@ -215,7 +223,7 @@ export async function GET(req: NextRequest) {
 
     // --- Per-gudang contents: what is physically held at each gudang ---------
     const heldShipments = await db.masterShipment.findMany({
-      where: { status: { in: ["RECEIVED_AT_GUDANG", "ARRIVED_AT_GUDANG"] } },
+      where: { status: { in: ["RECEIVED_AT_GUDANG", "AT_DEST_GUDANG", "ARRIVED_AT_GUDANG"] } },
       orderBy: { updatedAt: "desc" },
       include: {
         customer: { select: { name: true } },
@@ -242,7 +250,7 @@ export async function GET(req: NextRequest) {
             if (s.originWarehouseId != null) return s.originWarehouseId === w.id;
             return sameCity(s.origin, w.city);
           }
-          // ARRIVED_AT_GUDANG: held at destination gudang
+          // AT_DEST_GUDANG / ARRIVED_AT_GUDANG: held at destination gudang
           if (s.arrivedWarehouseId != null) return s.arrivedWarehouseId === w.id;
           if (s.destinationWarehouseId != null) return s.destinationWarehouseId === w.id;
           return sameCity(s.destination, w.city);
@@ -253,7 +261,7 @@ export async function GET(req: NextRequest) {
           const finalPrice = s.finalPriceAmount ?? (s.priceAmount != null ? s.priceAmount - (s.discountAmount ?? 0) : null);
           // destination-stage rows carry "where this shipment came from"
           const originWarehouseName =
-            s.status === "ARRIVED_AT_GUDANG" && s.originWarehouseId != null
+            ["AT_DEST_GUDANG", "ARRIVED_AT_GUDANG"].includes(s.status) && s.originWarehouseId != null
               ? warehouses.find((x) => x.id === s.originWarehouseId)?.name ?? null
               : null;
           return {

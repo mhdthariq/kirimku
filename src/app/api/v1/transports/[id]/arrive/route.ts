@@ -33,17 +33,18 @@ export async function POST(req: NextRequest, { params }: Params) {
         const destIds = shipmentDestinationGudangIds(s.master, cityIdx);
         const arrivedWarehouseId = s.master.destinationWarehouseId ?? destIds[0] ?? null;
         if (s.master.status === "IN_TRANSPORT") {
-          // The package reached ANOTHER gudang (the destination branch).
-          // destReceivedAt stays null until Admin Gudang of that gudang scans
-          // every package in (transport drop-off verification).
-          await tx.masterShipment.update({ where: { id: s.shipmentId }, data: { status: "ARRIVED_AT_GUDANG", arrivedWarehouseId, destReceivedAt: null } });
+          // The transport reached the destination gudang (admin override of the
+          // final-checkpoint check-in). "Arrived at {Gudang}" only happens
+          // AFTER Admin Gudang of that gudang scans every package in — until
+          // then the shipment sits at AT_DEST_GUDANG with destReceivedAt null.
+          await tx.masterShipment.update({ where: { id: s.shipmentId }, data: { status: "AT_DEST_GUDANG", arrivedWarehouseId, destReceivedAt: null } });
         }
         const fromTo = `${originGudangName ? ` dari ${originGudangName}` : ""}${destGudangName ? ` ke ${destGudangName}` : ""}`;
         await tx.trackingEvent.create({
           data: {
             masterId: s.shipmentId,
-            event: "ARRIVED_AT_GUDANG",
-            description: `Transport ${transport.transportCode} tiba di gudang tujuan${fromTo} — menunggu scan penerimaan Admin Gudang`,
+            event: "AT_DEST_GUDANG",
+            description: `Transport ${transport.transportCode} tiba di gudang tujuan${fromTo} — paket menunggu scan penerimaan Admin Gudang sebelum berstatus Arrived`,
             actorId: user.id,
           },
         });

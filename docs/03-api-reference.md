@@ -150,7 +150,7 @@ Same executor mode: `GET /deliveries?mine=true` filters to the logged-in kurir. 
 | POST | `/transports` | `transport.create` | `{routeId, vehicleId, driverId?, kenekId?, shipmentIds[]}` → code `TRP-YYYY-…`; vehicle must be `ACTIVE` |
 | PUT | `/transports/{id}` | `transport.create` | Update while `PLANNED` (reassign vehicle/route/shipments) |
 | POST | `/transports/{id}/depart` | `transport.depart` | `PLANNED → DEPARTED`: marks carried shipments `IN_TRANSPORT`, records `departedAt` |
-| POST | `/transports/{id}/arrive` | `transport.arrive` | `DEPARTED → ARRIVED`: shipments → `ARRIVED_AT_GUDANG`, records `arrivedAt` |
+| POST | `/transports/{id}/arrive` | `transport.arrive` | `DEPARTED → ARRIVED`: shipments → `AT_DEST_GUDANG` (awaiting Admin Gudang reception scan), records `arrivedAt` |
 | DELETE | `/transports/{id}` | `transport.create` | Cancel while `PLANNED` (detaches shipments) |
 
 ## Vehicles

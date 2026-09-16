@@ -123,6 +123,12 @@ function ShipmentList() {
     cancel: hasPermission(user, "shipment.cancel"),
     delete: hasPermission(user, "shipment.delete"),
     confirmArrival: hasPermission(user, "shipment.confirm_arrival"),
+    // Cetak Resi is permission-gated: only Admin Gudang & the Owner for now —
+    // users without it never see the print buttons.
+    printResi: hasPermission(user, "shipment.print_resi"),
+    // The Log Aktivitas tab reads the audit trail — hidden entirely for users
+    // without audit_log.view (e.g. Marketing) so they never see an empty log.
+    viewLog: hasPermission(user, "audit_log.view"),
   };
 
   const { data, loading, reload } = useApiData<Shipment[]>(() => apiGet<Shipment[]>("/shipments"), []);
@@ -166,6 +172,27 @@ function ShipmentList() {
           (s.penerimaName ?? "").toLowerCase().includes(q)),
     );
   }, [data, search, statusFilter, activeGudangId]);
+
+  /** Auto-pick Gudang Asal & Gudang Tujuan from the selected rute (tariff):
+   *  the warehouse whose city matches the tariff's origin/destination is
+   *  preselected — still changeable by the user. */
+  function onTariffChange(v: string) {
+    const tariff = (options?.tariffs ?? []).find((t) => String(t.id) === v) ?? null;
+    const cityMatch = (city: string | null | undefined) => {
+      const key = (city ?? "").trim().toLowerCase();
+      if (!key) return "";
+      const wh = (options?.warehouses ?? []).find((w) => (w.city ?? "").trim().toLowerCase() === key);
+      return wh ? String(wh.id) : "";
+    };
+    setForm((f) => ({
+      ...f,
+      tariffId: v,
+      // auto-filled from the route (cleared when the route's city has no
+      // gudang yet) — the user can still change either gudang afterwards
+      originWarehouseId: tariff ? cityMatch(tariff.origin) : f.originWarehouseId,
+      destinationWarehouseId: tariff ? cityMatch(tariff.destination) : f.destinationWarehouseId,
+    }));
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -323,7 +350,9 @@ function ShipmentList() {
         <TabsList>
           <TabsTrigger value="list">Daftar</TabsTrigger>
           {isOwner && <GudangTabsTriggers warehouses={gudangOptions} />}
-          <TabsTrigger value="activity">Log Aktivitas</TabsTrigger>
+          {/* Log Aktivitas reads the audit trail — hidden for users without
+              audit_log.view (e.g. Marketing) so they never see an empty log. */}
+          {can.viewLog && <TabsTrigger value="activity">Log Aktivitas</TabsTrigger>}
         </TabsList>
         {["list", ...(isOwner ? gudangOptions.map((g) => gudangTabValue(g.id)) : [])].map((v) => {
           const activeW = gudangOptions.find((g) => gudangTabValue(g.id) === v) ?? null;
@@ -336,10 +365,10 @@ function ShipmentList() {
                   (kamera / reader / manual) lalu konfirmasi <b>Tiba di Gudang</b>.
                 </p>
               )}
-              {statusFilter === "ARRIVED_AT_GUDANG" && can.confirmArrival && (
+              {(statusFilter === "AT_DEST_GUDANG" || statusFilter === "ARRIVED_AT_GUDANG") && can.confirmArrival && (
                 <p className="rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-2 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300">
-                  Shipment <b>ARRIVED AT ANOTHER GUDANG</b> sudah tiba di gudang Anda dari gudang lain via transport — klik <b>Terima / Scan</b>{" "}
-                  untuk scan tiap paketnya sebelum bisa ditugaskan ke kurir untuk delivery.
+                  Shipment <b>TIBA DI GUDANG TUJUAN</b> — driver transport sudah check-in di checkpoint akhir; paket menunggu <b>Terima / Scan</b>{" "}
+                  oleh Admin Gudang sebelum berstatus <b>Arrived at (nama gudang)</b> dan bisa ditugaskan ke kurir delivery.
                 </p>
               )}
               <DataTable
@@ -357,7 +386,8 @@ function ShipmentList() {
                   { key: "PICKED_UP", label: "Picked Up" },
                   { key: "RECEIVED_AT_GUDANG", label: "At Origin Gudang" },
                   { key: "IN_TRANSPORT", label: "In Transport" },
-                  { key: "ARRIVED_AT_GUDANG", label: "From Another Gudang" },
+                  { key: "AT_DEST_GUDANG", label: "At Dest. Gudang" },
+                  { key: "ARRIVED_AT_GUDANG", label: "Arrived at Gudang" },
                   { key: "DELIVERED", label: "Delivered" },
                   { key: "CANCELLED", label: "Cancelled" },
                 ].map((t) => (
@@ -399,12 +429,12 @@ function ShipmentList() {
                     </p>
                     {/* "This shipment is from Gudang X" — shown once the package
                         reached the destination side (another gudang) */}
-                    {["ARRIVED_AT_GUDANG", "DELIVERED"].includes(s.status) && (s.originWarehouseName ?? s.originWarehouseId) && (
+                    {["AT_DEST_GUDANG", "ARRIVED_AT_GUDANG", "DELIVERED"].includes(s.status) && (s.originWarehouseName ?? s.originWarehouseId) && (
                       <p className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-sky-100/70 px-1.5 py-0.5 text-[10px] font-semibold text-sky-800 dark:bg-sky-950/60 dark:text-sky-300">
                         <Warehouse className="h-3 w-3" /> dari {s.originWarehouseName ?? `Gudang #${s.originWarehouseId}`}
                       </p>
                     )}
-                    {s.status === "ARRIVED_AT_GUDANG" && s.destReceivedAt == null && (
+                    {(s.status === "AT_DEST_GUDANG" || (s.status === "ARRIVED_AT_GUDANG" && s.destReceivedAt == null)) && (
                       <p className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-amber-100/80 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
                         <ScanLine className="h-3 w-3" /> menunggu scan Admin Gudang
                       </p>
@@ -424,7 +454,13 @@ function ShipmentList() {
                 header: "Harga",
                 render: (s) => (
                   <div>
-                    <p className="text-sm font-semibold">{formatRupiah(s.priceAmount)}</p>
+                    {/* Price is hidden until "Hitung Harga" has been run —
+                        unpriced shipments show a hint instead of a number. */}
+                    {s.priceAmount != null ? (
+                      <p className="text-sm font-semibold">{formatRupiah(s.priceAmount)}</p>
+                    ) : (
+                      <p className="text-sm font-medium text-muted-foreground">— belum dihitung</p>
+                    )}
                     {s.chargeableWeightKg != null && <p className="text-[11px] text-muted-foreground">{formatNumber(s.chargeableWeightKg)} kg cw</p>}
                   </div>
                 ),
@@ -447,7 +483,20 @@ function ShipmentList() {
                 ),
               },
               { key: "created", header: "Dibuat", hideOnMobile: true, render: (s) => formatDate(s.createdAt) },
-              { key: "status", header: "Status", render: (s) => <StatusBadge status={s.status} /> },
+              {
+                key: "status",
+                header: "Status",
+                render: (s) => (
+                  <StatusBadge
+                    status={s.status}
+                    label={
+                      s.status === "ARRIVED_AT_GUDANG"
+                        ? `Arrived at ${s.arrivedWarehouseName ?? s.destinationWarehouseName ?? s.destination}`
+                        : undefined
+                    }
+                  />
+                ),
+              },
               {
                 key: "actions",
                 header: "Aksi",
@@ -462,12 +511,12 @@ function ShipmentList() {
                         <ScanLine className="h-3.5 w-3.5" /> Terima / Scan
                       </Button>
                     )}
-                    {can.confirmArrival && s.status === "ARRIVED_AT_GUDANG" && s.destReceivedAt == null && (
+                    {can.confirmArrival && (s.status === "AT_DEST_GUDANG" || (s.status === "ARRIVED_AT_GUDANG" && s.destReceivedAt == null)) && (
                       <Button size="sm" className="h-7" onClick={() => openRowTransportScan(s)} title="Scan paket dari transport & konfirmasi penerimaan">
                         <ScanLine className="h-3.5 w-3.5" /> Terima / Scan
                       </Button>
                     )}
-                    {s.status !== "CANCELLED" && (s.totals?.totalPackages ?? s._count?.details ?? 0) > 0 && (
+                    {can.printResi && s.status !== "CANCELLED" && (s.totals?.totalPackages ?? s._count?.details ?? 0) > 0 && (
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => (window.location.hash = `#/shipments/${s.id}?print=1`)} aria-label="Cetak resi" title="Cetak Resi">
                         <Printer className="h-4 w-4" />
                       </Button>
@@ -485,9 +534,11 @@ function ShipmentList() {
             </TabsContent>
           );
         })}
-        <TabsContent value="activity" className="mt-3">
-          <ActivityLogPanel entityTypes={["shipment", "shipment_detail"]} />
-        </TabsContent>
+        {can.viewLog && (
+          <TabsContent value="activity" className="mt-3">
+            <ActivityLogPanel entityTypes={["shipment", "shipment_detail"]} />
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* Create dialog */}
@@ -532,7 +583,7 @@ function ShipmentList() {
               >
                 <FormSelect
                   value={form.tariffId}
-                  onValueChange={(v) => setForm({ ...form, tariffId: v })}
+                  onValueChange={onTariffChange}
                   placeholder={selectedCustomer ? `Pilih rute ${selectedCustomer.type.toUpperCase()}…` : "Pilih customer untuk melihat rute…"}
                   options={routeOptions}
                   disabled={busy || !selectedCustomer}
@@ -551,7 +602,11 @@ function ShipmentList() {
                   </p>
                 </div>
               )}*/}
-              <Field label="Gudang Asal" htmlFor="s-warehouse-from" hint="Opsional">
+              <Field
+                label="Gudang Asal"
+                htmlFor="s-warehouse-from"
+                hint={selectedTariff ? "Otomatis dari rute — dapat diubah" : "Otomatis terisi saat rute dipilih"}
+              >
                 <FormSelect
                   value={form.originWarehouseId}
                   onValueChange={(v) => setForm({ ...form, originWarehouseId: v })}
@@ -560,7 +615,11 @@ function ShipmentList() {
                   disabled={busy}
                 />
               </Field>
-              <Field label="Gudang Tujuan" htmlFor="s-warehouse-to" hint="Opsional">
+              <Field
+                label="Gudang Tujuan"
+                htmlFor="s-warehouse-to"
+                hint={selectedTariff ? "Otomatis dari rute — dapat diubah" : "Otomatis terisi saat rute dipilih"}
+              >
                 <FormSelect
                   value={form.destinationWarehouseId}
                   onValueChange={(v) => setForm({ ...form, destinationWarehouseId: v })}
@@ -735,8 +794,8 @@ function ShipmentList() {
         />
       )}
 
-      {/* Per-row transport arrival scan — opens straight from an
-          ARRIVED_AT_GUDANG row ("From Another Gudang" tab) */}
+      {/* Per-row transport arrival scan — opens straight from a row that
+          reached the destination gudang (AT_DEST_GUDANG / awaiting scan) */}
       {can.confirmArrival && (
         <ArrivalScanDialog
           key={rowTransportTask ? `row-tarr-${rowTransportTask.id}` : "row-tarr-none"}
@@ -817,8 +876,8 @@ function ScanArrivalPickerDialog({
               <QrCode className="h-5 w-5 text-primary" /> Scan Kedatangan
             </DialogTitle>
             <DialogDescription>
-              Shipment yang menunggu diterima gudang: <b>PICKED UP</b> (dibawa kurir kembali ke gudang) dan <b>ARRIVED AT ANOTHER GUDANG</b>{" "}
-              (dibongkar muat driver transport dari gudang lain). Pilih satu untuk scan tiap paketnya (kamera HP / reader tool / ketik
+              Shipment yang menunggu diterima gudang: <b>PICKED UP</b> (dibawa kurir kembali ke gudang) dan <b>TIBA DI GUDANG TUJUAN</b>{" "}
+              (driver transport sudah check-in di checkpoint akhir — paket dari gudang lain menunggu diterima). Pilih satu untuk scan tiap paketnya (kamera HP / reader tool / ketik
               manual), lalu konfirmasi penerimaannya setelah semua paket lengkap.
             </DialogDescription>
           </DialogHeader>
@@ -878,11 +937,11 @@ function ScanArrivalPickerDialog({
               </div>
             )}
 
-            {/* --- Transport drop-off queue (ARRIVED_AT_GUDANG, from another gudang) --- */}
+            {/* --- Transport drop-off queue (AT_DEST_GUDANG, from another gudang) --- */}
             {transportArrivals.length > 0 && (
               <div className="space-y-2">
                 <p className="flex items-center gap-1.5 px-1 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-                  <RouteIcon className="h-3.5 w-3.5" /> Transport Drop-off · Dari Gudang Lain ({transportArrivals.length})
+                  <RouteIcon className="h-3.5 w-3.5" /> Transport Drop-off · Di Gudang Tujuan, menunggu scan ({transportArrivals.length})
                 </p>
                 {transportArrivals.map((a) => {
                   const pct = a.detailsCount ? Math.round((a.scannedCount / a.detailsCount) * 100) : 0;
@@ -968,6 +1027,10 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
     // Walk-in arrival (customer hands the package over at the gudang counter) —
     // only visible/usable for users granted this permission (e.g. Admin Gudang).
     confirmArrival: hasPermission(user, "shipment.confirm_arrival"),
+    // Cetak Resi — permission-gated (Admin Gudang & Owner for now).
+    printResi: hasPermission(user, "shipment.print_resi"),
+    // Bottom "Log Aktivitas Shipment Ini" panel — only for audit_log.view holders.
+    viewLog: hasPermission(user, "audit_log.view"),
   };
 
   const [shipment, setShipment] = useState<(Shipment & { details: DetailShipment[]; trackingEvents: TrackingEvent[] }) | null>(null);
@@ -1016,13 +1079,14 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
   const [pengirimForm, setPengirimForm] = useState({ name: "", phone: "", email: "", address: "" });
 
   // deep link #/shipments/{id}?print=1 — open the resi print preview
+  // (only for users holding the print-resi permission)
   useEffect(() => {
-    if (autoPrint && !autoPrintHandled.current && shipment && shipment.details.length > 0) {
+    if (autoPrint && can.printResi && !autoPrintHandled.current && shipment && shipment.details.length > 0) {
       autoPrintHandled.current = true;
       setPrintOpen(true);
       window.history.replaceState(null, "", `#/shipments/${id}`); // avoid re-trigger
     }
-  }, [autoPrint, shipment, id]);
+  }, [autoPrint, can.printResi, shipment, id]);
 
   if (loading) {
     return (
@@ -1055,11 +1119,13 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
 
   async function submitForPickup() {
     const ok = await runAction(() => apiPost(`/shipments/${shipment!.id}/ready`), {
-      success: "Shipment siap dijemput — resi siap dicetak. Buat task pickup di menu Pickups / Gudang.",
+      success: "Shipment siap dijemput. Buat task pickup di menu Pickups / Gudang.",
     });
     if (ok) {
       await refresh();
-      setPrintOpen(true); // print the Shipment Resi + Detail Resi when the pickup is requested
+      // Auto-open the resi print preview when the user may print it
+      // (shipment.print_resi — Admin Gudang & Owner for now).
+      if (can.printResi) setPrintOpen(true);
     }
   }
 
@@ -1237,7 +1303,14 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
         subtitle={`${shipment.customer?.name ?? "—"} · ${shipment.origin} → ${shipment.destination} · dibuat ${formatDate(shipment.createdAt)}`}
         actions={
           <>
-            <StatusBadge status={shipment.status} />
+            <StatusBadge
+              status={shipment.status}
+              label={
+                shipment.status === "ARRIVED_AT_GUDANG"
+                  ? `Arrived at ${shipment.arrivedWarehouseName ?? shipment.destinationWarehouseName ?? options?.warehouses?.find((w) => w.id === shipment.destinationWarehouseId)?.name ?? shipment.destination}`
+                  : undefined
+              }
+            />
             <ItemAuditDialog entityType="shipment" entityId={shipment.id} itemLabel={shipment.masterCode} />
             {shipment.customer?.type === "b2b" && shipment.invoiceLines?.[0] && (
               <a href={`#/invoices/${shipment.invoiceLines[0].invoice.id}`} className="rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
@@ -1261,7 +1334,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
                 <Calculator className="h-4 w-4" /> {shipment.priceAmount != null ? "Hitung Ulang Harga" : "Hitung Harga"}
               </Button>
             )}
-            {shipment.status !== "CANCELLED" && shipment.details.length > 0 && (
+            {can.printResi && shipment.status !== "CANCELLED" && shipment.details.length > 0 && (
               <Button variant="secondary" onClick={() => setPrintOpen(true)}>
                 <Printer className="h-4 w-4" /> Cetak Resi
               </Button>
@@ -1276,18 +1349,20 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
       />
 
       {/* Where is this shipment from? — origin gudang banner for shipments that
-          reached another gudang (destination side). Admin Gudang of the
-          destination branch sees at a glance where the package came from. */}
-      {["ARRIVED_AT_GUDANG", "DELIVERED"].includes(shipment.status) && (
+          reached the destination gudang. Admin Gudang of the destination branch
+          sees at a glance where the package came from. */}
+      {["AT_DEST_GUDANG", "ARRIVED_AT_GUDANG", "DELIVERED"].includes(shipment.status) && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-2 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300">
           <Warehouse className="h-4 w-4 shrink-0" />
           <p>
             Shipment ini <b>dari {shipment.originWarehouseName ?? options?.warehouses?.find((w) => w.id === shipment.originWarehouseId)?.name ?? shipment.origin}</b> —{" "}
-            {shipment.status === "ARRIVED_AT_GUDANG"
-              ? shipment.destReceivedAt != null
-                ? <>sudah diterima & diverifikasi scan Admin Gudang di <b>{shipment.arrivedWarehouseName ?? options?.warehouses?.find((w) => w.id === shipment.arrivedWarehouseId)?.name ?? shipment.destination}</b> pada {formatDate(shipment.destReceivedAt, true)}.</>
-                : <>menunggu scan penerimaan Admin Gudang di <b>{shipment.arrivedWarehouseName ?? options?.warehouses?.find((w) => w.id === shipment.arrivedWarehouseId)?.name ?? shipment.destination}</b> — scan semua paket sebelum menugaskan kurir delivery.</>
-              : <>sudah selesai dikirim ke penerima.</>}
+            {shipment.status === "AT_DEST_GUDANG"
+              ? <>driver transport sudah check-in di gudang tujuan (<b>{shipment.arrivedWarehouseName ?? options?.warehouses?.find((w) => w.id === shipment.arrivedWarehouseId)?.name ?? shipment.destination}</b>) — menunggu scan penerimaan Admin Gudang sebelum berstatus <b>Arrived at (gudang)</b>.</>
+              : shipment.status === "ARRIVED_AT_GUDANG"
+                ? shipment.destReceivedAt != null
+                  ? <>sudah diterima & diverifikasi scan Admin Gudang di <b>{shipment.arrivedWarehouseName ?? options?.warehouses?.find((w) => w.id === shipment.arrivedWarehouseId)?.name ?? shipment.destination}</b> pada {formatDate(shipment.destReceivedAt, true)}.</>
+                  : <>menunggu scan penerimaan Admin Gudang di <b>{shipment.arrivedWarehouseName ?? options?.warehouses?.find((w) => w.id === shipment.arrivedWarehouseId)?.name ?? shipment.destination}</b> — scan semua paket sebelum menugaskan kurir delivery.</>
+                : <>sudah selesai dikirim ke penerima.</>}
           </p>
         </div>
       )}
@@ -1336,10 +1411,21 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
               }
             />
             <Row label="Asuransi" value={formatRupiah(shipment.insuranceAmount)} />
-            <div className="flex items-center justify-between rounded-lg bg-primary/10 px-3 py-2.5">
-              <span className="text-xs font-semibold text-primary">{shipment.priceAmount != null ? "TOTAL HARGA" : "ESTIMASI HARGA"}</span>
-              <span className="text-base font-bold text-primary">{formatRupiah(shipment.priceAmount ?? pricing?.estimatedPrice ?? null)}</span>
-            </div>
+            {/* The price stays hidden until "Hitung Harga" is clicked — the
+                estimation is deliberately NOT shown either. */}
+            {shipment.priceAmount != null ? (
+              <div className="flex items-center justify-between rounded-lg bg-primary/10 px-3 py-2.5">
+                <span className="text-xs font-semibold text-primary">TOTAL HARGA</span>
+                <span className="text-base font-bold text-primary">{formatRupiah(shipment.priceAmount)}</span>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-primary/40 bg-primary/5 px-3 py-2.5 text-center">
+                <p className="text-xs font-semibold text-primary">Harga belum dihitung</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  Klik tombol <b>Hitung Harga</b> untuk menghitung & menampilkan harga shipment ini.
+                </p>
+              </div>
+            )}
             {/* Discount breakdown: funding source is snapshotted at creation. */}
             {shipment.discountAmount > 0 && (
               <div className={cn(
@@ -1559,7 +1645,11 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
         </CardContent>
       </Card>
 
-      <ActivityLogPanel entityTypes={["shipment", "shipment_detail", "pickup", "delivery", "transport"]} title="Log Aktivitas Shipment Ini" limit={20} />
+      {/* Log Aktivitas — only rendered for audit_log.view holders (hidden for
+           Marketing & other roles that cannot read the audit trail). */}
+      {can.viewLog && (
+        <ActivityLogPanel entityTypes={["shipment", "shipment_detail", "pickup", "delivery", "transport"]} title="Log Aktivitas Shipment Ini" limit={20} />
+      )}
 
       {/* Detail create/edit dialog */}
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>

@@ -24,7 +24,7 @@ import { formatDate, formatNumber, formatRupiah } from "@/components/app/form-pa
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
-const LIFECYCLE = ["CREATED", "READY_FOR_PICKUP", "PICKED_UP", "RECEIVED_AT_GUDANG", "IN_TRANSPORT", "ARRIVED_AT_GUDANG", "DELIVERED"];
+const LIFECYCLE = ["CREATED", "READY_FOR_PICKUP", "PICKED_UP", "RECEIVED_AT_GUDANG", "IN_TRANSPORT", "AT_DEST_GUDANG", "ARRIVED_AT_GUDANG", "DELIVERED"];
 
 export function DashboardPage() {
   const { user } = useAuth();

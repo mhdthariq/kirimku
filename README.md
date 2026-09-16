@@ -204,7 +204,8 @@ CREATED
   → PICKED_UP
   → RECEIVED_AT_GUDANG
   → IN_TRANSPORT
-  → ARRIVED_AT_GUDANG
+  → AT_DEST_GUDANG        (driver check-in at the LAST checkpoint — Gudang Tujuan)
+  → ARRIVED_AT_GUDANG     (Admin Gudang scan-verified — "Arrived at {Gudang}")
   → DELIVERED
 ```
 

@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Clock, History, Loader2, Package, RefreshCw } from "lucide-react";
-import { apiGetWithMeta, type AuditEntry, type AuditResponse } from "@/lib/client-api";
+import { apiGetWithMeta, hasPermission, type AuditEntry, type AuditResponse } from "@/lib/client-api";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/components/app/form-parts";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,10 @@ const ACTION_STYLES: Record<string, string> = {
 /**
  * Per-menu activity log: filters the global audit trail by entity type(s)
  * so each menu has its own clear, separated history.
+ *
+ * Users WITHOUT audit_log.view (e.g. Marketing) would only ever see an
+ * empty/erroring panel — the API rejects them — so the panel renders nothing
+ * at all for them instead of a useless "Belum ada aktivitas" box.
  */
 export function ActivityLogPanel({
   entityTypes,
@@ -38,12 +43,15 @@ export function ActivityLogPanel({
   limit?: number;
   compact?: boolean;
 }) {
+  const { user } = useAuth();
+  const canViewLog = hasPermission(user, "audit_log.view");
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    if (!canViewLog) return;
     setLoading(true);
     setError(null);
     try {
@@ -59,11 +67,14 @@ export function ActivityLogPanel({
     } finally {
       setLoading(false);
     }
-  }, [entityTypes, entityId, limit]);
+  }, [canViewLog, entityTypes, entityId, limit]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  // No audit_log.view → no log panel at all (never render an empty shell).
+  if (!canViewLog) return null;
 
   return (
     <div className="rounded-xl border bg-card">

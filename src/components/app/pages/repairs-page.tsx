@@ -48,6 +48,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
 /**
@@ -672,38 +673,50 @@ function RepairDetailDialog({ repair, onOpenChange }: { repair: VehicleRepairRow
             {repair.description} — {formatRupiah(repair.amount)} (terdeduct dari wallet Vehicle Owner)
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-3 text-sm">
-          <div className="grid grid-cols-2 gap-2">
-            <DetailItem label="Bengkel" value={repair.workshopVendor ?? "—"} />
-            <DetailItem label="Tanggal Repair" value={formatDate(repair.repairDate)} />
-            <DetailItem label="Dibuat" value={formatDate(repair.createdAt, true)} />
-            <DetailItem label="Status" value="Terverifikasi & Terdeduct" />
-          </div>
-          {repair.notes && <DetailItem label="Catatan" value={repair.notes} />}
-          {repair.proofUrl && (
-            <div className="space-y-2 rounded-lg border border-primary/25 bg-primary/5 p-3">
-              <p className="flex items-center gap-1.5 text-xs font-semibold text-primary"><FileImage className="h-3.5 w-3.5" /> Bukti Repair</p>
-              {repair.proofUrl.startsWith("data:image/") && <img src={repair.proofUrl} alt={`Bukti ${repair.repairCode}`} className="max-h-64 w-full rounded-md border bg-white object-contain" />}
-              <a href={repair.proofUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline">
-                <ExternalLink className="h-3.5 w-3.5" /> Buka bukti dalam tab baru
-              </a>
+        {/* Tabs keep the dialog clean: data repair di tab pertama, riwayat
+            aksi (kapan dibuat & siapa mengubah apa) di tab kedua. */}
+        <Tabs defaultValue="detail">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="detail">Detail Repair</TabsTrigger>
+            <TabsTrigger value="log">
+              Log Item Ini
+              {!logsLoading && <span className="ml-1.5 rounded-full bg-muted px-1.5 text-[10px] font-semibold text-muted-foreground">{(logs ?? []).length}</span>}
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="detail" className="mt-3 space-y-3 text-sm">
+            <div className="grid grid-cols-2 gap-2">
+              <DetailItem label="Bengkel" value={repair.workshopVendor ?? "—"} />
+              <DetailItem label="Tanggal Repair" value={formatDate(repair.repairDate)} />
+              <DetailItem label="Dibuat" value={formatDate(repair.createdAt, true)} />
+              <DetailItem label="Status" value="Terverifikasi & Terdeduct" />
             </div>
-          )}
-
-          {/* LOG #1 — per-item action log */}
-          <div className="rounded-lg border bg-muted/40 p-3">
-            <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              <History className="h-3.5 w-3.5" /> Log Item Ini — kapan dibuat & siapa mengubah apa
-            </p>
-            {logsLoading ? (
-              <div className="flex items-center justify-center gap-2 py-4 text-xs text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" /> Memuat log…
+            {repair.notes && <DetailItem label="Catatan" value={repair.notes} />}
+            {repair.proofUrl && (
+              <div className="space-y-2 rounded-lg border border-primary/25 bg-primary/5 p-3">
+                <p className="flex items-center gap-1.5 text-xs font-semibold text-primary"><FileImage className="h-3.5 w-3.5" /> Bukti Repair</p>
+                {repair.proofUrl.startsWith("data:image/") && <img src={repair.proofUrl} alt={`Bukti ${repair.repairCode}`} className="max-h-64 w-full rounded-md border bg-white object-contain" />}
+                <a href={repair.proofUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline">
+                  <ExternalLink className="h-3.5 w-3.5" /> Buka bukti dalam tab baru
+                </a>
               </div>
-            ) : (
-              <RepairLogTimeline logs={logs ?? []} />
             )}
-          </div>
-        </div>
+          </TabsContent>
+          <TabsContent value="log" className="mt-3">
+            {/* LOG #1 — per-item action log */}
+            <div className="rounded-lg border bg-muted/40 p-3">
+              <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <History className="h-3.5 w-3.5" /> Log Item Ini — kapan dibuat & siapa mengubah apa
+              </p>
+              {logsLoading ? (
+                <div className="flex items-center justify-center gap-2 py-4 text-xs text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Memuat log…
+                </div>
+              ) : (
+                <RepairLogTimeline logs={logs ?? []} />
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

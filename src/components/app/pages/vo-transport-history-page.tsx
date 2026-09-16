@@ -32,8 +32,17 @@ export function VOTransportHistoryPage({ initialTab = "history" }: { initialTab?
   const vehicles = useMemo(() => Array.from(new Set((data ?? []).map((r) => r.vehicleNumber))), [data]);
 
   const settled = rows.filter((r) => r.settlement);
+  const unsettled = rows.filter(
+    (r) => !r.settlement && r.transportValue > 0 && ["ARRIVED", "DEPARTED"].includes(r.status),
+  );
   const totalEarnings = settled.reduce((sum, r) => sum + (r.settlement?.ownerAmount ?? 0), 0);
   const totalValue = settled.reduce((sum, r) => sum + (r.settlement?.transportValue ?? 0), 0);
+  // Potential earnings not settled yet — what the owner COULD earn from
+  // finished transports still awaiting settlement (current config preview).
+  const potentialEarnings = unsettled.reduce((sum, r) => sum + (r.transportValue * r.ownerPercent) / 100, 0);
+
+  /** Potential (unsettled) earnings for a single row — amber/yellow. */
+  const estimateFor = (r: (typeof rows)[number]) => Math.round((r.transportValue * r.ownerPercent) / 100);
 
   if (!canView || user?.partnerType !== "VEHICLE_OWNER") {
     return <PageHeader title="Riwayat Transport" subtitle="Halaman ini khusus untuk Vehicle Owner." icon={<History className="h-5 w-5" />} />;
@@ -107,7 +116,17 @@ export function VOTransportHistoryPage({ initialTab = "history" }: { initialTab?
                 header: "Penghasilan",
                 render: (r) =>
                   r.settlement ? (
-                    <span className="font-semibold text-primary">+{formatRupiah(r.settlement.ownerAmount)}</span>
+                    // settled → GREEN (already in the wallet)
+                    <div>
+                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">+{formatRupiah(r.settlement.ownerAmount)}</span>
+                      <p className="text-[10px] font-medium text-emerald-600/80 dark:text-emerald-400/80">sudah disettle</p>
+                    </div>
+                  ) : r.transportValue > 0 && ["ARRIVED", "DEPARTED"].includes(r.status) ? (
+                    // not settled yet → YELLOW with the potential amount
+                    <div>
+                      <span className="font-semibold text-amber-500 dark:text-yellow-400">~{formatRupiah(estimateFor(r))}</span>
+                      <p className="text-[10px] font-medium text-amber-500/80 dark:text-yellow-400/80">potensi — belum disettle</p>
+                    </div>
                   ) : (
                     <span className="text-xs text-muted-foreground">belum disettle</span>
                   ),
@@ -133,11 +152,24 @@ export function VOTransportHistoryPage({ initialTab = "history" }: { initialTab?
         </TabsContent>
 
         <TabsContent value="earnings" className="mt-3 space-y-3">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
             <SummaryTile label="Total Nilai Transport Disettle" value={formatRupiah(totalValue)} icon={<History className="h-4 w-4" />} />
-            <SummaryTile label="Total Earnings Anda" value={formatRupiah(totalEarnings)} icon={<TrendingUp className="h-4 w-4" />} accent="text-primary" />
+            <SummaryTile label="Total Earnings Anda" value={formatRupiah(totalEarnings)} icon={<TrendingUp className="h-4 w-4" />} accent="text-emerald-600 dark:text-emerald-400" />
             <SummaryTile label="Jumlah Settlement" value={`${settled.length}×`} icon={<TrendingUp className="h-4 w-4" />} />
+            {/* Potential (unsettled) earnings — YELLOW so the owner knows what
+                they could still earn from transports awaiting settlement. */}
+            <SummaryTile
+              label="Potensi Belum Disettle"
+              value={formatRupiah(potentialEarnings)}
+              icon={<TrendingUp className="h-4 w-4" />}
+              accent="text-amber-500 dark:text-yellow-400"
+            />
           </div>
+          {potentialEarnings > 0 && (
+            <p className="rounded-lg border border-amber-300/60 bg-amber-50/70 px-3 py-2 text-xs text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
+              Anda punya <b>{unsettled.length} transport selesai</b> yang belum di-settle — potensi penghasilan <b className="text-amber-600 dark:text-yellow-400">~{formatRupiah(potentialEarnings)}</b> (dihitung dari konfigurasi profit sharing saat ini, berupa warna kuning sampai disettle).
+            </p>
+          )}
           <p className="text-xs text-muted-foreground">
             Setiap settlement menyimpan persentase saat settlement dibuat — perubahan konfigurasi profit sharing di kemudian hari tidak mengubah settlement lama (§37).
           </p>
@@ -167,7 +199,7 @@ export function VOTransportHistoryPage({ initialTab = "history" }: { initialTab?
               {
                 key: "earnings",
                 header: "Penghasilan Anda",
-                render: (r) => <span className="font-semibold text-primary">+{formatRupiah(r.settlement?.ownerAmount ?? 0)}</span>,
+                render: (r) => <span className="font-semibold text-emerald-600 dark:text-emerald-400">+{formatRupiah(r.settlement?.ownerAmount ?? 0)}</span>,
               },
               { key: "date", header: "Finalisasi", hideOnMobile: true, render: (r) => formatDate(r.settlement?.finalizedAt) },
             ]}

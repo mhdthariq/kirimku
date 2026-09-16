@@ -32,10 +32,12 @@ type ArrivalTask = GudangArrivalQueueItem | GudangTransportArrivalItem;
  * - mode "kurir":     shipment PICKED_UP — the kurir brings the packages back
  *                     to the ORIGIN gudang. Confirming flips the shipment to
  *                     RECEIVED_AT_GUDANG.
- * - mode "transport": shipment ARRIVED_AT_GUDANG — a transport driver unloaded
- *                     packages from ANOTHER gudang at this (destination)
- *                     gudang. Confirming stamps destReceivedAt so the shipment
- *                     can be assigned for delivery.
+ * - mode "transport": shipment AT_DEST_GUDANG — the transport driver checked
+ *                     in at the LAST checkpoint (packages from ANOTHER gudang
+ *                     at this destination gudang). Confirming stamps
+ *                     destReceivedAt AND flips the shipment to ARRIVED_AT_GUDANG
+ *                     ("Arrived at {Gudang}") so it can be assigned for
+ *                     delivery.
  *
  * Shared by:
  * - Gudang → Kedatangan tab (per-row "Terima / Scan" button)

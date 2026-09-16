@@ -9,9 +9,10 @@ type Params = { params: Promise<{ id: string }> };
 
 /** Arrival scan progress for a shipment.
  *  - PICKED_UP → kurir drop-off at the origin gudang (gudang_arrival)
- *  - ARRIVED_AT_GUDANG → transport drop-off at the destination gudang
- *    (transport_arrival) — Admin Gudang scans every package before the
- *    shipment can be received / assigned for delivery.
+ *  - AT_DEST_GUDANG / ARRIVED_AT_GUDANG-without-destReceivedAt → transport
+ *    drop-off at the destination gudang (transport_arrival) — Admin Gudang
+ *    scans every package before the shipment can be received / assigned for
+ *    delivery.
  */
 export async function GET(req: NextRequest, { params }: Params) {
   return handle(async () => {
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     const master = await db.masterShipment.findUnique({ where: { id: Number(id) } });
     if (!master) return fail(404, "Shipment tidak ditemukan.");
     await assertShipmentScope(user, master);
-    const context = arrivalScanContext(master.status) ?? "gudang_arrival";
+    const context = arrivalScanContext(master.status, master.destReceivedAt) ?? "gudang_arrival";
     const progress = await scanProgress({ masterId: master.id, context });
     return ok({ progress, context });
   });
@@ -29,8 +30,9 @@ export async function GET(req: NextRequest, { params }: Params) {
 /**
  * Record one package scan while a shipment is being received at the gudang:
  *  - kurir drop-off: shipment PICKED_UP (kurir brings picked-up packages back)
- *  - transport drop-off: shipment ARRIVED_AT_GUDANG (driver unloaded packages
- *    from the linehaul vehicle at the destination gudang)
+ *  - transport drop-off: shipment AT_DEST_GUDANG (driver checked in at the
+ *    last checkpoint — packages unloaded at the destination gudang, awaiting
+ *    the Admin Gudang reception scan)
  * Body: { payload, method } where method is "SCANNED" (phone camera / reader
  * tool) or "TYPED" (typed manually). Response messages never echo the code
  * back (anti copy-paste).
@@ -43,11 +45,11 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (!master) return fail(404, "Shipment tidak ditemukan.");
     await assertShipmentScope(user, master);
 
-    const context = arrivalScanContext(master.status);
+    const context = arrivalScanContext(master.status, master.destReceivedAt);
     if (!context) {
       return fail(
         422,
-        `Konfirmasi tiba di gudang hanya untuk shipment PICKED_UP (kurir) atau ARRIVED_AT_GUDANG (transport) — saat ini: ${master.status}.`,
+        `Konfirmasi tiba di gudang hanya untuk shipment PICKED_UP (kurir) atau AT_DEST_GUDANG (transport) — saat ini: ${master.status}.`,
       );
     }
 

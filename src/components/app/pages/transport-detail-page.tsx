@@ -13,6 +13,7 @@ import {
   Package,
   PackageCheck,
   PackageSearch,
+  Pencil,
   Route,
   Scale,
   Truck,
@@ -21,18 +22,30 @@ import {
   Boxes,
   Coins,
   Info,
+  XCircle,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { apiGet, apiPost, hasPermission, type TransportDetail } from "@/lib/client-api";
+import { apiDelete, apiGet, hasPermission, type Transport, type TransportDetail } from "@/lib/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader } from "@/components/app/data-table";
 import { StatusBadge } from "@/components/app/status-badge";
 import { formatDate, formatNumber, formatRupiah } from "@/components/app/form-parts";
 import { CheckpointCheckinDialog } from "@/components/app/checkpoint-checkin-dialog";
+import { TransportFormDialog } from "@/components/app/transport-form-dialog";
 import type { TransportMapCheckpoint } from "@/components/app/transport-map";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const TransportMap = dynamic(() => import("@/components/app/transport-map").then((m) => m.TransportMap), {
   ssr: false,
@@ -67,10 +80,54 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
     [transportId],
   );
   const [checkinOpen, setCheckinOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const can = {
     checkin: hasPermission(user, "transport.checkin"),
+    // Edit & Remove are available for PLANNED transports only, gated on
+    // transport.create (same rule as the list page + the API).
+    manage: hasPermission(user, "transport.create"),
   };
+
+  async function onDelete() {
+    setConfirmDelete(false);
+    const ok = await runAction(() => apiDelete(`/transports/${transportId}`), { success: "Transport dihapus." });
+    if (ok) window.location.hash = "#/transports";
+  }
+
+  // TransportDetail → the Transport-ish shape the shared edit dialog expects.
+  const editingTransport: Transport | null =
+    transport && transport.status === "PLANNED"
+      ? {
+          id: transport.id,
+          transportCode: transport.transportCode,
+          status: transport.status,
+          routeId: transport.routeId,
+          routeName: transport.routeName,
+          vehicleId: transport.vehicle.id,
+          vehicleNumber: transport.vehicle.vehicleNumber,
+          vehicleName: transport.vehicle.name,
+          driverName: transport.driver?.name ?? null,
+          kenekName: transport.kenek?.name ?? null,
+          origin: transport.origin,
+          destination: transport.destination,
+          plannedDepartureAt: transport.plannedDepartureAt,
+          plannedArrivalAt: transport.plannedArrivalAt,
+          departedAt: transport.departedAt,
+          arrivedAt: transport.arrivedAt,
+          createdAt: transport.createdAt,
+          currentLatitude: transport.currentLatitude,
+          currentLongitude: transport.currentLongitude,
+          lastLocationAt: transport.lastLocationAt,
+          shipments: [],
+          checkpointRecordsCount: transport.checkpointRecords.length,
+          shipmentCount: transport.shipmentCount,
+          totalWeightKg: transport.totalWeightKg,
+          totalVolumeM3: transport.totalVolumeM3,
+          totalPrice: transport.totalPrice,
+        }
+      : null;
 
   // is the signed-in user part of this transport's crew (driver/kenek)?
   const isCrew = useMemo(() => {
@@ -154,6 +211,16 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
             {canCheckinNow && (
               <Button size="sm" onClick={() => setCheckinOpen(true)}>
                 <Camera className="h-3.5 w-3.5" /> Check-in Checkpoint
+              </Button>
+            )}
+            {transport.status === "PLANNED" && can.manage && (
+              <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
+                <Pencil className="h-3.5 w-3.5" /> Edit
+              </Button>
+            )}
+            {transport.status === "PLANNED" && can.manage && (
+              <Button size="sm" variant="outline" className="text-destructive hover:text-destructive" onClick={() => setConfirmDelete(true)}>
+                <XCircle className="h-3.5 w-3.5" /> Hapus
               </Button>
             )}
           </div>
@@ -356,7 +423,16 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
                       <td className="px-3 py-2.5 text-right font-mono text-xs">{formatNumber(s.weightKg, 1)}</td>
                       <td className="px-3 py-2.5 text-right font-mono text-xs">{formatNumber(s.volumeM3, 3)}</td>
                       <td className="px-3 py-2.5 text-right font-mono text-xs">{s.priceAmount != null ? formatRupiah(s.priceAmount) : "—"}</td>
-                      <td className="px-3 py-2.5"><StatusBadge status={s.status} /></td>
+                      <td className="px-3 py-2.5">
+                        <StatusBadge
+                          status={s.status}
+                          label={
+                            s.status === "ARRIVED_AT_GUDANG"
+                              ? `Arrived at ${s.arrivedWarehouseName ?? s.destinationWarehouseName ?? s.destination}`
+                              : undefined
+                          }
+                        />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -390,6 +466,32 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
         checkpoints={mapCheckpoints}
         onDone={reload}
       />
+
+      {/* Edit — shared create/edit dialog (PLANNED transports only) */}
+      <TransportFormDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        editing={editingTransport}
+        onSaved={reload}
+      />
+
+      {/* Remove — confirmation dialog (PLANNED transports only) */}
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus transport {transport.transportCode}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Hanya transport berstatus PLANNED yang bisa dihapus. Shipment yang belum berangkat akan dikembalikan ke status RECEIVED_AT_GUDANG.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={onDelete}>
+              Ya, hapus
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

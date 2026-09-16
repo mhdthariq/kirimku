@@ -17,9 +17,11 @@ let seedPromise: Promise<void> | null = null;
  *  1. connects the demo customers to the Marketing partner budi (only when
  *     still unassigned, so manual owner assignments always win) — powers the
  *     "marketing only knows their customers" data separation;
- *  2. creates the "arrived at ANOTHER gudang" demo shipment MKT-000007 —
- *     physically at Gudang Bandung with destReceivedAt still null, awaiting
- *     the Admin Gudang (ratna) transport drop-off scan.
+ *  2. creates the "driver checked in at the destination gudang" demo
+ *     shipment MKT-000007 — physically at Gudang Bandung on the new
+ *     AT_DEST_GUDANG status (destReceivedAt still null), awaiting the Admin
+ *     Gudang (ratna) transport drop-off scan; legacy rows still on
+ *     ARRIVED_AT_GUDANG + destReceivedAt null are migrated to the new status.
  */
 async function seedBackfill(): Promise<void> {
   try {
@@ -38,8 +40,15 @@ async function seedBackfill(): Promise<void> {
       });
     }
 
-    // --- 2. MKT-000007 — arrived at another gudang, awaiting scan ------------
-    if (await db.masterShipment.findUnique({ where: { masterCode: "MKT-000007" } })) return;
+    // --- 2. MKT-000007 — driver at destination gudang, awaiting scan ---------
+    const existingDemo = await db.masterShipment.findUnique({ where: { masterCode: "MKT-000007" } });
+    if (existingDemo) {
+      // migrate legacy demo rows (pre AT_DEST_GUDANG split) to the new status
+      if (existingDemo.status === "ARRIVED_AT_GUDANG" && existingDemo.destReceivedAt == null) {
+        await db.masterShipment.update({ where: { id: existingDemo.id }, data: { status: "AT_DEST_GUDANG" } });
+      }
+      return;
+    }
     const [sari, jakarta, bandung, tariffRow] = await Promise.all([
       db.customer.findUnique({ where: { code: "CUS-000005" } }),
       db.warehouse.findFirst({ where: { city: "Jakarta Pusat" } }),
@@ -62,7 +71,7 @@ async function seedBackfill(): Promise<void> {
         resi: "MKT-000007",
         customerId: sari.id,
         tariffId: tariffRow?.id ?? null,
-        status: "ARRIVED_AT_GUDANG",
+        status: "AT_DEST_GUDANG",
         origin: "Jakarta Pusat",
         destination: "Bandung",
         originWarehouseId: jakarta.id,
@@ -124,7 +133,7 @@ async function seedBackfill(): Promise<void> {
       { event: "PICKED_UP", description: "Picked-up by Dewi Lestari", daysAgo: 1.45, actorId: dewiId },
       { event: "RECEIVED_AT_GUDANG", description: "Diterima di Gudang Jakarta Pusat", daysAgo: 1.4, actorId: agusId },
       { event: "IN_TRANSPORT", description: "Berangkat via transport TRP-2026-000003", daysAgo: 1.3, actorId: jokoId },
-      { event: "ARRIVED_AT_GUDANG", description: `Transport TRP-2026-000003 tiba di gudang tujuan dari ${jakarta.name} — menunggu scan penerimaan Admin Gudang`, daysAgo: 0.8, actorId: jokoId },
+      { event: "AT_DEST_GUDANG", description: `Driver transport TRP-2026-000003 check-in di checkpoint akhir (dari ${jakarta.name}) — paket ada di gudang tujuan, menunggu scan penerimaan Admin Gudang`, daysAgo: 0.8, actorId: jokoId },
     ];
     for (const ev of events) {
       await db.trackingEvent.create({

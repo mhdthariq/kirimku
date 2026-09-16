@@ -17,11 +17,14 @@ type Params = { params: Promise<{ id: string }> };
  * - mode "walk_in":   customer handed the package over at the gudang counter —
  *                     no scanning needed, allowed straight from CREATED /
  *                     READY_FOR_PICKUP.
- * - mode "transport": shipment ARRIVED_AT_GUDANG (transport driver unloaded
- *                     the packages at the DESTINATION gudang) — every package
- *                     must have been scanned (transport_arrival context)
- *                     first; stamps destReceivedAt so the shipment counts as
- *                     fully received and can be assigned for delivery.
+ * - mode "transport": shipment AT_DEST_GUDANG (transport driver checked in
+ *                     at the LAST checkpoint / unloaded the packages at the
+ *                     DESTINATION gudang) — every package must have been
+ *                     scanned (transport_arrival context) first; stamps
+ *                     destReceivedAt AND moves the status to
+ *                     ARRIVED_AT_GUDANG ("Arrived at {Gudang Tujuan}"), so
+ *                     the shipment counts as fully received and can be
+ *                     assigned for delivery.
  */
 export async function POST(req: NextRequest, { params }: Params) {
   return handle(async () => {
@@ -40,12 +43,16 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     if (mode === "transport") {
       // ------------------------------------------------------------------
-      // Transport drop-off at the destination gudang: the shipment already
-      // reached ANOTHER gudang (ARRIVED_AT_GUDANG). Admin Gudang of that
-      // gudang scans every package and confirms receipt here.
+      // Transport drop-off at the destination gudang: the driver already
+      // checked in at the LAST checkpoint (AT_DEST_GUDANG). Admin Gudang of
+      // that gudang scans every package and confirms receipt here — THAT is
+      // the moment the shipment becomes "Arrived at {Gudang Tujuan}".
+      // (Legacy rows still on ARRIVED_AT_GUDANG with destReceivedAt null are
+      // accepted too.)
       // ------------------------------------------------------------------
-      if (master.status !== "ARRIVED_AT_GUDANG") {
-        return fail(422, `Mode transport hanya untuk shipment ARRIVED_AT_GUDANG (saat ini: ${master.status}).`);
+      const awaitingScan = master.status === "AT_DEST_GUDANG" || (master.status === "ARRIVED_AT_GUDANG" && master.destReceivedAt == null);
+      if (!awaitingScan) {
+        return fail(422, `Mode transport hanya untuk shipment AT_DEST_GUDANG / menunggu scan Admin Gudang (saat ini: ${master.status}).`);
       }
       if (master.destReceivedAt != null) {
         return fail(422, "Shipment ini sudah diterima & diverifikasi scan di gudang tujuan.");
@@ -75,7 +82,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       const updated = await db.$transaction(async (tx) => {
         const result = await tx.masterShipment.update({
           where: { id: master.id },
-          data: { destReceivedAt: new Date() },
+          data: { destReceivedAt: new Date(), status: "ARRIVED_AT_GUDANG" },
         });
         await tx.trackingEvent.create({
           data: {

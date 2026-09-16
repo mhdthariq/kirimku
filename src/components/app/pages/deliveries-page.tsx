@@ -45,9 +45,10 @@ export function DeliveriesPage() {
     if (!can.assign) return;
     Promise.all([
       apiGet<Shipment[]>("/shipments?status=ARRIVED_AT_GUDANG"),
+      apiGet<Shipment[]>("/shipments?status=AT_DEST_GUDANG"),
       apiGet<Shipment[]>("/shipments?status=RECEIVED_AT_GUDANG"),
     ])
-      .then(([a, r]) => setReadyShipments([...a, ...r]))
+      .then(([a, d, r]) => setReadyShipments([...a, ...d, ...r]))
       .catch(() => undefined);
   }, [can.assign, data]);
 
@@ -128,14 +129,18 @@ export function DeliveriesPage() {
   // employee has a position set (legacy data).
   const kurirOptions = employeesByPosition(options?.employees ?? [], "Kurir").map((emp) => ({ value: String(emp.id), label: emp.name }));
   // Ready-to-deliver shipments — shipments from ANOTHER gudang must have been
-  // scan-verified by Admin Gudang (destReceivedAt) before they appear here.
+  // scan-verified & received by Admin Gudang (status ARRIVED_AT_GUDANG with
+  // destReceivedAt set) before they appear here. AT_DEST_GUDANG rows (driver
+  // checked in, packages not yet scanned) are deliberately excluded.
   const shipmentOptions = readyShipments
-    .filter((s) => s.status !== "ARRIVED_AT_GUDANG" || s.destReceivedAt != null)
+    .filter((s) => (s.status === "ARRIVED_AT_GUDANG" ? s.destReceivedAt != null : s.status === "RECEIVED_AT_GUDANG"))
     .map((s) => ({
       value: String(s.id),
       label: `${s.masterCode} · ${s.customer?.name ?? ""} → ${s.destination}${s.status === "ARRIVED_AT_GUDANG" && s.originWarehouseName ? ` (dari ${s.originWarehouseName})` : ""}`,
     }));
-  const pendingScanCount = readyShipments.filter((s) => s.status === "ARRIVED_AT_GUDANG" && s.destReceivedAt == null).length;
+  const pendingScanCount = readyShipments.filter(
+    (s) => s.status === "AT_DEST_GUDANG" || (s.status === "ARRIVED_AT_GUDANG" && s.destReceivedAt == null),
+  ).length;
 
   return (
     <div className="space-y-4">
@@ -161,12 +166,12 @@ export function DeliveriesPage() {
         }
       />
 
-      {/* Shipments from another gudang still awaiting the Admin Gudang scan-in —
+      {/* Shipments whose driver already checked in at the destination gudang
+          but whose packages were not scan-received by Admin Gudang yet —
           they cannot be assigned for delivery until scanned. */}
       {pendingScanCount > 0 && (
         <p className="rounded-lg border border-amber-300 bg-amber-50/70 px-3 py-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
-          {pendingScanCount} shipment dari gudang lain menunggu scan penerimaan Admin Gudang — buka menu <b>Shipments</b> (status From Another
-          Gudang) untuk scan paketnya sebelum menugaskan kurir delivery.
+          {pendingScanCount} shipment sudah tiba di gudang tujuan (driver check-in checkpoint akhir) tetapi menunggu scan penerimaan Admin Gudang — buka menu <b>Shipments</b> (status Tiba di Gudang Tujuan) untuk scan paketnya sebelum menugaskan kurir delivery.
         </p>
       )}
 

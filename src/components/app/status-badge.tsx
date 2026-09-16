@@ -11,15 +11,20 @@ const STATUS_MAP: Record<string, { label: string; variant: "default" | "secondar
   // Origin-side intake (kurir drop-off scan / walk-in at the journey's first gudang)
   RECEIVED_AT_GUDANG: { label: "Arrived at Origin Gudang", variant: "secondary" },
   IN_TRANSPORT: { label: "In Transport", variant: "default", pulse: true },
-  // Reached ANOTHER gudang (destination branch) via transport — Admin Gudang
-  // of that gudang must scan the packages in before delivery can be assigned.
-  ARRIVED_AT_GUDANG: { label: "Arrived at Another Gudang", variant: "default", pulse: true },
+  // The transport driver checked in at the LAST checkpoint (Gudang Tujuan) —
+  // packages are physically at the destination branch but Admin Gudang has
+  // NOT scan-verified them yet (awaiting the reception scan).
+  AT_DEST_GUDANG: { label: "Tiba di Gudang Tujuan", variant: "secondary", pulse: true },
+  // Packages scan-verified & received by Admin Gudang of the destination
+  // gudang. Pages that know the destination gudang pass a dynamic label such
+  // as "Arrived at Gudang Jakarta Pusat" via the `label` prop.
+  ARRIVED_AT_GUDANG: { label: "Arrived at Gudang Tujuan", variant: "default" },
   DELIVERED: { label: "Delivered", variant: "default" },
   CANCELLED: { label: "Cancelled", variant: "destructive" },
-  // Tasks
+  // Tasks (PICKED_UP is already defined above — one badge style for both the
+  // shipment status and the pickup task state)
   ASSIGNED: { label: "Assigned", variant: "secondary" },
   IN_PROGRESS: { label: "In Progress", variant: "default", pulse: true },
-  PICKED_UP: { label: "Picked Up", variant: "default", pulse: true },
   COMPLETED: { label: "Completed", variant: "default" },
   FAILED: { label: "Failed", variant: "destructive" },
   // Transport
@@ -48,12 +53,12 @@ const STATUS_MAP: Record<string, { label: string; variant: "default" | "secondar
   FINALIZED: { label: "Final", variant: "default" },
 };
 
-export function StatusBadge({ status, className }: { status: string; className?: string }) {
+export function StatusBadge({ status, className, label }: { status: string; className?: string; label?: string }) {
   const meta = STATUS_MAP[status] ?? { label: status, variant: "outline" as const };
   return (
     <Badge variant={meta.variant} className={cn("whitespace-nowrap", className)}>
       <span className={cn("mr-1 inline-block h-1.5 w-1.5 rounded-full bg-current", meta.pulse && "pulse-dot")} />
-      {meta.label}
+      {label ?? meta.label}
     </Badge>
   );
 }

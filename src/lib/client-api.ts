@@ -479,6 +479,9 @@ export interface TransportDetail {
     destination: string;
     customerName: string | null;
     penerimaName: string | null;
+    /** warehouse names — power the dynamic "Arrived at {Gudang}" status label */
+    arrivedWarehouseName: string | null;
+    destinationWarehouseName: string | null;
     packages: number;
     weightKg: number;
     volumeM3: number;

@@ -74,6 +74,11 @@ export async function GET(req: NextRequest, { params }: Params) {
     const masters = transport.shipments.map((s) => s.master);
     const agg = aggregateTransport(masters, volumeByMaster, actualKgByMaster);
 
+    // Warehouse names so the UI can render the dynamic "Arrived at {Gudang}"
+    // status label for destination-side shipments.
+    const whRows = await db.warehouse.findMany({ select: { id: true, name: true } });
+    const whName = (id: number | null | undefined) => (id == null ? null : whRows.find((w) => w.id === id)?.name ?? null);
+
     return ok({
       id: transport.id,
       transportCode: transport.transportCode,
@@ -129,6 +134,8 @@ export async function GET(req: NextRequest, { params }: Params) {
         destination: s.master.destination,
         customerName: s.master.customer?.name ?? null,
         penerimaName: s.master.penerimaName,
+        arrivedWarehouseName: whName(s.master.arrivedWarehouseId),
+        destinationWarehouseName: whName(s.master.destinationWarehouseId),
         packages: packagesByMaster.get(s.shipmentId) ?? 0,
         weightKg: Math.round((s.master.chargeableWeightKg ?? actualKgByMaster.get(s.shipmentId) ?? 0) * 100) / 100,
         volumeM3: Math.round((volumeByMaster.get(s.shipmentId) ?? 0) * 1_000_000) / 1_000_000,
@@ -170,9 +177,28 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
     const plannedDepartureAt = (data.plannedDepartureAt as Date | null | undefined) ?? existing.plannedDepartureAt;
     const plannedArrivalAt = (data.plannedArrivalAt as Date | null | undefined) ?? existing.plannedArrivalAt;
-    if (plannedDepartureAt && plannedArrivalAt && plannedArrivalAt < plannedDepartureAt) {
+    // Rencana Berangkat & Rencana Tiba are REQUIRED — a PLANNED transport must
+    // always carry a complete schedule before it can be departed/confirmed.
+    if (!plannedDepartureAt) {
+      return fail(422, "Rencana Berangkat wajib diisi.", {
+        plannedDepartureAt: ["Rencana Berangkat wajib diisi."],
+      });
+    }
+    if (!plannedArrivalAt) {
+      return fail(422, "Rencana Tiba wajib diisi.", {
+        plannedArrivalAt: ["Rencana Tiba wajib diisi."],
+      });
+    }
+    if (plannedArrivalAt < plannedDepartureAt) {
       return fail(422, "Rencana tiba tidak boleh lebih awal dari rencana berangkat.", {
         plannedArrivalAt: ["Rencana tiba harus setelah rencana berangkat."],
+      });
+    }
+    // Rute wajib terpasang sebelum transport dikonfirmasi/diberangkatkan.
+    const routeId = (data.routeId as number | undefined) ?? existing.routeId;
+    if (!routeId) {
+      return fail(422, "Rute wajib dipilih sebelum transport dikonfirmasi.", {
+        routeId: ["Rute wajib dipilih."],
       });
     }
 

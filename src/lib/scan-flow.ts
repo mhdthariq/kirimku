@@ -29,14 +29,19 @@ export function normalizeMethod(value: unknown): "SCANNED" | "TYPED" {
 /** Resolve the arrival-scan context for a shipment:
  *  - PICKED_UP          → "gudang_arrival"  (kurir drops the packages off at
  *                                             the origin gudang counter)
- *  - ARRIVED_AT_GUDANG   → "transport_arrival" (transport driver dropped the
- *                                             packages at the DESTINATION
- *                                             gudang — Admin Gudang scans
- *                                             them in before delivery)
+ *  - AT_DEST_GUDANG      → "transport_arrival" (transport driver checked in at
+ *                                             the LAST checkpoint — packages
+ *                                             physically at the destination
+ *                                             gudang, awaiting Admin Gudang
+ *                                             reception scan)
+ *  - ARRIVED_AT_GUDANG   → "transport_arrival" (LEGACY rows created before the
+ *                             AT_DEST_GUDANG split: arrived but destReceivedAt
+ *                             still null — still mid-scan)
  *  Returns null when the shipment is in no arrival-scan state. */
-export function arrivalScanContext(status: string): ScanContext | null {
+export function arrivalScanContext(status: string, destReceivedAt?: Date | string | null): ScanContext | null {
   if (status === "PICKED_UP") return "gudang_arrival";
-  if (status === "ARRIVED_AT_GUDANG") return "transport_arrival";
+  if (status === "AT_DEST_GUDANG") return "transport_arrival";
+  if (status === "ARRIVED_AT_GUDANG" && (destReceivedAt == null || destReceivedAt === undefined)) return "transport_arrival";
   return null;
 }
 
