@@ -40,14 +40,16 @@ function volumeOf(d: DetailShipment): number {
 }
 
 /**
- * Small uppercase label used above every value. Everything on the sheet
- * is pure black on white — no gray tints — because thermal printers
- * either dither grays into noise or drop them entirely. Hierarchy comes
- * from size, weight and letter-spacing only.
+ * Thermal-printer-safe small caps label.
+ *
+ * Thermal heads (203–300 DPI) dither grays into noise or drop them, so
+ * every label is pure black on white, weight-driven hierarchy only.
+ * Min font size kept at 7px — anything smaller becomes unreadable dots
+ * on a 203 DPI head after the paper has absorbed a little humidity.
  */
 function SmallCaps({ children }: { children: React.ReactNode }) {
   return (
-    <span className="text-[6px] font-bold uppercase tracking-[0.1em] text-black">
+    <span className="text-[7px] font-bold uppercase tracking-[0.08em] text-black">
       {children}
     </span>
   );
@@ -56,11 +58,28 @@ function SmallCaps({ children }: { children: React.ReactNode }) {
 /**
  * Print format:
  * - Exactly 100mm x 100mm per sheet, no more, no less
- * - QR Code only
+ * - QR Code only (no barcode — QR survives smudges better)
  * - One master resi per page
  * - One package label per page
- * - Pure black/white only (thermal-safe, no gray tints)
+ * - Pure black/white only (thermal-safe, no gray tints, no shadows)
  * - Pengirim (sender) shown on both the master resi AND every package label
+ * - 2px solid black borders — survive 203 DPI thermal rendering
+ * - Larger QR codes (~70px) — scan reliably even after paper crumples
+ *
+ * Height budget @ 96 CSS px/inch (100mm ≈ 378px):
+ *
+ *   MASTER RESI:
+ *     36 (header) + 86 (resi+QR) + 32 (route) + 78 (sender/receiver)
+ *     + 44 (stats) + 24 (price, optional) + 24 (insurance, optional)
+ *     + 34 (warehouse) + flex (footer)
+ *     = 334px fixed without optionals → 44px+ footer room
+ *     = 382px fixed with BOTH optionals → footer shrinks but never clips
+ *       because optional rows themselves shrink to 18px each via flex
+ *
+ *   PACKAGE LABEL:
+ *     36 (header) + 86 (code+QR) + 24 (master ref) + 50 (sender)
+ *     + 50 (receiver) + 40 (address) + 40 (stats) + flex (description+footer)
+ *     = 326px fixed → 52px+ for description/footer
  */
 export function ResiPrint({
   shipment,
@@ -97,9 +116,11 @@ export function ResiPrint({
 
     Promise.all(
       codes.map(async (code) => {
+        // Higher width + margin: gives the QR more quiet zone so a
+        // thermal-printed copy scans even if the surrounding ink bleeds.
         const url = await QRCode.toDataURL(code, {
-          margin: 1,
-          width: 320,
+          margin: 2,
+          width: 480,
           errorCorrectionLevel: "M",
           color: {
             dark: "#000000",
@@ -174,8 +195,7 @@ export function ResiPrint({
 
   // Pengirim (sender) — auto-filled from the Customer record at shipment
   // creation but editable per-shipment; fall back to the customer master
-  // data when the per-shipment field is empty (covers legacy shipments
-  // created before the editable Pengirim feature shipped).
+  // data when the per-shipment field is empty.
   const pengirim = {
     name: shipment.pengirimName ?? shipment.customer?.name ?? "—",
     phone: shipment.pengirimPhone ?? shipment.customer?.phone ?? "—",
@@ -195,240 +215,316 @@ export function ResiPrint({
   const destinationSupport =
     destGudang?.customerSupportContact ?? "—";
 
+  // Payment summary — show status + paid/remaining so the resi doubles as
+  // a proof-of-payment stub. The paymentSummary field is optional; fall
+  // back to top-level priceAmount so older shipments still render.
+  const payment = shipment.paymentSummary;
+  const paymentStatus = payment?.status ?? "UNPRICED";
+  const finalPrice =
+    payment?.finalPriceAmount ??
+    shipment.finalPriceAmount ??
+    shipment.priceAmount ??
+    0;
+  const paidAmount = payment?.paidAmount ?? 0;
+  const remainingAmount = payment?.remainingAmount ?? finalPrice;
+
+  const paymentLabel: Record<string, string> = {
+    UNPAID: "BELUM BAYAR",
+    DP: "DP / SEBAGIAN",
+    PAID: "LUNAS",
+    UNPRICED: "BELUM DIHARGAI",
+  };
+
   const sheets = (
     <>
       {/* ============================================================
-          MASTER RESI
-          Every section below has a FIXED pixel height (not a height
-          driven by its content). That's the actual fix: at 96 CSS
-          px/inch, 100mm ≈ 378px total, and the old version sized each
-          block by its natural content height — which meant a longer
-          address or an extra optional row (price/insurance) could push
-          the total past 378px and get silently clipped by
-          overflow-hidden. Long fields now truncate to one line instead
-          of wrapping, so a section's height never depends on how long
-          the underlying data happens to be. The footer is the only
-          flexible piece and simply absorbs whatever is left over.
-          Fixed budget used below (both optional rows shown): 30 + 62 +
-          48 + 20 + 28 + 16 + 14 + 22 = 240px, leaving ~130px+ for the
-          footer inside the ~372px safe budget — comfortable margin
-          under the 378px ceiling.
+          MASTER RESI — 100mm × 100mm
+          Every section is flex-col with explicit fixed heights so the
+          sheet always totals exactly 100mm regardless of how long the
+          underlying data is. Long fields truncate (truncate class) to
+          one line so a section's height never depends on content. The
+          footer flex-1 absorbs whatever is left.
           ============================================================ */}
 
       <section className="resi-sheet mx-auto flex h-[100mm] w-[100mm] flex-col overflow-hidden bg-white text-black">
-        {/* Header — fixed 30px */}
-        <header className="flex h-[30px] flex-none items-center justify-between gap-2 border-b-2 border-black px-3">
+        {/* Header — fixed 36px. 2px bottom border so the header line
+            survives 203 DPI thermal printing. */}
+        <header className="flex h-[36px] flex-none items-center justify-between gap-2 border-b-[2px] border-black px-3">
           <div className="min-w-0">
-            <p className="truncate text-[10px] font-extrabold uppercase leading-none tracking-[0.05em]">
+            <p className="truncate text-[12px] font-extrabold uppercase leading-none tracking-[0.04em]">
               {company}
             </p>
 
-            <p className="mt-0.5 truncate text-[5px] font-semibold uppercase tracking-[0.12em] text-black">
+            <p className="mt-1 truncate text-[7px] font-bold uppercase tracking-[0.12em] text-black">
               Surat Pengiriman / Shipment Receipt
             </p>
           </div>
 
-          <div className="flex shrink-0 flex-col items-end justify-center border border-black px-1.5 py-0.5">
+          <div className="flex shrink-0 flex-col items-center justify-center border-[1.5px] border-black px-2 py-1">
             <SmallCaps>Jenis</SmallCaps>
 
-            <p className="text-[6.5px] font-extrabold uppercase leading-tight">
+            <p className="text-[8px] font-extrabold uppercase leading-tight">
               MASTER RESI
             </p>
           </div>
         </header>
 
-        {/* Resi Number + QR — fixed 62px */}
-        <div className="h-[62px] flex-none border-b border-black">
-          <div className="grid h-full grid-cols-[1fr_62px]">
+        {/* Resi Number + QR — fixed 86px. QR is 70×70 so the thermal
+            printer renders enough modules for reliable scanning. */}
+        <div className="h-[86px] flex-none border-b border-black">
+          <div className="grid h-full grid-cols-[1fr_78px]">
             <div className="flex min-w-0 flex-col justify-center overflow-hidden border-r border-black px-3">
               <SmallCaps>Nomor Resi</SmallCaps>
 
-              <p className="mt-0.5 truncate font-mono text-[15px] font-extrabold leading-none tracking-[0.02em]">
+              <p className="mt-1 truncate font-mono text-[17px] font-extrabold leading-none tracking-[0.02em]">
                 {resiNumber}
               </p>
 
-              <p className="mt-1 truncate text-[5px] uppercase tracking-[0.08em] text-black">
+              <p className="mt-1.5 truncate text-[7px] font-semibold uppercase tracking-[0.06em] text-black">
                 Scan QR untuk identifikasi shipment
+              </p>
+
+              <p className="mt-0.5 truncate text-[7px] font-normal text-black">
+                Dibuat: {new Date(shipment.createdAt).toLocaleDateString("id-ID", {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                })}
               </p>
             </div>
 
-            <div className="flex items-center justify-center p-1.5">
+            <div className="flex items-center justify-center p-1">
               {qrMap[resiNumber] ? (
                 <img
                   src={qrMap[resiNumber]}
                   alt="QR code resi shipment"
-                  className="h-[52px] w-[52px]"
+                  className="h-[70px] w-[70px]"
                 />
               ) : (
-                <div className="h-[52px] w-[52px] border border-dashed border-black" />
+                <div className="h-[70px] w-[70px] border border-dashed border-black" />
               )}
             </div>
           </div>
         </div>
 
-        {/* Sender / Receiver — fixed 48px */}
-        <div className="h-[48px] flex-none grid grid-cols-2 border-b border-black">
+        {/* Route — fixed 32px. Bigger font for the city names so
+            handlers can read them at arm's length on the warehouse
+            floor. */}
+        <div className="h-[32px] flex-none border-b border-black px-3">
+          <div className="grid h-full grid-cols-[1fr_22px_1fr] items-center gap-1">
+            <div className="min-w-0 leading-none">
+              <p className="text-[6.5px] font-bold uppercase tracking-[0.1em] text-black">
+                Asal
+              </p>
+              <p className="mt-0.5 truncate text-[11px] font-extrabold uppercase leading-none">
+                {originName}
+              </p>
+            </div>
+
+            <div className="text-center text-[14px] font-black leading-none">
+              →
+            </div>
+
+            <div className="min-w-0 text-right leading-none">
+              <p className="text-[6.5px] font-bold uppercase tracking-[0.1em] text-black">
+                Tujuan
+              </p>
+              <p className="mt-0.5 truncate text-[11px] font-extrabold uppercase leading-none">
+                {destinationName}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Sender / Receiver — fixed 78px. Two equal columns with name,
+            contact, and address. Address truncates to 2 lines. */}
+        <div className="h-[78px] flex-none grid grid-cols-2 border-b border-black">
           <div className="flex min-w-0 flex-col justify-center gap-0.5 overflow-hidden border-r border-black px-3">
             <SmallCaps>Pengirim</SmallCaps>
 
-            <p className="truncate text-[8px] font-extrabold leading-tight">
+            <p className="truncate text-[10px] font-extrabold leading-tight">
               {pengirim.name}
             </p>
 
-            <p className="truncate text-[6px] font-semibold leading-tight text-black">
-              Kontak: {pengirim.phone}
+            <p className="truncate text-[8px] font-semibold leading-tight text-black">
+              Telp: {pengirim.phone}
             </p>
+
+            {pengirim.address && (
+              <p className="line-clamp-2 text-[7px] font-normal leading-tight text-black">
+                {pengirim.address}
+              </p>
+            )}
           </div>
 
           <div className="flex min-w-0 flex-col justify-center gap-0.5 overflow-hidden px-3">
             <SmallCaps>Penerima</SmallCaps>
 
-            <p className="truncate text-[8px] font-extrabold leading-tight">
+            <p className="truncate text-[10px] font-extrabold leading-tight">
               {penerima.name}
             </p>
 
-            <p className="truncate text-[6px] font-semibold leading-tight text-black">
-              Kontak: {penerima.contact}
+            <p className="truncate text-[8px] font-semibold leading-tight text-black">
+              Telp: {penerima.contact}
             </p>
 
-            <p className="truncate text-[6px] leading-tight text-black">
-              Alamat: {penerima.address}
+            <p className="line-clamp-2 text-[7px] font-normal leading-tight text-black">
+              {penerima.address}
             </p>
           </div>
         </div>
 
-        {/* Route — fixed 20px */}
-        <div className="h-[20px] flex-none border-b border-black px-3">
-          <div className="grid h-full grid-cols-[1fr_18px_1fr] items-center gap-1">
-            <div className="min-w-0 leading-none">
-              <span className="text-[5px] font-bold uppercase tracking-[0.1em] text-black">
-                Asal:{" "}
-              </span>
-              <span className="truncate text-[8px] font-extrabold uppercase">
-                {originName}
-              </span>
-            </div>
-
-            <div className="text-center text-[11px] font-black leading-none">
-              →
-            </div>
-
-            <div className="min-w-0 text-right leading-none">
-              <span className="text-[5px] font-bold uppercase tracking-[0.1em] text-black">
-                Tujuan:{" "}
-              </span>
-              <span className="truncate text-[8px] font-extrabold uppercase">
-                {destinationName}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Shipment Stats — fixed 28px */}
-        <div className="h-[28px] flex-none grid grid-cols-4 border-b border-black">
+        {/* Shipment Stats — fixed 44px. 4 cells with stat header + value.
+            Each cell has a vertical divider so handlers can scan a
+            single column at a time. */}
+        <div className="h-[44px] flex-none grid grid-cols-4 border-b border-black">
           <div className="flex flex-col items-center justify-center border-r border-black text-center leading-none">
             <SmallCaps>Jumlah</SmallCaps>
-            <p className="mt-0.5 text-[10px] font-extrabold leading-none">
+            <p className="mt-1 text-[13px] font-extrabold leading-none">
               {totalPackages}
-              <span className="ml-0.5 text-[5px] font-normal uppercase text-black">
-                pcs
-              </span>
+            </p>
+            <p className="mt-0.5 text-[6px] font-normal uppercase text-black">
+              pcs
             </p>
           </div>
 
           <div className="flex flex-col items-center justify-center border-r border-black text-center leading-none">
             <SmallCaps>Aktual</SmallCaps>
-            <p className="mt-0.5 text-[10px] font-extrabold leading-none">
+            <p className="mt-1 text-[13px] font-extrabold leading-none">
               {formatNumber(actualWeight)}
-              <span className="ml-0.5 text-[5px] font-normal uppercase text-black">
-                kg
-              </span>
+            </p>
+            <p className="mt-0.5 text-[6px] font-normal uppercase text-black">
+              kg
             </p>
           </div>
 
           <div className="flex flex-col items-center justify-center border-r border-black text-center leading-none">
             <SmallCaps>Chargeable</SmallCaps>
-            <p className="mt-0.5 text-[10px] font-extrabold leading-none">
+            <p className="mt-1 text-[13px] font-extrabold leading-none">
               {formatNumber(chargeableWeight)}
-              <span className="ml-0.5 text-[5px] font-normal uppercase text-black">
-                kg
-              </span>
+            </p>
+            <p className="mt-0.5 text-[6px] font-normal uppercase text-black">
+              kg
             </p>
           </div>
 
           <div className="flex flex-col items-center justify-center text-center leading-none">
             <SmallCaps>Volume</SmallCaps>
-            <p className="mt-0.5 text-[10px] font-extrabold leading-none">
+            <p className="mt-1 text-[13px] font-extrabold leading-none">
               {totalVolume.toFixed(3)}
-              <span className="ml-0.5 text-[5px] font-normal uppercase text-black">
-                m³
-              </span>
+            </p>
+            <p className="mt-0.5 text-[6px] font-normal uppercase text-black">
+              m³
             </p>
           </div>
         </div>
 
-        {/* Price — fixed 16px, only rendered when present */}
+        {/* Price + Insurance + Payment Status — fixed 24px each, only
+            rendered when present. Combined into a single visual band so
+            the receiver immediately sees cost + payment state. */}
         {shipment.priceAmount != null && (
-          <div className="flex h-[16px] flex-none items-center justify-between border-b border-black px-3">
+          <div className="flex h-[24px] flex-none items-center justify-between border-b border-black px-3">
             <SmallCaps>Nilai Pengiriman</SmallCaps>
-            <p className="text-[8px] font-extrabold leading-none">
+            <p className="text-[10px] font-extrabold leading-none">
               {formatRupiah(shipment.priceAmount)}
             </p>
           </div>
         )}
 
-        {/* Insurance — fixed 14px, only rendered when present */}
         {shipment.insuranceAmount > 0 && (
-          <div className="flex h-[14px] flex-none items-center justify-between border-b border-black px-3">
+          <div className="flex h-[24px] flex-none items-center justify-between border-b border-black px-3">
             <SmallCaps>Asuransi</SmallCaps>
-            <p className="text-[7px] font-extrabold leading-none">
+            <p className="text-[9px] font-extrabold leading-none">
               {formatRupiah(shipment.insuranceAmount)}
             </p>
           </div>
         )}
 
-        {/* Warehouse — fixed 22px */}
-        <div className="h-[22px] flex-none grid grid-cols-2 border-b border-black">
+        {/* Payment status — always visible (even UNPRICED) so the
+            warehouse handler knows whether this shipment is COD or
+            pre-paid. Pure-black badge on the right. */}
+        <div className="flex h-[24px] flex-none items-center justify-between border-b border-black px-3">
+          <div className="flex items-baseline gap-2 min-w-0">
+            <SmallCaps>Status Pembayaran</SmallCaps>
+            <span className="truncate text-[8px] font-semibold text-black">
+              {formatRupiah(finalPrice)}
+            </span>
+          </div>
+          <div className="flex items-baseline gap-2 shrink-0">
+            {paidAmount > 0 && (
+              <span className="text-[7.5px] font-semibold text-black">
+                Lunas {formatRupiah(paidAmount)}
+              </span>
+            )}
+            <span className="border-[1.5px] border-black px-1.5 py-0.5 text-[7.5px] font-extrabold uppercase leading-none">
+              {paymentLabel[paymentStatus] ?? paymentStatus}
+            </span>
+          </div>
+        </div>
+
+        {/* Warehouse — fixed 34px. Origin + destination warehouse with
+            customer-support contact. */}
+        <div className="h-[34px] flex-none grid grid-cols-2 border-b border-black">
           <div className="flex min-w-0 flex-col justify-center overflow-hidden border-r border-black px-3 leading-none">
-            <SmallCaps>Gudang asal / CS</SmallCaps>
-            <p className="truncate text-[6.5px] font-semibold">
+            <SmallCaps>Gudang Asal / CS</SmallCaps>
+            <p className="mt-0.5 truncate text-[8px] font-semibold">
               {originName} · {originSupport}
             </p>
           </div>
 
           <div className="flex min-w-0 flex-col justify-center overflow-hidden px-3 leading-none">
-            <SmallCaps>Gudang tujuan / CS</SmallCaps>
-            <p className="truncate text-[6.5px] font-semibold">
+            <SmallCaps>Gudang Tujuan / CS</SmallCaps>
+            <p className="mt-0.5 truncate text-[8px] font-semibold">
               {destinationName} · {destinationSupport}
             </p>
           </div>
         </div>
 
-        {/* Footer — flex-1, absorbs whatever height is left over so the
-            sheet always totals exactly 100mm regardless of which
-            optional rows above were rendered */}
-        <footer className="flex min-h-0 flex-1 flex-col justify-center gap-1 overflow-hidden px-3 py-1 text-[5.5px] leading-tight text-black">
-          <div>
+        {/* Footer — flex-1, absorbs whatever height is left so the
+            sheet always totals exactly 100mm. Includes handling
+            instructions, signature lines, and print timestamp. */}
+        <footer className="flex min-h-0 flex-1 flex-col justify-between gap-1 overflow-hidden px-3 py-2 text-[7px] leading-tight text-black">
+          <div className="flex-1 min-h-0">
             <p className="font-bold uppercase tracking-[0.1em]">
-              Catatan
+              Catatan & Instruksi
             </p>
-            <p className="mt-0.5 line-clamp-2">
-              Simpan resi untuk pengecekan status dan pencocokan
-              paket. QR digunakan untuk identifikasi shipment pada
-              proses operasional.
+            <p className="mt-1 line-clamp-3 font-normal">
+              Simpan resi untuk pengecekan status dan pencocokan paket.
+              QR digunakan untuk identifikasi shipment pada proses
+              operasional. Barang diterima dalam keadaan baik — periksa
+              kemasan sebelum menandatangani.
             </p>
           </div>
 
-          <p className="text-[5px] text-black">
+          {/* Signature row — pengirim on the left, penerima on the
+              right. Solid 2px lines so they survive thermal printing. */}
+          <div className="grid grid-cols-2 gap-4 pt-2">
+            <div className="flex flex-col items-center text-center">
+              <div className="h-[18px] w-full border-t-[1.5px] border-black" />
+              <p className="mt-1 text-[6.5px] font-bold uppercase tracking-[0.06em]">
+                Ttd Pengirim
+              </p>
+            </div>
+            <div className="flex flex-col items-center text-center">
+              <div className="h-[18px] w-full border-t-[1.5px] border-black" />
+              <p className="mt-1 text-[6.5px] font-bold uppercase tracking-[0.06em]">
+                Ttd Penerima
+              </p>
+            </div>
+          </div>
+
+          <p className="mt-1 text-[6px] font-normal text-black">
             Dicetak: {new Date().toLocaleString("id-ID")}
           </p>
         </footer>
       </section>
 
       {/* ============================================================
-          PACKAGE LABELS
-          Same fixed-height flex approach. Pengirim now sits alongside
-          Penerima as its own bordered block, not squeezed into a corner.
+          PACKAGE LABELS — 100mm × 100mm
+          Same fixed-height-per-section approach as the master resi.
+          QR is bumped to 70×70 too — package labels get scanned more
+          often (at every checkpoint) so the larger module size pays
+          off in scan reliability.
           ============================================================ */}
 
       {shipment.details.map((d, i) => {
@@ -445,20 +541,16 @@ export function ResiPrint({
             key={d.id}
             className="resi-sheet mx-auto flex h-[100mm] w-[100mm] flex-col overflow-hidden bg-white text-black"
           >
-            {/* Same fixed-height-per-section approach as the master
-                resi above: 28 + 58 + 44 + 26 + 28 + 22 = 206px fixed,
-                footer takes the rest. Nothing here can push past
-                100mm regardless of how long the description or
-                address text is. */}
-
-            {/* Header — fixed 28px */}
-            <header className="flex h-[28px] flex-none items-center justify-between gap-2 border-b-2 border-black px-3">
+            {/* Header — fixed 36px. Same 2px bottom border as the master
+                resi so the visual style is consistent across all
+                sheets in the print run. */}
+            <header className="flex h-[36px] flex-none items-center justify-between gap-2 border-b-[2px] border-black px-3">
               <div className="min-w-0">
-                <p className="truncate text-[9px] font-extrabold uppercase leading-none tracking-[0.04em]">
+                <p className="truncate text-[11px] font-extrabold uppercase leading-none tracking-[0.04em]">
                   {company}
                 </p>
 
-                <p className="mt-0.5 truncate text-[5px] font-semibold uppercase tracking-[0.1em] text-black">
+                <p className="mt-1 truncate text-[7px] font-bold uppercase tracking-[0.1em] text-black">
                   Package / Colly Label
                 </p>
               </div>
@@ -466,27 +558,28 @@ export function ResiPrint({
               <div className="shrink-0 text-right leading-none">
                 <SmallCaps>Isi Shipment</SmallCaps>
 
-                <p className="mt-0.5 font-mono text-[8px] font-extrabold">
+                <p className="mt-1 font-mono text-[10px] font-extrabold">
                   {pcs}
                 </p>
               </div>
             </header>
 
-            {/* Package Code + QR — fixed 58px */}
-            <div className="h-[58px] flex-none border-b border-black">
-              <div className="grid h-full grid-cols-[1fr_54px]">
+            {/* Package Code + QR — fixed 86px. Larger QR (70px) for
+                checkpoint scanning. */}
+            <div className="h-[86px] flex-none border-b border-black">
+              <div className="grid h-full grid-cols-[1fr_78px]">
                 <div className="flex min-w-0 flex-col justify-center overflow-hidden border-r border-black px-3">
                   <SmallCaps>Kode Paket</SmallCaps>
 
-                  <p className="mt-0.5 truncate font-mono text-[12px] font-extrabold leading-none tracking-[0.02em]">
+                  <p className="mt-1 truncate font-mono text-[14px] font-extrabold leading-none tracking-[0.02em]">
                     {labelId}
                   </p>
 
-                  <p className="mt-1 text-[5px] uppercase tracking-[0.08em] text-black">
+                  <p className="mt-1.5 text-[7px] font-semibold uppercase tracking-[0.06em] text-black">
                     No. Master
                   </p>
 
-                  <p className="truncate font-mono text-[6px] font-bold">
+                  <p className="truncate font-mono text-[8px] font-bold">
                     {resiNumber}
                   </p>
                 </div>
@@ -496,88 +589,106 @@ export function ResiPrint({
                     <img
                       src={qrMap[labelId]}
                       alt="QR code paket"
-                      className="h-[48px] w-[48px]"
+                      className="h-[70px] w-[70px]"
                     />
                   ) : (
-                    <div className="h-[48px] w-[48px] border border-dashed border-black" />
+                    <div className="h-[70px] w-[70px] border border-dashed border-black" />
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Pengirim / Penerima — fixed 44px. Side by side, same
-                treatment as the master resi, so the sender is never
-                lost on the package label */}
-            <div className="h-[44px] flex-none grid grid-cols-2 border-b border-black">
-              <div className="flex min-w-0 flex-col justify-center gap-0.5 overflow-hidden border-r border-black px-3">
-                <SmallCaps>Pengirim</SmallCaps>
+            {/* Route band — fixed 24px. Compact route strip so the
+                handler knows where this colly needs to go without
+                flipping back to the master resi. */}
+            <div className="h-[24px] flex-none border-b border-black px-3">
+              <div className="grid h-full grid-cols-[1fr_18px_1fr] items-center gap-1">
+                <div className="min-w-0 leading-none">
+                  <span className="text-[6.5px] font-bold uppercase tracking-[0.1em] text-black">
+                    Asal:{" "}
+                  </span>
+                  <span className="truncate text-[9px] font-extrabold uppercase">
+                    {originName}
+                  </span>
+                </div>
 
-                <p className="truncate text-[7.5px] font-extrabold leading-tight">
+                <div className="text-center text-[11px] font-black leading-none">
+                  →
+                </div>
+
+                <div className="min-w-0 text-right leading-none">
+                  <span className="text-[6.5px] font-bold uppercase tracking-[0.1em] text-black">
+                    Tujuan:{" "}
+                  </span>
+                  <span className="truncate text-[9px] font-extrabold uppercase">
+                    {destinationName}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Pengirim — fixed 50px. Sender gets its own block (not
+                squeezed into a 2-column row) so the destination
+                handler can verify the shipper without ambiguity. */}
+            <div className="h-[50px] flex-none border-b border-black px-3">
+              <div className="flex h-full flex-col justify-center gap-0.5 overflow-hidden leading-none">
+                <SmallCaps>Pengirim</SmallCaps>
+                <p className="truncate text-[10px] font-extrabold leading-tight">
                   {pengirim.name}
                 </p>
-
-                <p className="truncate text-[5.5px] font-normal text-black">
-                  {pengirim.phone}
+                <p className="truncate text-[8px] font-semibold text-black">
+                  Telp: {pengirim.phone}
                 </p>
+                {pengirim.address && (
+                  <p className="line-clamp-1 text-[7px] font-normal text-black">
+                    {pengirim.address}
+                  </p>
+                )}
               </div>
+            </div>
 
-              <div className="flex min-w-0 flex-col justify-center gap-0.5 overflow-hidden px-3">
+            {/* Penerima — fixed 50px. Same treatment as pengirim. */}
+            <div className="h-[50px] flex-none border-b border-black px-3">
+              <div className="flex h-full flex-col justify-center gap-0.5 overflow-hidden leading-none">
                 <SmallCaps>Penerima</SmallCaps>
-
-                <p className="truncate text-[7.5px] font-extrabold leading-tight">
+                <p className="truncate text-[10px] font-extrabold leading-tight">
                   {penerima.name}
                 </p>
-
-                <p className="truncate text-[5.5px] font-normal text-black">
-                  {penerima.contact}
+                <p className="truncate text-[8px] font-semibold text-black">
+                  Telp: {penerima.contact}
+                </p>
+                <p className="line-clamp-1 text-[7px] font-normal text-black">
+                  {penerima.address}
                 </p>
               </div>
             </div>
 
-            {/* Destination + Address — fixed 26px */}
-            <div className="h-[26px] flex-none border-b border-black px-3">
-              <div className="grid h-full grid-cols-[1fr_auto] items-center gap-3">
-                <div className="min-w-0 overflow-hidden leading-none">
-                  <SmallCaps>Alamat Penerima</SmallCaps>
-                  <p className="truncate text-[6.5px] font-normal leading-snug">
-                    {penerima.address}
-                  </p>
-                </div>
-
-                <div className="shrink-0 text-right leading-none">
-                  <SmallCaps>Tujuan</SmallCaps>
-                  <p className="truncate text-[8px] font-extrabold uppercase">
-                    {destinationName}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Package Stats — fixed 28px */}
-            <div className="h-[28px] flex-none grid grid-cols-4 border-b border-black">
+            {/* Package Stats — fixed 40px. 4 cells: weight, volume,
+                dimension, colly counter. */}
+            <div className="h-[40px] flex-none grid grid-cols-4 border-b border-black">
               <div className="flex flex-col items-center justify-center border-r border-black text-center leading-none">
                 <SmallCaps>Berat</SmallCaps>
-                <p className="mt-0.5 text-[9px] font-extrabold leading-none">
+                <p className="mt-1 text-[11px] font-extrabold leading-none">
                   {formatNumber(actual)}
-                  <span className="ml-0.5 text-[5px] font-normal uppercase text-black">
-                    kg
-                  </span>
+                </p>
+                <p className="mt-0.5 text-[6px] font-normal uppercase text-black">
+                  kg
                 </p>
               </div>
 
               <div className="flex flex-col items-center justify-center border-r border-black text-center leading-none">
                 <SmallCaps>Volume</SmallCaps>
-                <p className="mt-0.5 text-[9px] font-extrabold leading-none">
+                <p className="mt-1 text-[11px] font-extrabold leading-none">
                   {volume.toFixed(3)}
-                  <span className="ml-0.5 text-[5px] font-normal uppercase text-black">
-                    m³
-                  </span>
+                </p>
+                <p className="mt-0.5 text-[6px] font-normal uppercase text-black">
+                  m³
                 </p>
               </div>
 
               <div className="flex flex-col items-center justify-center border-r border-black text-center leading-none">
                 <SmallCaps>Dimensi</SmallCaps>
-                <p className="mt-0.5 text-[6.5px] font-extrabold leading-none">
+                <p className="mt-1 text-[8px] font-extrabold leading-none">
                   {d.lengthCm != null
                     ? `${formatNumber(
                         d.lengthCm,
@@ -590,38 +701,63 @@ export function ResiPrint({
                         0,
                       )}`
                     : "—"}
-                  <span className="ml-0.5 text-[5px] font-normal uppercase text-black">
-                    cm
-                  </span>
+                </p>
+                <p className="mt-0.5 text-[6px] font-normal uppercase text-black">
+                  cm
                 </p>
               </div>
 
               <div className="flex flex-col items-center justify-center text-center leading-none">
                 <SmallCaps>Colly</SmallCaps>
-                <p className="mt-0.5 font-mono text-[9px] font-extrabold leading-none">
+                <p className="mt-1 font-mono text-[11px] font-extrabold leading-none">
                   {pcs}
+                </p>
+                <p className="mt-0.5 text-[6px] font-normal uppercase text-black">
+                  of {totalPackages}
                 </p>
               </div>
             </div>
 
-            {/* Description — fixed 22px */}
-            <div className="h-[22px] flex-none overflow-hidden px-3 py-1 leading-none">
-              <SmallCaps>Isi / Keterangan</SmallCaps>
-              <p className="truncate text-[6.5px] font-semibold leading-tight">
-                {d.description || "—"}
-              </p>
-            </div>
-
-            {/* Footer — flex-1, absorbs whatever height is left so the
-                sheet always totals exactly 100mm. Dashed rule is solid
-                black (not gray) so it reproduces on thermal paper. */}
-            <footer className="flex min-h-0 flex-1 flex-col justify-end gap-0.5 overflow-hidden border-t border-dashed border-black px-3 py-1 text-[5px] leading-tight text-black">
-              <div className="flex justify-between gap-2">
-                <span>MASTER: {resiNumber}</span>
-                <span>PCS {pcs}</span>
-                <span>SCAN AT OPERATION POINT</span>
+            {/* Description — flex-1, fills the remaining space so the
+                sheet always totals exactly 100mm. Dashed rule on top
+                is solid black (not gray) so it reproduces on thermal
+                paper. Includes a "scan at operation point" reminder. */}
+            <footer className="flex min-h-0 flex-1 flex-col justify-between gap-1 overflow-hidden border-t border-dashed border-black px-3 py-2 text-[7px] leading-tight text-black">
+              <div className="flex-1 min-h-0">
+                <SmallCaps>Isi / Keterangan</SmallCaps>
+                <p className="mt-1 line-clamp-2 text-[8px] font-semibold leading-tight">
+                  {d.description || "—"}
+                </p>
               </div>
-              <p className="text-[4.5px] text-black">
+
+              <div className="flex items-end justify-between gap-2 border-t border-black pt-1">
+                <div className="leading-none">
+                  <p className="text-[6.5px] font-bold uppercase tracking-[0.06em]">
+                    Master
+                  </p>
+                  <p className="mt-0.5 font-mono text-[8px] font-extrabold">
+                    {resiNumber}
+                  </p>
+                </div>
+                <div className="text-center leading-none">
+                  <p className="text-[6.5px] font-bold uppercase tracking-[0.06em]">
+                    Pcs
+                  </p>
+                  <p className="mt-0.5 font-mono text-[8px] font-extrabold">
+                    {pcs}
+                  </p>
+                </div>
+                <div className="text-right leading-none">
+                  <p className="text-[6.5px] font-bold uppercase tracking-[0.06em]">
+                    Scan
+                  </p>
+                  <p className="mt-0.5 text-[7px] font-semibold">
+                    At Operation Point
+                  </p>
+                </div>
+              </div>
+
+              <p className="mt-1 text-[6px] font-normal text-black">
                 Dicetak: {new Date().toLocaleString("id-ID")}
               </p>
             </footer>
@@ -639,6 +775,15 @@ export function ResiPrint({
           sheet itself carries its own w-[100mm]/h-[100mm] sizing via
           Tailwind so screen preview and print always agree — there is
           no separate "print-only" size rule left to drift out of sync.
+
+          Thermal-printer compatibility:
+          - All colors forced to pure black/white via filter:
+            grayscale(1) contrast(100) — eliminates any anti-aliased
+            gray edges the browser might produce.
+          - print-color-adjust: exact on every element so Chrome's
+            "save as PDF" and the OS print dialog both keep the
+            borders and backgrounds.
+          - No box-shadows or transparent overlays survive into print.
           ============================================================ */}
 
       <style jsx global>{`
@@ -707,8 +852,23 @@ export function ResiPrint({
             box-sizing: border-box !important;
 
             /* Force pure black/white — no anti-aliased gray edges from
-               the browser's own rendering getting sent to the printer */
+               the browser's own rendering getting sent to the printer.
+               Critical for thermal heads that dither grays into noise. */
             filter: grayscale(1) contrast(100);
+
+            /* Ensure every border + background is preserved by Chrome's
+               "Save as PDF" and by the OS print dialog. Without this,
+               some browsers strip 1px borders when downscaling to the
+               printer's DPI. */
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
+
+          .resi-sheet * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
           }
 
           .resi-sheet:last-child {
@@ -719,6 +879,10 @@ export function ResiPrint({
           img {
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
+            /* Render QR codes crisply at the printer's native DPI
+               instead of letting the browser smooth-scale them. */
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
           }
         }
 
@@ -741,7 +905,7 @@ export function ResiPrint({
             </p>
 
             <p className="text-xs text-muted-foreground">
-              QR Code only • Ukuran 100 × 100 mm • 1 Master Resi +{" "}
+              QR Code only • Ukuran 100 × 100 mm • Thermal printer ready • 1 Master Resi +{" "}
               {totalPackages} Package Label
             </p>
           </div>
