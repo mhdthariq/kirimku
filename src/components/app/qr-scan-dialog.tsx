@@ -147,7 +147,15 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
     }
   }, [task, confirming, isPickup, proof, notes, balance, balanceMethod, basePath, onOpenChange, onDone]);
 
-  const pct = progress && progress.total > 0 ? Math.round((progress.scanned / progress.total) * 100) : 0;
+  const pct = progress
+    ? progress.isB2B
+      ? progress.masterScanned
+        ? 100
+        : 0
+      : progress.total > 0
+        ? Math.round((progress.scanned / progress.total) * 100)
+        : 0
+    : 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -157,14 +165,22 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
             <QrCode className="h-5 w-5 text-primary" />
             {isPickup ? `Scan Paket — Pickup ${task?.code ?? ""}` : `Scan Paket — Delivery ${task?.code ?? ""}`}
           </DialogTitle>
-
+          {progress?.isB2B && (
+            <DialogDescription className="rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-2 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300">
+              <strong>Shipment B2B — cukup scan Master Resi sekali.</strong> Semua paket pada konsinyasi ini akan otomatis ter-scan setelah Master Resi terbaca. Tidak perlu scan tiap detail barang.
+            </DialogDescription>
+          )}
         </DialogHeader>
 
         {/* Progress */}
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
             <span className="font-medium text-foreground">
-              Paket ter-scan: {progress?.scanned ?? 0}/{progress?.total ?? "…"}
+              {progress?.isB2B
+                ? progress.masterScanned
+                  ? "Master Resi ter-scan — semua paket lengkap"
+                  : "Menunggu scan Master Resi"
+                : `Paket ter-scan: ${progress?.scanned ?? 0}/${progress?.total ?? "…"}`}
             </span>
             <span className={cn("text-xs font-semibold", progress?.allScanned ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground")}>
               {progress?.allScanned ? "SEMUA PAKET LENGKAP" : `${pct}%`}

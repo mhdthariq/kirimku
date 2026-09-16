@@ -16,34 +16,40 @@ Both are safe to run repeatedly: every insert is an upsert or existence check. R
 | Username | Password | Role | Position |
 |---|---|---|---|
 | `owner` | `ChangeMeOwner#2026` | Owner (full access) | Owner |
-| `siti` | `Demo#Pass2026` | Admin Kantor | Admin Kantor |
-| `budi` | `Demo#Pass2026` | Marketing | Marketing |
-| `agus` | `Demo#Pass2026` | Admin Gudang | Admin Gudang |
-| `dewi` | `Demo#Pass2026` | Kurir | Kurir |
-| `rizky` | `Demo#Pass2026` | Kurir | Kurir |
-| `joko` | `Demo#Pass2026` | Driver | Driver |
-| `andi` | `Demo#Pass2026` | Kenek | Kenek |
+| `siti` | `Demo#Pass2026` | Admin Kantor | Admin Kantor (Gudang Medan) |
+| `budi` | `Demo#Pass2026` | Marketing | Marketing (Gudang Medan) |
+| `agus` | `Demo#Pass2026` | Admin Gudang | Admin Gudang (Gudang Medan) |
+| `ratna` | `Demo#Pass2026` | Admin Gudang | Admin Gudang (Gudang Lhokseumawe — data isolation demo) |
+| `dewi` | `Demo#Pass2026` | Kurir | Kurir (Gudang Medan) |
+| `rizky` | `Demo#Pass2026` | Kurir | Kurir (Gudang Medan) |
+| `joko` | `Demo#Pass2026` | Driver | Driver (Gudang Medan) |
+| `andi` | `Demo#Pass2026` | Kenek | Kenek (Gudang Medan) |
+| `wawan` | `Demo#Pass2026` | Staff Gudang | Staff Gudang (Gudang Medan) |
+| `hendra` | `Demo#Pass2026` | Vehicle Owner | Vehicle Owner (hendra — owns BK 9102 KTA & BK 9455 KTB) |
+| `sari` | `Demo#Pass2026` | Vehicle Owner | Vehicle Owner (sari — owns BK 7788 KTC) |
 
 Each staff user is linked 1:1 to an `Employee` row (`EMP-000001`…`EMP-000008`), and role assignments are created via `UserRole`. Passwords are hashed with scrypt — the plaintext only exists in this documentation.
 
-### Master data
+### Master data (Sumatra Island — main corridor Medan → Banda Aceh)
 
-- **3 Gudang** — Jakarta Pusat, Bandung, Surabaya (with real coordinates for the map).
-- **3 Vehicles** — Engkel Box, CDD 6 Ban, Fuso (one `MAINTENANCE`); CDD has a seeded crew assignment (driver Joko + kenek Andi).
-- **2 Routes** — JKT–BDG (Tol Cipularang) and JKT–SBY (Pantura), each with **3 checkpoints** (start gudang, rest area, end gudang) with radii.
-- **4 Tariffs** — JKT→BDG and JKT→SBY, each in b2b/b2c variants, with configurable volumetric multipliers (250 kg/m³ Bandung, 300 kg/m³ Surabaya) and prices computed by the real formula (e.g. MKT-000002 "Karton Tulis" ×10 → 25 kg → Rp112.500).
-- **5 Customers** — mix of b2b (PT Maju Bersama, CV Sinar Jaya) and b2c.
+- **3 Gudang** — **Medan** (origin hub), **Banda Aceh** (destination hub), **Lhokseumawe** (mid-route branch — demonstrates per-gudang data isolation: ratna only sees LSM-side data).
+- **3 Vehicles** — Engkel Box, CDD 6 Ban, Fuso (one `MAINTENANCE`); plates are Sumatran (BK = North Sumatra / Aceh). CDD has a seeded crew assignment (driver Joko + kenek Andi).
+- **2 Routes** — `MDN - BNA Aceh Timur` (Medan → Banda Aceh via the east-coast Trans-Sumatran highway, 4 checkpoints) and `MDN - LSM Lintas Sumatera` (Medan → Lhokseumawe, 3 checkpoints). Real lat/long for each checkpoint so the driver dashboard map shows the route.
+- **4 Tariffs** — MDN→BNA and MDN→LSM, each in b2b/b2c variants, with configurable volumetric multiplier (250 kg/m³) and prices computed by the real formula.
+- **5 Customers** — mix of b2b (PT Maju Bersama Medan, CV Sinar Jaya Lhokseumawe) and b2c.
 
-### Transactional data (6 shipments across the whole lifecycle)
+### Transactional data (8 shipments across the whole lifecycle)
 
 | Shipment | Customer | Status | Priced |
 |---|---|---|---|
 | `MKT-000001` | Rina Amelia (b2c) | `READY_FOR_PICKUP` | — |
-| `MKT-000002` | PT Maju Bersama (b2b) | `PICKED_UP` | 25 kg × 4.500 |
-| `MKT-000003` | CV Sinar Jaya (b2b) | `RECEIVED_AT_GUDANG` | 60 kg × 7.500 |
-| `MKT-000004` | Tono Susilo (b2c) | `IN_TRANSPORT` | 3 kg × 8.500 |
-| `MKT-000005` | PT Maju Bersama (b2b) | `DELIVERED` | 40 kg × 4.500 |
+| `MKT-000002` | PT Maju Bersama (b2b) | `PICKED_UP` | B2B Master Resi demo |
+| `MKT-000003` | CV Sinar Jaya (b2b) | `RECEIVED_AT_GUDANG` | 60 kg × 5.500 |
+| `MKT-000004` | Tono Susilo (b2c) | `IN_TRANSPORT` | 3 kg × 9.500 |
+| `MKT-000005` | PT Maju Bersama (b2b) | `DELIVERED` | 40 kg × 8.000 |
 | `MKT-000006` | Sari Indah (b2c) | `CREATED` | — |
+| `MKT-000007` | Sari Indah (b2c) | `AT_DEST_GUDANG` | (driver checked in Banda Aceh, awaiting Admin Gudang scan) |
+| `MKT-000008` | PT Maju Bersama (b2b) | `READY_FOR_PICKUP` | B2B Master Resi demo (8 cartons, single scan suffices) |
 
 Plus: 8 detail items, tracking events matching each lifecycle position, 4 pickups (completed), 1 completed delivery with proof, 1 `DEPARTED` transport carrying MKT-000004, 4 payments in various states (`RECORDED`/`VERIFIED`), 1 `SENT` invoice (PT Maju Bersama, 2 lines), and 12–16 audit log entries across modules.
 
@@ -51,8 +57,9 @@ Plus: 8 detail items, tracking events matching each lifecycle position, 4 pickup
 
 | Task | Shipment | Status | Purpose |
 |---|---|---|---|
-| `PICK-2026-000001` | `MKT-000001` (READY_FOR_PICKUP) | `ASSIGNED` | Login as **rizky** → Pickups shows only this task → "Proses / Scan QR" → scan the first two seeded package codes shown on the shipment → confirm → tracking shows **"Picked-up by Rizky Hidayat"** |
-| `DLV-2026-000002` | `MKT-000003` (RECEIVED_AT_GUDANG) | `ASSIGNED` | Deliveries as rizky → "Antar / Scan QR" → scan the first two seeded package codes shown on the shipment → PoD → DELIVERED |
+| `PICK-2026-000001` | `MKT-000001` (b2c, READY_FOR_PICKUP) | `ASSIGNED` | Login as **rizky** → Pickups → "Proses / Scan QR" → scan each package QR code shown on the shipment → confirm → tracking shows **"Picked-up by Rizky Hidayat"** |
+| `PICK-2026-000008` | `MKT-000008` (b2b, READY_FOR_PICKUP) | `ASSIGNED` | **B2B Master Resi demo** — login as **rizky** → Pickups → "Proses / Scan QR" → scan the **Master Resi ONCE** (`MKT-000008`) and all 8 packages are automatically marked scanned → confirm |
+| `DLV-2026-000002` | `MKT-000003` (b2b, RECEIVED_AT_GUDANG) | `ASSIGNED` | **B2B Master Resi demo** — Deliveries as rizky → "Antar / Scan QR" → scan the Master Resi once → all packages auto-scanned → PoD → DELIVERED |
 
 The kurir role template ships with `pickup.scan` / `delivery.scan` / `pickup.confirm` / `delivery.confirm` — and the owner can adjust any role's capabilities in Access Control → Roles without creating a new role.
 
@@ -90,10 +97,41 @@ After editing, reset the database (above) so the new dataset is created.
 
 Before accounts, `ensureSeed()` calls `ensureRbac()`: it upserts the **79 permissions** and **6 system roles** and re-links role→permission rows if the catalog in code has changed. This runs even outside the demo seed (it's also called on API boot), so a production database gets the RBAC catalog without demo data.
 
-## Revision 4 — seeder additions
+## Revision 5 — B2B Master Resi scan + Sumatra Island + Owner Dashboard redesign
 
-- **New demo account `wawan` / `Demo#Pass2026`** — Staff Gudang, assigned (`Employee.warehouseId`) to Gudang Jakarta Pusat; role `staff-gudang` with `warehouse.scope_own` (sees only his gudang).
-- Every seeded shipment now carries a **Penerima** (name/address/contact) and gudangs carry **customer support contacts** (printed on resi).
-- Demo states for the new flows: **MKT-000002** (PICKED_UP, 10 Karton Tulis, DP 60,000 of 112,500) sits in the gudang arrival queue; **MKT-000001** (READY_FOR_PICKUP, priced, DP ≥ 50%) has the open pickup task for kurir `rizky` (scan 4 packages + collect balance on confirm); **MKT-000006** (CREATED, unpriced) is the walk-in candidate.
-- Completed pickups/deliveries include seeded scans with mixed methods (mostly SCANNED, some TYPED) so Riwayat Scan demonstrates the differentiation.
-- `scripts/reset-demo-db.ts` truncates all tables **in place** (never delete `db/custom.db` while a dev server is holding it open — that causes "readonly database" errors). Re-seed afterwards with `bun run db:seed`.
+### B2B Master Resi scan mode
+For B2B shipments, a single scan of the **Master Resi** (master code) satisfies the entire shipment — no need to scan each detail package. The kurir / driver / Admin Gudang can scan the Master Resi once and the system marks every package as scanned, unlocking the confirm button. This applies to:
+- Pickup scans (kurir → customer's warehouse)
+- Delivery scans (kurir → final receiver)
+- Gudang arrival scans (kurir drop-off at the origin gudang)
+- Transport arrival scans (driver drop-off at the destination gudang)
+- The "Scan All" bulk action (records a single master-level scan instead of N detail scans for B2B)
+
+B2C shipments keep the per-package scan requirement (one QR per detail barang). The scan progress API returns `isB2B` and `masterScanned` flags so the UI can show a different progress display ("Scan the Master Resi" vs. "Scan each package").
+
+### Owner Dashboard redesign
+The owner now sees the dashboard with two priorities:
+1. **Approval Queue** (top of page) — items the owner must act on FIRST:
+   - Pending Top Up verifications (`PENDING_VERIFICATION` — topup with proof attached)
+   - Pending Withdrawal approvals (`PENDING` — partner requests)
+   - Pending Payment verifications (`RECORDED` — payments awaiting verification)
+   - Pending Marketing Commissions (PENDING — informational, released when invoice settles)
+2. **Operational info** (below) — same data as before but filtered by a **date period filter** (calendar) identical to the Kurir & Driver dashboards:
+   - Shipment status funnel (period-filtered)
+   - Revenue verified (period-filtered)
+   - Recent shipments (period-filtered)
+   - Recent audit log (period-filtered)
+   - Stat cards (counts in period)
+
+The approval queue is permission-gated: only users with `wallet.topup.verify`, `wallet.withdrawal.approve`, `payment.verify`, or `invoice.send` (or owner) see the relevant items.
+
+### Sumatra Island demo dataset
+The seeder no longer uses Java locations. All demo data is now Sumatran:
+- Gudang: **Medan**, **Banda Aceh**, **Lhokseumawe** (mid-route branch)
+- Routes: **MDN → BNA Aceh Timur** (Medan → Banda Aceh, main corridor) and **MDN → LSM Lintas Sumatera**
+- Tariffs: MDN→BNA and MDN→LSM (b2b/b2c variants)
+- Vehicle plates: BK (Sumatran)
+- Customer addresses updated to Medan / Banda Aceh / Lhokseumawe
+- Demo B2B Master Resi scan: **MKT-000008** (PT Maju Bersama, 8 cartons, READY_FOR_PICKUP) is an open task assigned to kurir `rizky`
+- Demo B2B arrival scan: **MKT-000002** (PT Maju Bersama, PICKED_UP) sits in the gudang arrival queue — Admin Gudang can scan the Master Resi once to receive all 10 packages
+

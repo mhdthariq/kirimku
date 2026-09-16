@@ -12,6 +12,12 @@
  * `prisma db push` (see src/lib/seed.ts → ensureSeed), mirroring a
  * "migrate + seed on boot" docker workflow. This CLI script simply
  * exposes the same routine for manual / CI usage.
+ *
+ * Demo dataset geography: Sumatra Island only — main corridor
+ *   Medan → Banda Aceh (via Lhokseumawe mid-route).
+ * The B2B shipment MKT-000002 / MKT-000008 demonstrates the new
+ *   B2B Master Resi scan option (single Master Resi scan covers all
+ *   packages — no per-package scan required).
  */
 import { ensureSeed } from "../src/lib/seed";
 import { db } from "../src/lib/db";
@@ -44,7 +50,7 @@ async function main() {
   console.log("✔ Seed selesai. Ringkasan data mock-up:");
   console.log(`   Users: ${users} (owner + 8 staff)`);
   console.log(`   Employees: ${employees}`);
-  console.log(`   Gudang: ${warehouses}`);
+  console.log(`   Gudang: ${warehouses} (Medan · Banda Aceh · Lhokseumawe)`);
   console.log(`   Vehicles: ${vehicles}`);
   console.log(`   Routes: ${routes} | Checkpoints: ${checkpoints}`);
   console.log(`   Tariffs: ${tariffs}`);
@@ -57,15 +63,25 @@ async function main() {
   console.log("");
   console.log("Akun demo:");
   console.log("  owner  / ChangeMeOwner#2026   (akses penuh — satu-satunya yang melihat data SEMUA gudang)");
-  console.log("  siti   / Demo#Pass2026        (admin kantor, Gudang Jakarta Pusat)");
-  console.log("  budi   / Demo#Pass2026        (marketing, Gudang Jakarta Pusat)");
-  console.log("  agus   / Demo#Pass2026        (admin gudang, Gudang Jakarta Pusat)");
-  console.log("  ratna  / Demo#Pass2026        (admin gudang, Gudang Bandung — demo isolasi data)");
-  console.log("  dewi   / Demo#Pass2026        (kurir, Gudang Jakarta Pusat)");
-  console.log("  rizky  / Demo#Pass2026        (kurir, Gudang Jakarta Pusat)");
-  console.log("  joko   / Demo#Pass2026        (driver, Gudang Jakarta Pusat)");
-  console.log("  andi   / Demo#Pass2026        (kenek, Gudang Jakarta Pusat)");
-  console.log("  wawan  / Demo#Pass2026        (staff gudang, Gudang Jakarta Pusat)");
+  console.log("  siti   / Demo#Pass2026        (admin kantor, Gudang Medan)");
+  console.log("  budi   / Demo#Pass2026        (marketing, Gudang Medan)");
+  console.log("  agus   / Demo#Pass2026        (admin gudang, Gudang Medan)");
+  console.log("  ratna  / Demo#Pass2026        (admin gudang, Gudang Lhokseumawe — demo isolasi data)");
+  console.log("  dewi   / Demo#Pass2026        (kurir, Gudang Medan)");
+  console.log("  rizky  / Demo#Pass2026        (kurir, Gudang Medan)");
+  console.log("  joko   / Demo#Pass2026        (driver, Gudang Medan)");
+  console.log("  andi   / Demo#Pass2026        (kenek, Gudang Medan)");
+  console.log("  wawan  / Demo#Pass2026        (staff gudang, Gudang Medan)");
+  console.log("");
+  console.log("Demo B2B Master Resi scan:");
+  console.log("  MKT-000002 (PT Maju Bersama, PICKED_UP) — paket sudah di kurir, Admin Gudang tinggal scan Master Resi sekali");
+  console.log("  MKT-000008 (PT Maju Bersama, READY_FOR_PICKUP) — tugas pickup Rizky, scan Master Resi sekali cukup");
+  console.log("");
+  console.log("Demo Owner Dashboard approval queue:");
+  console.log("  TOP-000002  Top Up Budi        (Rp150.000, menunggu verifikasi Owner — ada bukti transfer)");
+  console.log("  WDR-000001  Withdrawal Hendra (Rp30.000, menunggu approval Owner)");
+  console.log("  PAY-000001  Payment MKT-000001 (Rp20.000, status RECORDED — menunggu verifikasi)");
+  console.log("  COM-000001  Komisi Budi        (Rp58.500, PENDING — invoice belum LUNAS)");
 }
 
 main()

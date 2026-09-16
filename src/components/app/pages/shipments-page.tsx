@@ -423,7 +423,14 @@ function ShipmentList() {
                 header: "Customer & Rute",
                 render: (s) => (
                   <div>
-                    <p className="text-sm font-medium text-foreground">{s.customer?.name ?? "—"}</p>
+                    <p className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                      {s.customer?.name ?? "—"}
+                      {s.customer?.type === "b2b" && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-950 dark:text-sky-300" title="B2B — cukup scan Master Resi sekali">
+                          B2B · Master Resi
+                        </span>
+                      )}
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       {s.origin} → {s.destination}
                     </p>

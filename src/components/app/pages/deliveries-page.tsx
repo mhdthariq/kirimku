@@ -219,7 +219,14 @@ export function DeliveriesPage() {
                 header: "Penerima",
                 render: (d) => (
                   <div>
-                    <p className="text-sm font-medium text-foreground">{d.customerName}</p>
+                    <p className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                      {d.customerName}
+                      {d.customerType === "b2b" && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-950 dark:text-sky-300" title="B2B — cukup scan Master Resi sekali">
+                          B2B · Master Resi
+                        </span>
+                      )}
+                    </p>
                     <p className="text-xs text-muted-foreground">{d.address ?? d.destination}</p>
                     {/* "This shipment is from Gudang X" — the destination-side
                         crew sees at a glance where the package started */}

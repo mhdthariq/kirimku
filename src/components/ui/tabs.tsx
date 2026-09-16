@@ -33,7 +33,7 @@ function TabsList({
         // scroll). Left-aligned content always keeps the first tab reachable.
         // Desktop (≥sm): w-fit keeps the list content-sized (no overflow), so
         // centering is safe there.
-        "bg-muted text-muted-foreground inline-flex h-9 w-full max-w-full items-center justify-start gap-1 overflow-x-auto rounded-lg p-[3px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:w-fit sm:justify-center",
+        "bg-muted text-muted-foreground inline-flex h-9 w-full max-w-full items-center justify-start gap-1 overflow-x-auto rounded-lg p-0.75 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:w-fit sm:justify-center",
         className
       )}
       {...props}

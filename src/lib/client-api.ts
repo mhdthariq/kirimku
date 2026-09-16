@@ -274,6 +274,10 @@ export interface ScanProgress {
   scanned: number;
   allScanned: boolean;
   details: ScanDetailState[];
+  /** B2B Master Resi mode — a single Master Resi scan satisfies the whole shipment. */
+  isB2B: boolean;
+  /** True once at least one Master Resi scan is recorded. */
+  masterScanned: boolean;
 }
 
 export interface ScanResponse {
@@ -320,6 +324,7 @@ export interface DeliveryTask {
   address: string | null;
   customerName: string;
   customerPhone: string | null;
+  customerType?: string;
   priceAmount: number | null;
   detailsCount: number;
   scannedCount: number;
@@ -785,7 +790,42 @@ export interface UnpaidShipment {
   payments: { id: number; method: string; amount: number; status: string; reference: string | null; createdAt: string; recordedByName: string | null }[];
 }
 
+export interface DashboardApprovalItem {
+  id: number;
+  requestCode?: string;
+  amount: number;
+  partnerName: string;
+  partnerType?: string;
+  submittedAt?: string;
+  createdAt?: string;
+  // topup
+  proofUrl?: string | null;
+  // withdrawal
+  bankName?: string | null;
+  bankAccountName?: string | null;
+  bankAccountNumber?: string | null;
+  // payment
+  method?: string;
+  reference?: string | null;
+  masterCode?: string;
+  customerName?: string;
+  recordedByName?: string;
+  // commission
+  commissionCode?: string;
+  invoiceNumber?: string;
+  invoiceStatus?: string;
+}
+
+export interface DashboardApprovals {
+  pendingTopups: DashboardApprovalItem[];
+  pendingWithdrawals: DashboardApprovalItem[];
+  pendingPayments: DashboardApprovalItem[];
+  pendingCommissions: DashboardApprovalItem[];
+}
+
 export interface DashboardData {
+  period: { from: string; to: string; days: number };
+  approvals: DashboardApprovals;
   counts: Record<string, number | null>;
   statusCounts: Record<string, number>;
   revenueVerified: number;

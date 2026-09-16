@@ -79,6 +79,7 @@ export async function GET(req: NextRequest) {
           address: d.master.customer.address,
           customerName: d.master.customer.name,
           customerPhone: d.master.customer.phone,
+          customerType: d.master.customer.type,
           priceAmount: d.master.priceAmount,
           detailsCount: d.master.details.length,
           scannedCount: scannedIds.size,

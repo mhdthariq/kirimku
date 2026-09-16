@@ -17,6 +17,16 @@ export interface ScanProgress {
   scanned: number;
   allScanned: boolean;
   details: ScanDetailState[];
+  /**
+   * B2B Master Resi scan mode — when true, a single Master Resi scan is
+   * enough to confirm receipt of the whole shipment (no need to scan each
+   * detail barang). Mirrors how B2B shipments are physically handled: the
+   * customer hands over a single consignment note (Master Resi) covering
+   * all packages in one go.
+   */
+  isB2B: boolean;
+  /** True when at least one Master Resi scan has been recorded (result ok). */
+  masterScanned: boolean;
 }
 
 export type ScanContext = "pickup" | "delivery" | "gudang_arrival" | "transport_arrival";
@@ -46,11 +56,31 @@ export function arrivalScanContext(status: string, destReceivedAt?: Date | strin
 }
 
 /**
+ * Resolve the customer type (b2b | b2c) for a master shipment.
+ * Returns "b2c" when the master / customer cannot be found (safe default —
+ * keeps B2C packages requiring per-detail scans).
+ */
+async function customerTypeOf(masterId: number): Promise<"b2b" | "b2c"> {
+  const row = await db.masterShipment.findUnique({
+    where: { id: masterId },
+    select: { customer: { select: { type: true } } },
+  });
+  return row?.customer.type === "b2b" ? "b2b" : "b2c";
+}
+
+/**
  * Compute detail-level scan progress for a pickup, a delivery, a gudang
  * arrival (kurir drop-off) or a transport arrival (driver drop-off at the
  * destination gudang). A detail counts as scanned when it has a
  * HandoverScan with result "ok" (or "duplicate" — a repeated confirmation of
  * the same package).
+ *
+ * B2B Master Resi mode (Revise.md "B2B Master Resi scan"):
+ * for B2B shipments, a single Master Resi scan marks the whole shipment as
+ * complete — kurir/driver/admin gudang only need to scan the Master Resi
+ * once, no per-package scan required. The detail list is still returned for
+ * display, but every detail is treated as "scanned" once a master scan is
+ * recorded.
  */
 export async function scanProgress(options: { pickupId?: number; deliveryId?: number; masterId?: number; context?: ScanContext }): Promise<ScanProgress> {
   const where =
@@ -64,7 +94,20 @@ export async function scanProgress(options: { pickupId?: number; deliveryId?: nu
     include: { scannedBy: true },
   });
   const okByDetail = new Map<number, { scannedAt: Date; by: string | null; method: string }>();
+  let masterScanned = false;
+  let masterMethod: string | null = null;
+  let masterAt: Date | null = null;
+  let masterBy: string | null = null;
   for (const s of scans) {
+    // master-level scan (e.g. the kurir / admin scanned the Master Resi)
+    if (s.scanLevel === "master") {
+      masterScanned = true;
+      if (masterAt == null || s.scannedAt < masterAt) {
+        masterAt = s.scannedAt;
+        masterMethod = s.method;
+        masterBy = s.scannedBy?.name ?? null;
+      }
+    }
     if (s.detailId == null) continue;
     const prev = okByDetail.get(s.detailId);
     if (!prev || s.scannedAt < prev.scannedAt) {
@@ -73,8 +116,30 @@ export async function scanProgress(options: { pickupId?: number; deliveryId?: nu
   }
 
   const details = await detailListFor(options);
+  const masterId =
+    options.masterId != null
+      ? options.masterId
+      : options.pickupId != null
+        ? (await db.pickup.findUnique({ where: { id: options.pickupId }, select: { masterId: true } }))?.masterId
+        : (await db.delivery.findUnique({ where: { id: options.deliveryId! }, select: { masterId: true } }))?.masterId;
+
+  const isB2B = masterId != null && (await customerTypeOf(masterId)) === "b2b";
+
   const states: ScanDetailState[] = details.map((d) => {
     const hit = okByDetail.get(d.id);
+    // B2B shipments: when the master resi has been scanned, every package is
+    // implicitly "received" — surface that as a single green state in the UI.
+    if (isB2B && masterScanned) {
+      return {
+        id: d.id,
+        detailCode: d.detailCode,
+        description: d.description,
+        scanned: true,
+        scannedAt: masterAt ? masterAt.toISOString() : null,
+        scannedByName: masterBy,
+        scanMethod: masterMethod,
+      };
+    }
     return {
       id: d.id,
       detailCode: d.detailCode,
@@ -85,11 +150,24 @@ export async function scanProgress(options: { pickupId?: number; deliveryId?: nu
       scanMethod: hit?.method ?? null,
     };
   });
+
+  const scannedCount = states.filter((s) => s.scanned).length;
+  const allScanned =
+    states.length > 0
+      ? isB2B
+        ? masterScanned || states.every((s) => s.scanned)
+        : states.every((s) => s.scanned)
+      : isB2B
+        ? masterScanned
+        : false;
+
   return {
     total: states.length,
-    scanned: states.filter((s) => s.scanned).length,
-    allScanned: states.length > 0 && states.every((s) => s.scanned),
+    scanned: scannedCount,
+    allScanned,
     details: states,
+    isB2B,
+    masterScanned,
   };
 }
 

@@ -149,7 +149,15 @@ export function ArrivalScanDialog({
     }
   }
 
-  const pct = progress && progress.total > 0 ? Math.round((progress.scanned / progress.total) * 100) : 0;
+  const pct = progress
+    ? progress.isB2B
+      ? progress.masterScanned
+        ? 100
+        : 0
+      : progress.total > 0
+        ? Math.round((progress.scanned / progress.total) * 100)
+        : 0
+    : 0;
 
   const whoLabel = isTransport
     ? [t?.driverName, t?.kenekName].filter(Boolean).join(" & ") || "driver transport"
@@ -200,7 +208,11 @@ export function ArrivalScanDialog({
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
             <span className="font-medium text-foreground">
-              Paket ter-scan: {progress?.scanned ?? 0}/{progress?.total ?? "…"}
+              {progress?.isB2B
+                ? progress.masterScanned
+                  ? "Master Resi ter-scan — semua paket lengkap"
+                  : "Menunggu scan Master Resi"
+                : `Paket ter-scan: ${progress?.scanned ?? 0}/${progress?.total ?? "…"}`}
             </span>
             <span className={cn("text-xs font-semibold", progress?.allScanned ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground")}>
               {progress?.allScanned ? "SEMUA PAKET LENGKAP" : `${pct}%`}
@@ -209,7 +221,13 @@ export function ArrivalScanDialog({
           <Progress value={pct} className="h-2" />
         </div>
 
-        <ScanConsole onScan={onScan} busy={busy || scanningAll} placeholder="Ketik kode dari label / tembak dengan reader…" />
+        {progress?.isB2B && !progress?.masterScanned && (
+          <div className="rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-2 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300">
+            <strong>Shipment B2B — cukup scan Master Resi sekali.</strong> Tidak perlu scan tiap paket. Gunakan kamera / reader untuk membaca Master Resi, atau klik <strong>Scan Master Resi</strong> di bawah.
+          </div>
+        )}
+
+        <ScanConsole onScan={onScan} busy={busy || scanningAll} placeholder={progress?.isB2B ? "Arahkan QR Master Resi ke kamera / tembak dengan reader…" : "Ketik kode dari label / tembak dengan reader…"} />
 
         {feedback && (
           <div
@@ -263,7 +281,13 @@ export function ArrivalScanDialog({
         <div className="space-y-3">
           <Button type="button" variant="secondary" className="w-full" onClick={onScanAll} disabled={scanningAll || busy || !!progress?.allScanned}>
             <Zap className="h-4 w-4" />
-            {scanningAll ? "Memproses…" : "Scan Semua Paket (mode reader)"}
+            {scanningAll
+              ? "Memproses…"
+              : progress?.isB2B
+                ? progress?.masterScanned
+                  ? "Master Resi Sudah Ter-scan"
+                  : "Scan Master Resi (mode reader)"
+                : "Scan Semua Paket (mode reader)"}
           </Button>
 
           {progress?.allScanned && (

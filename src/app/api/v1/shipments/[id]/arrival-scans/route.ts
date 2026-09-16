@@ -41,7 +41,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   return handle(async () => {
     const user = await guard(req, "shipment.confirm_arrival");
     const { id } = await params;
-    const master = await db.masterShipment.findUnique({ where: { id: Number(id) } , include: { details: true } });
+    const master = await db.masterShipment.findUnique({ where: { id: Number(id) } , include: { customer: { select: { type: true } }, details: true } });
     if (!master) return fail(404, "Shipment tidak ditemukan.");
     await assertShipmentScope(user, master);
 
@@ -56,6 +56,45 @@ export async function POST(req: NextRequest, { params }: Params) {
     const body = await req.json().catch(() => ({}));
     const payload = requireStr(body.payload, "payload").trim();
     const method = normalizeMethod(body.method);
+
+    const isB2B = master.customer?.type === "b2b";
+
+    // Master-level scan — for B2B shipments this satisfies the ENTIRE arrival
+    // (single Master Resi scan covers all packages in the consignment). For
+    // B2C the master scan is recorded but per-package scanning is still
+    // required.
+    if (payload === master.masterCode) {
+      const scan = await db.handoverScan.create({
+        data: {
+          masterId: master.id,
+          context,
+          scanLevel: "master",
+          detailId: null,
+          payload,
+          result: "ok",
+          method,
+          scannedById: user.id,
+        },
+      });
+      const progress = await scanProgress({ masterId: master.id, context });
+      await audit({
+        action: "scanned",
+        entityType: "shipment",
+        entityId: master.id,
+        entityLabel: `${master.masterCode} · master · ${context} · ${method}`,
+        actor: user,
+      });
+      const doneMessage =
+        context === "transport_arrival"
+          ? "Master Resi B2B terbaca — semua paket ter-scan. Siap konfirmasi penerimaan dari transport."
+          : "Master Resi B2B terbaca — semua paket ter-scan. Siap konfirmasi tiba di gudang.";
+      return ok({
+        scan,
+        message: isB2B ? doneMessage : "QR master terbaca — lanjut scan semua paket (detail barang).",
+        progress,
+        context,
+      });
+    }
 
     const detail = master.details.find((d) => d.detailCode === payload);
     if (!detail) {

@@ -16,7 +16,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   return handle(async () => {
     const user = await guard(req, "delivery.scan");
     const { id } = await params;
-    const delivery = await db.delivery.findUnique({ where: { id: Number(id) }, include: { master: { include: { details: true } } } });
+    const delivery = await db.delivery.findUnique({ where: { id: Number(id) }, include: { master: { include: { customer: { select: { type: true } }, details: true } } } });
     if (!delivery) return fail(404, "Delivery tidak ditemukan.");
     if (delivery.status === "COMPLETED") return fail(422, "Delivery sudah selesai — tidak perlu scan lagi.");
     if (delivery.status === "FAILED") return fail(422, "Delivery ditandai gagal.");
@@ -28,11 +28,24 @@ export async function POST(req: NextRequest, { params }: Params) {
     const payload = requireStr(body.payload, "payload").trim();
     const method = normalizeMethod(body.method);
 
+    const isB2B = delivery.master.customer?.type === "b2b";
+
+    // Master-level scan — for B2B shipments this satisfies the ENTIRE
+    // delivery (single Master Resi scan covers all packages in the
+    // consignment). For B2C the master scan is recorded but per-package
+    // scanning is still required.
     if (payload === delivery.master.masterCode || payload === delivery.deliveryCode) {
       const scan = await db.handoverScan.create({
         data: { deliveryId: delivery.id, context: "delivery", scanLevel: "master", detailId: null, payload, result: "ok", method, scannedById: user.id },
       });
-      return ok({ scan, message: "QR master terbaca — lanjut scan semua paket untuk customer ini.", progress: await scanProgress({ deliveryId: delivery.id }) });
+      const progress = await scanProgress({ deliveryId: delivery.id });
+      return ok({
+        scan,
+        message: isB2B
+          ? "Master Resi B2B terbaca — semua paket pada konsinyasi ini otomatis ter-scan. Silakan konfirmasi serah terima."
+          : "QR master terbaca — lanjut scan semua paket untuk customer ini.",
+        progress,
+      });
     }
 
     const detail = delivery.master.details.find((d) => d.detailCode === payload);

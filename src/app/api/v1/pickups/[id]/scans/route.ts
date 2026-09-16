@@ -18,7 +18,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   return handle(async () => {
     const user = await guard(req, "pickup.scan");
     const { id } = await params;
-    const pickup = await db.pickup.findUnique({ where: { id: Number(id) }, include: { master: { include: { details: true } } } });
+    const pickup = await db.pickup.findUnique({ where: { id: Number(id) }, include: { master: { include: { customer: { select: { type: true } }, details: true } } } });
     if (!pickup) return fail(404, "Pickup tidak ditemukan.");
     if (pickup.status === "COMPLETED") return fail(422, "Pickup sudah selesai — tidak perlu scan lagi.");
     if (pickup.status === "CANCELLED") return fail(422, "Pickup sudah dibatalkan.");
@@ -30,12 +30,24 @@ export async function POST(req: NextRequest, { params }: Params) {
     const payload = requireStr(body.payload, "payload").trim();
     const method = normalizeMethod(body.method);
 
-    // Master-level scan: accepted, recorded, but per-package scanning is still required.
+    const isB2B = pickup.master.customer?.type === "b2b";
+
+    // Master-level scan — for B2B shipments this satisfies the ENTIRE pickup
+    // (single Master Resi scan covers all packages in the consignment). For
+    // B2C the master scan is recorded but per-package scanning is still
+    // required.
     if (payload === pickup.master.masterCode || payload === pickup.pickupCode) {
       const scan = await db.handoverScan.create({
         data: { pickupId: pickup.id, context: "pickup", scanLevel: "master", detailId: null, payload, result: "ok", method, scannedById: user.id },
       });
-      return ok({ scan, message: "QR master terbaca — lanjut scan semua paket (detail barang).", progress: await scanProgress({ pickupId: pickup.id }) });
+      const progress = await scanProgress({ pickupId: pickup.id });
+      return ok({
+        scan,
+        message: isB2B
+          ? "Master Resi B2B terbaca — semua paket pada konsinyasi ini otomatis ter-scan. Silakan konfirmasi pickup."
+          : "QR master terbaca — lanjut scan semua paket (detail barang).",
+        progress,
+      });
     }
 
     const detail = pickup.master.details.find((d) => d.detailCode === payload);

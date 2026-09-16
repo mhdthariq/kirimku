@@ -18,10 +18,13 @@ let seedPromise: Promise<void> | null = null;
  *     still unassigned, so manual owner assignments always win) — powers the
  *     "marketing only knows their customers" data separation;
  *  2. creates the "driver checked in at the destination gudang" demo
- *     shipment MKT-000007 — physically at Gudang Bandung on the new
+ *     shipment MKT-000007 — physically at Gudang Banda Aceh on the new
  *     AT_DEST_GUDANG status (destReceivedAt still null), awaiting the Admin
  *     Gudang (ratna) transport drop-off scan; legacy rows still on
- *     ARRIVED_AT_GUDANG + destReceivedAt null are migrated to the new status.
+ *     ARRIVED_AT_GUDANG + destReceivedAt null are migrated to the new status;
+ *  3. creates MKT-000008 — a B2B shipment (PT Maju Bersama) that demonstrates
+ *     the new "B2B Master Resi scan" mode: a single Master Resi scan satisfies
+ *     the entire pickup (no per-package scan required).
  */
 async function seedBackfill(): Promise<void> {
   try {
@@ -47,125 +50,257 @@ async function seedBackfill(): Promise<void> {
       if (existingDemo.status === "ARRIVED_AT_GUDANG" && existingDemo.destReceivedAt == null) {
         await db.masterShipment.update({ where: { id: existingDemo.id }, data: { status: "AT_DEST_GUDANG" } });
       }
-      return;
-    }
-    const [sari, jakarta, bandung, tariffRow] = await Promise.all([
-      db.customer.findUnique({ where: { code: "CUS-000005" } }),
-      db.warehouse.findFirst({ where: { city: "Jakarta Pusat" } }),
-      db.warehouse.findFirst({ where: { city: "Bandung" } }),
-      db.tariff.findFirst({ where: { origin: "Jakarta Pusat", destination: "Bandung", customerType: "b2c", isActive: true } }),
-    ]);
-    if (!sari || !jakarta || !bandung) return;
-
-    const actorId = async (username: string) =>
-      (await db.user.findUnique({ where: { username }, select: { id: true } }))?.id ?? null;
-    const [budiId, dewiId, agusId, jokoId] = await Promise.all([actorId("budi"), actorId("dewi"), actorId("agus"), actorId("joko")]);
-
-    const now = new Date();
-    const daysAgo = (d: number) => new Date(now.getTime() - d * 24 * 60 * 60 * 1000);
-    const createdAt = daysAgo(1.6);
-
-    const shipment = await db.masterShipment.create({
-      data: {
-        masterCode: "MKT-000007",
-        resi: "MKT-000007",
-        customerId: sari.id,
-        tariffId: tariffRow?.id ?? null,
-        status: "AT_DEST_GUDANG",
-        origin: "Jakarta Pusat",
-        destination: "Bandung",
-        originWarehouseId: jakarta.id,
-        destinationWarehouseId: bandung.id,
-        arrivedWarehouseId: bandung.id, // physically at the destination gudang
-        destReceivedAt: null, // NOT yet scan-verified by Admin Gudang Bandung
-        penerimaName: "Sari Indah",
-        penerimaAddress: "Jl. Anggrek No. 3, Bandung",
-        penerimaContact: "0812-3456-0005",
-        pengirimName: sari.name,
-        pengirimPhone: sari.phone,
-        createdByPartnerId: budiPartner?.id ?? null,
-        createdAt,
-        updatedAt: daysAgo(0.8),
-      },
-    });
-
-    const detailDefs = [
-      { description: "Paket elektronik", weightKg: 2.5, l: 30, w: 22, h: 14 },
-      { description: "Kemasan kue kering", weightKg: 1.5, l: 25, w: 20, h: 10 },
-    ];
-    const date = [createdAt.getFullYear(), createdAt.getMonth() + 1, createdAt.getDate()]
-      .map((part) => String(part).padStart(2, "0"))
-      .join("");
-    const detailRows: { id: number; lengthCm: number | null; widthCm: number | null; heightCm: number | null; actualWeightKg: number }[] = [];
-    for (const [i, d] of detailDefs.entries()) {
-      const row = await db.detailShipment.create({
-        data: {
-          detailCode: `DTL-${date}-ARR-${String(i + 1).padStart(3, "0")}`,
-          masterId: shipment.id,
-          description: d.description,
-          actualWeightKg: d.weightKg,
-          lengthCm: d.l,
-          widthCm: d.w,
-          heightCm: d.h,
-          createdAt,
-        },
-      });
-      detailRows.push(row);
-    }
-    if (tariffRow) {
-      const r = computePricing(detailRows, tariffRow);
-      await db.masterShipment.update({
-        where: { id: shipment.id },
-        data: { chargeableWeightKg: r.chargeableKg, ratePerKg: tariffRow.ratePerKg, priceAmount: r.price, pricedAt: createdAt },
-      });
-      await db.payment.create({
-        data: {
-          masterId: shipment.id, method: "TRANSFER", amount: r.price, status: "VERIFIED",
-          reference: "PAY-MKT000007", recordedById: dewiId, createdAt,
-          verifiedById: agusId, verifiedAt: daysAgo(1.4),
-        },
-      });
+    } else {
+      await createDemoArrivalShipment(budiPartner);
     }
 
-    const events: { event: string; description: string; daysAgo: number; actorId: number | null }[] = [
-      { event: "CREATED", description: "Shipment MKT-000007 dibuat", daysAgo: 1.6, actorId: budiId },
-      { event: "READY_FOR_PICKUP", description: "Menunggu penjemputan kurir", daysAgo: 1.5, actorId: budiId },
-      { event: "PICKED_UP", description: "Picked-up by Dewi Lestari", daysAgo: 1.45, actorId: dewiId },
-      { event: "RECEIVED_AT_GUDANG", description: "Diterima di Gudang Jakarta Pusat", daysAgo: 1.4, actorId: agusId },
-      { event: "IN_TRANSPORT", description: "Berangkat via transport TRP-2026-000003", daysAgo: 1.3, actorId: jokoId },
-      { event: "AT_DEST_GUDANG", description: `Driver transport TRP-2026-000003 check-in di checkpoint akhir (dari ${jakarta.name}) — paket ada di gudang tujuan, menunggu scan penerimaan Admin Gudang`, daysAgo: 0.8, actorId: jokoId },
-    ];
-    for (const ev of events) {
-      await db.trackingEvent.create({
-        data: { masterId: shipment.id, event: ev.event, description: ev.description, actorId: ev.actorId, occurredAt: daysAgo(ev.daysAgo) },
-      });
-    }
-
-    // The arrived linehaul that carried it (JKT → BDG, crew joko + andi)
-    const [vehicle, driverEmp, kenekEmp] = await Promise.all([
-      db.vehicle.findFirst({ where: { vehicleNumber: "B 9455 KTB" } }),
-      db.employee.findFirst({ where: { position: "Driver" } }),
-      db.employee.findFirst({ where: { position: "Kenek" } }),
-    ]);
-    if (vehicle) {
-      const transport = await db.transport.create({
-        data: {
-          transportCode: "TRP-2026-000003",
-          vehicleId: vehicle.id,
-          driverId: driverEmp?.id ?? null,
-          kenekId: kenekEmp?.id ?? null,
-          status: "ARRIVED",
-          origin: "Jakarta Pusat",
-          destination: "Bandung",
-          departedAt: daysAgo(1.3),
-          arrivedAt: daysAgo(0.8),
-          createdAt: daysAgo(1.5),
-        },
-      });
-      await db.transportShipment.create({ data: { transportId: transport.id, shipmentId: shipment.id } });
+    // --- 3. MKT-000008 — B2B Master Resi scan demo -------------------------
+    const existingB2B = await db.masterShipment.findUnique({ where: { masterCode: "MKT-000008" } });
+    if (!existingB2B) {
+      await createB2BMasterResiShipment(budiPartner);
     }
   } catch {
     // backfill is best-effort — never block boot
+  }
+}
+
+/** MKT-000007 — driver at destination gudang (Banda Aceh), awaiting scan. */
+async function createDemoArrivalShipment(budiPartner: { id: number } | null): Promise<void> {
+  const [sari, medan, bandaAceh, tariffRow] = await Promise.all([
+    db.customer.findUnique({ where: { code: "CUS-000005" } }),
+    db.warehouse.findFirst({ where: { city: "Medan" } }),
+    db.warehouse.findFirst({ where: { city: "Banda Aceh" } }),
+    db.tariff.findFirst({ where: { origin: "Medan", destination: "Banda Aceh", customerType: "b2c", isActive: true } }),
+  ]);
+  if (!sari || !medan || !bandaAceh) return;
+
+  const actorId = async (username: string) =>
+    (await db.user.findUnique({ where: { username }, select: { id: true } }))?.id ?? null;
+  const [budiId, dewiId, agusId, jokoId] = await Promise.all([actorId("budi"), actorId("dewi"), actorId("agus"), actorId("joko")]);
+
+  const now = new Date();
+  const daysAgo = (d: number) => new Date(now.getTime() - d * 24 * 60 * 60 * 1000);
+  const createdAt = daysAgo(1.6);
+
+  const shipment = await db.masterShipment.create({
+    data: {
+      masterCode: "MKT-000007",
+      resi: "MKT-000007",
+      customerId: sari.id,
+      tariffId: tariffRow?.id ?? null,
+      status: "AT_DEST_GUDANG",
+      origin: "Medan",
+      destination: "Banda Aceh",
+      originWarehouseId: medan.id,
+      destinationWarehouseId: bandaAceh.id,
+      arrivedWarehouseId: bandaAceh.id, // physically at the destination gudang
+      destReceivedAt: null, // NOT yet scan-verified by Admin Gudang Banda Aceh
+      penerimaName: "Sari Indah",
+      penerimaAddress: "Jl. T. Iskandar No. 7, Banda Aceh",
+      penerimaContact: "0812-3456-0005",
+      pengirimName: sari.name,
+      pengirimPhone: sari.phone,
+      createdByPartnerId: budiPartner?.id ?? null,
+      createdAt,
+      updatedAt: daysAgo(0.8),
+    },
+  });
+
+  const detailDefs = [
+    { description: "Paket elektronik", weightKg: 2.5, l: 30, w: 22, h: 14 },
+    { description: "Kemasan kue kering", weightKg: 1.5, l: 25, w: 20, h: 10 },
+  ];
+  const date = [createdAt.getFullYear(), createdAt.getMonth() + 1, createdAt.getDate()]
+    .map((part) => String(part).padStart(2, "0"))
+    .join("");
+  const detailRows: { id: number; lengthCm: number | null; widthCm: number | null; heightCm: number | null; actualWeightKg: number }[] = [];
+  for (const [i, d] of detailDefs.entries()) {
+    const row = await db.detailShipment.create({
+      data: {
+        detailCode: `DTL-${date}-ARR-${String(i + 1).padStart(3, "0")}`,
+        masterId: shipment.id,
+        description: d.description,
+        actualWeightKg: d.weightKg,
+        lengthCm: d.l,
+        widthCm: d.w,
+        heightCm: d.h,
+        createdAt,
+      },
+    });
+    detailRows.push(row);
+  }
+  if (tariffRow) {
+    const r = computePricing(detailRows, tariffRow);
+    await db.masterShipment.update({
+      where: { id: shipment.id },
+      data: { chargeableWeightKg: r.chargeableKg, ratePerKg: tariffRow.ratePerKg, priceAmount: r.price, pricedAt: createdAt },
+    });
+    await db.payment.create({
+      data: {
+        masterId: shipment.id, method: "TRANSFER", amount: r.price, status: "VERIFIED",
+        reference: "PAY-MKT000007", recordedById: dewiId, createdAt,
+        verifiedById: agusId, verifiedAt: daysAgo(1.4),
+      },
+    });
+  }
+
+  const events: { event: string; description: string; daysAgo: number; actorId: number | null }[] = [
+    { event: "CREATED", description: "Shipment MKT-000007 dibuat", daysAgo: 1.6, actorId: budiId },
+    { event: "READY_FOR_PICKUP", description: "Menunggu penjemputan kurir", daysAgo: 1.5, actorId: budiId },
+    { event: "PICKED_UP", description: "Picked-up by Dewi Lestari", daysAgo: 1.45, actorId: dewiId },
+    { event: "RECEIVED_AT_GUDANG", description: "Diterima di Gudang Medan", daysAgo: 1.4, actorId: agusId },
+    { event: "IN_TRANSPORT", description: "Berangkat via transport TRP-2026-000003", daysAgo: 1.3, actorId: jokoId },
+    { event: "AT_DEST_GUDANG", description: `Driver transport TRP-2026-000003 check-in di checkpoint akhir (dari ${medan.name}) — paket ada di gudang tujuan, menunggu scan penerimaan Admin Gudang`, daysAgo: 0.8, actorId: jokoId },
+  ];
+  for (const ev of events) {
+    await db.trackingEvent.create({
+      data: { masterId: shipment.id, event: ev.event, description: ev.description, actorId: ev.actorId, occurredAt: daysAgo(ev.daysAgo) },
+    });
+  }
+
+  // The arrived linehaul that carried it (MDN → BNA, crew joko + andi)
+  const [vehicle, driverEmp, kenekEmp] = await Promise.all([
+    db.vehicle.findFirst({ where: { vehicleNumber: "BK 9455 KTB" } }),
+    db.employee.findFirst({ where: { position: "Driver" } }),
+    db.employee.findFirst({ where: { position: "Kenek" } }),
+  ]);
+  if (vehicle) {
+    const transport = await db.transport.create({
+      data: {
+        transportCode: "TRP-2026-000003",
+        vehicleId: vehicle.id,
+        driverId: driverEmp?.id ?? null,
+        kenekId: kenekEmp?.id ?? null,
+        status: "ARRIVED",
+        origin: "Medan",
+        destination: "Banda Aceh",
+        departedAt: daysAgo(1.3),
+        arrivedAt: daysAgo(0.8),
+        createdAt: daysAgo(1.5),
+      },
+    });
+    await db.transportShipment.create({ data: { transportId: transport.id, shipmentId: shipment.id } });
+  }
+}
+
+/**
+ * MKT-000008 — B2B shipment (PT Maju Bersama) demonstrating the new B2B
+ * Master Resi scan mode. A B2B pickup task assigned to kurir Rizky so the
+ * kurir can open the scan dialog and only need to scan the Master Resi once
+ * (not 8 packages individually).
+ */
+async function createB2BMasterResiShipment(budiPartner: { id: number } | null): Promise<void> {
+  const [maju, medan, bandaAceh, tariffRow] = await Promise.all([
+    db.customer.findUnique({ where: { code: "CUS-000002" } }),
+    db.warehouse.findFirst({ where: { city: "Medan" } }),
+    db.warehouse.findFirst({ where: { city: "Banda Aceh" } }),
+    db.tariff.findFirst({ where: { origin: "Medan", destination: "Banda Aceh", customerType: "b2b", isActive: true } }),
+  ]);
+  if (!maju || !medan || !bandaAceh) return;
+
+  const actorId = async (username: string) =>
+    (await db.user.findUnique({ where: { username }, select: { id: true } }))?.id ?? null;
+  const [budiId] = await Promise.all([actorId("budi")]);
+
+  const now = new Date();
+  const daysAgo = (d: number) => new Date(now.getTime() - d * 24 * 60 * 60 * 1000);
+  const createdAt = daysAgo(0.4);
+
+  const shipment = await db.masterShipment.create({
+    data: {
+      masterCode: "MKT-000008",
+      resi: "MKT-000008",
+      customerId: maju.id,
+      tariffId: tariffRow?.id ?? null,
+      status: "READY_FOR_PICKUP",
+      origin: "Medan",
+      destination: "Banda Aceh",
+      originWarehouseId: medan.id,
+      destinationWarehouseId: bandaAceh.id,
+      arrivedWarehouseId: null,
+      penerimaName: "Bagian Gudang PT Maju Bersama",
+      penerimaAddress: "Jl. T. Iskandar No. 12, Banda Aceh",
+      penerimaContact: "0812-3456-0002",
+      pengirimName: maju.companyName ?? maju.name,
+      pengirimPhone: maju.phone,
+      pengirimAddress: maju.address,
+      createdByPartnerId: budiPartner?.id ?? null,
+      createdAt,
+      updatedAt: createdAt,
+    },
+  });
+
+  // B2B shipments typically carry MANY packages — exactly the use case for
+  // the Master Resi scan mode (one scan covers the whole consignment).
+  const date = [createdAt.getFullYear(), createdAt.getMonth() + 1, createdAt.getDate()]
+    .map((part) => String(part).padStart(2, "0"))
+    .join("");
+  const time = [createdAt.getHours(), createdAt.getMinutes(), createdAt.getSeconds()]
+    .map((part) => String(part).padStart(2, "0"))
+    .join("");
+  const detailRows: { id: number; lengthCm: number | null; widthCm: number | null; heightCm: number | null; actualWeightKg: number }[] = [];
+  // 8 packages — typical B2B carton consignment
+  for (let i = 0; i < 8; i++) {
+    const row = await db.detailShipment.create({
+      data: {
+        detailCode: `DTL-${date}-${time}-${String(i + 1).padStart(3, "0")}`,
+        masterId: shipment.id,
+        description: `Karton B2B #${i + 1}`,
+        actualWeightKg: 3.5,
+        lengthCm: 40,
+        widthCm: 30,
+        heightCm: 25,
+        createdAt,
+      },
+    });
+    detailRows.push(row);
+  }
+  if (tariffRow) {
+    const r = computePricing(detailRows, tariffRow);
+    await db.masterShipment.update({
+      where: { id: shipment.id },
+      data: { chargeableWeightKg: r.chargeableKg, ratePerKg: tariffRow.ratePerKg, priceAmount: r.price, pricedAt: createdAt },
+    });
+    // 50% DP — pickup is unlocked once the kurir scans the Master Resi.
+    await db.payment.create({
+      data: {
+        masterId: shipment.id, method: "TRANSFER", amount: r.price / 2, status: "VERIFIED",
+        reference: "PAY-MKT000008", recordedById: budiId, createdAt,
+        verifiedById: budiId, verifiedAt: daysAgo(0.35),
+      },
+    });
+  }
+
+  await db.trackingEvent.create({
+    data: {
+      masterId: shipment.id,
+      event: "CREATED",
+      description: `Shipment MKT-000008 (B2B Master Resi demo) dibuat oleh Budi Santoso`,
+      actorId: budiId,
+      occurredAt: createdAt,
+    },
+  });
+  await db.trackingEvent.create({
+    data: {
+      masterId: shipment.id,
+      event: "READY_FOR_PICKUP",
+      description: "Menunggu penjemputan kurir — B2B: cukup scan Master Resi sekali",
+      actorId: budiId,
+      occurredAt: daysAgo(0.38),
+    },
+  });
+
+  // Open pickup task assigned to kurir Rizky (MKT-000008 — READY_FOR_PICKUP).
+  const rizkyEmp = await db.employee.findFirst({ where: { position: "Kurir", name: { contains: "Rizky" } } });
+  if (rizkyEmp) {
+    await db.pickup.create({
+      data: {
+        pickupCode: "PICK-2026-000008", masterId: shipment.id,
+        kurirId: rizkyEmp.id,
+        status: "ASSIGNED", notes: "B2B — cukup scan Master Resi di lokasi customer",
+        createdAt: daysAgo(0.2), updatedAt: daysAgo(0.2),
+      },
+    });
   }
 }
 
@@ -182,12 +317,16 @@ export function ensureSeed(): Promise<void> {
 async function runSeed(): Promise<void> {
   await ensureRbac();
 
-  // ----- Gudang (no gateway/type distinction) -------------------------------
+  // ----- Gudang (Sumatra Island — main corridor Medan → Banda Aceh) --------
+  // WH-000001: Medan — origin hub & HQ
+  // WH-000002: Banda Aceh — destination hub (main route endpoint)
+  // WH-000003: Lhokseumawe — mid-route branch (demonstrates per-gudang data
+  //             isolation: ratna in Lhokseumawe only sees LSM-side data)
   // customerSupportContact is printed on the Shipment Resi & Detail Resi.
   const gudangDefs = [
-    { code: "WH-000001", name: "Gudang Jakarta Pusat", city: "Jakarta Pusat", address: "Jl. Gunung Sahari No. 45", latitude: -6.1105, longitude: 106.8814, customerSupportContact: "0811-1000-001" },
-    { code: "WH-000002", name: "Gudang Bandung", city: "Bandung", address: "Jl. Soekarno Hatta No. 210", latitude: -6.9175, longitude: 107.6191, customerSupportContact: "0822-2000-002" },
-    { code: "WH-000003", name: "Gudang Surabaya", city: "Surabaya", address: "Jl. Ahmad Yani No. 88", latitude: -7.2575, longitude: 112.7521, customerSupportContact: "0833-3000-003" },
+    { code: "WH-000001", name: "Gudang Medan", city: "Medan", address: "Jl. Gatot Subroto No. 45, Medan", latitude: 3.5952, longitude: 98.6722, customerSupportContact: "061-1234-0001" },
+    { code: "WH-000002", name: "Gudang Banda Aceh", city: "Banda Aceh", address: "Jl. T. Iskandar No. 12, Banda Aceh", latitude: 5.5483, longitude: 95.3238, customerSupportContact: "0651-2345-0002" },
+    { code: "WH-000003", name: "Gudang Lhokseumawe", city: "Lhokseumawe", address: "Jl. Merdeka No. 88, Lhokseumawe", latitude: 5.0313, longitude: 97.1417, customerSupportContact: "0645-3456-0003" },
   ];
   const gudang: Record<string, number> = {};
   for (const g of gudangDefs) {
@@ -204,15 +343,15 @@ async function runSeed(): Promise<void> {
   // everything), so older databases are backfilled with the first gudang.
   const unbound = await db.employee.findMany({ where: { warehouseId: null, isActive: true }, select: { id: true } });
   if (unbound.length > 0) {
-    await db.employee.updateMany({ where: { id: { in: unbound.map((e) => e.id) } }, data: { warehouseId: gudang["Jakarta Pusat"] } });
+    await db.employee.updateMany({ where: { id: { in: unbound.map((e) => e.id) } }, data: { warehouseId: gudang["Medan"] } });
   }
 
   const ownerExists = await db.user.findFirst({ where: { username: "owner" } });
   const shipmentCount = await db.masterShipment.count();
   if (ownerExists && shipmentCount >= 6) {
     // Already seeded — still run the idempotent backfill (customer ↔ marketing
-    // linkage + the transport-arrival demo shipment) so upgraded DBs get the
-    // new demo data without touching existing rows.
+    // linkage + the transport-arrival demo shipment + B2B Master Resi demo)
+    // so upgraded DBs get the new demo data without touching existing rows.
     await seedBackfill();
     return;
   }
@@ -223,30 +362,30 @@ async function runSeed(): Promise<void> {
   // ----- Employees + users -------------------------------------------------
   // EVERY karyawan is stationed at one gudang (warehouseId) — operational data
   // (shipments, pickups, deliveries, transports) is separated by that gudang.
-  // ratna (Admin Gudang Bandung) demonstrates the data isolation: she only
-  // sees Bandung-side data, never Jakarta's.
+  // ratna (Admin Gudang Lhokseumawe) demonstrates the data isolation: she only
+  // sees Lhokseumawe-side data, never Medan's or Banda Aceh's.
   const staffPassword = hashPassword("Demo#Pass2026");
   const ownerPassword = hashPassword("ChangeMeOwner#2026");
 
   const staff: { username: string; name: string; position: string; role: string; employeeNumber: string; warehouseId: string }[] = [
-    { username: "siti", name: "Siti Rahma", position: "Admin Kantor", role: "admin-kantor", employeeNumber: "EMP-000002", warehouseId: "Jakarta Pusat" },
-    { username: "budi", name: "Budi Santoso", position: "Marketing", role: "marketing", employeeNumber: "EMP-000003", warehouseId: "Jakarta Pusat" },
-    { username: "agus", name: "Agus Pratama", position: "Admin Gudang", role: "admin-gudang", employeeNumber: "EMP-000004", warehouseId: "Jakarta Pusat" },
-    { username: "dewi", name: "Dewi Lestari", position: "Kurir", role: "kurir", employeeNumber: "EMP-000005", warehouseId: "Jakarta Pusat" },
-    { username: "rizky", name: "Rizky Hidayat", position: "Kurir", role: "kurir", employeeNumber: "EMP-000006", warehouseId: "Jakarta Pusat" },
-    { username: "joko", name: "Joko Widodo", position: "Driver", role: "driver", employeeNumber: "EMP-000007", warehouseId: "Jakarta Pusat" },
-    { username: "andi", name: "Andi Wijaya", position: "Kenek", role: "kenek", employeeNumber: "EMP-000008", warehouseId: "Jakarta Pusat" },
-    { username: "wawan", name: "Wawan Setiawan", position: "Staff Gudang", role: "staff-gudang", employeeNumber: "EMP-000009", warehouseId: "Jakarta Pusat" },
-    { username: "ratna", name: "Ratna Kurnia", position: "Admin Gudang", role: "admin-gudang", employeeNumber: "EMP-000010", warehouseId: "Bandung" },
+    { username: "siti", name: "Siti Rahma", position: "Admin Kantor", role: "admin-kantor", employeeNumber: "EMP-000002", warehouseId: "Medan" },
+    { username: "budi", name: "Budi Santoso", position: "Marketing", role: "marketing", employeeNumber: "EMP-000003", warehouseId: "Medan" },
+    { username: "agus", name: "Agus Pratama", position: "Admin Gudang", role: "admin-gudang", employeeNumber: "EMP-000004", warehouseId: "Medan" },
+    { username: "dewi", name: "Dewi Lestari", position: "Kurir", role: "kurir", employeeNumber: "EMP-000005", warehouseId: "Medan" },
+    { username: "rizky", name: "Rizky Hidayat", position: "Kurir", role: "kurir", employeeNumber: "EMP-000006", warehouseId: "Medan" },
+    { username: "joko", name: "Joko Widodo", position: "Driver", role: "driver", employeeNumber: "EMP-000007", warehouseId: "Medan" },
+    { username: "andi", name: "Andi Wijaya", position: "Kenek", role: "kenek", employeeNumber: "EMP-000008", warehouseId: "Medan" },
+    { username: "wawan", name: "Wawan Setiawan", position: "Staff Gudang", role: "staff-gudang", employeeNumber: "EMP-000009", warehouseId: "Medan" },
+    { username: "ratna", name: "Ratna Kurnia", position: "Admin Gudang", role: "admin-gudang", employeeNumber: "EMP-000010", warehouseId: "Lhokseumawe" },
     // Revise.md §12 — Vehicle Owner: first-class external partner (NOT an
     // employee). hendra & sari own vehicles and earn transport profit share.
-    { username: "hendra", name: "Hendra Gunawan", position: "Vehicle Owner", role: "vehicle-owner", employeeNumber: "EMP-000011", warehouseId: "Jakarta Pusat" },
-    { username: "sari", name: "Sari Puspita", position: "Vehicle Owner", role: "vehicle-owner", employeeNumber: "EMP-000012", warehouseId: "Bandung" },
+    { username: "hendra", name: "Hendra Gunawan", position: "Vehicle Owner", role: "vehicle-owner", employeeNumber: "EMP-000011", warehouseId: "Medan" },
+    { username: "sari", name: "Sari Puspita", position: "Vehicle Owner", role: "vehicle-owner", employeeNumber: "EMP-000012", warehouseId: "Banda Aceh" },
   ];
 
   const ownerEmployee = await db.employee.upsert({
     where: { employeeNumber: "EMP-000001" },
-    create: { employeeNumber: "EMP-000001", name: "Owner Utama", position: "Owner", phone: "081100000001" },
+    create: { employeeNumber: "EMP-000001", name: "Owner Utama", position: "Owner", phone: "061100000001" },
     update: {},
   });
   await db.user.upsert({
@@ -260,7 +399,7 @@ async function runSeed(): Promise<void> {
     const employee = await db.employee.upsert({
       where: { employeeNumber: s.employeeNumber },
       create: {
-        employeeNumber: s.employeeNumber, name: s.name, position: s.position, phone: `08110000${s.employeeNumber.slice(-4)}`,
+        employeeNumber: s.employeeNumber, name: s.name, position: s.position, phone: `06110000${s.employeeNumber.slice(-4)}`,
         warehouseId: gudang[s.warehouseId] ?? null,
       },
       update: { warehouseId: gudang[s.warehouseId] ?? null },
@@ -309,12 +448,13 @@ async function runSeed(): Promise<void> {
   }
 
   // ----- Vehicles -----------------------------------------------------------
-  // Revise.md §13 — B 9102 KTA & B 9455 KTB belong to Vehicle Owner hendra;
-  // L 7788 KTC belongs to sari (multiple vehicles per owner, multiple owners).
+  // Vehicle plates are Sumatran (BK = North Sumatra / Aceh plates).
+  // Revise.md §13 — BK 9102 KTA & BK 9455 KTB belong to Vehicle Owner hendra;
+  // BK 7788 KTC belongs to sari (multiple vehicles per owner, multiple owners).
   const vehicleDefs = [
-    { vehicleNumber: "B 9102 KTA", name: "Engkel Box", status: "ACTIVE", maxWeightKg: 1200, maxVolumeM3: 6, ownerUsername: "hendra" },
-    { vehicleNumber: "B 9455 KTB", name: "CDD 6 Ban", status: "ACTIVE", maxWeightKg: 3500, maxVolumeM3: 14, ownerUsername: "hendra" },
-    { vehicleNumber: "L 7788 KTC", name: "Fuso Besar", status: "MAINTENANCE", maxWeightKg: 8000, maxVolumeM3: 28, notes: "Perawatan berkala, kembali aktif minggu depan.", ownerUsername: "sari" },
+    { vehicleNumber: "BK 9102 KTA", name: "Engkel Box", status: "ACTIVE", maxWeightKg: 1200, maxVolumeM3: 6, ownerUsername: "hendra" },
+    { vehicleNumber: "BK 9455 KTB", name: "CDD 6 Ban", status: "ACTIVE", maxWeightKg: 3500, maxVolumeM3: 14, ownerUsername: "hendra" },
+    { vehicleNumber: "BK 7788 KTC", name: "Fuso Besar", status: "MAINTENANCE", maxWeightKg: 8000, maxVolumeM3: 28, notes: "Perawatan berkala, kembali aktif minggu depan.", ownerUsername: "sari" },
   ];
   const vehicles: Record<string, number> = {};
   for (const { ownerUsername, ...v } of vehicleDefs) {
@@ -330,14 +470,14 @@ async function runSeed(): Promise<void> {
   await db.vehicleAssignment.upsert({
     where: {
       vehicleId_driverId_kenekId_validFrom: {
-        vehicleId: vehicles["B 9455 KTB"],
+        vehicleId: vehicles["BK 9455 KTB"],
         driverId: usersByHandle.joko.employeeId ?? 0,
         kenekId: usersByHandle.andi.employeeId ?? 0,
         validFrom: daysAgo(30),
       },
     },
     create: {
-      vehicleId: vehicles["B 9455 KTB"],
+      vehicleId: vehicles["BK 9455 KTB"],
       driverId: usersByHandle.joko.employeeId,
       kenekId: usersByHandle.andi.employeeId,
       validFrom: daysAgo(30),
@@ -346,21 +486,25 @@ async function runSeed(): Promise<void> {
   }).catch(() => undefined);
 
   // ----- Routes + checkpoints (≥ 3 per route) --------------------------------
+  // Main route: Medan → Banda Aceh via the east-coast Trans-Sumatran highway.
+  // Mid-stop checkpoints are real rest areas / towns along the corridor so
+  // the driver dashboard map shows realistic progress.
   const routeDefs = [
     {
-      name: "JKT - BDG Tol Cipularang", origin: "Jakarta Pusat", destination: "Bandung",
+      name: "MDN - BNA Aceh Timur", origin: "Medan", destination: "Banda Aceh",
       checkpoints: [
-        { name: "Gudang Jakarta Pusat (Start)", latitude: -6.1105, longitude: 106.8814, radiusMeters: 300 },
-        { name: "Rest Area KM 57 Cipularang", latitude: -6.4461, longitude: 107.4394, radiusMeters: 250 },
-        { name: "Gudang Bandung (End)", latitude: -6.9175, longitude: 107.6191, radiusMeters: 300 },
+        { name: "Gudang Medan (Start)", latitude: 3.5952, longitude: 98.6722, radiusMeters: 300 },
+        { name: "Rest Area Tebing Tinggi", latitude: 3.3302, longitude: 99.1652, radiusMeters: 250 },
+        { name: "Lhokseumawe (Mid)", latitude: 5.0313, longitude: 97.1417, radiusMeters: 250 },
+        { name: "Gudang Banda Aceh (End)", latitude: 5.5483, longitude: 95.3238, radiusMeters: 300 },
       ],
     },
     {
-      name: "JKT - SBY Pantura", origin: "Jakarta Pusat", destination: "Surabaya",
+      name: "MDN - LSM Lintas Sumatera", origin: "Medan", destination: "Lhokseumawe",
       checkpoints: [
-        { name: "Gudang Jakarta Pusat (Start)", latitude: -6.1105, longitude: 106.8814, radiusMeters: 300 },
-        { name: "Rest Area KM 207 Brebes", latitude: -6.8721, longitude: 109.0354, radiusMeters: 250 },
-        { name: "Gudang Surabaya (End)", latitude: -7.2575, longitude: 112.7521, radiusMeters: 300 },
+        { name: "Gudang Medan (Start)", latitude: 3.5952, longitude: 98.6722, radiusMeters: 300 },
+        { name: "Rest Area Tebing Tinggi", latitude: 3.3302, longitude: 99.1652, radiusMeters: 250 },
+        { name: "Gudang Lhokseumawe (End)", latitude: 5.0313, longitude: 97.1417, radiusMeters: 300 },
       ],
     },
   ];
@@ -380,11 +524,12 @@ async function runSeed(): Promise<void> {
   // ----- Tariffs -------------------------------------------------------------
   // volumetricMultiplier (kg per m³) is configurable per tariff — pricing formula:
   // volumetric kg = (L×W×H cm / 1.000.000) × multiplier
+  // Medan → Banda Aceh (~440 km east-coast corridor) — main route.
   const tariffDefs = [
-    { origin: "Jakarta Pusat", destination: "Bandung", customerType: "b2b", ratePerKg: 4500, volumetricMultiplier: 250 },
-    { origin: "Jakarta Pusat", destination: "Bandung", customerType: "b2c", ratePerKg: 5500, volumetricMultiplier: 250 },
-    { origin: "Jakarta Pusat", destination: "Surabaya", customerType: "b2b", ratePerKg: 7500, volumetricMultiplier: 300 },
-    { origin: "Jakarta Pusat", destination: "Surabaya", customerType: "b2c", ratePerKg: 8500, volumetricMultiplier: 300 },
+    { origin: "Medan", destination: "Banda Aceh", customerType: "b2b", ratePerKg: 8000, volumetricMultiplier: 250 },
+    { origin: "Medan", destination: "Banda Aceh", customerType: "b2c", ratePerKg: 9500, volumetricMultiplier: 250 },
+    { origin: "Medan", destination: "Lhokseumawe", customerType: "b2b", ratePerKg: 5500, volumetricMultiplier: 250 },
+    { origin: "Medan", destination: "Lhokseumawe", customerType: "b2c", ratePerKg: 6500, volumetricMultiplier: 250 },
   ];
   const tariffByRoute: Record<string, { id: number; ratePerKg: number; minChargeableKg: number; volumetricMultiplier: number; roundingMode: string; roundingUnitKg: number }> = {};
   for (const t of tariffDefs) {
@@ -395,11 +540,11 @@ async function runSeed(): Promise<void> {
 
   // ----- Customers -------------------------------------------------------------
   const customerDefs = [
-    { code: "CUS-000001", type: "b2c", name: "Rina Amelia", phone: "081234000001", address: "Jl. Melati No. 12, Bandung" },
-    { code: "CUS-000002", type: "b2b", name: "PT Maju Bersama", companyName: "PT Maju Bersama", phone: "081234000002", address: "Jl. Sudirman Kav. 21, Jakarta" },
-    { code: "CUS-000003", type: "b2b", name: "CV Sinar Jaya", companyName: "CV Sinar Jaya", phone: "081234000003", address: "Jl. Pemuda No. 5, Surabaya" },
-    { code: "CUS-000004", type: "b2c", name: "Tono Susilo", phone: "081234000004", address: "Jl. Kenanga No. 9, Surabaya" },
-    { code: "CUS-000005", type: "b2c", name: "Sari Indah", phone: "081234000005", address: "Jl. Anggrek No. 3, Bandung" },
+    { code: "CUS-000001", type: "b2c", name: "Rina Amelia", phone: "081234000001", address: "Jl. T. Iskandar No. 12, Banda Aceh" },
+    { code: "CUS-000002", type: "b2b", name: "PT Maju Bersama", companyName: "PT Maju Bersama", phone: "081234000002", address: "Jl. Gatot Subroto No. 21, Medan" },
+    { code: "CUS-000003", type: "b2b", name: "CV Sinar Jaya", companyName: "CV Sinar Jaya", phone: "081234000003", address: "Jl. Merdeka No. 5, Lhokseumawe" },
+    { code: "CUS-000004", type: "b2c", name: "Tono Susilo", phone: "081234000004", address: "Jl. Kenanga No. 9, Banda Aceh" },
+    { code: "CUS-000005", type: "b2c", name: "Sari Indah", phone: "081234000005", address: "Jl. Anggrek No. 3, Banda Aceh" },
   ];
   const customers: Record<string, { id: number; type: string }> = {};
   for (const c of customerDefs) {
@@ -425,8 +570,8 @@ async function runSeed(): Promise<void> {
         // Priced + DP ≥ 50% so the open pickup task (rizky) can be confirmed —
         // demonstrates the DP rule + QR scan flow end-to-end.
         masterCode: "MKT-000001", customer: "Rina Amelia", status: "READY_FOR_PICKUP",
-        origin: "Jakarta Pusat", destination: "Bandung", priced: true, createdDaysAgo: 1,
-        penerima: { name: "Laksmi Dewi", address: "Jl. Melati No. 12, Bandung", contact: "0813-2222-3333" },
+        origin: "Medan", destination: "Banda Aceh", priced: true, createdDaysAgo: 1,
+        penerima: { name: "Laksmi Dewi", address: "Jl. T. Iskandar No. 12, Banda Aceh", contact: "0813-2222-3333" },
         payment: { amount: 20000, method: "TRANSFER", status: "RECORDED" },
         details: [
           { description: "Paket pakaian", quantity: 1, weightKg: 2, l: 35, w: 25, h: 12 },
@@ -434,19 +579,19 @@ async function runSeed(): Promise<void> {
         ],
       },
       {
-        // PICKED_UP — sits in the gudang arrival queue (Admin Gudang scans the
-        // 10 packages / uses “Scan Semua”, then confirms arrival). Balance
-        // unpaid → “Notify Marketing” demo after arrival.
+        // B2B PICKED_UP — sits in the gudang arrival queue. With the new B2B
+        // Master Resi scan option, Admin Gudang can scan the Master Resi ONCE
+        // to confirm receipt of all 10 packages (demo of the new feature).
         masterCode: "MKT-000002", customer: "PT Maju Bersama", status: "PICKED_UP",
-        origin: "Jakarta Pusat", destination: "Bandung", priced: true, createdDaysAgo: 2,
-        penerima: { name: "Hendra Gunawan", address: "Jl. Merdeka No. 88, Bandung", contact: "0814-4444-5555" },
+        origin: "Medan", destination: "Banda Aceh", priced: true, createdDaysAgo: 2,
+        penerima: { name: "Hendra Gunawan", address: "Jl. T. Iskandar No. 88, Banda Aceh", contact: "0814-4444-5555" },
         payment: { amount: 60000, method: "TRANSFER", status: "VERIFIED" },
         details: [{ description: "Karton Tulis", quantity: 10, weightKg: 2.5, l: 25, w: 20, h: 20 }],
       },
       {
         masterCode: "MKT-000003", customer: "CV Sinar Jaya", status: "RECEIVED_AT_GUDANG",
-        origin: "Jakarta Pusat", destination: "Surabaya", priced: true, createdDaysAgo: 4,
-        penerima: { name: "Bagian Gudang CV Sinar Jaya", address: "Jl. Pemuda No. 5, Surabaya", contact: "0815-5555-6666" },
+        origin: "Medan", destination: "Lhokseumawe", priced: true, createdDaysAgo: 4,
+        penerima: { name: "Bagian Gudang CV Sinar Jaya", address: "Jl. Merdeka No. 5, Lhokseumawe", contact: "0815-5555-6666" },
         payment: { amount: 450000, method: "TRANSFER", status: "VERIFIED" },
         details: [
           { description: "Mesin bubut mini", quantity: 1, weightKg: 40, l: 60, w: 45, h: 40 },
@@ -455,15 +600,15 @@ async function runSeed(): Promise<void> {
       },
       {
         masterCode: "MKT-000004", customer: "Tono Susilo", status: "IN_TRANSPORT",
-        origin: "Jakarta Pusat", destination: "Surabaya", priced: true, createdDaysAgo: 3,
-        penerima: { name: "Tono Susilo", address: "Jl. Kenanga No. 9, Surabaya", contact: "0812-3456-0004" },
+        origin: "Medan", destination: "Banda Aceh", priced: true, createdDaysAgo: 3,
+        penerima: { name: "Tono Susilo", address: "Jl. Kenanga No. 9, Banda Aceh", contact: "0812-3456-0004" },
         payment: { amount: 25500, method: "CASH", status: "VERIFIED" },
         details: [{ description: "Kipas angin", quantity: 1, weightKg: 3, l: 30, w: 25, h: 12 }],
       },
       {
         masterCode: "MKT-000005", customer: "PT Maju Bersama", status: "DELIVERED",
-        origin: "Jakarta Pusat", destination: "Bandung", priced: true, createdDaysAgo: 6,
-        penerima: { name: "Bagian Gudang PT Maju Bersama", address: "Jl. Sudirman Kav. 21, Jakarta", contact: "0812-3456-0002" },
+        origin: "Medan", destination: "Banda Aceh", priced: true, createdDaysAgo: 6,
+        penerima: { name: "Bagian Gudang PT Maju Bersama", address: "Jl. Gatot Subroto No. 21, Medan", contact: "0812-3456-0002" },
         payment: { amount: 180000, method: "CASH", status: "VERIFIED" },
         details: [{ description: "Paket promosi", quantity: 8, weightKg: 5, l: 30, w: 20, h: 15 }],
       },
@@ -471,8 +616,8 @@ async function runSeed(): Promise<void> {
         // CREATED + unpriced — walk-in candidate: customer hands the package
         // straight to Admin Gudang (no scan needed).
         masterCode: "MKT-000006", customer: "Sari Indah", status: "CREATED",
-        origin: "Jakarta Pusat", destination: "Bandung", priced: false, createdDaysAgo: 0,
-        penerima: { name: "Sari Indah", address: "Jl. Anggrek No. 3, Bandung", contact: "0812-3456-0005" },
+        origin: "Medan", destination: "Banda Aceh", priced: false, createdDaysAgo: 0,
+        penerima: { name: "Sari Indah", address: "Jl. Anggrek No. 3, Banda Aceh", contact: "0812-3456-0005" },
         details: [{ description: "Kosmetik", quantity: 2, weightKg: 1, l: 20, w: 15, h: 10 }],
       },
     ];
@@ -495,9 +640,9 @@ async function runSeed(): Promise<void> {
           tariffId: tariff?.id ?? null,
           status: s.status,
           origin: s.origin, destination: s.destination,
-          originWarehouseId: gudang["Jakarta Pusat"],
+          originWarehouseId: gudang["Medan"],
           destinationWarehouseId: gudang[s.destination],
-          arrivedWarehouseId: ["RECEIVED_AT_GUDANG", "ARRIVED_AT_GUDANG"].includes(s.status) ? gudang["Jakarta Pusat"] : null,
+          arrivedWarehouseId: ["RECEIVED_AT_GUDANG", "ARRIVED_AT_GUDANG"].includes(s.status) ? gudang["Medan"] : null,
           penerimaName: s.penerima.name,
           penerimaAddress: s.penerima.address,
           penerimaContact: s.penerima.contact,
@@ -560,13 +705,13 @@ async function runSeed(): Promise<void> {
         events.push({ event: "PICKED_UP", description: "Picked-up by Dewi Lestari", daysAgo: s.createdDaysAgo - 0.4, actor: "dewi" });
       }
       if (["RECEIVED_AT_GUDANG", "IN_TRANSPORT", "DELIVERED"].includes(s.status)) {
-        events.push({ event: "RECEIVED_AT_GUDANG", description: "Diterima di Gudang Jakarta Pusat", daysAgo: s.createdDaysAgo - 0.6, actor: "agus" });
+        events.push({ event: "RECEIVED_AT_GUDANG", description: "Diterima di Gudang Medan", daysAgo: s.createdDaysAgo - 0.6, actor: "agus" });
       }
       if (["IN_TRANSPORT", "DELIVERED"].includes(s.status)) {
         events.push({ event: "IN_TRANSPORT", description: "Berangkat via transport TRP-2026-000001", daysAgo: s.createdDaysAgo - 0.8, actor: "joko" });
       }
       if (s.status === "DELIVERED") {
-        events.push({ event: "ARRIVED_AT_GUDANG", description: "Tiba di Gudang Bandung", daysAgo: s.createdDaysAgo - 1, actor: "agus" });
+        events.push({ event: "ARRIVED_AT_GUDANG", description: "Tiba di Gudang Banda Aceh", daysAgo: s.createdDaysAgo - 1, actor: "agus" });
         events.push({ event: "DELIVERED", description: "Terkirim ke penerima", daysAgo: s.createdDaysAgo - 1.2, actor: "dewi" });
       }
       for (const ev of events) {
@@ -596,27 +741,52 @@ async function runSeed(): Promise<void> {
             updatedAt: createdAt,
           },
         });
-        for (const [i, d] of detailRowsByCode[s.masterCode].entries()) {
+        // B2B shipments (e.g. MKT-000002 PT Maju Bersama): record a single
+        // master-level scan instead of per-package scans — demonstrates the
+        // new B2B Master Resi scan mode in the Riwayat Scan view.
+        const isB2B = cust.type === "b2b";
+        if (isB2B) {
           await db.handoverScan.create({
             data: {
-              pickupId: pickup.id, context: "pickup", scanLevel: "detail", detailId: d.id, payload: d.detailCode,
-              result: "ok", method: i % 4 === 3 ? "TYPED" : "SCANNED", // mostly scanner, some typed
+              pickupId: pickup.id, context: "pickup", scanLevel: "master", detailId: null,
+              payload: shipment.masterCode, result: "ok", method: "SCANNED",
               scannedById: usersByHandle.dewi.id, scannedAt: daysAgo(Math.max(0, s.createdDaysAgo - 0.4)),
             },
           });
+        } else {
+          for (const [i, d] of detailRowsByCode[s.masterCode].entries()) {
+            await db.handoverScan.create({
+              data: {
+                pickupId: pickup.id, context: "pickup", scanLevel: "detail", detailId: d.id, payload: d.detailCode,
+                result: "ok", method: i % 4 === 3 ? "TYPED" : "SCANNED", // mostly scanner, some typed
+                scannedById: usersByHandle.dewi.id, scannedAt: daysAgo(Math.max(0, s.createdDaysAgo - 0.4)),
+              },
+            });
+          }
         }
       }
-      // Gudang arrival scans for RECEIVED_AT_GUDANG shipments (mostly SCANNED,
-      // one TYPED so Riwayat Scan differentiates both methods)
+      // Gudang arrival scans for RECEIVED_AT_GUDANG shipments (B2B uses the
+      // master-scan shortcut; B2C keeps per-package scans).
       if (["RECEIVED_AT_GUDANG"].includes(s.status)) {
-        for (const [i, d] of detailRowsByCode[s.masterCode].entries()) {
+        const isB2B = cust.type === "b2b";
+        if (isB2B) {
           await db.handoverScan.create({
             data: {
-              masterId: shipment.id, context: "gudang_arrival", scanLevel: "detail", detailId: d.id, payload: d.detailCode,
-              result: "ok", method: i === detailRowsByCode[s.masterCode].length - 1 ? "TYPED" : "SCANNED",
+              masterId: shipment.id, context: "gudang_arrival", scanLevel: "master", detailId: null,
+              payload: shipment.masterCode, result: "ok", method: "SCANNED",
               scannedById: usersByHandle.agus.id, scannedAt: daysAgo(Math.max(0, s.createdDaysAgo - 0.6)),
             },
           });
+        } else {
+          for (const [i, d] of detailRowsByCode[s.masterCode].entries()) {
+            await db.handoverScan.create({
+              data: {
+                masterId: shipment.id, context: "gudang_arrival", scanLevel: "detail", detailId: d.id, payload: d.detailCode,
+                result: "ok", method: i === detailRowsByCode[s.masterCode].length - 1 ? "TYPED" : "SCANNED",
+                scannedById: usersByHandle.agus.id, scannedAt: daysAgo(Math.max(0, s.createdDaysAgo - 0.6)),
+              },
+            });
+          }
         }
       }
       // Payment for priced shipments — DP/balance demo values per def
@@ -639,8 +809,8 @@ async function runSeed(): Promise<void> {
     const mkt4 = await db.masterShipment.findUniqueOrThrow({ where: { masterCode: "MKT-000004" } });
     const transport = await db.transport.create({
       data: {
-        transportCode: "TRP-2026-000001", routeId: routes["JKT - SBY Pantura"],
-        vehicleId: vehicles["B 9455 KTB"],
+        transportCode: "TRP-2026-000001", routeId: routes["MDN - BNA Aceh Timur"],
+        vehicleId: vehicles["BK 9455 KTB"],
         driverId: usersByHandle.joko.employeeId, kenekId: usersByHandle.dewi.employeeId,
         status: "DEPARTED", departedAt: daysAgo(1), createdAt: daysAgo(1.5),
       },
@@ -698,15 +868,15 @@ async function runSeed(): Promise<void> {
       data: {
         invoiceNumber: "INV-2026-000001", customerId: maju.id, status: "SENT",
         issueDate: daysAgo(3), dueDate: new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000),
-        notes: "Tagihan pengiriman periode ini", createdAt: daysAgo(3),
+        notes: "Tagihan pengiriman periode ini — Medan → Banda Aceh", createdAt: daysAgo(3),
       },
     });
     const mkt2 = await db.masterShipment.findUniqueOrThrow({ where: { masterCode: "MKT-000002" } });
     const mkt5Row = await db.masterShipment.findUniqueOrThrow({ where: { masterCode: "MKT-000005" } });
     await db.invoiceLine.createMany({
       data: [
-        { invoiceId: invoice.id, description: "MKT-000002 — pengiriman Jakarta → Bandung (25 kg × Rp4.500)", quantity: 1, unitPrice: priceByCode["MKT-000002"] ?? 112500, shipmentId: mkt2.id },
-        { invoiceId: invoice.id, description: "MKT-000005 — pengiriman Jakarta → Bandung (40 kg × Rp4.500)", quantity: 1, unitPrice: priceByCode["MKT-000005"] ?? 180000, shipmentId: mkt5Row.id },
+        { invoiceId: invoice.id, description: "MKT-000002 — pengiriman Medan → Banda Aceh (B2B, 25 kg × Rp8.000)", quantity: 1, unitPrice: priceByCode["MKT-000002"] ?? 200000, shipmentId: mkt2.id },
+        { invoiceId: invoice.id, description: "MKT-000005 — pengiriman Medan → Banda Aceh (B2B, 40 kg × Rp8.000)", quantity: 1, unitPrice: priceByCode["MKT-000005"] ?? 320000, shipmentId: mkt5Row.id },
       ],
     });
     // Partial settlement — invoice PARTIALLY_SETTLED, commission stays
@@ -714,7 +884,7 @@ async function runSeed(): Promise<void> {
     await db.invoiceSettlement.create({
       data: { invoiceId: invoice.id, amount: 100000, method: "TRANSFER", reference: "TRF-MAJU-001", recordedById: usersByHandle.siti.id, settledAt: daysAgo(1.5) },
     });
-    const invoiceTotal = (priceByCode["MKT-000002"] ?? 112500) + (priceByCode["MKT-000005"] ?? 180000);
+    const invoiceTotal = (priceByCode["MKT-000002"] ?? 200000) + (priceByCode["MKT-000005"] ?? 320000);
     await db.invoice.update({ where: { id: invoice.id }, data: { status: "PARTIALLY_SETTLED" } });
 
     // PENDING Marketing commission on the invoice (§8) — 20% for budi.
@@ -729,16 +899,16 @@ async function runSeed(): Promise<void> {
     });
 
     // ----- Revise.md demo: completed transport with settlement (§14/§15) ---
-    // TRP-2026-000002: ARRIVED JKT→BDG with hendra's Engkel Box carrying the
+    // TRP-2026-000002: ARRIVED MDN→BNA with hendra's Engkel Box carrying the
     // delivered MKT-000005; settled at an explicit transport value of
     // Rp500.000 → hendra 20% = Rp100.000 credited as TRANSPORT_PROFIT_SHARE.
     const settledTransport = await db.transport.create({
       data: {
-        transportCode: "TRP-2026-000002", routeId: routes["JKT - BDG Tol Cipularang"],
-        vehicleId: vehicles["B 9102 KTA"],
+        transportCode: "TRP-2026-000002", routeId: routes["MDN - BNA Aceh Timur"],
+        vehicleId: vehicles["BK 9102 KTA"],
         driverId: usersByHandle.joko.employeeId, kenekId: usersByHandle.andi.employeeId,
         status: "ARRIVED",
-        origin: "Jakarta Pusat", destination: "Bandung",
+        origin: "Medan", destination: "Banda Aceh",
         departedAt: daysAgo(5), arrivedAt: daysAgo(4.5), createdAt: daysAgo(5.5),
       },
     });
@@ -761,7 +931,7 @@ async function runSeed(): Promise<void> {
     await db.transportSettlement.create({
       data: {
         settlementCode: "TST-000001", transportId: settledTransport.id,
-        vehicleId: vehicles["B 9102 KTA"], ownerId: hendraPartnerId,
+        vehicleId: vehicles["BK 9102 KTA"], ownerId: hendraPartnerId,
         transportValue, companyPercent: 80, ownerPercent: 20,
         companyAmount: transportValue - ownerAmount, ownerAmount,
         status: "FINALIZED", finalizedById: usersByHandle.owner.id, finalizedAt: daysAgo(4.5),
@@ -780,9 +950,9 @@ async function runSeed(): Promise<void> {
     //                        DELETED log entries survive for the owner.
     const rep1 = await db.vehicleRepair.create({
       data: {
-        repairCode: "REP-000001", vehicleId: vehicles["B 9102 KTA"], ownerId: hendraPartnerId,
+        repairCode: "REP-000001", vehicleId: vehicles["BK 9102 KTA"], ownerId: hendraPartnerId,
         description: "Ganti oli + servis rem depan", amount: 25000, repairDate: daysAgo(2),
-        workshopVendor: "Bengkel Amanah Jaya",
+        workshopVendor: "Bengkel Amanah Jaya Medan",
         proofUrl: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNDAiIGhlaWdodD0iMTIwIj48cmVjdCB3aWR0aD0iMjQwIiBoZWlnaHQ9IjEyMCIgZmlsbD0iI2Y4ZjlmYSIvPjx0ZXh0IHg9IjEyIiB5PSI3MCIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTMiIGZpbGw9IiM2NDc0OGIiPk5vdGEgUmVwYWlyIC0gQnVrdGkgUmVzbWk8L3RleHQ+PC9zdmc+",
         notes: "Bengkel menyerahkan nota asli ke kantor.",
         status: "VERIFIED", createdById: usersByHandle.siti.id,
@@ -811,7 +981,7 @@ async function runSeed(): Promise<void> {
     });
     await db.repairActionLog.create({
       data: {
-        repairId: rep1.id, repairCode: "REP-000001", ownerId: hendraPartnerId, vehicleNumber: "B 9102 KTA",
+        repairId: rep1.id, repairCode: "REP-000001", ownerId: hendraPartnerId, vehicleNumber: "BK 9102 KTA",
         action: "CREATED",
         detail: "Repair REP-000001 dibuat dan langsung terverifikasi — deduction Rp20.000 dari wallet Vehicle Owner.",
         amount: 20000, actorId: usersByHandle.siti.id, actorName: "Siti Rahma", createdAt: daysAgo(2),
@@ -819,7 +989,7 @@ async function runSeed(): Promise<void> {
     });
     await db.repairActionLog.create({
       data: {
-        repairId: rep1.id, repairCode: "REP-000001", ownerId: hendraPartnerId, vehicleNumber: "B 9102 KTA",
+        repairId: rep1.id, repairCode: "REP-000001", ownerId: hendraPartnerId, vehicleNumber: "BK 9102 KTA",
         action: "UPDATED",
         detail: "Repair REP-000001 diubah oleh Siti Rahma — field: amount · wallet disesuaikan +Rp5.000.",
         changes: JSON.stringify({ amount: { before: 20000, after: 25000 } }),
@@ -830,9 +1000,9 @@ async function runSeed(): Promise<void> {
     // REP-000002 — created then deleted (full refund). Row is deleted, logs survive.
     const rep2 = await db.vehicleRepair.create({
       data: {
-        repairCode: "REP-000002", vehicleId: vehicles["B 9455 KTB"], ownerId: hendraPartnerId,
+        repairCode: "REP-000002", vehicleId: vehicles["BK 9455 KTB"], ownerId: hendraPartnerId,
         description: "Servis kopling", amount: 40000, repairDate: daysAgo(1.2),
-        workshopVendor: "Bengkel Jaya Motor",
+        workshopVendor: "Bengkel Jaya Motor Medan",
         proofUrl: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNDAiIGhlaWdodD0iMTIwIj48cmVjdCB3aWR0aD0iMjQwIiBoZWlnaHQ9IjEyMCIgZmlsbD0iI2Y4ZjlmYSIvPjx0ZXh0IHg9IjEyIiB5PSI3MCIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTMiIGZpbGw9IiM2NDc0OGIiPk5vdGEgUmVwYWlyIC0gS29wbGluZzwvdGV4dD48L3N2Zz4=",
         notes: "Entry salah kendaraan — record ini sengaja dihapus sebagai demo log.",
         status: "VERIFIED", createdById: usersByHandle.owner.id,
@@ -860,7 +1030,7 @@ async function runSeed(): Promise<void> {
     });
     await db.repairActionLog.create({
       data: {
-        repairId: rep2.id, repairCode: "REP-000002", ownerId: hendraPartnerId, vehicleNumber: "B 9455 KTB",
+        repairId: rep2.id, repairCode: "REP-000002", ownerId: hendraPartnerId, vehicleNumber: "BK 9455 KTB",
         action: "CREATED",
         detail: "Repair REP-000002 dibuat dan langsung terverifikasi — deduction Rp40.000 dari wallet Vehicle Owner.",
         amount: 40000, actorId: usersByHandle.owner.id, actorName: "Owner Utama", createdAt: daysAgo(1),
@@ -868,7 +1038,7 @@ async function runSeed(): Promise<void> {
     });
     await db.repairActionLog.create({
       data: {
-        repairId: rep2.id, repairCode: "REP-000002", ownerId: hendraPartnerId, vehicleNumber: "B 9455 KTB",
+        repairId: rep2.id, repairCode: "REP-000002", ownerId: hendraPartnerId, vehicleNumber: "BK 9455 KTB",
         action: "DELETED",
         detail: "Repair REP-000002 (Servis kopling — Rp40.000) dihapus oleh Owner Utama · deduction Rp40.000 dikembalikan ke wallet.",
         amount: 40000, actorId: usersByHandle.owner.id, actorName: "Owner Utama", createdAt: daysAgo(0.8),
@@ -941,8 +1111,8 @@ async function runSeed(): Promise<void> {
       { action: "created", entityType: "transport", entityLabel: "TRP-2026-000001", actor: "agus" },
       { action: "status_change", entityType: "transport", entityLabel: "TRP-2026-000001 → DEPARTED", actor: "joko" },
       { action: "created", entityType: "invoice", entityLabel: "INV-2026-000001", actor: "siti" },
-      { action: "created", entityType: "warehouse", entityLabel: "Gudang Bandung", actor: "agus" },
-      { action: "updated", entityType: "tariff", entityLabel: "Jakarta → Bandung (b2c)", actor: "siti" },
+      { action: "created", entityType: "warehouse", entityLabel: "Gudang Banda Aceh", actor: "agus" },
+      { action: "updated", entityType: "tariff", entityLabel: "Medan → Banda Aceh (b2c)", actor: "siti" },
       { action: "login", entityType: "auth", entityLabel: "siti", actor: "siti" },
       { action: "login", entityType: "auth", entityLabel: "agus", actor: "agus" },
     ];
@@ -958,6 +1128,6 @@ async function runSeed(): Promise<void> {
   }
 
   // fresh seed finished — run the same idempotent backfill (customer ↔
-  // marketing linkage + the transport-arrival demo shipment)
+  // marketing linkage + the transport-arrival demo shipment + B2B Master Resi demo)
   await seedBackfill();
 }
