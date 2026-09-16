@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
       partners,
       pendingTopUps,
       pendingWithdrawals,
-      pendingRepairs,
+      recentRepairs,
       pendingCommissions,
       verifiedTopUpAgg,
       commissionAgg,
@@ -42,9 +42,11 @@ export async function GET(req: NextRequest) {
         orderBy: { createdAt: "desc" },
         include: { partner: { include: { user: { select: { name: true } } } } },
       }),
+      // No approval workflow anymore — show the latest repair records
+      // (all of them are VERIFIED at creation).
       db.vehicleRepair.findMany({
-        where: { status: { in: ["PENDING_CONFIRMATION", "OWNER_CONFIRMED"] } },
         orderBy: { createdAt: "desc" },
+        take: 6,
         include: { vehicle: { select: { vehicleNumber: true } }, owner: { include: { user: { select: { name: true } } } } },
       }),
       db.marketingCommission.findMany({
@@ -124,7 +126,7 @@ export async function GET(req: NextRequest) {
           bankAccountNumber: w.bankAccountNumber,
           createdAt: w.createdAt,
         })),
-        repairs: pendingRepairs.map((r) => ({
+        repairs: recentRepairs.map((r) => ({
           id: r.id,
           repairCode: r.repairCode,
           vehicleNumber: r.vehicle.vehicleNumber,

@@ -760,24 +760,119 @@ async function runSeed(): Promise<void> {
       },
     });
 
-    // ----- Revise.md demo: repair awaiting confirmation (§19–§22) ----------
-    // Rp25.000 ganti oli + servis rem — PENDING_CONFIRMATION: hendra confirms
-    // in his Repairs page, then Owner Company confirms → REPAIR_DEDUCTION.
-    await db.vehicleRepair.create({
+    // ----- Repair demo (simplified §19–§22 flow) ---------------------------
+    // No approval workflow: an authorized company user creates a repair and
+    // it is VERIFIED immediately with an atomic wallet deduction. Two demo
+    // records exercise BOTH log views:
+    //   REP-000001 (kept)  — created (Rp20.000) then edited (→ Rp25.000,
+    //                        wallet auto-adjusted +Rp5.000)
+    //   REP-000002 (gone)  — created (Rp40.000) then DELETED (full refund);
+    //                        the row is gone from the list but its CREATED +
+    //                        DELETED log entries survive for the owner.
+    const rep1 = await db.vehicleRepair.create({
       data: {
         repairCode: "REP-000001", vehicleId: vehicles["B 9102 KTA"], ownerId: hendraPartnerId,
         description: "Ganti oli + servis rem depan", amount: 25000, repairDate: daysAgo(2),
         workshopVendor: "Bengkel Amanah Jaya",
         proofUrl: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNDAiIGhlaWdodD0iMTIwIj48cmVjdCB3aWR0aD0iMjQwIiBoZWlnaHQ9IjEyMCIgZmlsbD0iI2Y4ZjlmYSIvPjx0ZXh0IHg9IjEyIiB5PSI3MCIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTMiIGZpbGw9IiM2NDc0OGIiPk5vdGEgUmVwYWlyIC0gQnVrdGkgUmVzbWk8L3RleHQ+PC9zdmc+",
         notes: "Bengkel menyerahkan nota asli ke kantor.",
-        status: "PENDING_CONFIRMATION", createdById: usersByHandle.siti.id,
-        createdAt: daysAgo(1),
+        status: "VERIFIED", createdById: usersByHandle.siti.id,
+        deductedAmount: 25000, verifiedAt: daysAgo(2),
+        createdAt: daysAgo(2),
+      },
+    });
+    // REP-000001 deduction ledger (Rp20.000 at creation) + edit adjustment (+Rp5.000)
+    await db.walletTransaction.create({
+      data: {
+        walletId: hendraWallet.id, type: "REPAIR_DEDUCTION", amount: 20000, direction: "DEBIT",
+        balanceBefore: 100000, balanceAfter: 80000,
+        referenceType: "repair", referenceId: rep1.id, businessRef: `REP-${rep1.id}`, status: "COMPLETED",
+        description: `Deduction repair REP-000001 — Ganti oli + servis rem depan`,
+        createdById: usersByHandle.siti.id, createdAt: daysAgo(2),
+      },
+    });
+    await db.walletTransaction.create({
+      data: {
+        walletId: hendraWallet.id, type: "REPAIR_DEDUCTION", amount: 5000, direction: "DEBIT",
+        balanceBefore: 80000, balanceAfter: 75000,
+        referenceType: "repair", referenceId: rep1.id, businessRef: `REP-ADJ-${rep1.id}-seed`, status: "COMPLETED",
+        description: `Tambahan deduction repair REP-000001 (biaya diubah Rp20.000 → Rp25.000)`,
+        createdById: usersByHandle.siti.id, createdAt: daysAgo(1.5),
+      },
+    });
+    await db.repairActionLog.create({
+      data: {
+        repairId: rep1.id, repairCode: "REP-000001", ownerId: hendraPartnerId, vehicleNumber: "B 9102 KTA",
+        action: "CREATED",
+        detail: "Repair REP-000001 dibuat dan langsung terverifikasi — deduction Rp20.000 dari wallet Vehicle Owner.",
+        amount: 20000, actorId: usersByHandle.siti.id, actorName: "Siti Rahma", createdAt: daysAgo(2),
+      },
+    });
+    await db.repairActionLog.create({
+      data: {
+        repairId: rep1.id, repairCode: "REP-000001", ownerId: hendraPartnerId, vehicleNumber: "B 9102 KTA",
+        action: "UPDATED",
+        detail: "Repair REP-000001 diubah oleh Siti Rahma — field: amount · wallet disesuaikan +Rp5.000.",
+        changes: JSON.stringify({ amount: { before: 20000, after: 25000 } }),
+        amount: 25000, actorId: usersByHandle.siti.id, actorName: "Siti Rahma", createdAt: daysAgo(1.5),
       },
     });
 
+    // REP-000002 — created then deleted (full refund). Row is deleted, logs survive.
+    const rep2 = await db.vehicleRepair.create({
+      data: {
+        repairCode: "REP-000002", vehicleId: vehicles["B 9455 KTB"], ownerId: hendraPartnerId,
+        description: "Servis kopling", amount: 40000, repairDate: daysAgo(1.2),
+        workshopVendor: "Bengkel Jaya Motor",
+        proofUrl: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNDAiIGhlaWdodD0iMTIwIj48cmVjdCB3aWR0aD0iMjQwIiBoZWlnaHQ9IjEyMCIgZmlsbD0iI2Y4ZjlmYSIvPjx0ZXh0IHg9IjEyIiB5PSI3MCIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTMiIGZpbGw9IiM2NDc0OGIiPk5vdGEgUmVwYWlyIC0gS29wbGluZzwvdGV4dD48L3N2Zz4=",
+        notes: "Entry salah kendaraan — record ini sengaja dihapus sebagai demo log.",
+        status: "VERIFIED", createdById: usersByHandle.owner.id,
+        deductedAmount: 0, verifiedAt: daysAgo(1),
+        createdAt: daysAgo(1),
+      },
+    });
+    await db.walletTransaction.create({
+      data: {
+        walletId: hendraWallet.id, type: "REPAIR_DEDUCTION", amount: 40000, direction: "DEBIT",
+        balanceBefore: 75000, balanceAfter: 35000,
+        referenceType: "repair", referenceId: rep2.id, businessRef: `REP-${rep2.id}`, status: "COMPLETED",
+        description: `Deduction repair REP-000002 — Servis kopling`,
+        createdById: usersByHandle.owner.id, createdAt: daysAgo(1),
+      },
+    });
+    await db.walletTransaction.create({
+      data: {
+        walletId: hendraWallet.id, type: "REPAIR_DEDUCTION", amount: 40000, direction: "CREDIT",
+        balanceBefore: 35000, balanceAfter: 75000,
+        referenceType: "repair", referenceId: rep2.id, businessRef: `REP-DEL-${rep2.id}-seed`, status: "COMPLETED",
+        description: `Pengembalian penuh deduction repair REP-000002 (Rp40.000) — record dihapus.`,
+        createdById: usersByHandle.owner.id, createdAt: daysAgo(0.8),
+      },
+    });
+    await db.repairActionLog.create({
+      data: {
+        repairId: rep2.id, repairCode: "REP-000002", ownerId: hendraPartnerId, vehicleNumber: "B 9455 KTB",
+        action: "CREATED",
+        detail: "Repair REP-000002 dibuat dan langsung terverifikasi — deduction Rp40.000 dari wallet Vehicle Owner.",
+        amount: 40000, actorId: usersByHandle.owner.id, actorName: "Owner Utama", createdAt: daysAgo(1),
+      },
+    });
+    await db.repairActionLog.create({
+      data: {
+        repairId: rep2.id, repairCode: "REP-000002", ownerId: hendraPartnerId, vehicleNumber: "B 9455 KTB",
+        action: "DELETED",
+        detail: "Repair REP-000002 (Servis kopling — Rp40.000) dihapus oleh Owner Utama · deduction Rp40.000 dikembalikan ke wallet.",
+        amount: 40000, actorId: usersByHandle.owner.id, actorName: "Owner Utama", createdAt: daysAgo(0.8),
+      },
+    });
+    await db.vehicleRepair.delete({ where: { id: rep2.id } });
+    // Net wallet effect of both repairs: -25.000 (REP-000001) — hendra's
+    // balance lands at Rp75.000 before the withdrawal reservation below.
+    await db.wallet.update({ where: { id: hendraWallet.id }, data: { balance: 75000 } });
+
     // ----- Revise.md demo: pending withdrawal with reservation (§26/§27) ---
-    // hendra requests Rp30.000 — reserved out of his Rp100.000 balance
-    // (available becomes Rp70.000) until approved+completed or rejected.
+    // hendra requests Rp30.000 — reserved out of his Rp75.000 balance
+    // (available becomes Rp45.000) until approved+completed or rejected.
     await db.withdrawalRequest.create({
       data: {
         requestCode: "WDR-000001", partnerId: hendraPartnerId, amount: 30000, status: "PENDING",

@@ -1,15 +1,20 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { guard, ok, handle, fail, requireStr, requireNum, str, num, dateOrNull } from "@/lib/api-helpers";
-import { requirePartner, financeAudit } from "@/lib/wallet";
+import { financeAudit } from "@/lib/wallet";
+import { appendRepairLedger, logRepairAction } from "@/lib/repair-helpers";
 import { nextCode } from "@/lib/code-generator";
 
 /**
- * Repair / maintenance deduction records (§19/§20):
+ * Repair / maintenance deduction records (§19/§20, simplified flow):
  *   - Company (repair.create) submits a repair cost for a partner-owned
- *     vehicle with proof. Status starts at PENDING_CONFIRMATION and the
- *     Vehicle Owner wallet is NOT touched yet.
- *   - Vehicle Owner (repair.view_own) sees only their own-vehicle repairs.
+ *     vehicle with proof. The record is VERIFIED immediately — no approval
+ *     workflow — and the REPAIR_DEDUCTION is debited from the Vehicle Owner
+ *     wallet atomically in the same DB transaction.
+ *   - Every mutation writes a RepairActionLog entry (CREATED / UPDATED /
+ *     DELETED) so the Vehicle Owner can audit the full history.
+ *   - Vehicle Owner (repair.view_own) sees only their own-vehicle repairs
+ *     (list + detail + logs) — read-only.
  */
 export async function GET(req: NextRequest) {
   return handle(async () => {
@@ -17,14 +22,14 @@ export async function GET(req: NextRequest) {
     const params = req.nextUrl.searchParams;
     const status = str(params.get("status"));
 
-    // Vehicle Owner: own repairs only (§39).
+    // Vehicle Owner: own repairs only (§39) — read-only view.
     if (user.partnerType === "VEHICLE_OWNER" && user.partnerId) {
       const rows = await db.vehicleRepair.findMany({
         where: { ownerId: user.partnerId, ...(status ? { status } : {}) },
         orderBy: { createdAt: "desc" },
         include: {
           vehicle: { select: { id: true, vehicleNumber: true, name: true } },
-          confirmations: { include: { user: { select: { name: true } } } },
+          owner: { include: { user: { select: { name: true } } } },
         },
       });
       return ok(rows);
@@ -40,7 +45,6 @@ export async function GET(req: NextRequest) {
       include: {
         vehicle: { select: { id: true, vehicleNumber: true, name: true } },
         owner: { include: { user: { select: { name: true } } } },
-        confirmations: { include: { user: { select: { name: true } } } },
       },
     });
     return ok(rows);
@@ -48,9 +52,11 @@ export async function GET(req: NextRequest) {
 }
 
 /**
- * POST /api/v1/repairs — company submits a repair record. The wallet is NOT
- * debited at creation (§20) — the deduction only happens after BOTH the
- * Vehicle Owner and Owner Company confirm (§21).
+ * POST /api/v1/repairs — company creates a repair record. Authorized users
+ * (repair.create) create FINAL records: status VERIFIED + wallet deduction
+ * happen atomically at creation. A RepairActionLog entry (CREATED) is
+ * written in the same transaction so the Vehicle Owner always knows who
+ * created what and when.
  */
 export async function POST(req: NextRequest) {
   return handle(async () => {
@@ -82,28 +88,67 @@ export async function POST(req: NextRequest) {
     }
 
     const repairCode = await nextCode("vehicleRepair", "REP-", "repairCode");
-    const repair = await db.vehicleRepair.create({
-      data: {
-        repairCode,
-        vehicleId,
-        ownerId: vehicle.owner.id,
-        description,
+
+    // One atomic transaction: repair row (VERIFIED) + REPAIR_DEDUCTION
+    // ledger + balance update + action log — all or nothing (§30).
+    const repair = await db.$transaction(async (tx) => {
+      const created = await tx.vehicleRepair.create({
+        data: {
+          repairCode,
+          vehicleId,
+          ownerId: vehicle.owner!.id,
+          description,
+          amount,
+          repairDate,
+          workshopVendor,
+          proofUrl,
+          relatedTransportId,
+          notes,
+          status: "VERIFIED",
+          createdById: user.id,
+        },
+      });
+
+      const ledgerId = await appendRepairLedger(tx, {
+        partnerId: created.ownerId,
+        direction: "DEBIT",
         amount,
-        repairDate,
-        workshopVendor,
-        proofUrl,
-        relatedTransportId,
-        notes,
-        status: "PENDING_CONFIRMATION",
+        businessRef: `REP-${created.id}`,
+        description: `Deduction repair ${repairCode} — ${description}`,
+        repairId: created.id,
         createdById: user.id,
-      },
-      include: { vehicle: { select: { vehicleNumber: true } }, owner: { include: { user: { select: { name: true } } } } },
+      });
+
+      const withLedger = await tx.vehicleRepair.update({
+        where: { id: created.id },
+        data: { walletTransactionId: ledgerId, deductedAmount: amount, verifiedAt: new Date() },
+        include: { vehicle: { select: { vehicleNumber: true } }, owner: { include: { user: { select: { name: true } } } } },
+      });
+
+      await logRepairAction(tx, {
+        repairId: created.id,
+        repairCode,
+        ownerId: created.ownerId,
+        vehicleNumber: vehicle.vehicleNumber,
+        action: "CREATED",
+        detail: `Repair ${repairCode} dibuat dan langsung terverifikasi — deduction ${formatIDR(amount)} dari wallet Vehicle Owner.`,
+        amount,
+        actor: user,
+      });
+
+      return withLedger;
     });
+
     await financeAudit(user, "created", "repair", repair.id, repairCode, {
       vehicle: vehicle.vehicleNumber,
       amount,
-      status: "PENDING_CONFIRMATION",
+      status: "VERIFIED",
+      immediatelyDeducted: true,
     });
     return ok(repair);
   });
+}
+
+function formatIDR(n: number): string {
+  return `Rp${n.toLocaleString("id-ID")}`;
 }

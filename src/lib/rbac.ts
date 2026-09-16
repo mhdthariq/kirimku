@@ -107,13 +107,14 @@ export const PERMISSIONS: { slug: string; module: string; description: string }[
   // Transport settlement (Vehicle Owner profit share)
   { slug: "transport.settle", module: "Transports", description: "Finalize transport settlements (credits Vehicle Owner profit share)" },
   { slug: "transport.view_own_vehicles", module: "Transports", description: "View transports performed with own vehicles (Vehicle Owner)" },
-  // Repairs
+  // Repairs — simplified flow: creating a repair record (with proof) is
+  // immediately final (VERIFIED + wallet deduction). No approval workflow;
+  // every create/update/delete is tracked in the repair action log.
   { slug: "repair.view", module: "Repairs", description: "View all repair records (company)" },
-  { slug: "repair.create", module: "Repairs", description: "Submit repair/maintenance deduction records (company)" },
-  { slug: "repair.view_own", module: "Repairs", description: "View own-vehicle repair records (Vehicle Owner)" },
-  { slug: "repair.confirm", module: "Repairs", description: "Confirm/reject own-vehicle repairs (Vehicle Owner party)" },
-  { slug: "repair.approve", module: "Repairs", description: "Confirm repairs as Owner Company (second party)" },
-  { slug: "repair.reject", module: "Repairs", description: "Reject repairs as Owner Company" },
+  { slug: "repair.create", module: "Repairs", description: "Create repair records — immediately verified & deducted" },
+  { slug: "repair.update", module: "Repairs", description: "Edit repair records (wallet auto-adjusted, logged)" },
+  { slug: "repair.delete", module: "Repairs", description: "Delete repair records (deduction refunded, logged)" },
+  { slug: "repair.view_own", module: "Repairs", description: "View own-vehicle repair records + action logs (Vehicle Owner)" },
   // Financial reports
   { slug: "financial.report.view", module: "Finance", description: "View financial dashboard & reports" },
 ];
@@ -138,7 +139,7 @@ export const ROLE_TEMPLATES: { slug: string; name: string; description: string; 
       "wallet.topup.view", "wallet.topup.cancel",
       "wallet.withdrawal.view", "wallet.withdrawal.review", "wallet.withdrawal.process",
       "partner.view", "transport.settle",
-      "repair.view", "repair.create",
+      "repair.view", "repair.create", "repair.update", "repair.delete",
       "financial.report.view",
     ],
   },
@@ -162,13 +163,15 @@ export const ROLE_TEMPLATES: { slug: string; name: string; description: string; 
   {
     slug: "vehicle-owner",
     name: "Vehicle Owner",
-    description: "Transport partner: owns vehicles, earns transport profit share, bears confirmed repair deductions",
+    description: "Transport partner: owns vehicles, earns transport profit share, bears verified repair deductions",
     permissions: [
       // Revise.md §32/§35.2 — first-class partner role, own data only
       "vehicle.view_own", "transport.view_own_vehicles",
       "wallet.view_own", "wallet.transaction.view_own",
       "wallet.withdrawal.create", "wallet.withdrawal.view_own",
-      "repair.view_own", "repair.confirm",
+      // Repairs: read-only — list, detail & action logs (no approval needed
+      // anymore; the company-side create is already final)
+      "repair.view_own",
     ],
   },
   {

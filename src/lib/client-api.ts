@@ -912,12 +912,33 @@ export interface VehicleRepairRow {
   proofUrl: string | null;
   relatedTransportId: number | null;
   notes: string | null;
-  status: "PENDING_CONFIRMATION" | "OWNER_CONFIRMED" | "VERIFIED" | "REJECTED";
-  rejectReason: string | null;
+  /** Simplified flow — records are final (VERIFIED) the moment an
+   *  authorized user creates them; no approval workflow. */
+  status: "VERIFIED";
+  /** Net amount currently deducted from the owner wallet for this repair. */
+  deductedAmount: number;
+  verifiedAt: string | null;
   createdAt: string;
+  updatedAt: string;
   vehicle: { id: number; vehicleNumber: string; name: string | null };
   owner?: { user: { name: string } } | null;
-  confirmations: { id: number; party: "VEHICLE_OWNER" | "OWNER_COMPANY"; decision: string; note: string | null; user: { name: string } | null; createdAt: string }[];
+}
+
+/** Append-only repair action log — visible to the Vehicle Owner (own
+ *  vehicles) and the company (repair.view). Survives repair deletion. */
+export interface RepairActionLogRow {
+  id: number;
+  repairId: number;
+  repairCode: string;
+  ownerId: number;
+  vehicleNumber: string;
+  action: "CREATED" | "UPDATED" | "DELETED";
+  detail: string | null;
+  changes: Record<string, { before: unknown; after: unknown }> | null;
+  amount: number | null;
+  actorId: number | null;
+  actorName: string | null;
+  createdAt: string;
 }
 
 export interface PartnerRow {
@@ -951,7 +972,7 @@ export interface VehicleOwnerDashboard {
     vehicle: { vehicleNumber: string };
   }[];
   recentTransactions: WalletTransaction[];
-  pendingRepairs: number;
+  recentRepairLogs: RepairActionLogRow[];
 }
 
 export interface VOTransportRow {

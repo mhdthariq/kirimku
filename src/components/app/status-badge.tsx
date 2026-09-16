@@ -45,8 +45,6 @@ const STATUS_MAP: Record<string, { label: string; variant: "default" | "secondar
   APPROVED: { label: "Disetujui", variant: "default" },
   PROCESSING: { label: "Diproses", variant: "default", pulse: true },
   RELEASED: { label: "Dirilis", variant: "default" },
-  PENDING_CONFIRMATION: { label: "Menunggu Konfirmasi", variant: "secondary", pulse: true },
-  OWNER_CONFIRMED: { label: "VO Konfirmasi", variant: "default" },
   FINALIZED: { label: "Final", variant: "default" },
 };
 

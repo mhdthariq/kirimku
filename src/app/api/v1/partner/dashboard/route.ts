@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     const user = await guard(req, "wallet.view_own");
     const partner = requirePartner(user, "VEHICLE_OWNER");
 
-    const [summary, vehicles, settlements, repairAgg, withdrawalAgg, transactions, pendingRepairs] = await Promise.all([
+    const [summary, vehicles, settlements, repairAgg, withdrawalAgg, transactions, recentRepairLogs] = await Promise.all([
       walletSummary(partner.id),
       db.vehicle.findMany({
         where: { ownerId: partner.id },
@@ -37,7 +37,13 @@ export async function GET(req: NextRequest) {
         orderBy: { createdAt: "desc" },
         take: 8,
       }),
-      db.vehicleRepair.count({ where: { ownerId: partner.id, status: { in: ["PENDING_CONFIRMATION", "OWNER_CONFIRMED"] } } }),
+      // Recent repair action-log entries — the VO sees create/update/delete
+      // activity on their records without any approval workflow.
+      db.repairActionLog.findMany({
+        where: { ownerId: partner.id },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+      }),
     ]);
 
     const earningsAgg = await db.walletTransaction.aggregate({
@@ -57,7 +63,7 @@ export async function GET(req: NextRequest) {
       vehicles,
       recentSettlements: settlements,
       recentTransactions: transactions,
-      pendingRepairs,
+      recentRepairLogs,
     });
   });
 }

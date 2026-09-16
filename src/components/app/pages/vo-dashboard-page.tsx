@@ -44,7 +44,7 @@ export function VehicleOwnerDashboard() {
     { label: "Saldo Tersedia", value: formatRupiah(data.wallet.available), icon: <CheckCircle2 className="h-4 w-4" />, accent: "text-primary", sub: `dari ${formatRupiah(data.wallet.balance)} (reserved ${formatRupiah(data.wallet.reserved)})` },
     { label: "Total Earnings", value: formatRupiah(data.totals.earnings), icon: <TrendingUp className="h-4 w-4" />, accent: "text-foreground", sub: "profit share transport" },
     { label: "Total Transport", value: `${data.totals.transportCount}×`, icon: <Package className="h-4 w-4" />, accent: "text-foreground", sub: "transport disettle" },
-    { label: "Repair Deductions", value: formatRupiah(data.totals.repairDeductions), icon: <Wrench className="h-4 w-4" />, accent: "text-destructive", sub: "terkonfirmasi dua pihak" },
+    { label: "Repair Deductions", value: formatRupiah(data.totals.repairDeductions), icon: <Wrench className="h-4 w-4" />, accent: "text-destructive", sub: "terverifikasi & terdeduct" },
   ];
 
   return (
@@ -54,10 +54,10 @@ export function VehicleOwnerDashboard() {
         subtitle="Armada, earnings, repair, dan wallet Anda — hanya milik Anda (§39)."
         icon={<CarFront className="h-5 w-5" />}
         actions={
-          data.pendingRepairs > 0 ? (
+          data.recentRepairLogs.length > 0 ? (
             <a href="#/repairs">
               <span className="inline-flex items-center gap-2 rounded-xl border border-chart-4/40 bg-chart-4/10 px-4 py-2 text-xs font-semibold text-chart-4">
-                <Wrench className="h-3.5 w-3.5" /> {data.pendingRepairs} repair menunggu konfirmasi Anda
+                <Wrench className="h-3.5 w-3.5" /> {data.recentRepairLogs.length} aktivitas repair terbaru
               </span>
             </a>
           ) : undefined
@@ -125,6 +125,33 @@ export function VehicleOwnerDashboard() {
           </div>
         </section>
       </div>
+
+      {/* Recent repair activity (action log) — the VO no longer approves
+          anything; this feed keeps them informed of create/update/delete. */}
+      {data.recentRepairLogs.length > 0 && (
+        <section className="rounded-xl border bg-card">
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <p className="text-sm font-semibold">Aktivitas Repair Terbaru</p>
+            <a href="#/repairs" className="text-xs text-primary hover:underline">Log lengkap →</a>
+          </div>
+          <div className="divide-y">
+            {data.recentRepairLogs.map((log) => (
+              <div key={log.id} className="flex items-start justify-between gap-3 px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold">
+                    <span className={cn("mr-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase", log.action === "CREATED" ? "bg-primary/10 text-primary" : log.action === "DELETED" ? "bg-destructive/10 text-destructive" : "bg-chart-3/15 text-chart-3")}>
+                      {log.action === "CREATED" ? "Dibuat" : log.action === "DELETED" ? "Dihapus" : "Diubah"}
+                    </span>
+                    <span className="font-mono text-xs font-semibold">{log.repairCode}</span>
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{log.detail}</p>
+                </div>
+                <p className="shrink-0 text-[10px] text-muted-foreground">{formatDate(log.createdAt, true)}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Recent wallet transactions */}
       <section className="rounded-xl border bg-card">

@@ -57,7 +57,7 @@ model User {
   handoverScans HandoverScan[]
   checkpointRecords CheckpointRecord[]
   walletTransactionsCreated WalletTransaction[] @relation("WalletTransactionCreator")
-  repairConfirmationsMade RepairConfirmation[] @relation("RepairConfirmationBy")
+  repairActionLogsMade RepairActionLog[] @relation("RepairActionLogBy")
   verifiedTopUps TopUpRequest[] @relation("TopUpVerifier")
   reviewedWithdrawals WithdrawalRequest[] @relation("WithdrawalReviewer")
   processedWithdrawals WithdrawalRequest[] @relation("WithdrawalProcessor")
@@ -757,10 +757,13 @@ model TransportSettlement {
 // Repair / maintenance deduction (Revise.md §19–§22)
 // ---------------------------------------------------------------------------
 
-// Company-submitted repair cost deducted from the Vehicle Owner's profit.
-// Created as PENDING_CONFIRMATION — the wallet is NOT touched until BOTH the
-// Vehicle Owner AND Owner Company confirm (two-party rule §21). The deduction
-// is a separate REPAIR_DEDUCTION ledger entry; transport earnings stay intact.
+// Repair / maintenance deduction record (§19/§20, simplified flow):
+// a company user with `repair.create` submits a repair cost for a
+// partner-owned vehicle with proof — the record is CONFIRMED (VERIFIED)
+// immediately and the REPAIR_DEDUCTION is debited from the Vehicle Owner
+// wallet atomically at creation. No approval workflow. Every action
+// (created / updated / deleted) is recorded in RepairActionLog so the
+// Vehicle Owner can always audit what happened to their records.
 model VehicleRepair {
   id          Int      @id @default(autoincrement())
   repairCode  String   @unique
@@ -775,35 +778,42 @@ model VehicleRepair {
   proofUrl    String?  // invoice / receipt / photo (data URL)
   relatedTransportId Int?
   notes       String?
-  // PENDING_CONFIRMATION | OWNER_CONFIRMED | VERIFIED | REJECTED
-  status      String   @default("PENDING_CONFIRMATION")
-  rejectReason String?
+  // VERIFIED — creation by an authorized user is final (no approval flow)
+  status      String   @default("VERIFIED")
+  // Net amount currently deducted from the owner wallet for this repair
+  // (kept in sync when the amount is edited; refunded on delete).
+  deductedAmount Float  @default(0)
   createdById Int?
   walletTransactionId Int?
   verifiedAt  DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  confirmations RepairConfirmation[]
-
   @@index([ownerId, status])
   @@index([vehicleId])
 }
 
-// One row per party decision — the two required parties are
-// VEHICLE_OWNER and OWNER_COMPANY (§21).
-model RepairConfirmation {
-  id        Int      @id @default(autoincrement())
-  repairId  Int
-  repair    VehicleRepair @relation(fields: [repairId], references: [id], onDelete: Cascade)
-  party     String   // VEHICLE_OWNER | OWNER_COMPANY
-  decision  String   // CONFIRMED | REJECTED
-  note      String?
-  userId    Int?
-  user      User?    @relation("RepairConfirmationBy", fields: [userId], references: [id])
-  createdAt DateTime @default(now())
+// Append-only action log for repairs. `repairId` is a PLAIN integer (no FK)
+// so the log SURVIVES repair deletion — the Vehicle Owner can still see that
+// a record was created and later deleted, complete with snapshots.
+model RepairActionLog {
+  id          Int      @id @default(autoincrement())
+  repairId    Int      // plain reference — logs outlive the repair row
+  repairCode  String   // snapshot of VehicleRepair.repairCode
+  ownerId     Int      // Vehicle Owner partner id (log scoping)
+  vehicleNumber String // snapshot of the vehicle plate
+  // CREATED | UPDATED | DELETED
+  action      String
+  detail      String?  // human-readable summary of the action
+  changes     String?  // JSON diff snapshot for UPDATED ({field:{before,after}})
+  amount      Float?   // snapshot of the repair amount at action time
+  actorId     Int?
+  actor       User?    @relation("RepairActionLogBy", fields: [actorId], references: [id])
+  actorName   String?  // snapshot of the acting user's display name
+  createdAt   DateTime @default(now())
 
   @@index([repairId])
+  @@index([ownerId, createdAt])
 }
 
 // ---------------------------------------------------------------------------

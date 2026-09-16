@@ -103,7 +103,7 @@ export function FinancePage() {
           }))}
         />
         <PendingSection
-          title="Repair Menunggu Konfirmasi"
+          title="Repair Terbaru (Langsung Verifikasi)"
           icon={<Wrench className="h-4 w-4" />}
           href="#/repairs"
           items={data.pending.repairs.map((x) => ({
