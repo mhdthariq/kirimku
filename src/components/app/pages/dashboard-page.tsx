@@ -830,11 +830,10 @@ function GudangScanQueue({ workspace }: { workspace: GudangDashboardWorkspace })
                         <p className="text-[9px] uppercase tracking-wide text-muted-foreground">kg</p>
                       </div>
                     </div>
-                    {w.unpaidCount > 0 && (
-                      <p className="mt-1.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
-                        {w.unpaidCount} shipment belum lunas
-                      </p>
-                    )}
+                    {w.unpaidCount > 0 && null}
+                    {/* "belum lunas" badge dihapus — B2C ditanggung Marketing,
+                        B2B via invoice. Dashboard tidak menampilkan status
+                        pembayaran per shipment lagi. */}
                   </a>
                 ))}
               </div>

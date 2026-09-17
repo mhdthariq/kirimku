@@ -315,11 +315,9 @@ export function GudangPage() {
                                   </span>
                                 )}
                               </div>
-                              {s.remainingAmount != null && s.remainingAmount > 0 ? (
-                                <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">sisa {formatRupiah(s.remainingAmount)}</span>
-                              ) : (
-                                <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">lunas</span>
-                              )}
+                              {/* "sisa dibayar customer" badge dihapus — B2C ditanggung
+                                  Marketing, B2B via invoice. Gudang tidak perlu melihat
+                                  status pembayaran per shipment. */}
                             </div>
                           </div>
                         ))}

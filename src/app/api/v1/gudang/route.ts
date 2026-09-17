@@ -291,7 +291,10 @@ export async function GET(req: NextRequest) {
           heldShipments: rows.length,
           heldPackages: rows.reduce((sum, r) => sum + r.packages, 0),
           heldWeightKg: Math.round(rows.reduce((sum, r) => sum + r.weightKg, 0) * 100) / 100,
-          unpaidCount: rows.filter((r) => (r.remainingAmount ?? 0) > 0).length,
+          // unpaidCount di-set 0 — aturan baru: B2C ditanggung Marketing, B2B
+          // via invoice. Gudang tidak lagi menampilkan status pembayaran per
+          // shipment. Field tetap dipertahankan untuk backward-compat UI lama.
+          unpaidCount: 0,
           shipments: rows,
         };
       });

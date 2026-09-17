@@ -224,8 +224,8 @@ export function ScanConsole({ onScan, disabled, placeholder = "Arahkan QR ke kam
 
       <p className="flex items-center gap-1.5 text-[11px] leading-relaxed text-muted-foreground">
         <Zap className="h-3.5 w-3.5 shrink-0 text-primary" />
-        Kamera &amp; reader tool tercatat <span className="font-semibold text-foreground">Scanned</span> · ketik manual tercatat{" "}
-        <span className="font-semibold text-foreground">Typed</span> di Riwayat Scan. Kode tidak ditampilkan supaya tidak bisa di-copy paste.
+        <span className="font-semibold text-foreground">Scanned</span>
+        <span className="font-semibold text-foreground">Typed</span>
       </p>
     </div>
   );

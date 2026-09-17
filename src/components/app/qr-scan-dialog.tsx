@@ -1,14 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, PackageCheck, QrCode, ScanLine, TriangleAlert, Wallet } from "lucide-react";
+import { CheckCircle2, PackageCheck, QrCode, ScanLine, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { apiGet, apiPost, type PaymentSummary, type ScanProgress, type ScanResponse } from "@/lib/client-api";
 import { ScanConsole, type ScanMethod } from "@/components/app/scan-console";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
-import { FormSelect, Input, Textarea, NumberInput, formatRupiah } from "@/components/app/form-parts";
+import { Input, Textarea } from "@/components/app/form-parts";
 import { cn } from "@/lib/utils";
 
 export interface ScanTaskInfo {
@@ -60,7 +60,8 @@ function MethodBadge({ method }: { method: string | null }) {
  *   in Riwayat Scan below;
  * - DP rule sudah dihapus. Biaya B2C ditanggung Marketing, biaya B2B ditagih
  *   via invoice. Pickup B2B wajib sudah masuk ke invoice perusahaan customer.
- *   Kurir tetap boleh mencatat sisa pembayaran on-the-spot jika diperlukan.
+ *   Kurir tidak menarik pembayaran dari customer — setelah semua paket ter-scan,
+ *   hanya tombol Konfirmasi yang ditampilkan (tanpa field sisa/metode/catatan).
  */
 export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanDialogProps) {
   const [progress, setProgress] = useState<ScanProgress | null>(null);
@@ -70,8 +71,6 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
   const [proof, setProof] = useState("");
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const [balance, setBalance] = useState("");
-  const [balanceMethod, setBalanceMethod] = useState("CASH");
 
   const basePath = mode === "pickup" ? `/pickups/${task?.id}` : `/deliveries/${task?.id}`;
   const isPickup = mode === "pickup";
@@ -85,12 +84,10 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
     setFeedback(null);
     setNotes("");
     setProof("");
-    setBalance("");
     apiGet<{ progress: ScanProgress; paymentSummary?: PaymentSummary }>(basePath)
       .then((d) => {
         setProgress(d.progress);
         setPayment(d.paymentSummary ?? null);
-        if (d.paymentSummary?.remainingAmount) setBalance(String(Math.round(d.paymentSummary.remainingAmount)));
       })
       .catch(() => setFeedback({ kind: "warn", text: "Gagal memuat daftar paket." }));
   }, [open, task, basePath]);
@@ -124,15 +121,9 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
     }
     setConfirming(true);
     try {
-      const balanceAmount = isPickup && balance.trim() ? Number(balance) : null;
-      const body = isPickup
-        ? {
-            notes: notes || null,
-            ...(balanceAmount != null && balanceAmount > 0
-              ? { payment: { method: balanceMethod, amount: balanceAmount } }
-              : {}),
-          }
-        : { proofOfDelivery: proof.trim(), notes: notes || null };
+      // Pickup: kurir tidak menarik pembayaran — body kosong, hanya konfirmasi.
+      // Delivery: tetap kirim POD (bukti serah terima) + catatan opsional.
+      const body = isPickup ? {} : { proofOfDelivery: proof.trim(), notes: notes || null };
       const res = await apiPost<{ tracking: string }>(`${basePath}/${isPickup ? "confirm" : "complete"}`, body);
       toast.success(
         isPickup
@@ -146,7 +137,7 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
     } finally {
       setConfirming(false);
     }
-  }, [task, confirming, isPickup, proof, notes, balance, balanceMethod, basePath, onOpenChange, onDone]);
+  }, [task, confirming, isPickup, proof, notes, basePath, onOpenChange, onDone]);
 
   const pct = progress
     ? progress.isB2B
@@ -164,11 +155,11 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
         <DialogHeader>
           <DialogTitle className="flex items-start gap-2 pr-6 text-base leading-snug sm:text-lg">
             <QrCode className="h-5 w-5 text-primary" />
-            {isPickup ? `Scan Paket — Pickup ${task?.code ?? ""}` : `Scan Paket — Delivery ${task?.code ?? ""}`}
+            {isPickup ? `Scan Paket Pickup ${task?.code ?? ""}` : `Scan Paket Delivery ${task?.code ?? ""}`}
           </DialogTitle>
           {progress?.isB2B && (
             <DialogDescription className="rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-2 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300">
-              <strong>Shipment B2B — cukup scan Master Resi sekali.</strong> Semua paket pada konsinyasi ini akan otomatis ter-scan setelah Master Resi terbaca. Tidak perlu scan tiap detail barang.
+              <strong>Shipment B2B — cukup scan Master Resi sekali.</strong> Semua paket pada konsinyasi ini akan otomatis ter-scan setelah Master Resi terbaca.
             </DialogDescription>
           )}
         </DialogHeader>
@@ -244,66 +235,38 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
           {!progress && <p className="px-2 py-4 text-center text-sm text-muted-foreground">Memuat daftar paket…</p>}
         </div>
 
-        {/* Pickup info (B2B invoice reminder). DP rule sudah dihapus —
-            biaya B2C ditanggung Marketing, biaya B2B ditagih via invoice. */}
-        {isPickup && payment && payment.priceAmount != null && (
-          <div className="rounded-lg border border-sky-300 bg-sky-50/60 px-3 py-2 text-xs dark:border-sky-900 dark:bg-sky-950/40">
-            <p className="flex items-center gap-1.5 font-semibold text-foreground">
-              <Wallet className="h-3.5 w-3.5" /> Nilai Pengiriman {formatRupiah(payment.priceAmount)}
-            </p>
-            <p className="text-sky-700 dark:text-sky-300">
-              Pickup tidak lagi memerlukan DP. Untuk B2B, pastikan shipment sudah ditagirkan ke invoice perusahaan customer.
+        {/* Pickup info — kurir tidak menarik pembayaran, info box singkat. */}
+        {isPickup && (
+          <div className="rounded-lg border border-sky-200 bg-sky-50/60 px-3 py-2 text-xs dark:border-sky-900 dark:bg-sky-950/40">
+            <p className="text-sky-800 dark:text-sky-300">
+              Kurir tidak menarik pembayaran biaya B2C ditanggung Marketing, B2B via invoice.
             </p>
           </div>
         )}
 
-        {/* Confirm section — unlocked when all packages scanned */}
+        {/* Confirm section — unlocked when all packages scanned.
+            Pickup: hanya tombol Konfirmasi (tanpa field sisa/metode/catatan). */}
         {!completed && progress?.allScanned && (
           <div className="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 dark:border-emerald-900 dark:bg-emerald-950/40">
             <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
               Semua paket sudah ter-scan — siap konfirmasi {isPickup ? "pickup" : "serah terima"}.
             </p>
-            {isPickup && payment && payment.remainingAmount > 0 && (
-              <div className="grid gap-2 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <label htmlFor="balance-amt" className="text-xs font-medium text-foreground">
-                    Sisa dibayar customer (Rp)
-                  </label>
-                  <NumberInput
-                    id="balance-amt"
-                    value={balance}
-                    onChange={(e) => setBalance(e.target.value)}
-                    placeholder={String(Math.round(payment.remainingAmount))}
-                    disabled={confirming}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label htmlFor="balance-method" className="text-xs font-medium text-foreground">
-                    Metode
-                  </label>
-                  <FormSelect
-                    value={balanceMethod}
-                    onValueChange={setBalanceMethod}
-                    options={[{ value: "CASH", label: "Cash" }, { value: "TRANSFER", label: "Transfer" }]}
-                    disabled={confirming}
-                  />
-                </div>
-              </div>
-            )}
             {!isPickup && (
-              <div className="space-y-1.5">
-                <label htmlFor="pod-name" className="text-xs font-medium text-foreground">
-                  Diterima oleh (POD) <span className="text-destructive">*</span>
-                </label>
-                <Input id="pod-name" value={proof} onChange={(e) => setProof(e.target.value)} placeholder="Nama penerima di lokasi customer" disabled={confirming} />
-              </div>
+              <>
+                <div className="space-y-1.5">
+                  <label htmlFor="pod-name" className="text-xs font-medium text-foreground">
+                    Diterima oleh (POD) <span className="text-destructive">*</span>
+                  </label>
+                  <Input id="pod-name" value={proof} onChange={(e) => setProof(e.target.value)} placeholder="Nama penerima di lokasi customer" disabled={confirming} />
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="scan-notes" className="text-xs font-medium text-foreground">
+                    Catatan (opsional)
+                  </label>
+                  <Textarea id="scan-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Info serah terima…" disabled={confirming} />
+                </div>
+              </>
             )}
-            <div className="space-y-1.5">
-              <label htmlFor="scan-notes" className="text-xs font-medium text-foreground">
-                Catatan (opsional)
-              </label>
-              <Textarea id="scan-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder={isPickup ? "Kondisi kiriman, info tambahan…" : "Info serah terima…"} disabled={confirming} />
-            </div>
             <Button className="w-full" onClick={onConfirm} disabled={confirming}>
               <CheckCircle2 className="h-4 w-4" />
               {confirming ? "Memproses…" : isPickup ? "Konfirmasi Paket Diambil (Picked Up)" : "Konfirmasi Delivered (Di Tangan Customer)"}

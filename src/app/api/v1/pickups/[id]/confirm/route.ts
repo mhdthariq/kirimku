@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { guard, ok, handle, fail, str, num } from "@/lib/api-helpers";
+import { guard, ok, handle, fail, str } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
 import { assertKurirAssignment, scanProgress } from "@/lib/scan-flow";
 
@@ -68,33 +68,9 @@ export async function POST(req: NextRequest, { params }: Params) {
     const body = await req.json().catch(() => ({}));
     const notes = str(body.notes) ?? pickup.notes;
 
-    // --- Optional balance payment collected by the kurir at pickup time -----
-    // Tetap dipertahankan untuk kasus pelunasan on-the-spot (bukan DP gate).
-    let paymentRecorded: { amount: number; method: string } | null = null;
-    const paymentInput = body.payment as { method?: unknown; amount?: unknown; reference?: unknown } | undefined;
-    const balanceAmount = num(paymentInput?.amount);
-    if (paymentInput && balanceAmount != null && balanceAmount > 0) {
-      const method = paymentInput.method === "TRANSFER" ? "TRANSFER" : "CASH";
-      const payment = await db.payment.create({
-        data: {
-          masterId: pickup.masterId,
-          method,
-          amount: balanceAmount,
-          status: "RECORDED",
-          reference: str(paymentInput.reference) ?? `SISA-${pickup.pickupCode}`,
-          recordedById: user.id,
-        },
-      });
-      paymentRecorded = { amount: payment.amount, method: payment.method };
-      await audit({
-        action: "created",
-        entityType: "payment",
-        entityId: payment.id,
-        entityLabel: `${pickup.master.masterCode} · sisa diambil kurir`,
-        actor: user,
-        after: { amount: payment.amount, method },
-      });
-    }
+    // Aturan baru: kurir tidak menarik pembayaran dari customer. B2C ditanggung
+    // Marketing, B2B via invoice. Body `payment` diabaikan jika dikirim (untuk
+    // backward-compat dengan client lama). Tidak ada Payment row yang dibuat.
 
     // Assigned kurir name for the tracking event — fallback to confirming user.
     const kurirName = pickup.kurirId
@@ -115,7 +91,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       data: {
         masterId: pickup.masterId,
         event: "PICKED_UP",
-        description: `Picked-up by ${kurirName}${paymentRecorded ? ` — sisa ${paymentRecorded.method} Rp${Math.round(paymentRecorded.amount).toLocaleString("id-ID")} diterima kurir` : ""}`,
+        description: `Picked-up by ${kurirName}`,
         actorId: user.id,
       },
     });
@@ -125,8 +101,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       entityId: pickup.id,
       entityLabel: `${pickup.pickupCode} → PICKED_UP`,
       actor: user,
-      after: { packagesScanned: `${progress.scanned}/${progress.total}`, kurir: kurirName, payment: paymentRecorded },
+      after: { packagesScanned: `${progress.scanned}/${progress.total}`, kurir: kurirName },
     });
-    return ok({ ...updated, tracking: `Picked-up by ${kurirName}`, paymentRecorded });
+    return ok({ ...updated, tracking: `Picked-up by ${kurirName}` });
   });
 }
