@@ -249,7 +249,7 @@ export function ResiPrint({
       <section className="resi-sheet mx-auto flex h-[100mm] w-[100mm] flex-col overflow-hidden bg-white text-black">
         {/* Header — fixed 36px. 2px bottom border so the header line
             survives 203 DPI thermal printing. */}
-        <header className="flex h-[36px] flex-none items-center justify-between gap-2 border-b-[2px] border-black px-3">
+        <header className="flex h-9 flex-none items-center justify-between gap-2 border-b-2 border-black px-3">
           <div className="min-w-0">
             <p className="truncate text-[12px] font-extrabold uppercase leading-none tracking-[0.04em]">
               {company}
@@ -271,7 +271,7 @@ export function ResiPrint({
 
         {/* Resi Number + QR — fixed 86px. QR is 70×70 so the thermal
             printer renders enough modules for reliable scanning. */}
-        <div className="h-[86px] flex-none border-b border-black">
+        <div className="h-21.5 flex-none border-b border-black">
           <div className="grid h-full grid-cols-[1fr_78px]">
             <div className="flex min-w-0 flex-col justify-center overflow-hidden border-r border-black px-3">
               <SmallCaps>Nomor Resi</SmallCaps>
@@ -298,10 +298,10 @@ export function ResiPrint({
                 <img
                   src={qrMap[resiNumber]}
                   alt="QR code resi shipment"
-                  className="h-[70px] w-[70px]"
+                  className="h-17.5 w-17.5"
                 />
               ) : (
-                <div className="h-[70px] w-[70px] border border-dashed border-black" />
+                <div className="h-17.5 w-17.5 border border-dashed border-black" />
               )}
             </div>
           </div>
@@ -310,10 +310,10 @@ export function ResiPrint({
         {/* Route — fixed 32px. Bigger font for the city names so
             handlers can read them at arm's length on the warehouse
             floor. */}
-        <div className="h-[32px] flex-none border-b border-black px-3">
+        <div className="h-8 flex-none border-b border-black px-3">
           <div className="grid h-full grid-cols-[1fr_22px_1fr] items-center gap-1">
             <div className="min-w-0 leading-none">
-              <p className="text-[6.5px] font-bold uppercase tracking-[0.1em] text-black">
+              <p className="text-[6.5px] font-bold uppercase tracking-widest text-black">
                 Asal
               </p>
               <p className="mt-0.5 truncate text-[11px] font-extrabold uppercase leading-none">
@@ -326,7 +326,7 @@ export function ResiPrint({
             </div>
 
             <div className="min-w-0 text-right leading-none">
-              <p className="text-[6.5px] font-bold uppercase tracking-[0.1em] text-black">
+              <p className="text-[6.5px] font-bold uppercase tracking-widest text-black">
                 Tujuan
               </p>
               <p className="mt-0.5 truncate text-[11px] font-extrabold uppercase leading-none">
@@ -338,7 +338,7 @@ export function ResiPrint({
 
         {/* Sender / Receiver — fixed 78px. Two equal columns with name,
             contact, and address. Address truncates to 2 lines. */}
-        <div className="h-[78px] flex-none grid grid-cols-2 border-b border-black">
+        <div className="h-19.5 flex-none grid grid-cols-2 border-b border-black">
           <div className="flex min-w-0 flex-col justify-center gap-0.5 overflow-hidden border-r border-black px-3">
             <SmallCaps>Pengirim</SmallCaps>
 
@@ -377,7 +377,7 @@ export function ResiPrint({
         {/* Shipment Stats — fixed 44px. 4 cells with stat header + value.
             Each cell has a vertical divider so handlers can scan a
             single column at a time. */}
-        <div className="h-[44px] flex-none grid grid-cols-4 border-b border-black">
+        <div className="h-11 flex-none grid grid-cols-4 border-b border-black">
           <div className="flex flex-col items-center justify-center border-r border-black text-center leading-none">
             <SmallCaps>Jumlah</SmallCaps>
             <p className="mt-1 text-[13px] font-extrabold leading-none">
@@ -423,7 +423,7 @@ export function ResiPrint({
             rendered when present. Combined into a single visual band so
             the receiver immediately sees cost + payment state. */}
         {shipment.priceAmount != null && (
-          <div className="flex h-[24px] flex-none items-center justify-between border-b border-black px-3">
+          <div className="flex h-6 flex-none items-center justify-between border-b border-black px-3">
             <SmallCaps>Nilai Pengiriman</SmallCaps>
             <p className="text-[10px] font-extrabold leading-none">
               {formatRupiah(shipment.priceAmount)}
@@ -432,7 +432,7 @@ export function ResiPrint({
         )}
 
         {shipment.insuranceAmount > 0 && (
-          <div className="flex h-[24px] flex-none items-center justify-between border-b border-black px-3">
+          <div className="flex h-6 flex-none items-center justify-between border-b border-black px-3">
             <SmallCaps>Asuransi</SmallCaps>
             <p className="text-[9px] font-extrabold leading-none">
               {formatRupiah(shipment.insuranceAmount)}
@@ -443,7 +443,7 @@ export function ResiPrint({
         {/* Payment status — always visible (even UNPRICED) so the
             warehouse handler knows whether this shipment is COD or
             pre-paid. Pure-black badge on the right. */}
-        <div className="flex h-[24px] flex-none items-center justify-between border-b border-black px-3">
+        <div className="flex h-6 flex-none items-center justify-between border-b border-black px-3">
           <div className="flex items-baseline gap-2 min-w-0">
             <SmallCaps>Status Pembayaran</SmallCaps>
             <span className="truncate text-[8px] font-semibold text-black">
@@ -464,7 +464,7 @@ export function ResiPrint({
 
         {/* Warehouse — fixed 34px. Origin + destination warehouse with
             customer-support contact. */}
-        <div className="h-[34px] flex-none grid grid-cols-2 border-b border-black">
+        <div className="h-8.5 flex-none grid grid-cols-2 border-b border-black">
           <div className="flex min-w-0 flex-col justify-center overflow-hidden border-r border-black px-3 leading-none">
             <SmallCaps>Gudang Asal / CS</SmallCaps>
             <p className="mt-0.5 truncate text-[8px] font-semibold">
@@ -485,37 +485,10 @@ export function ResiPrint({
             instructions, signature lines, and print timestamp. */}
         <footer className="flex min-h-0 flex-1 flex-col justify-between gap-1 overflow-hidden px-3 py-2 text-[7px] leading-tight text-black">
           <div className="flex-1 min-h-0">
-            <p className="font-bold uppercase tracking-[0.1em]">
-              Catatan & Instruksi
-            </p>
-            <p className="mt-1 line-clamp-3 font-normal">
-              Simpan resi untuk pengecekan status dan pencocokan paket.
-              QR digunakan untuk identifikasi shipment pada proses
-              operasional. Barang diterima dalam keadaan baik — periksa
-              kemasan sebelum menandatangani.
+            <p className="tracking-widest">
+              Dicetak: {new Date().toLocaleString("id-ID")}
             </p>
           </div>
-
-          {/* Signature row — pengirim on the left, penerima on the
-              right. Solid 2px lines so they survive thermal printing. */}
-          <div className="grid grid-cols-2 gap-4 pt-2">
-            <div className="flex flex-col items-center text-center">
-              <div className="h-[18px] w-full border-t-[1.5px] border-black" />
-              <p className="mt-1 text-[6.5px] font-bold uppercase tracking-[0.06em]">
-                Ttd Pengirim
-              </p>
-            </div>
-            <div className="flex flex-col items-center text-center">
-              <div className="h-[18px] w-full border-t-[1.5px] border-black" />
-              <p className="mt-1 text-[6.5px] font-bold uppercase tracking-[0.06em]">
-                Ttd Penerima
-              </p>
-            </div>
-          </div>
-
-          <p className="mt-1 text-[6px] font-normal text-black">
-            Dicetak: {new Date().toLocaleString("id-ID")}
-          </p>
         </footer>
       </section>
 
@@ -544,13 +517,13 @@ export function ResiPrint({
             {/* Header — fixed 36px. Same 2px bottom border as the master
                 resi so the visual style is consistent across all
                 sheets in the print run. */}
-            <header className="flex h-[36px] flex-none items-center justify-between gap-2 border-b-[2px] border-black px-3">
+            <header className="flex h-9 flex-none items-center justify-between gap-2 border-b-2 border-black px-3">
               <div className="min-w-0">
                 <p className="truncate text-[11px] font-extrabold uppercase leading-none tracking-[0.04em]">
                   {company}
                 </p>
 
-                <p className="mt-1 truncate text-[7px] font-bold uppercase tracking-[0.1em] text-black">
+                <p className="mt-1 truncate text-[7px] font-bold uppercase tracking-widest text-black">
                   Package / Colly Label
                 </p>
               </div>
@@ -566,7 +539,7 @@ export function ResiPrint({
 
             {/* Package Code + QR — fixed 86px. Larger QR (70px) for
                 checkpoint scanning. */}
-            <div className="h-[86px] flex-none border-b border-black">
+            <div className="h-21.5 flex-none border-b border-black">
               <div className="grid h-full grid-cols-[1fr_78px]">
                 <div className="flex min-w-0 flex-col justify-center overflow-hidden border-r border-black px-3">
                   <SmallCaps>Kode Paket</SmallCaps>
@@ -589,10 +562,10 @@ export function ResiPrint({
                     <img
                       src={qrMap[labelId]}
                       alt="QR code paket"
-                      className="h-[70px] w-[70px]"
+                      className="h-17.5 w-17.5"
                     />
                   ) : (
-                    <div className="h-[70px] w-[70px] border border-dashed border-black" />
+                    <div className="h-17.5 w-17.5 border border-dashed border-black" />
                   )}
                 </div>
               </div>
@@ -601,10 +574,10 @@ export function ResiPrint({
             {/* Route band — fixed 24px. Compact route strip so the
                 handler knows where this colly needs to go without
                 flipping back to the master resi. */}
-            <div className="h-[24px] flex-none border-b border-black px-3">
+            <div className="h-6 flex-none border-b border-black px-3">
               <div className="grid h-full grid-cols-[1fr_18px_1fr] items-center gap-1">
                 <div className="min-w-0 leading-none">
-                  <span className="text-[6.5px] font-bold uppercase tracking-[0.1em] text-black">
+                  <span className="text-[6.5px] font-bold uppercase tracking-widest text-black">
                     Asal:{" "}
                   </span>
                   <span className="truncate text-[9px] font-extrabold uppercase">
@@ -617,7 +590,7 @@ export function ResiPrint({
                 </div>
 
                 <div className="min-w-0 text-right leading-none">
-                  <span className="text-[6.5px] font-bold uppercase tracking-[0.1em] text-black">
+                  <span className="text-[6.5px] font-bold uppercase tracking-widest text-black">
                     Tujuan:{" "}
                   </span>
                   <span className="truncate text-[9px] font-extrabold uppercase">
@@ -630,7 +603,7 @@ export function ResiPrint({
             {/* Pengirim — fixed 50px. Sender gets its own block (not
                 squeezed into a 2-column row) so the destination
                 handler can verify the shipper without ambiguity. */}
-            <div className="h-[50px] flex-none border-b border-black px-3">
+            <div className="h-12.5 flex-none border-b border-black px-3">
               <div className="flex h-full flex-col justify-center gap-0.5 overflow-hidden leading-none">
                 <SmallCaps>Pengirim</SmallCaps>
                 <p className="truncate text-[10px] font-extrabold leading-tight">
@@ -648,7 +621,7 @@ export function ResiPrint({
             </div>
 
             {/* Penerima — fixed 50px. Same treatment as pengirim. */}
-            <div className="h-[50px] flex-none border-b border-black px-3">
+            <div className="h-12.5 flex-none border-b border-black px-3">
               <div className="flex h-full flex-col justify-center gap-0.5 overflow-hidden leading-none">
                 <SmallCaps>Penerima</SmallCaps>
                 <p className="truncate text-[10px] font-extrabold leading-tight">
@@ -665,7 +638,7 @@ export function ResiPrint({
 
             {/* Package Stats — fixed 40px. 4 cells: weight, volume,
                 dimension, colly counter. */}
-            <div className="h-[40px] flex-none grid grid-cols-4 border-b border-black">
+            <div className="h-10 flex-none grid grid-cols-4 border-b border-black">
               <div className="flex flex-col items-center justify-center border-r border-black text-center leading-none">
                 <SmallCaps>Berat</SmallCaps>
                 <p className="mt-1 text-[11px] font-extrabold leading-none">
@@ -895,7 +868,7 @@ export function ResiPrint({
 
       <div
         id="resi-print-portal"
-        className="fixed inset-0 z-[80] overflow-y-auto bg-neutral-200 dark:bg-neutral-900"
+        className="fixed inset-0 z-80 overflow-y-auto bg-neutral-200 dark:bg-neutral-900"
       >
         {/* Screen toolbar */}
         <div className="print-toolbar sticky top-0 z-10 flex flex-col gap-3 border-b bg-white px-4 py-3 shadow-sm dark:bg-neutral-800 sm:flex-row sm:items-center sm:justify-between">
