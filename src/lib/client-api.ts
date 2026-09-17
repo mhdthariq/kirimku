@@ -823,7 +823,99 @@ export interface DashboardApprovals {
   pendingCommissions: DashboardApprovalItem[];
 }
 
+export interface DashboardPermissions {
+  canVerifyTopup: boolean;
+  canApproveWithdrawal: boolean;
+  canReviewWithdrawal: boolean;
+  canVerifyPayment: boolean;
+  canReleaseCommission: boolean;
+}
+
+/** Marketing-specific dashboard extras — own wallet & commission pipeline. */
+export interface MarketingDashboardSnapshot {
+  wallet: { balance: number; reserved: number; available: number };
+  pendingCommission: number;
+  releasedCommission: number;
+  recentCommissions: {
+    id: number;
+    commissionCode: string;
+    status: string;
+    amount: number;
+    invoiceNumber: string;
+    invoiceStatus: string;
+    customerName: string;
+    createdAt: string;
+  }[];
+  recentTransactions: {
+    id: number;
+    type: string;
+    amount: number;
+    direction: string;
+    description: string | null;
+    businessRef: string;
+    createdAt: string;
+  }[];
+  pendingWithdrawals: {
+    id: number;
+    requestCode: string;
+    amount: number;
+    status: string;
+    createdAt: string;
+  }[];
+}
+
+/** Gudang workspace surfaced inside the dashboard for admin/staff gudang. */
+export interface GudangDashboardWorkspace {
+  scope: { warehouseId: number | null; warehouseName: string | null; scoped: boolean };
+  arrivals: {
+    id: number;
+    masterCode: string;
+    customerName: string;
+    origin: string;
+    destination: string;
+    detailsCount: number;
+    scannedCount: number;
+    pickupCode: string | null;
+    kurirName: string | null;
+    updatedAt: string;
+  }[];
+  transportArrivals: {
+    id: number;
+    masterCode: string;
+    customerName: string;
+    origin: string;
+    destination: string;
+    originWarehouseName: string | null;
+    transportCode: string | null;
+    driverName: string | null;
+    detailsCount: number;
+    scannedCount: number;
+    updatedAt: string;
+  }[];
+  walkIns: {
+    id: number;
+    masterCode: string;
+    customerName: string;
+    origin: string;
+    destination: string;
+    status: string;
+    detailsCount: number;
+    totalWeightKg: number;
+  }[];
+  heldSummary: {
+    warehouseId: number;
+    warehouseName: string;
+    city: string | null;
+    heldShipments: number;
+    heldPackages: number;
+    heldWeightKg: number;
+    unpaidCount: number;
+  }[];
+}
+
 export interface DashboardData {
+  role: "owner" | "admin-kantor" | "marketing" | "admin-gudang" | "staff-gudang";
+  permissions: DashboardPermissions;
   period: { from: string; to: string; days: number };
   approvals: DashboardApprovals;
   counts: Record<string, number | null>;
@@ -846,6 +938,10 @@ export interface DashboardData {
     actorName: string;
     createdAt: string;
   }[];
+  /** Present only for Marketing partners — own wallet & commission pipeline. */
+  marketing: MarketingDashboardSnapshot | null;
+  /** Present for owner / admin-gudang / staff-gudang — gudang scan queue. */
+  gudang: GudangDashboardWorkspace | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -1002,8 +1098,9 @@ export interface PartnerRow {
 
 export interface VehicleOwnerDashboard {
   wallet: { balance: number; reserved: number; available: number };
-  totals: { earnings: number; transportCount: number; repairDeductions: number; withdrawals: number };
+  totals: { earnings: number; transportCount: number; repairDeductions: number; withdrawals: number; pendingWithdrawals: number };
   vehicles: { id: number; vehicleNumber: string; name: string | null; status: string; maxWeightKg: number; maxVolumeM3: number }[];
+  vehicleStatusBreakdown: Record<string, number>;
   recentSettlements: {
     id: number;
     settlementCode: string;
@@ -1016,6 +1113,23 @@ export interface VehicleOwnerDashboard {
   }[];
   recentTransactions: WalletTransaction[];
   recentRepairLogs: RepairActionLogRow[];
+  /** Full list of the partner's own repair records (not just action log). */
+  repairs: {
+    id: number;
+    repairCode: string;
+    vehicleId: number;
+    description: string;
+    amount: number;
+    repairDate: string;
+    workshopVendor: string | null;
+    proofUrl: string | null;
+    notes: string | null;
+    status: string;
+    deductedAmount: number;
+    verifiedAt: string | null;
+    createdAt: string;
+    vehicle: { id: number; vehicleNumber: string; name: string | null };
+  }[];
 }
 
 export interface VOTransportRow {
