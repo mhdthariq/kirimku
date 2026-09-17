@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { guard, ok, handle, fail, str, num } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
-import { assertKurirAssignment, scanProgress, paymentSummary } from "@/lib/scan-flow";
+import { assertKurirAssignment, scanProgress } from "@/lib/scan-flow";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -11,10 +11,12 @@ type Params = { params: Promise<{ id: string }> };
  * Requirements:
  * - every detail barang (package) must have been QR-scanned "ok" before the
  *   kurir can confirm;
- * - DP rule: at least 50% of the price must be paid before the packages can
- *   be picked up. The kurir may record the remaining balance at pickup time
- *   via body.payment = { method, amount, reference } (recorded as CASH/TRANSFER
- *   payment by the confirming user).
+ * - B2B shipments MUST be linked to an invoice before pickup — penagihan B2B
+ *   dilakukan via invoice, jadi pickup tidak boleh terjadi sebelum shipment
+ *   masuk ke invoice perusahaan tersebut.
+ * - DP rule dihapus: untuk B2C semua biaya ditanggung Marketing (jadi tidak
+ *   ada pemeriksaan pembayaran di sini). Untuk B2B pembayaran ditagihkan via
+ *   invoice terpisah.
  *
  * Pickup lifecycle (Revision Part A):
  *   ASSIGNED → PICKED_UP (this action) → … in transit … → the package arrives
@@ -31,7 +33,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const { id } = await params;
     const pickup = await db.pickup.findUnique({
       where: { id: Number(id) },
-      include: { master: { include: { details: true, customer: true } } },
+      include: { master: { include: { details: true, customer: true, invoiceLines: true } } },
     });
     if (!pickup) return fail(404, "Pickup tidak ditemukan.");
     if (pickup.status === "COMPLETED") return fail(422, "Pickup sudah selesai.");
@@ -50,19 +52,24 @@ export async function POST(req: NextRequest, { params }: Params) {
       return fail(422, `Belum semua paket discan (${progress.scanned}/${progress.total}, sisa ${remaining} paket).`);
     }
 
+    // --- B2B invoice gate: shipment B2B wajib ada di salah satu invoice -----
+    // perusahaan customer-nya sebelum bisa di-pickup. Untuk B2C biaya
+    // ditanggung Marketing, jadi tidak ada pemeriksaan pembayaran.
+    if (pickup.master.customer?.type === "b2b") {
+      const hasInvoice = pickup.master.invoiceLines.length > 0;
+      if (!hasInvoice) {
+        return fail(
+          422,
+          "Shipment B2B belum ditagirkan ke invoice manapun — tambahkan shipment ini ke invoice perusahaan customer sebelum pickup.",
+        );
+      }
+    }
+
     const body = await req.json().catch(() => ({}));
     const notes = str(body.notes) ?? pickup.notes;
 
-    // --- DP rule: minimal 50% paid before the packages can be picked up -----
-    const summary = await paymentSummary(pickup.masterId);
-    if (summary.priceAmount != null && summary.priceAmount > 0 && !summary.dpOk) {
-      return fail(
-        422,
-        `DP belum cukup — minimal 50% dari ${"Rp"}${Math.round(summary.priceAmount).toLocaleString("id-ID")} (terbayar ${"Rp"}${Math.round(summary.paidAmount).toLocaleString("id-ID")}). Catat pembayaran DP terlebih dahulu.`,
-      );
-    }
-
     // --- Optional balance payment collected by the kurir at pickup time -----
+    // Tetap dipertahankan untuk kasus pelunasan on-the-spot (bukan DP gate).
     let paymentRecorded: { amount: number; method: string } | null = null;
     const paymentInput = body.payment as { method?: unknown; amount?: unknown; reference?: unknown } | undefined;
     const balanceAmount = num(paymentInput?.amount);

@@ -93,7 +93,9 @@ export async function GET(req: NextRequest) {
         priceAmount: s.priceAmount,
         paidAmount: paid,
         remainingAmount: finalPrice != null ? Math.max(0, finalPrice - paid) : null,
-        dpOk: finalPrice == null || paid >= finalPrice / 2 - 0.01,
+        // DP rule dihapus — biaya B2C ditanggung Marketing, B2B via invoice.
+        // Field dipertahankan untuk backward-compat UI lama.
+        dpOk: true,
         penerimaName: s.penerimaName,
         detailsCount: totals.totalPackages,
         totalWeightKg: totals.totalActualKg,

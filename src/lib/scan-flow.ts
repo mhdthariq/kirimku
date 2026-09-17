@@ -201,8 +201,17 @@ export function assertKurirAssignment(
 }
 
 // ---------------------------------------------------------------------------
-// Payment / DP helpers (gudang + pickup gates)
+// Payment helpers (informational only — DP rule dihapus)
 // ---------------------------------------------------------------------------
+// Aturan baru:
+// - B2C: seluruh biaya ditanggung Marketing — tidak ada DP / status pembayaran
+//   yang diperiksa di mana pun. Resi hanya menampilkan Nilai Pengiriman.
+// - B2B: penagihan via invoice + settlement. Pickup B2B wajib sudah masuk
+//   invoice perusahaan customer sebelum bisa di-confirm (gate ada di
+//   /pickups + /pickups/[id]/confirm).
+//
+// paymentSummary() tetap dihitung untuk keperluan display (wallet, dashboard
+// keuangan) — field `dpOk` selalu `true` karena aturan DP sudah tidak berlaku.
 
 export interface PaymentSummary {
   priceAmount: number | null;
@@ -210,14 +219,16 @@ export interface PaymentSummary {
   finalPriceAmount: number | null; // what the customer actually owes
   paidAmount: number; // sum of RECORDED + VERIFIED payments
   remainingAmount: number; // final price - paid (>= 0)
-  dpRequirement: number; // 50% of final price
-  dpOk: boolean; // paid >= 50% of final price
+  dpRequirement: number; // deprecated — always 0 (DP rule dihapus)
+  dpOk: boolean; // deprecated — always true (DP rule dihapus)
   status: "UNPAID" | "DP" | "PAID" | "UNPRICED";
 }
 
-/** Payment summary of a shipment: DP rule = at least 50% paid before pickup.
+/** Payment summary of a shipment.
  *  Revise.md §6 — the customer owes the DISCOUNTED final price; the company
- *  share is still calculated from the original price at settlement time. */
+ *  share is still calculated from the original price at settlement time.
+ *  NOTE: DP rule sudah dihapus — `dpOk` selalu `true`. Field tetap dipertahankan
+ *  untuk backward-compat dengan UI lama. */
 export async function paymentSummary(masterId: number): Promise<PaymentSummary> {
   const [master, payments] = await Promise.all([
     db.masterShipment.findUnique({
@@ -234,10 +245,9 @@ export async function paymentSummary(masterId: number): Promise<PaymentSummary> 
   if (finalPriceAmount == null || finalPriceAmount <= 0) {
     return {
       priceAmount, discountAmount, finalPriceAmount,
-      paidAmount, remainingAmount: 0, dpRequirement: 0, dpOk: false, status: "UNPRICED",
+      paidAmount, remainingAmount: 0, dpRequirement: 0, dpOk: true, status: "UNPRICED",
     };
   }
-  const dpRequirement = finalPriceAmount / 2;
   const remainingAmount = Math.max(0, finalPriceAmount - paidAmount);
   return {
     priceAmount,
@@ -245,8 +255,8 @@ export async function paymentSummary(masterId: number): Promise<PaymentSummary> 
     finalPriceAmount,
     paidAmount,
     remainingAmount,
-    dpRequirement,
-    dpOk: paidAmount >= dpRequirement - 0.01,
+    dpRequirement: 0, // deprecated — DP rule dihapus
+    dpOk: true, // deprecated — DP rule dihapus, selalu diizinkan
     status: paidAmount >= finalPriceAmount - 0.01 ? "PAID" : paidAmount > 0 ? "DP" : "UNPAID",
   };
 }

@@ -124,6 +124,29 @@ export async function POST(req: NextRequest) {
       return fail(422, "Rute wajib dipilih dari daftar tarif.", { tariffId: ["Rute wajib dipilih dari daftar tarif."] });
     }
 
+    // --- Verification: pengirim & penerima tidak boleh identik -----------
+    // Bandingkan nama + kontak + alamat (case-insensitive, trim whitespace).
+    // Jika ketiganya sama persis, tolak submission. Pengiriman ke diri
+    // sendiri tidak masuk akal secara bisnis.
+    const normStr = (v: unknown) => (typeof v === "string" ? v.trim().toLowerCase() : "");
+    const senderName = normStr(body.pengirimName) || (customer.name ?? "").toLowerCase();
+    const senderPhone = normStr(body.pengirimPhone) || (customer.phone ?? "").toLowerCase();
+    const senderAddress = normStr(body.pengirimAddress) || (customer.address ?? "").toLowerCase();
+    const receiverName = normStr(body.penerimaName);
+    const receiverContact = normStr(body.penerimaContact);
+    const receiverAddress = normStr(body.penerimaAddress);
+
+    const allSame =
+      receiverName && senderName === receiverName &&
+      receiverContact && senderPhone === receiverContact &&
+      receiverAddress && senderAddress === receiverAddress;
+
+    if (allSame) {
+      return fail(422, "Data Pengirim dan Penerima identik (nama, kontak, dan alamat sama persis). Ubah minimal salah satu field penerima sebelum membuat shipment.", {
+        penerimaName: ["Pengirim dan Penerima tidak boleh identik."],
+      });
+    }
+
     const masterCode = await nextCode("masterShipment", "MKT-", "masterCode", 7);
 
     const originWarehouseId = num(body.originWarehouseId);

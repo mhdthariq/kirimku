@@ -215,25 +215,17 @@ export function ResiPrint({
   const destinationSupport =
     destGudang?.customerSupportContact ?? "—";
 
-  // Payment summary — show status + paid/remaining so the resi doubles as
-  // a proof-of-payment stub. The paymentSummary field is optional; fall
-  // back to top-level priceAmount so older shipments still render.
-  const payment = shipment.paymentSummary;
-  const paymentStatus = payment?.status ?? "UNPRICED";
+  // Resi hanya menampilkan Nilai Pengiriman (+ No. Invoice untuk B2B).
+  // Status pembayaran (UNPAID / DP / PAID) tidak lagi ditampilkan di resi
+  // karena seluruh biaya B2C ditanggung Marketing dan B2B ditagihkan via Invoice.
   const finalPrice =
-    payment?.finalPriceAmount ??
     shipment.finalPriceAmount ??
     shipment.priceAmount ??
     0;
-  const paidAmount = payment?.paidAmount ?? 0;
-  const remainingAmount = payment?.remainingAmount ?? finalPrice;
 
-  const paymentLabel: Record<string, string> = {
-    UNPAID: "BELUM BAYAR",
-    DP: "DP / SEBAGIAN",
-    PAID: "LUNAS",
-    UNPRICED: "BELUM DIHARGAI",
-  };
+  const isB2B = shipment.customer?.type === "b2b";
+  const invoiceNumber =
+    shipment.invoiceLines?.[0]?.invoice.invoiceNumber ?? null;
 
   const sheets = (
     <>
@@ -419,15 +411,22 @@ export function ResiPrint({
           </div>
         </div>
 
-        {/* Price + Insurance + Payment Status — fixed 24px each, only
-            rendered when present. Combined into a single visual band so
-            the receiver immediately sees cost + payment state. */}
+        {/* Nilai Pengiriman — fixed 24px. Untuk B2B, No. Invoice ditampilkan
+            di samping harga karena penagihan ke perusahaan dilakukan via invoice,
+            bukan via pembayaran per resi. Pembayaran B2C ditanggung Marketing. */}
         {shipment.priceAmount != null && (
           <div className="flex h-6 flex-none items-center justify-between border-b border-black px-3">
             <SmallCaps>Nilai Pengiriman</SmallCaps>
-            <p className="text-[10px] font-extrabold leading-none">
-              {formatRupiah(shipment.priceAmount)}
-            </p>
+            <div className="flex items-baseline gap-2 min-w-0">
+              {isB2B && invoiceNumber && (
+                <span className="truncate text-[8px] font-semibold text-black">
+                  Inv. {invoiceNumber}
+                </span>
+              )}
+              <p className="text-[10px] font-extrabold leading-none">
+                {formatRupiah(finalPrice || shipment.priceAmount)}
+              </p>
+            </div>
           </div>
         )}
 
@@ -439,28 +438,6 @@ export function ResiPrint({
             </p>
           </div>
         )}
-
-        {/* Payment status — always visible (even UNPRICED) so the
-            warehouse handler knows whether this shipment is COD or
-            pre-paid. Pure-black badge on the right. */}
-        <div className="flex h-6 flex-none items-center justify-between border-b border-black px-3">
-          <div className="flex items-baseline gap-2 min-w-0">
-            <SmallCaps>Status Pembayaran</SmallCaps>
-            <span className="truncate text-[8px] font-semibold text-black">
-              {formatRupiah(finalPrice)}
-            </span>
-          </div>
-          <div className="flex items-baseline gap-2 shrink-0">
-            {paidAmount > 0 && (
-              <span className="text-[7.5px] font-semibold text-black">
-                Lunas {formatRupiah(paidAmount)}
-              </span>
-            )}
-            <span className="border-[1.5px] border-black px-1.5 py-0.5 text-[7.5px] font-extrabold uppercase leading-none">
-              {paymentLabel[paymentStatus] ?? paymentStatus}
-            </span>
-          </div>
-        </div>
 
         {/* Warehouse — fixed 34px. Origin + destination warehouse with
             customer-support contact. */}

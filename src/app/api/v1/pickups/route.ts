@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
     const user = await guard(req, "pickup.create");
     const body = await req.json().catch(() => ({}));
     const masterId = num(body.masterId);
-    const master = masterId ? await db.masterShipment.findUnique({ where: { id: masterId }, include: { customer: true } }) : null;
+    const master = masterId ? await db.masterShipment.findUnique({ where: { id: masterId }, include: { customer: true, invoiceLines: true } }) : null;
     if (!master) return fail(422, "Shipment wajib dipilih.", { masterId: ["Shipment wajib dipilih."] });
     if (master.status !== "READY_FOR_PICKUP") {
       return fail(422, `Shipment harus berstatus READY_FOR_PICKUP (saat ini: ${master.status}).`);
@@ -92,6 +92,15 @@ export async function POST(req: NextRequest) {
     // Defensive gate: a pickup request requires a counted price (Revision rule)
     if (master.priceAmount == null || master.priceAmount <= 0) {
       return fail(422, "Harga shipment belum dihitung — hitung harga sebelum membuat task pickup.");
+    }
+    // B2B invoice gate: shipment B2B wajib sudah masuk ke invoice perusahaan
+    // customernya sebelum bisa dibuatkan task pickup. Untuk B2C biaya
+    // ditanggung Marketing, jadi tidak ada pemeriksaan invoice.
+    if (master.customer?.type === "b2b" && master.invoiceLines.length === 0) {
+      return fail(
+        422,
+        "Shipment B2B belum ditagirkan ke invoice manapun — tambahkan shipment ini ke invoice perusahaan customer sebelum membuat task pickup.",
+      );
     }
     const kurirId = num(body.kurirId);
     if (!kurirId) return fail(422, "Kurir wajib dipilih.", { kurirId: ["Kurir wajib dipilih."] });

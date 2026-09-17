@@ -204,6 +204,32 @@ function ShipmentList() {
       toast.error("Pilih rute (tarif) untuk shipment ini.");
       return;
     }
+    // --- Verification: pengirim & penerima tidak boleh identik ----------
+    // Bandingkan nama + kontak + alamat (case-insensitive, trim whitespace).
+    // Jika semua field yang dimiliki keduanya sama persis, blok submission
+    // dan minta user memperbaiki — pengiriman ke diri sendiri tidak masuk akal.
+    const norm = (v: string) => (v ?? "").trim().toLowerCase();
+    const senderName = norm(form.pengirimName);
+    const receiverName = norm(form.penerimaName);
+    const senderContact = norm(form.pengirimPhone);
+    const receiverContact = norm(form.penerimaContact);
+    const senderAddress = norm(form.pengirimAddress);
+    const receiverAddress = norm(form.penerimaAddress);
+
+    const nameSame = senderName && receiverName && senderName === receiverName;
+    const contactSame = senderContact && receiverContact && senderContact === receiverContact;
+    const addressSame = senderAddress && receiverAddress && senderAddress === receiverAddress;
+
+    if (nameSame && contactSame && addressSame) {
+      toast.error("Data Pengirim dan Penerima identik. Pengiriman ke diri sendiri tidak diperbolehkan — ubah minimal nama, kontak, atau alamat penerima.");
+      return;
+    }
+    if (nameSame && contactSame) {
+      const proceed = window.confirm(
+        "Nama dan kontak Pengirim & Penerima terlihat sama. Pastikan penerima benar-benar pihak yang berbeda (contoh: bagian gudang, keluarga, dsb.). Lanjutkan?",
+      );
+      if (!proceed) return;
+    }
     setBusy(true);
     const payload = {
       customerId: Number(form.customerId),

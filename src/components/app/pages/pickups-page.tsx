@@ -136,10 +136,21 @@ export function PickupsPage() {
   // drivers, admin kantor, …). Falls back to the full list only when no
   // employee has a position set (legacy data).
   const kurirOptions = employeesByPosition(options?.employees ?? [], "Kurir").map((e) => ({ value: String(e.id), label: e.name }));
-  const shipmentOptions = readyShipments.map((s) => ({
-    value: String(s.id),
-    label: `${s.masterCode} · ${s.customer?.name ?? ""} (${s.details?.length ?? s._count?.details ?? 0} detail)`,
-  }));
+  // B2B shipments wajib sudah masuk ke invoice perusahaan customer-nya sebelum
+  // bisa di-pickup. B2C biaya ditanggung Marketing, jadi selalu eligible.
+  const shipmentOptions = readyShipments
+    .filter((s) => {
+      if (s.customer?.type !== "b2b") return true;
+      const hasInvoice = (s.invoiceLines?.length ?? 0) > 0;
+      return hasInvoice;
+    })
+    .map((s) => ({
+      value: String(s.id),
+      label: `${s.masterCode} · ${s.customer?.name ?? ""} (${s.details?.length ?? s._count?.details ?? 0} detail)`,
+    }));
+  const blockedB2BCount = readyShipments.filter(
+    (s) => s.customer?.type === "b2b" && (s.invoiceLines?.length ?? 0) === 0,
+  ).length;
 
   const tableView = (
     <DataTable
@@ -315,6 +326,11 @@ export function PickupsPage() {
                   options={shipmentOptions}
                   disabled={busy || shipmentOptions.length === 0}
                 />
+                {blockedB2BCount > 0 && (
+                  <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400">
+                    {blockedB2BCount} shipment B2B disembunyikan karena belum ditagirkan ke invoice perusahaan customer. Tambahkan shipment tersebut ke invoice terlebih dahulu di halaman Invoices.
+                  </p>
+                )}
               </Field>
             )}
             <Field label="Kurir" htmlFor="p-kurir">

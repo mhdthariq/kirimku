@@ -95,9 +95,11 @@ async function createDemoArrivalShipment(budiPartner: { id: number } | null): Pr
       destinationWarehouseId: bandaAceh.id,
       arrivedWarehouseId: bandaAceh.id, // physically at the destination gudang
       destReceivedAt: null, // NOT yet scan-verified by Admin Gudang Banda Aceh
-      penerimaName: "Sari Indah",
+      // Penerima != Pengirim: customer (Sari Indah) mengirim ke alamat berbeda
+      // di kota tujuan — penerima adalah keluarga di Banda Aceh.
+      penerimaName: "Reza Pahlawan",
       penerimaAddress: "Jl. T. Iskandar No. 7, Banda Aceh",
-      penerimaContact: "0812-3456-0005",
+      penerimaContact: "0813-7700-0007",
       pengirimName: sari.name,
       pengirimPhone: sari.phone,
       createdByPartnerId: budiPartner?.id ?? null,
@@ -135,13 +137,8 @@ async function createDemoArrivalShipment(budiPartner: { id: number } | null): Pr
       where: { id: shipment.id },
       data: { chargeableWeightKg: r.chargeableKg, ratePerKg: tariffRow.ratePerKg, priceAmount: r.price, pricedAt: createdAt },
     });
-    await db.payment.create({
-      data: {
-        masterId: shipment.id, method: "TRANSFER", amount: r.price, status: "VERIFIED",
-        reference: "PAY-MKT000007", recordedById: dewiId, createdAt,
-        verifiedById: agusId, verifiedAt: daysAgo(1.4),
-      },
-    });
+    // B2C — biaya ditanggung Marketing, tidak ada pembayaran customer.
+    // Payment row dihapus sesuai aturan baru: B2C tidak ada DP / status pembayaran.
   }
 
   const events: { event: string; description: string; daysAgo: number; actorId: number | null }[] = [
@@ -188,6 +185,11 @@ async function createDemoArrivalShipment(budiPartner: { id: number } | null): Pr
  * Master Resi scan mode. A B2B pickup task assigned to kurir Rizky so the
  * kurir can open the scan dialog and only need to scan the Master Resi once
  * (not 8 packages individually).
+ *
+ * Aturan baru: shipment B2B wajib masuk ke invoice perusahaan customer sebelum
+ * bisa di-pickup. Fungsi ini juga membuat (secara idempotent) invoice
+ * INV-2026-000002 untuk PT Maju Bersama dan menambahkan MKT-000008 sebagai
+ * invoice line — supaya pickup task yang dibuat di sini bisa di-confirm.
  */
 async function createB2BMasterResiShipment(budiPartner: { id: number } | null): Promise<void> {
   const [maju, medan, bandaAceh, tariffRow] = await Promise.all([
@@ -200,7 +202,7 @@ async function createB2BMasterResiShipment(budiPartner: { id: number } | null): 
 
   const actorId = async (username: string) =>
     (await db.user.findUnique({ where: { username }, select: { id: true } }))?.id ?? null;
-  const [budiId] = await Promise.all([actorId("budi")]);
+  const [budiId, sitiId] = await Promise.all([actorId("budi"), actorId("siti")]);
 
   const now = new Date();
   const daysAgo = (d: number) => new Date(now.getTime() - d * 24 * 60 * 60 * 1000);
@@ -218,9 +220,12 @@ async function createB2BMasterResiShipment(budiPartner: { id: number } | null): 
       originWarehouseId: medan.id,
       destinationWarehouseId: bandaAceh.id,
       arrivedWarehouseId: null,
+      // Penerima != Pengirim: PT Maju Bersama mengirim ke bagian gudangnya
+      // sendiri di Banda Aceh — nama & kontak berbeda, alamat gudang berbeda
+      // dari alamat kantor pusat (pengirim).
       penerimaName: "Bagian Gudang PT Maju Bersama",
       penerimaAddress: "Jl. T. Iskandar No. 12, Banda Aceh",
-      penerimaContact: "0812-3456-0002",
+      penerimaContact: "0812-3456-9008",
       pengirimName: maju.companyName ?? maju.name,
       pengirimPhone: maju.phone,
       pengirimAddress: maju.address,
@@ -255,20 +260,49 @@ async function createB2BMasterResiShipment(budiPartner: { id: number } | null): 
     });
     detailRows.push(row);
   }
+  let invoicePrice = 0;
   if (tariffRow) {
     const r = computePricing(detailRows, tariffRow);
+    invoicePrice = r.price;
     await db.masterShipment.update({
       where: { id: shipment.id },
       data: { chargeableWeightKg: r.chargeableKg, ratePerKg: tariffRow.ratePerKg, priceAmount: r.price, pricedAt: createdAt },
     });
-    // 50% DP — pickup is unlocked once the kurir scans the Master Resi.
-    await db.payment.create({
-      data: {
-        masterId: shipment.id, method: "TRANSFER", amount: r.price / 2, status: "VERIFIED",
-        reference: "PAY-MKT000008", recordedById: budiId, createdAt,
-        verifiedById: budiId, verifiedAt: daysAgo(0.35),
+    // DP / direct Payment untuk B2B dihapus — penagihan B2B dilakukan via invoice.
+  }
+
+  // --- B2B invoice gate: MKT-000008 wajib ada di invoice PT Maju Bersama ---
+  // Buat invoice baru (INV-2026-000002) terpisah dari INV-2026-000001 agar
+  // tidak mengubah total invoice yang sudah PARTIALLY_SETTLED. Idempotent:
+  // gunakan upsert by invoiceNumber, dan hanya tambahkan line jika belum ada.
+  if (invoicePrice > 0 && sitiId) {
+    const invoice = await db.invoice.upsert({
+      where: { invoiceNumber: "INV-2026-000002" },
+      create: {
+        invoiceNumber: "INV-2026-000002",
+        customerId: maju.id,
+        status: "SENT",
+        issueDate: daysAgo(0.4),
+        dueDate: new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000),
+        notes: "Tagihan pengiriman B2B Master Resi demo (MKT-000008) — Medan → Banda Aceh",
+        createdAt: daysAgo(0.4),
       },
+      update: {},
     });
+    const existingLine = await db.invoiceLine.findFirst({
+      where: { invoiceId: invoice.id, shipmentId: shipment.id },
+    });
+    if (!existingLine) {
+      await db.invoiceLine.create({
+        data: {
+          invoiceId: invoice.id,
+          description: "MKT-000008 — pengiriman B2B Master Resi (8 karton @ 3,5 kg)",
+          quantity: 1,
+          unitPrice: invoicePrice,
+          shipmentId: shipment.id,
+        },
+      });
+    }
   }
 
   await db.trackingEvent.create({
@@ -284,7 +318,7 @@ async function createB2BMasterResiShipment(budiPartner: { id: number } | null): 
     data: {
       masterId: shipment.id,
       event: "READY_FOR_PICKUP",
-      description: "Menunggu penjemputan kurir — B2B: cukup scan Master Resi sekali",
+      description: "Menunggu penjemputan kurir — B2B: cukup scan Master Resi sekali (sudah masuk ke INV-2026-000002)",
       actorId: budiId,
       occurredAt: daysAgo(0.38),
     },
@@ -297,7 +331,7 @@ async function createB2BMasterResiShipment(budiPartner: { id: number } | null): 
       data: {
         pickupCode: "PICK-2026-000008", masterId: shipment.id,
         kurirId: rizkyEmp.id,
-        status: "ASSIGNED", notes: "B2B — cukup scan Master Resi di lokasi customer",
+        status: "ASSIGNED", notes: "B2B — cukup scan Master Resi di lokasi customer (invoice INV-2026-000002)",
         createdAt: daysAgo(0.2), updatedAt: daysAgo(0.2),
       },
     });
@@ -563,16 +597,14 @@ async function runSeed(): Promise<void> {
       priced: boolean;
       createdDaysAgo: number;
       penerima: { name: string; address: string; contact: string };
-      payment?: { amount: number; method: string; status: string };
       details: { description: string; quantity: number; weightKg: number; l: number; w: number; h: number }[];
     }[] = [
       {
-        // Priced + DP ≥ 50% so the open pickup task (rizky) can be confirmed —
-        // demonstrates the DP rule + QR scan flow end-to-end.
+        // Priced + READY_FOR_PICKUP so the open pickup task (rizky) can be
+        // confirmed. Aturan baru: B2C tidak ada DP — biaya ditanggung Marketing.
         masterCode: "MKT-000001", customer: "Rina Amelia", status: "READY_FOR_PICKUP",
         origin: "Medan", destination: "Banda Aceh", priced: true, createdDaysAgo: 1,
         penerima: { name: "Laksmi Dewi", address: "Jl. T. Iskandar No. 12, Banda Aceh", contact: "0813-2222-3333" },
-        payment: { amount: 20000, method: "TRANSFER", status: "RECORDED" },
         details: [
           { description: "Paket pakaian", quantity: 1, weightKg: 2, l: 35, w: 25, h: 12 },
           { description: "Buku tulis", quantity: 3, weightKg: 1.5, l: 25, w: 20, h: 10 },
@@ -582,42 +614,44 @@ async function runSeed(): Promise<void> {
         // B2B PICKED_UP — sits in the gudang arrival queue. With the new B2B
         // Master Resi scan option, Admin Gudang can scan the Master Resi ONCE
         // to confirm receipt of all 10 packages (demo of the new feature).
+        // Sudah masuk ke invoice INV-2026-000001 — requirement pickup B2B OK.
         masterCode: "MKT-000002", customer: "PT Maju Bersama", status: "PICKED_UP",
         origin: "Medan", destination: "Banda Aceh", priced: true, createdDaysAgo: 2,
         penerima: { name: "Hendra Gunawan", address: "Jl. T. Iskandar No. 88, Banda Aceh", contact: "0814-4444-5555" },
-        payment: { amount: 60000, method: "TRANSFER", status: "VERIFIED" },
         details: [{ description: "Karton Tulis", quantity: 10, weightKg: 2.5, l: 25, w: 20, h: 20 }],
       },
       {
+        // B2B RECEIVED_AT_GUDANG — penagihan via invoice (INV-2026-000003).
         masterCode: "MKT-000003", customer: "CV Sinar Jaya", status: "RECEIVED_AT_GUDANG",
         origin: "Medan", destination: "Lhokseumawe", priced: true, createdDaysAgo: 4,
         penerima: { name: "Bagian Gudang CV Sinar Jaya", address: "Jl. Merdeka No. 5, Lhokseumawe", contact: "0815-5555-6666" },
-        payment: { amount: 450000, method: "TRANSFER", status: "VERIFIED" },
         details: [
           { description: "Mesin bubut mini", quantity: 1, weightKg: 40, l: 60, w: 45, h: 40 },
           { description: "Spare part", quantity: 4, weightKg: 5, l: 25, w: 20, h: 15 },
         ],
       },
       {
+        // B2C IN_TRANSPORT — biaya ditanggung Marketing. Penerima (Dewi Susilo)
+        // berbeda dari pengirim (Tono Susilo) — bukan diri sendiri.
         masterCode: "MKT-000004", customer: "Tono Susilo", status: "IN_TRANSPORT",
         origin: "Medan", destination: "Banda Aceh", priced: true, createdDaysAgo: 3,
-        penerima: { name: "Tono Susilo", address: "Jl. Kenanga No. 9, Banda Aceh", contact: "0812-3456-0004" },
-        payment: { amount: 25500, method: "CASH", status: "VERIFIED" },
+        penerima: { name: "Dewi Susilo", address: "Jl. Kenanga No. 9, Banda Aceh", contact: "0813-4444-1234" },
         details: [{ description: "Kipas angin", quantity: 1, weightKg: 3, l: 30, w: 25, h: 12 }],
       },
       {
+        // B2B DELIVERED — sudah masuk ke invoice INV-2026-000001.
         masterCode: "MKT-000005", customer: "PT Maju Bersama", status: "DELIVERED",
         origin: "Medan", destination: "Banda Aceh", priced: true, createdDaysAgo: 6,
         penerima: { name: "Bagian Gudang PT Maju Bersama", address: "Jl. Gatot Subroto No. 21, Medan", contact: "0812-3456-0002" },
-        payment: { amount: 180000, method: "CASH", status: "VERIFIED" },
         details: [{ description: "Paket promosi", quantity: 8, weightKg: 5, l: 30, w: 20, h: 15 }],
       },
       {
         // CREATED + unpriced — walk-in candidate: customer hands the package
         // straight to Admin Gudang (no scan needed).
+        // Penerima (Adik Indah) berbeda dari pengirim (Sari Indah).
         masterCode: "MKT-000006", customer: "Sari Indah", status: "CREATED",
         origin: "Medan", destination: "Banda Aceh", priced: false, createdDaysAgo: 0,
-        penerima: { name: "Sari Indah", address: "Jl. Anggrek No. 3, Banda Aceh", contact: "0812-3456-0005" },
+        penerima: { name: "Adik Indah", address: "Jl. Anggrek No. 3, Banda Aceh", contact: "0813-3300-0006" },
         details: [{ description: "Kosmetik", quantity: 2, weightKg: 1, l: 20, w: 15, h: 10 }],
       },
     ];
@@ -789,20 +823,9 @@ async function runSeed(): Promise<void> {
           }
         }
       }
-      // Payment for priced shipments — DP/balance demo values per def
-      const priceAmount = priceByCode[s.masterCode];
-      if (s.payment && priceAmount != null) {
-        await db.payment.create({
-          data: {
-            masterId: shipment.id, method: s.payment.method,
-            amount: s.payment.amount, status: s.payment.status,
-            reference: `PAY-${s.masterCode.slice(-6)}`,
-            recordedById: usersByHandle.dewi.id, createdAt,
-            verifiedById: s.payment.status === "VERIFIED" ? usersByHandle.siti.id : null,
-            verifiedAt: s.payment.status === "VERIFIED" ? daysAgo(Math.max(0, s.createdDaysAgo - 0.5)) : null,
-          },
-        });
-      }
+      // Payment rows untuk B2C dan B2B dihapus dari seed: aturan baru — B2C
+      // ditanggung Marketing (tidak ada DP / status pembayaran), B2B ditagih
+      // via invoice + settlement (lihat blok Invoice di bawah).
     }
 
     // Transport carrying MKT-000004
@@ -895,6 +918,30 @@ async function runSeed(): Promise<void> {
         invoiceAmount: invoiceTotal, companyPercent: 80, partnerPercent: 20,
         commissionAmount: Math.round(invoiceTotal * 0.2 * 100) / 100,
         status: "PENDING", createdAt: daysAgo(3),
+      },
+    });
+
+    // ----- Invoice for CV Sinar Jaya (MKT-000003 — B2B) ------------------
+    // Aturan baru: B2B shipment wajib masuk invoice sebelum bisa di-pickup.
+    // MKT-000003 sudah PICKED_UP / RECEIVED_AT_GUDANG di seed awal (status
+    // ditulis langsung, lewati gate pickup), tetapi tetap perlu invoice agar
+    // konsisten dengan aturan baru dan resi-nya menampilkan No. Invoice.
+    const sinar = await db.customer.findUniqueOrThrow({ where: { code: "CUS-000003" } });
+    const invoice3 = await db.invoice.create({
+      data: {
+        invoiceNumber: "INV-2026-000003", customerId: sinar.id, status: "SENT",
+        issueDate: daysAgo(4), dueDate: new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000),
+        notes: "Tagihan pengiriman Medan → Lhokseumawe (MKT-000003)", createdAt: daysAgo(4),
+      },
+    });
+    const mkt3Row = await db.masterShipment.findUniqueOrThrow({ where: { masterCode: "MKT-000003" } });
+    await db.invoiceLine.create({
+      data: {
+        invoiceId: invoice3.id,
+        description: "MKT-000003 — pengiriman Medan → Lhokseumawe (B2B, mesin + spare part)",
+        quantity: 1,
+        unitPrice: priceByCode["MKT-000003"] ?? 330000,
+        shipmentId: mkt3Row.id,
       },
     });
 
@@ -1111,6 +1158,7 @@ async function runSeed(): Promise<void> {
       { action: "created", entityType: "transport", entityLabel: "TRP-2026-000001", actor: "agus" },
       { action: "status_change", entityType: "transport", entityLabel: "TRP-2026-000001 → DEPARTED", actor: "joko" },
       { action: "created", entityType: "invoice", entityLabel: "INV-2026-000001", actor: "siti" },
+      { action: "created", entityType: "invoice", entityLabel: "INV-2026-000003 (CV Sinar Jaya — MKT-000003)", actor: "siti" },
       { action: "created", entityType: "warehouse", entityLabel: "Gudang Banda Aceh", actor: "agus" },
       { action: "updated", entityType: "tariff", entityLabel: "Medan → Banda Aceh (b2c)", actor: "siti" },
       { action: "login", entityType: "auth", entityLabel: "siti", actor: "siti" },

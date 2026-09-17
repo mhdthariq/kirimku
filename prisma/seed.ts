@@ -76,12 +76,18 @@ async function main() {
   console.log("Demo B2B Master Resi scan:");
   console.log("  MKT-000002 (PT Maju Bersama, PICKED_UP) — paket sudah di kurir, Admin Gudang tinggal scan Master Resi sekali");
   console.log("  MKT-000008 (PT Maju Bersama, READY_FOR_PICKUP) — tugas pickup Rizky, scan Master Resi sekali cukup");
+  console.log("  (semua shipment B2B sudah ditagirkan ke invoice: MKT-000002/5 → INV-2026-000001, MKT-000003 → INV-2026-000003, MKT-000008 → INV-2026-000002)");
   console.log("");
   console.log("Demo Owner Dashboard approval queue:");
   console.log("  TOP-000002  Top Up Budi        (Rp150.000, menunggu verifikasi Owner — ada bukti transfer)");
   console.log("  WDR-000001  Withdrawal Hendra (Rp30.000, menunggu approval Owner)");
-  console.log("  PAY-000001  Payment MKT-000001 (Rp20.000, status RECORDED — menunggu verifikasi)");
   console.log("  COM-000001  Komisi Budi        (Rp58.500, PENDING — invoice belum LUNAS)");
+  console.log("");
+  console.log("Catatan aturan baru:");
+  console.log("  - DP / 'Pembayaran Sebagian' dihapus. B2C ditanggung Marketing, B2B ditagih via invoice.");
+  console.log("  - Resi hanya menampilkan Nilai Pengiriman (+ No. Invoice untuk B2B).");
+  console.log("  - Shipment B2B wajib masuk invoice sebelum bisa di-pickup.");
+  console.log("  - Pengirim & Penerima tidak boleh identik (validasi client + server).");
 }
 
 main()

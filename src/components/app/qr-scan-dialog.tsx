@@ -58,8 +58,9 @@ function MethodBadge({ method }: { method: string | null }) {
  *   keyboard-wedge input auto-detected), or manual typing;
  * - camera + reader are recorded as SCANNED, manual typing as TYPED — shown
  *   in Riwayat Scan below;
- * - pickup confirmation enforces the DP rule (≥ 50% paid) and lets the kurir
- *   collect & record the remaining balance on the spot.
+ * - DP rule sudah dihapus. Biaya B2C ditanggung Marketing, biaya B2B ditagih
+ *   via invoice. Pickup B2B wajib sudah masuk ke invoice perusahaan customer.
+ *   Kurir tetap boleh mencatat sisa pembayaran on-the-spot jika diperlukan.
  */
 export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanDialogProps) {
   const [progress, setProgress] = useState<ScanProgress | null>(null);
@@ -243,18 +244,15 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
           {!progress && <p className="px-2 py-4 text-center text-sm text-muted-foreground">Memuat daftar paket…</p>}
         </div>
 
-        {/* DP rule info (pickup only) */}
+        {/* Pickup info (B2B invoice reminder). DP rule sudah dihapus —
+            biaya B2C ditanggung Marketing, biaya B2B ditagih via invoice. */}
         {isPickup && payment && payment.priceAmount != null && (
-          <div className={cn("rounded-lg border px-3 py-2 text-xs", payment.dpOk ? "border-emerald-300 bg-emerald-50/60 dark:border-emerald-900 dark:bg-emerald-950/40" : "border-amber-300 bg-amber-50/60 dark:border-amber-900 dark:bg-amber-950/40")}>
+          <div className="rounded-lg border border-sky-300 bg-sky-50/60 px-3 py-2 text-xs dark:border-sky-900 dark:bg-sky-950/40">
             <p className="flex items-center gap-1.5 font-semibold text-foreground">
-              <Wallet className="h-3.5 w-3.5" /> Harga {formatRupiah(payment.priceAmount)} · terbayar {formatRupiah(payment.paidAmount)}
+              <Wallet className="h-3.5 w-3.5" /> Nilai Pengiriman {formatRupiah(payment.priceAmount)}
             </p>
-            <p className={payment.dpOk ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300"}>
-              {payment.dpOk
-                ? payment.remainingAmount > 0
-                  ? `DP cukup — sisa ${formatRupiah(payment.remainingAmount)} bisa diambil saat pickup.`
-                  : "Lunas."
-                : `DP minimal 50% (${formatRupiah(payment.dpRequirement)}) belum terpenuhi — catat DP dulu sebelum pickup.`}
+            <p className="text-sky-700 dark:text-sky-300">
+              Pickup tidak lagi memerlukan DP. Untuk B2B, pastikan shipment sudah ditagirkan ke invoice perusahaan customer.
             </p>
           </div>
         )}
