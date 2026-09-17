@@ -3,95 +3,78 @@ generator client {
 }
 
 datasource db {
-  // Default: SQLite for zero-config local development.
-  // To use Supabase / PostgreSQL: change provider to "postgresql" and set
-  // DATABASE_URL in .env (see .env.example and docs/02-database.md).
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-// ---------------------------------------------------------------------------
-// Access control: employees, users, roles, permissions, sessions
-// ---------------------------------------------------------------------------
-
 model Employee {
-  id             Int      @id @default(autoincrement())
-  employeeNumber String   @unique
-  name           String
-  phone          String?
-  position       String?
-  // every karyawan belongs to exactly one gudang (branch) — ALL operational
-  // data (shipments, pickups, deliveries, transports) is scoped by this
-  // field; only the owner sees data across all gudang
-  warehouseId    Int?
-  warehouse      Warehouse? @relation(fields: [warehouseId], references: [id])
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  user User?
-  driverAssignments VehicleAssignment[] @relation("VehicleAssignmentDriver")
-  kenekAssignments  VehicleAssignment[] @relation("VehicleAssignmentKenek")
+  id                Int                 @id @default(autoincrement())
+  employeeNumber    String              @unique
+  name              String
+  phone             String?
+  position          String?
+  warehouseId       Int?
+  isActive          Boolean             @default(true)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  warehouse         Warehouse?          @relation(fields: [warehouseId], references: [id])
   drivenTransports  Transport[]         @relation("TransportDriver")
   kenekTransports   Transport[]         @relation("TransportKenek")
+  user              User?
+  driverAssignments VehicleAssignment[] @relation("VehicleAssignmentDriver")
+  kenekAssignments  VehicleAssignment[] @relation("VehicleAssignmentKenek")
 }
 
 model User {
-  id           Int       @id @default(autoincrement())
-  username     String    @unique
-  name         String
-  passwordHash String
-  isOwner      Boolean   @default(false)
-  isActive     Boolean   @default(true)
-  employeeId   Int?      @unique
-  employee     Employee? @relation(fields: [employeeId], references: [id])
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  roles        UserRole[]
-  sessions     SessionToken[]
-  trackingEvents TrackingEvent[]   @relation("TrackingActor")
-  auditLogs    AuditLog[]
-  payments     Payment[]          @relation("PaymentRecorder")
-  paymentsVerified Payment[]      @relation("PaymentVerifier")
-  handoverScans HandoverScan[]
-  checkpointRecords CheckpointRecord[]
+  id                        Int                 @id @default(autoincrement())
+  username                  String              @unique
+  name                      String
+  passwordHash              String
+  isOwner                   Boolean             @default(false)
+  isActive                  Boolean             @default(true)
+  employeeId                Int?                @unique
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
+  auditLogs                 AuditLog[]
+  checkpointRecords         CheckpointRecord[]
+  handoverScans             HandoverScan[]
+  partner                   Partner?
+  payments                  Payment[]           @relation("PaymentRecorder")
+  paymentsVerified          Payment[]           @relation("PaymentVerifier")
+  repairActionLogsMade      RepairActionLog[]   @relation("RepairActionLogBy")
+  sessions                  SessionToken[]
+  verifiedTopUps            TopUpRequest[]      @relation("TopUpVerifier")
+  trackingEvents            TrackingEvent[]     @relation("TrackingActor")
+  employee                  Employee?           @relation(fields: [employeeId], references: [id])
+  roles                     UserRole[]
   walletTransactionsCreated WalletTransaction[] @relation("WalletTransactionCreator")
-  repairActionLogsMade RepairActionLog[] @relation("RepairActionLogBy")
-  verifiedTopUps TopUpRequest[] @relation("TopUpVerifier")
-  reviewedWithdrawals WithdrawalRequest[] @relation("WithdrawalReviewer")
-  processedWithdrawals WithdrawalRequest[] @relation("WithdrawalProcessor")
-
-  // Partner wallet system (Revise.md) — a user MAY be a partner
-  // (Marketing or Vehicle Owner) with a wallet & profit-sharing config.
-  partner      Partner?
+  processedWithdrawals      WithdrawalRequest[] @relation("WithdrawalProcessor")
+  reviewedWithdrawals       WithdrawalRequest[] @relation("WithdrawalReviewer")
 }
 
 model Role {
-  id          Int     @id @default(autoincrement())
-  slug        String  @unique
+  id          Int              @id @default(autoincrement())
+  slug        String           @unique
   name        String
   description String?
-  isSystem    Boolean @default(false)
-
-  users       UserRole[]
+  isSystem    Boolean          @default(false)
   permissions RolePermission[]
+  users       UserRole[]
 }
 
 model Permission {
-  id          Int    @id @default(autoincrement())
-  slug        String @unique
+  id          Int              @id @default(autoincrement())
+  slug        String           @unique
   module      String
   description String
-
-  roles RolePermission[]
+  roles       RolePermission[]
 }
 
 model UserRole {
   userId Int
   roleId Int
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([userId, roleId])
 }
@@ -99,8 +82,8 @@ model UserRole {
 model RolePermission {
   roleId       Int
   permissionId Int
-  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
   permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@id([roleId, permissionId])
 }
@@ -109,9 +92,9 @@ model SessionToken {
   id        Int      @id @default(autoincrement())
   token     String   @unique
   userId    Int
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model CodeSequence {
@@ -120,210 +103,149 @@ model CodeSequence {
   updatedAt DateTime @updatedAt
 }
 
-// ---------------------------------------------------------------------------
-// Partner wallet system — Revise.md "Partner Wallet, B2B & Vehicle Owner
-// Financial Rules"
-// ---------------------------------------------------------------------------
-
-// A partner is an external business partner of the company:
-//   MARKETING      — sales / customer-acquisition partner (creates shipments,
-//                    earns B2B commissions, has a wallet + top-up workflow)
-//   VEHICLE_OWNER  — transport partner owning vehicles (earns transport
-//                    profit share, bears confirmed repair deductions)
 model Partner {
-  id          Int      @id @default(autoincrement())
-  userId      Int      @unique
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type        String   // MARKETING | VEHICLE_OWNER
-  // individual profit-sharing configuration (validated: sum must equal 100)
-  companyPercent Float  @default(80)
-  partnerPercent Float  @default(20)
-  // registered bank account used for withdrawals (partner-maintained)
-  bankName        String?
-  bankAccountName String?
-  bankAccountNumber String?
-  isActive    Boolean  @default(true)
-  notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  wallet             Wallet?
-  topUps             TopUpRequest[]
-  withdrawals        WithdrawalRequest[]
-  vehicles           Vehicle[]
+  id                   Int                   @id @default(autoincrement())
+  userId               Int                   @unique
+  type                 String
+  companyPercent       Float                 @default(80)
+  partnerPercent       Float                 @default(20)
+  bankName             String?
+  bankAccountName      String?
+  bankAccountNumber    String?
+  isActive             Boolean               @default(true)
+  notes                String?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  customers            Customer[]            @relation("CustomerMarketingOwner")
+  commissions          MarketingCommission[]
+  shipmentsCreated     MasterShipment[]      @relation("ShipmentCreatorPartner")
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topUps               TopUpRequest[]
   transportSettlements TransportSettlement[]
-  repairs            VehicleRepair[]
-  commissions        MarketingCommission[]
-  shipmentsCreated   MasterShipment[]  @relation("ShipmentCreatorPartner")
-  // customers acquired / handled by this Marketing partner — drives the
-  // "marketing only knows their own customers" data separation (B2B esp.)
-  customers          Customer[]       @relation("CustomerMarketingOwner")
+  vehicles             Vehicle[]
+  repairs              VehicleRepair[]
+  wallet               Wallet?
+  withdrawals          WithdrawalRequest[]
 }
 
-// Ledger-based wallet: the cached `balance` is ONLY mutated inside atomic
-// ledger operations (lib/wallet.ts) — every change creates a
-// WalletTransaction row with balanceBefore/balanceAfter. No ad-hoc edits.
 model Wallet {
-  id        Int      @id @default(autoincrement())
-  partnerId Int      @unique
-  partner   Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-  balance   Float    @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  id           Int                 @id @default(autoincrement())
+  partnerId    Int                 @unique
+  balance      Float               @default(0)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  partner      Partner             @relation(fields: [partnerId], references: [id], onDelete: Cascade)
   transactions WalletTransaction[]
 }
 
-// Append-only financial ledger. Completed rows are immutable — corrections
-// happen through new ADJUSTMENT rows. `businessRef` is the unique business
-// reference that guarantees exactly-once settlement (duplicate callbacks /
-// double clicks / retried requests cannot double-credit).
 model WalletTransaction {
-  id             Int      @id @default(autoincrement())
-  walletId       Int
-  wallet         Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
-  // TOPUP | COMMISSION | TRANSPORT_PROFIT_SHARE | REPAIR_DEDUCTION | WITHDRAWAL | SHIPMENT_ESCROW | ADJUSTMENT
-  type           String
-  amount         Float    // always positive; `direction` decides credit/debit
-  direction      String   // CREDIT | DEBIT
-  balanceBefore  Float
-  balanceAfter   Float
-  referenceType  String?  // topup | commission | transport_settlement | repair | withdrawal | adjustment
-  referenceId    Int?
-  businessRef    String   @unique
-  status         String   @default("COMPLETED")
-  description    String?
-  createdById    Int?
-  createdBy      User?    @relation("WalletTransactionCreator", fields: [createdById], references: [id])
-  createdAt      DateTime @default(now())
+  id            Int      @id @default(autoincrement())
+  walletId      Int
+  type          String
+  amount        Float
+  direction     String
+  balanceBefore Float
+  balanceAfter  Float
+  referenceType String?
+  referenceId   Int?
+  businessRef   String   @unique
+  status        String   @default("COMPLETED")
+  description   String?
+  createdById   Int?
+  createdAt     DateTime @default(now())
+  createdBy     User?    @relation("WalletTransactionCreator", fields: [createdById], references: [id])
+  wallet        Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
 
   @@index([walletId, createdAt])
 }
 
-// Marketing wallet top-up workflow (simplified §10):
-//   PENDING_VERIFICATION → VERIFIED (atomic wallet credit)
-//   (or REJECTED / CANCELLED at the appropriate stages)
-// The proof image is attached AT CREATION by Admin Kantor / Owner — there is
-// no separate "waiting for payment" stage.
 model TopUpRequest {
-  id            Int      @id @default(autoincrement())
-  requestCode   String   @unique
-  partnerId     Int
-  partner       Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-  amount        Float
-  // PENDING_VERIFICATION | VERIFIED | REJECTED | CANCELLED
-  status        String   @default("PENDING_VERIFICATION")
-  // partner-submitted transfer information / proof (data URL image + note)
-  partnerNote   String?
-  partnerProofUrl String?
-  // Admin Kantor-uploaded official transfer proof (data URL image), attached
-  // when the top-up is created
-  proofUrl      String?
-  // rejection / cancellation reason
-  rejectReason  String?
-  requestedById Int
+  id                         Int       @id @default(autoincrement())
+  requestCode                String    @unique
+  partnerId                  Int
+  amount                     Float
+  status                     String    @default("PENDING_VERIFICATION")
+  partnerNote                String?
+  partnerProofUrl            String?
+  proofUrl                   String?
+  rejectReason               String?
+  requestedById              Int
   submittedForVerificationAt DateTime?
-  verifiedById   Int?
-  verifiedBy     User?    @relation("TopUpVerifier", fields: [verifiedById], references: [id])
-  verifiedAt     DateTime?
-  // ledger entry created when VERIFIED (atomic with status change)
-  walletTransactionId Int?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  verifiedById               Int?
+  verifiedAt                 DateTime?
+  walletTransactionId        Int?
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+  partner                    Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  verifiedBy                 User?     @relation("TopUpVerifier", fields: [verifiedById], references: [id])
 
   @@index([partnerId, status])
   @@index([status])
 }
 
-// Partner withdrawal (Marketing + Vehicle Owner) with balance reservation:
-// a PENDING/APPROVED/PROCESSING withdrawal reserves its amount so the same
-// funds cannot be withdrawn twice; rejection/cancel/failure releases it and
-// completion atomically debits the wallet.
 model WithdrawalRequest {
-  id            Int      @id @default(autoincrement())
-  requestCode   String   @unique
-  partnerId     Int
-  partner       Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-  amount        Float
-  // PENDING | APPROVED | REJECTED | PROCESSING | COMPLETED | FAILED | CANCELLED
-  status        String   @default("PENDING")
-  // bank account snapshot at request time (from partner profile)
-  bankName        String?
-  bankAccountName String?
-  bankAccountNumber String?
-  partnerNote   String?
-  transferProofUrl String?
-  rejectReason  String?
-  requestedById Int
-  reviewedById  Int?
-  reviewedBy    User?    @relation("WithdrawalReviewer", fields: [reviewedById], references: [id])
-  reviewedAt    DateTime?
-  processedById Int?
-  processedBy   User?    @relation("WithdrawalProcessor", fields: [processedById], references: [id])
-  processedAt   DateTime?
-  completedAt   DateTime?
+  id                  Int       @id @default(autoincrement())
+  requestCode         String    @unique
+  partnerId           Int
+  amount              Float
+  status              String    @default("PENDING")
+  bankName            String?
+  bankAccountName     String?
+  bankAccountNumber   String?
+  partnerNote         String?
+  transferProofUrl    String?
+  rejectReason        String?
+  requestedById       Int
+  reviewedById        Int?
+  reviewedAt          DateTime?
+  processedById       Int?
+  processedAt         DateTime?
+  completedAt         DateTime?
   walletTransactionId Int?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  partner             Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  processedBy         User?     @relation("WithdrawalProcessor", fields: [processedById], references: [id])
+  reviewedBy          User?     @relation("WithdrawalReviewer", fields: [reviewedById], references: [id])
 
   @@index([partnerId, status])
   @@index([status])
 }
-
-// ---------------------------------------------------------------------------
-// Customers & shipments
-// ---------------------------------------------------------------------------
 
 model Customer {
-  id          Int      @id @default(autoincrement())
-  code        String   @unique
-  type        String   @default("b2c") // b2b | b2c
-  name        String
-  companyName String?
-  phone       String?
-  email       String?
-  address     String?
-  isActive    Boolean  @default(true)
-  // Marketing partner this customer is connected to ("customer connected to
-  // who"). null = unassigned / house account. Marketing partners only ever
-  // see their own customers; admins can (re)assign this in the Customers UI.
+  id                 Int              @id @default(autoincrement())
+  code               String           @unique
+  type               String           @default("b2c")
+  name               String
+  companyName        String?
+  phone              String?
+  email              String?
+  address            String?
+  isActive           Boolean          @default(true)
   marketingPartnerId Int?
-  marketingPartner   Partner? @relation("CustomerMarketingOwner", fields: [marketingPartnerId], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  shipments MasterShipment[]
-  invoices  Invoice[]
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  marketingPartner   Partner?         @relation("CustomerMarketingOwner", fields: [marketingPartnerId], references: [id])
+  invoices           Invoice[]
+  shipments          MasterShipment[]
 }
 
 model MasterShipment {
-  id                     Int      @id @default(autoincrement())
-  masterCode             String   @unique
-  resi                   String?  @unique
+  id                     Int                 @id @default(autoincrement())
+  masterCode             String              @unique
+  resi                   String?             @unique
   customerId             Int
-  customer               Customer @relation(fields: [customerId], references: [id])
-  tariffId               Int?     // tariff selected at creation (route dropdown)
-  tariff                 Tariff?  @relation(fields: [tariffId], references: [id])
-  status                 String   @default("CREATED")
+  tariffId               Int?
+  status                 String              @default("CREATED")
   origin                 String
   destination            String
   originWarehouseId      Int?
   destinationWarehouseId Int?
-  // gudang where the package physically arrived (set when Admin Gudang confirms
-  // arrival — via kurir drop-off scan or walk-in)
   arrivedWarehouseId     Int?
-  // when Admin Gudang scan-verified receipt of this shipment at the DESTINATION
-  // gudang (transport drop-off). null = arrived at another gudang but not yet
-  // scanned/received by Admin Gudang — delivery assignment is blocked until set.
   destReceivedAt         DateTime?
-  // Penerima (recipient) — typed manually, printed on both resi types
   penerimaName           String?
   penerimaAddress        String?
   penerimaContact        String?
-  // Pengirim (sender) — auto-filled from the Customer record at creation but
-  // fully editable per-shipment so the resi can show a different contact
-  // (e.g. drop-off person at the gudang counter, branch secretary, etc.).
-  // Kept on the shipment so it survives later edits to the Customer master.
   pengirimName           String?
   pengirimPhone          String?
   pengirimEmail          String?
@@ -332,184 +254,154 @@ model MasterShipment {
   ratePerKg              Float?
   priceAmount            Float?
   pricedAt               DateTime?
-  // Optional manually entered insurance amount in Rupiah.
-  insuranceAmount        Float    @default(0)
-
-  // ----- Revise.md: Marketing B2C discount + partner attribution ----------
-  // Marketing enters the discount as an AMOUNT (Rupiah); the percentage is
-  // always derived: discount% = discountAmount / priceAmount × 100.
-  // The discount is absorbed by Marketing's share (company share keeps being
-  // calculated from the ORIGINAL price).
-  discountAmount         Float    @default(0)
-  discountPercentage     Float?   // computed at pricing time
-  finalPriceAmount       Float?   // priceAmount − discountAmount (customer pays)
-  discountFundedBy       String   @default("COMPANY") // MARKETING | COMPANY
-  // partner (Marketing) that created this shipment — drives B2B commission
+  insuranceAmount        Float               @default(0)
+  discountAmount         Float               @default(0)
+  discountPercentage     Float?
+  finalPriceAmount       Float?
+  discountFundedBy       String              @default("COMPANY")
   createdByPartnerId     Int?
-  createdByPartner       Partner? @relation("ShipmentCreatorPartner", fields: [createdByPartnerId], references: [id])
-
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
-
-  details       DetailShipment[]
-  trackingEvents TrackingEvent[]
-  pickups       Pickup[]
-  deliveries    Delivery[]
-  payments      Payment[]
-  transportItems TransportShipment[]
-  invoiceLines  InvoiceLine[]
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+  deliveries             Delivery[]
+  details                DetailShipment[]
+  invoiceLines           InvoiceLine[]
+  createdByPartner       Partner?            @relation("ShipmentCreatorPartner", fields: [createdByPartnerId], references: [id])
+  customer               Customer            @relation(fields: [customerId], references: [id])
+  tariff                 Tariff?             @relation(fields: [tariffId], references: [id])
+  payments               Payment[]
+  pickups                Pickup[]
+  trackingEvents         TrackingEvent[]
+  transportItems         TransportShipment[]
 }
 
-// One row = ONE physical package with its own unique detailCode (QR label).
-// A "quantity" of N at input time expands into N rows; the grouped view in
-// the UI is purely a presentation-layer aggregation (no quantity column in DB).
 model DetailShipment {
-  id             Int      @id @default(autoincrement())
-  detailCode     String   @unique
+  id             Int            @id @default(autoincrement())
+  detailCode     String         @unique
   masterId       Int
-  master         MasterShipment @relation(fields: [masterId], references: [id], onDelete: Cascade)
   description    String
   lengthCm       Float?
   widthCm        Float?
   heightCm       Float?
-  actualWeightKg Float    @default(0)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  actualWeightKg Float          @default(0)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  master         MasterShipment @relation(fields: [masterId], references: [id], onDelete: Cascade)
 }
 
 model TrackingEvent {
-  id          Int      @id @default(autoincrement())
+  id          Int            @id @default(autoincrement())
   masterId    Int
-  master      MasterShipment @relation(fields: [masterId], references: [id], onDelete: Cascade)
   event       String
   description String?
   actorId     Int?
-  actor       User?    @relation("TrackingActor", fields: [actorId], references: [id])
-  occurredAt  DateTime @default(now())
+  occurredAt  DateTime       @default(now())
+  actor       User?          @relation("TrackingActor", fields: [actorId], references: [id])
+  master      MasterShipment @relation(fields: [masterId], references: [id], onDelete: Cascade)
 }
-
-// ---------------------------------------------------------------------------
-// Gudang (warehouses) — single physical-node table (no gateway/type split)
-// ---------------------------------------------------------------------------
 
 model Warehouse {
-  id        Int      @id @default(autoincrement())
-  code      String   @unique
-  name      String
-  city      String?
-  address   String?
-  latitude  Float?
-  longitude Float?
-  // customer support contact printed on Shipment Resi & Detail Resi
+  id                     Int        @id @default(autoincrement())
+  code                   String     @unique
+  name                   String
+  city                   String?
+  address                String?
+  latitude               Float?
+  longitude              Float?
   customerSupportContact String?
-  isActive  Boolean  @default(true)
-  notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  employees Employee[]
+  isActive               Boolean    @default(true)
+  notes                  String?
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
+  employees              Employee[]
 }
 
-// ---------------------------------------------------------------------------
-// Fleet: vehicles, routes, checkpoints, transports
-// ---------------------------------------------------------------------------
-
 model Vehicle {
-  id            Int     @id @default(autoincrement())
-  vehicleNumber String  @unique
+  id            Int                   @id @default(autoincrement())
+  vehicleNumber String                @unique
   name          String?
-  status        String  @default("ACTIVE") // ACTIVE | MAINTENANCE | INACTIVE
+  status        String                @default("ACTIVE")
   maxWeightKg   Float
   maxVolumeM3   Float
   notes         String?
-  // Revise.md §13 — partner-owned vehicles link to their Vehicle Owner;
-  // null = company-owned vehicle.
   ownerId       Int?
-  owner         Partner? @relation(fields: [ownerId], references: [id])
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  assignments VehicleAssignment[]
-  transports  Transport[]
-  repairs     VehicleRepair[]
-  settlements TransportSettlement[]
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  transports    Transport[]
+  settlements   TransportSettlement[]
+  owner         Partner?              @relation(fields: [ownerId], references: [id])
+  assignments   VehicleAssignment[]
+  repairs       VehicleRepair[]
 }
 
 model VehicleAssignment {
   id        Int       @id @default(autoincrement())
   vehicleId Int
-  vehicle   Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   driverId  Int?
-  driver    Employee? @relation("VehicleAssignmentDriver", fields: [driverId], references: [id])
   kenekId   Int?
-  kenek     Employee? @relation("VehicleAssignmentKenek", fields: [kenekId], references: [id])
   validFrom DateTime  @default(now())
   validTo   DateTime?
+  driver    Employee? @relation("VehicleAssignmentDriver", fields: [driverId], references: [id])
+  kenek     Employee? @relation("VehicleAssignmentKenek", fields: [kenekId], references: [id])
+  vehicle   Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 
   @@unique([vehicleId, driverId, kenekId, validFrom])
 }
 
 model Route {
-  id          Int     @id @default(autoincrement())
+  id          Int          @id @default(autoincrement())
   name        String
   origin      String?
   destination String?
-  isActive    Boolean @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
   checkpoints Checkpoint[]
   transports  Transport[]
 }
 
 model Checkpoint {
-  id           Int      @id @default(autoincrement())
+  id           Int                @id @default(autoincrement())
   routeId      Int
-  route        Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
   name         String
   sequence     Int
   latitude     Float
   longitude    Float
-  radiusMeters Int      @default(100)
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  records CheckpointRecord[]
+  radiusMeters Int                @default(100)
+  isActive     Boolean            @default(true)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  route        Route              @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  records      CheckpointRecord[]
 
   @@unique([routeId, sequence])
 }
 
 model Transport {
-  id            Int      @id @default(autoincrement())
-  transportCode String   @unique
-  routeId       Int?
-  route         Route?   @relation(fields: [routeId], references: [id])
-  vehicleId     Int
-  vehicle       Vehicle  @relation(fields: [vehicleId], references: [id])
-  driverId      Int?
-  driver        Employee? @relation("TransportDriver", fields: [driverId], references: [id])
-  kenekId       Int?
-  kenek         Employee? @relation("TransportKenek", fields: [kenekId], references: [id])
-  status        String   @default("PLANNED") // PLANNED | DEPARTED | ARRIVED | CANCELLED
-  // Transport planning (Revision Part J) — explicit endpoints & schedule.
-  // Fallback to the route's origin/destination when null.
-  origin              String?    // e.g. "Medan"
-  destination         String?    // e.g. "Banda Aceh"
-  plannedDepartureAt  DateTime?
-  plannedArrivalAt    DateTime?
-  // Last known position — updated by checkpoint check-ins (Revision Parts K/N)
-  currentLatitude     Float?
-  currentLongitude    Float?
-  lastLocationAt      DateTime?
-  departedAt    DateTime?
-  arrivedAt     DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  shipments        TransportShipment[]
-  checkpointRecords CheckpointRecord[]
-  settlement       TransportSettlement?
+  id                 Int                  @id @default(autoincrement())
+  transportCode      String               @unique
+  routeId            Int?
+  vehicleId          Int
+  driverId           Int?
+  kenekId            Int?
+  status             String               @default("PLANNED")
+  origin             String?
+  destination        String?
+  plannedDepartureAt DateTime?
+  plannedArrivalAt   DateTime?
+  currentLatitude    Float?
+  currentLongitude   Float?
+  lastLocationAt     DateTime?
+  departedAt         DateTime?
+  arrivedAt          DateTime?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  checkpointRecords  CheckpointRecord[]
+  driver             Employee?            @relation("TransportDriver", fields: [driverId], references: [id])
+  kenek              Employee?            @relation("TransportKenek", fields: [kenekId], references: [id])
+  route              Route?               @relation(fields: [routeId], references: [id])
+  vehicle            Vehicle              @relation(fields: [vehicleId], references: [id])
+  settlement         TransportSettlement?
+  shipments          TransportShipment[]
 
   @@index([driverId, status])
   @@index([kenekId, status])
@@ -519,8 +411,8 @@ model Transport {
 model TransportShipment {
   transportId Int
   shipmentId  Int
-  transport   Transport      @relation(fields: [transportId], references: [id], onDelete: Cascade)
   master      MasterShipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  transport   Transport      @relation(fields: [transportId], references: [id], onDelete: Cascade)
 
   @@id([transportId, shipmentId])
   @@index([transportId])
@@ -528,319 +420,256 @@ model TransportShipment {
 }
 
 model CheckpointRecord {
-  id           Int      @id @default(autoincrement())
-  transportId  Int
-  transport    Transport @relation(fields: [transportId], references: [id], onDelete: Cascade)
-  checkpointId Int
-  checkpoint   Checkpoint @relation(fields: [checkpointId], references: [id], onDelete: Cascade)
-  latitude     Float
-  longitude    Float
-  withinRadius Boolean
-  // Revision Part O — selfie/photo evidence (compressed JPEG data URL) and
-  // distance from the checkpoint at check-in time.
-  photoUrl     String?
+  id             Int        @id @default(autoincrement())
+  transportId    Int
+  checkpointId   Int
+  latitude       Float
+  longitude      Float
+  withinRadius   Boolean
+  photoUrl       String?
   distanceMeters Float?
-  recordedById Int?
-  recordedBy   User?    @relation(fields: [recordedById], references: [id])
-  recordedAt   DateTime @default(now())
+  recordedById   Int?
+  recordedAt     DateTime   @default(now())
+  checkpoint     Checkpoint @relation(fields: [checkpointId], references: [id], onDelete: Cascade)
+  recordedBy     User?      @relation(fields: [recordedById], references: [id])
+  transport      Transport  @relation(fields: [transportId], references: [id], onDelete: Cascade)
 
   @@index([transportId, recordedAt])
   @@index([checkpointId])
 }
 
-// ---------------------------------------------------------------------------
-// Pickup & handover
-// ---------------------------------------------------------------------------
-
 model Pickup {
-  id          Int      @id @default(autoincrement())
-  pickupCode  String   @unique
+  id          Int            @id @default(autoincrement())
+  pickupCode  String         @unique
   masterId    Int
-  master      MasterShipment @relation(fields: [masterId], references: [id], onDelete: Cascade)
   kurirId     Int?
-  status      String   @default("ASSIGNED") // ASSIGNED | PICKED_UP | COMPLETED | CANCELLED (Revision Part A)
+  status      String         @default("ASSIGNED")
   notes       String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime       @default(now())
   completedAt DateTime?
-  updatedAt   DateTime @updatedAt
-
-  scans HandoverScan[]
+  updatedAt   DateTime       @updatedAt
+  scans       HandoverScan[]
+  master      MasterShipment @relation(fields: [masterId], references: [id], onDelete: Cascade)
 
   @@index([kurirId, status])
   @@index([masterId, status])
 }
 
-// QR handover scan log — each physical package (detail barang) carries a QR
-// label encoding its detailCode. Kurir scans every package at pickup and at
-// delivery; Admin Gudang scans every package when a kurir drops them off at
-// the gudang. A task can only be confirmed once all details scanned "ok".
 model HandoverScan {
-  id          Int      @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
   pickupId    Int?
-  pickup      Pickup?  @relation(fields: [pickupId], references: [id], onDelete: Cascade)
   deliveryId  Int?
-  delivery    Delivery? @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
-  context     String   @default("pickup") // pickup | delivery | gudang_arrival | transport_arrival
-  masterId    Int?     // set for gudang_arrival / transport_arrival scans (no pickup/delivery task)
-  scanLevel   String   // master | detail
-  detailId    Int?     // set when the payload matched a detail barang
+  context     String    @default("pickup")
+  masterId    Int?
+  scanLevel   String
+  detailId    Int?
   payload     String
-  result      String   // ok | duplicate | unexpected
-  method      String   @default("TYPED") // SCANNED (camera / reader tool) | TYPED (manual input)
+  result      String
+  method      String    @default("TYPED")
   scannedById Int?
-  scannedBy   User?    @relation(fields: [scannedById], references: [id])
-  scannedAt   DateTime @default(now())
+  scannedAt   DateTime  @default(now())
+  delivery    Delivery? @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  pickup      Pickup?   @relation(fields: [pickupId], references: [id], onDelete: Cascade)
+  scannedBy   User?     @relation(fields: [scannedById], references: [id])
 }
 
 model Discrepancy {
-  id          Int      @id @default(autoincrement())
-  masterId    Int
-  pickupId    Int?
-  type        String   // MISSING_DETAIL | UNEXPECTED_PAYLOAD
-  description String
+  id           Int       @id @default(autoincrement())
+  masterId     Int
+  pickupId     Int?
+  type         String
+  description  String
   resolvedById Int?
-  resolvedAt  DateTime?
-  resolution  String?
-  createdAt   DateTime @default(now())
+  resolvedAt   DateTime?
+  resolution   String?
+  createdAt    DateTime  @default(now())
 }
-
-// ---------------------------------------------------------------------------
-// Delivery
-// ---------------------------------------------------------------------------
 
 model Delivery {
-  id             Int      @id @default(autoincrement())
-  deliveryCode   String   @unique
-  masterId       Int
-  master         MasterShipment @relation(fields: [masterId], references: [id], onDelete: Cascade)
-  kurirId        Int?
-  status         String   @default("ASSIGNED") // ASSIGNED | COMPLETED | FAILED
+  id              Int            @id @default(autoincrement())
+  deliveryCode    String         @unique
+  masterId        Int
+  kurirId         Int?
+  status          String         @default("ASSIGNED")
   proofOfDelivery String?
-  notes          String?
-  createdAt      DateTime @default(now())
-  completedAt    DateTime?
-  updatedAt      DateTime @updatedAt
-
-  scans HandoverScan[]
+  notes           String?
+  createdAt       DateTime       @default(now())
+  completedAt     DateTime?
+  updatedAt       DateTime       @updatedAt
+  master          MasterShipment @relation(fields: [masterId], references: [id], onDelete: Cascade)
+  scans           HandoverScan[]
 }
 
-// ---------------------------------------------------------------------------
-// Pricing: tariffs, payments, invoices
-// ---------------------------------------------------------------------------
-
 model Tariff {
-  id                  Int       @id @default(autoincrement())
-  origin              String
-  destination         String
-  customerType        String?   // b2b | b2c | null = all
-  ratePerKg           Float
-  minChargeableKg     Float     @default(1)
-  volumetricMultiplier Float    @default(250) // kg per m³: volumetric kg = (L×W×H cm / 1.000.000) × multiplier
-  roundingMode        String    @default("UP") // UP | NEAREST
-  roundingUnitKg      Float     @default(0.5)
-  effectiveFrom       DateTime
-  effectiveTo         DateTime?
-  isActive            Boolean   @default(true)
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-
-  shipments MasterShipment[]
+  id                   Int              @id @default(autoincrement())
+  origin               String
+  destination          String
+  customerType         String?
+  ratePerKg            Float
+  minChargeableKg      Float            @default(1)
+  volumetricMultiplier Float            @default(250)
+  roundingMode         String           @default("UP")
+  roundingUnitKg       Float            @default(0.5)
+  effectiveFrom        DateTime
+  effectiveTo          DateTime?
+  isActive             Boolean          @default(true)
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  shipments            MasterShipment[]
 }
 
 model Payment {
-  id           Int      @id @default(autoincrement())
+  id           Int            @id @default(autoincrement())
   masterId     Int
-  master       MasterShipment @relation(fields: [masterId], references: [id], onDelete: Cascade)
-  method       String   // CASH | TRANSFER
+  method       String
   amount       Float
-  status       String   @default("RECORDED") // RECORDED | VERIFIED | REJECTED
+  status       String         @default("RECORDED")
   reference    String?
   recordedById Int?
-  recordedBy   User?    @relation("PaymentRecorder", fields: [recordedById], references: [id])
   verifiedById Int?
-  verifiedBy   User?    @relation("PaymentVerifier", fields: [verifiedById], references: [id])
-  createdAt    DateTime @default(now())
+  createdAt    DateTime       @default(now())
   verifiedAt   DateTime?
+  master       MasterShipment @relation(fields: [masterId], references: [id], onDelete: Cascade)
+  recordedBy   User?          @relation("PaymentRecorder", fields: [recordedById], references: [id])
+  verifiedBy   User?          @relation("PaymentVerifier", fields: [verifiedById], references: [id])
 }
 
 model Invoice {
-  id            Int       @id @default(autoincrement())
-  invoiceNumber String    @unique
+  id            Int                  @id @default(autoincrement())
+  invoiceNumber String               @unique
   customerId    Int
-  customer      Customer  @relation(fields: [customerId], references: [id])
-  status        String    @default("DRAFT") // DRAFT | SENT | PARTIALLY_SETTLED | SETTLED | CANCELLED
+  status        String               @default("DRAFT")
   issueDate     DateTime?
   dueDate       DateTime?
   notes         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  lines       InvoiceLine[]
-  settlements InvoiceSettlement[]
-  commission  MarketingCommission?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  customer      Customer             @relation(fields: [customerId], references: [id])
+  lines         InvoiceLine[]
+  settlements   InvoiceSettlement[]
+  commission    MarketingCommission?
 }
 
 model InvoiceLine {
-  id          Int     @id @default(autoincrement())
+  id          Int             @id @default(autoincrement())
   invoiceId   Int
-  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   description String
-  quantity    Float   @default(1)
+  quantity    Float           @default(1)
   unitPrice   Float
-  // Revise.md §7 — link B2B invoice lines to the shipments they bill so the
-  // system knows which Marketing partner's commission the invoice carries.
   shipmentId  Int?
+  invoice     Invoice         @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   shipment    MasterShipment? @relation(fields: [shipmentId], references: [id])
 }
 
 model InvoiceSettlement {
   id           Int      @id @default(autoincrement())
   invoiceId    Int
-  invoice      Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   amount       Float
   method       String
   reference    String?
   recordedById Int?
   settledAt    DateTime @default(now())
+  invoice      Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 }
-
-// ---------------------------------------------------------------------------
-// Audit (append-only trail, per-entity viewable)
-// ---------------------------------------------------------------------------
 
 model AuditLog {
-  id         Int      @id @default(autoincrement())
-  action     String   // created | updated | deleted | login | logout | status_change | ...
-  entityType String   // customer | shipment | warehouse | vehicle | route | checkpoint | ...
-  entityId   Int?
+  id          Int      @id @default(autoincrement())
+  action      String
+  entityType  String
+  entityId    Int?
   entityLabel String?
-  actorId    Int?
-  actor      User?    @relation(fields: [actorId], references: [id])
-  beforeData String?
-  afterData  String?
-  createdAt  DateTime @default(now())
+  actorId     Int?
+  beforeData  String?
+  afterData   String?
+  createdAt   DateTime @default(now())
+  actor       User?    @relation(fields: [actorId], references: [id])
 }
 
-// ---------------------------------------------------------------------------
-// Vehicle Owner transport profit sharing (Revise.md §14/§15)
-// ---------------------------------------------------------------------------
-
-// One settlement per transport. Snapshots the value + percentages used at
-// settlement time — historical settlements are never recalculated when the
-// partner's profit-sharing configuration later changes (§37).
 model TransportSettlement {
-  id            Int      @id @default(autoincrement())
-  settlementCode String  @unique
-  transportId   Int      @unique
-  transport     Transport @relation(fields: [transportId], references: [id])
-  vehicleId     Int
-  vehicle       Vehicle  @relation(fields: [vehicleId], references: [id])
-  ownerId       Int
-  owner         Partner @relation(fields: [ownerId], references: [id])
-  transportValue Float
-  companyPercent Float
-  ownerPercent   Float
-  companyAmount  Float
-  ownerAmount    Float
-  // PENDING | FINALIZED | CANCELLED
-  status        String   @default("FINALIZED")
-  finalizedById Int?
-  finalizedAt   DateTime?
+  id                  Int       @id @default(autoincrement())
+  settlementCode      String    @unique
+  transportId         Int       @unique
+  vehicleId           Int
+  ownerId             Int
+  transportValue      Float
+  companyPercent      Float
+  ownerPercent        Float
+  companyAmount       Float
+  ownerAmount         Float
+  status              String    @default("FINALIZED")
+  finalizedById       Int?
+  finalizedAt         DateTime?
   walletTransactionId Int?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  owner               Partner   @relation(fields: [ownerId], references: [id])
+  transport           Transport @relation(fields: [transportId], references: [id])
+  vehicle             Vehicle   @relation(fields: [vehicleId], references: [id])
 
   @@index([ownerId, createdAt])
 }
 
-// ---------------------------------------------------------------------------
-// Repair / maintenance deduction (Revise.md §19–§22)
-// ---------------------------------------------------------------------------
-
-// Repair / maintenance deduction record (§19/§20, simplified flow):
-// a company user with `repair.create` submits a repair cost for a
-// partner-owned vehicle with proof — the record is CONFIRMED (VERIFIED)
-// immediately and the REPAIR_DEDUCTION is debited from the Vehicle Owner
-// wallet atomically at creation. No approval workflow. Every action
-// (created / updated / deleted) is recorded in RepairActionLog so the
-// Vehicle Owner can always audit what happened to their records.
 model VehicleRepair {
-  id          Int      @id @default(autoincrement())
-  repairCode  String   @unique
-  vehicleId   Int
-  vehicle     Vehicle  @relation(fields: [vehicleId], references: [id])
-  ownerId     Int
-  owner       Partner  @relation(fields: [ownerId], references: [id])
-  description String
-  amount      Float
-  repairDate  DateTime
-  workshopVendor String?
-  proofUrl    String?  // invoice / receipt / photo (data URL)
-  relatedTransportId Int?
-  notes       String?
-  // VERIFIED — creation by an authorized user is final (no approval flow)
-  status      String   @default("VERIFIED")
-  // Net amount currently deducted from the owner wallet for this repair
-  // (kept in sync when the amount is edited; refunded on delete).
-  deductedAmount Float  @default(0)
-  createdById Int?
+  id                  Int       @id @default(autoincrement())
+  repairCode          String    @unique
+  vehicleId           Int
+  ownerId             Int
+  description         String
+  amount              Float
+  repairDate          DateTime
+  workshopVendor      String?
+  proofUrl            String?
+  relatedTransportId  Int?
+  notes               String?
+  status              String    @default("VERIFIED")
+  deductedAmount      Float     @default(0)
+  createdById         Int?
   walletTransactionId Int?
-  verifiedAt  DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  verifiedAt          DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  owner               Partner   @relation(fields: [ownerId], references: [id])
+  vehicle             Vehicle   @relation(fields: [vehicleId], references: [id])
 
   @@index([ownerId, status])
   @@index([vehicleId])
 }
 
-// Append-only action log for repairs. `repairId` is a PLAIN integer (no FK)
-// so the log SURVIVES repair deletion — the Vehicle Owner can still see that
-// a record was created and later deleted, complete with snapshots.
 model RepairActionLog {
-  id          Int      @id @default(autoincrement())
-  repairId    Int      // plain reference — logs outlive the repair row
-  repairCode  String   // snapshot of VehicleRepair.repairCode
-  ownerId     Int      // Vehicle Owner partner id (log scoping)
-  vehicleNumber String // snapshot of the vehicle plate
-  // CREATED | UPDATED | DELETED
-  action      String
-  detail      String?  // human-readable summary of the action
-  changes     String?  // JSON diff snapshot for UPDATED ({field:{before,after}})
-  amount      Float?   // snapshot of the repair amount at action time
-  actorId     Int?
-  actor       User?    @relation("RepairActionLogBy", fields: [actorId], references: [id])
-  actorName   String?  // snapshot of the acting user's display name
-  createdAt   DateTime @default(now())
+  id            Int      @id @default(autoincrement())
+  repairId      Int
+  repairCode    String
+  ownerId       Int
+  vehicleNumber String
+  action        String
+  detail        String?
+  changes       String?
+  amount        Float?
+  actorId       Int?
+  actorName     String?
+  createdAt     DateTime @default(now())
+  actor         User?    @relation("RepairActionLogBy", fields: [actorId], references: [id])
 
   @@index([repairId])
   @@index([ownerId, createdAt])
 }
 
-// ---------------------------------------------------------------------------
-// Marketing B2B commission (Revise.md §8/§9)
-// ---------------------------------------------------------------------------
-
-// One commission per B2B invoice attributed to the Marketing partner who
-// created the underlying shipment(s). PENDING from invoice creation; released
-// to the Marketing wallet ONLY when the invoice becomes FULLY PAID (SETTLED),
-// exactly once (unique businessRef COMM-{invoiceId}).
 model MarketingCommission {
-  id             Int      @id @default(autoincrement())
-  commissionCode String   @unique
-  partnerId      Int
-  partner        Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-  invoiceId      Int      @unique
-  invoice        Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  invoiceAmount  Float    // snapshot of the invoice total
-  companyPercent Float
-  partnerPercent Float
-  commissionAmount Float
-  // PENDING | RELEASED | CANCELLED
-  status         String   @default("PENDING")
+  id                  Int       @id @default(autoincrement())
+  commissionCode      String    @unique
+  partnerId           Int
+  invoiceId           Int       @unique
+  invoiceAmount       Float
+  companyPercent      Float
+  partnerPercent      Float
+  commissionAmount    Float
+  status              String    @default("PENDING")
   walletTransactionId Int?
-  releasedAt     DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  releasedAt          DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  invoice             Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  partner             Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
 
   @@index([partnerId, status])
 }
