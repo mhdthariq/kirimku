@@ -11,6 +11,17 @@ bun run dev          # http://localhost:3000
 
 Environment: copy `.env.example` → `.env` and set `DATABASE_URL` (SQLite default, or Supabase Postgres — full guide in `02-database.md`).
 
+### Dev mode — no Corporate ID required
+
+`bun run dev` runs with `NODE_ENV=development`. In this mode:
+
+- The **Corporate ID field is hidden** on the login screen.
+- The **demo account quick-fill buttons are shown** (owner, budi, hendra, siti, agus, ratna, wawan, dewi) — these users only exist in the seeded local DB, so they only work here.
+- The license server (`LICENSE_API_URL`) is **never contacted**, so the `LICENSE_*` env vars can stay unset.
+- Every API request talks to whatever `DATABASE_URL` is in `.env` — exactly what you want when iterating on the schema with `prisma db push`.
+
+This is the recommended workflow for pushing schema changes: edit `prisma/schema.prisma` → `bun run db:push` → `bun run dev` → log in with a demo account.
+
 ## Production build
 
 ```bash
@@ -21,6 +32,16 @@ bun run start        # runs the standalone server (Node/Bun)
 - The build emits a **standalone server** (`.next/standalone/server.js`) with only the needed `node_modules` — ideal for containers.
 - `DATABASE_URL` must be present in the runtime environment (it is read at runtime, not baked in).
 - For Supabase in production, use the **transaction pooler** URL (port 6543, `pgbouncer=true`) for serverless/short-lived connections, or the **session pooler** (5432) for a long-running server. Templates are in `.env.example`.
+
+### Production mode — Corporate ID required
+
+`bun run build` + `bun run start` runs with `NODE_ENV=production`. In this mode:
+
+- The **Corporate ID field is shown** on the login screen and is required.
+- The **demo account quick-fill buttons are hidden** — those users don't exist in a real tenant's database, so showing them would only produce login errors. Every login must use a real user account created in the tenant's own DB.
+- The license server is contacted on every request (cached for 60 s per corp id) to validate the license and resolve the tenant's PostgreSQL connection details.
+- Each tenant is routed to its **own database** — `DATABASE_URL` is only used as the fallback when no Corporate ID is supplied (rare in prod).
+- The `LICENSE_API_URL`, `LICENSE_API_KEY`, `LICENSE_API_TOKEN`, and `LICENSE_APLIKASI` env vars must all be set.
 
 ## Docker
 
