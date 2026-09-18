@@ -52,9 +52,14 @@ The **owner** user short-circuits RBAC (`permissions: ["*"]`). All other users g
 - Optional filters are documented per endpoint (e.g. `?status=…`, `?q=…`, `?entityType=…`).
 - All mutating endpoints append an `AuditLog` row automatically.
 
-### Auto-seed
+### Auto-seed (Revision 6 — opt-in)
 
-The first request after a fresh `db:push` triggers `ensureSeed()` (RBAC + demo dataset) before the handler runs — so login works immediately after boot, mirroring a Docker "migrate + seed" entrypoint.
+The seeder NO LONGER runs automatically on the first API request. Two separate, operator-controlled steps now exist:
+
+1. **Schema sync** — `bun run db:push` (or `prisma db push`) syncs the Prisma schema to the database. This is the only required step before the app can run.
+2. **Demo data** — `bun run db:seed` runs the idempotent seeder that creates the demo accounts, gudang, vehicles, etc. **Optional**.
+
+To restore the old "auto-seed on first request" behaviour (useful for Docker where you can't shell in to run `db:seed`), set `AUTO_SEED_ON_BOOT=true` in `.env`. With the flag on, the first API request after a fresh `db:push` triggers `ensureSeed()` exactly once for the default (local-dev) tenant. Production / multi-tenant databases are NEVER auto-seeded regardless of the flag. RBAC bootstrap (`ensureRbac()`) still always runs on every API boot — that is required for auth.
 
 ---
 
@@ -228,13 +233,13 @@ Same executor mode: `GET /deliveries?mine=true` filters to the logged-in kurir. 
 |---|---|---|---|
 | GET | `/invoices` | `invoice.view` | List + `?status`, `?customerId` (includes totals) |
 | POST | `/invoices` | `invoice.create` | `{customerId, issueDate?, dueDate?, notes?, lines[]}` → `INV-YYYY-000NNN` (DRAFT) |
-| GET | `/invoices/{id}` | `invoice.view` | Detail with lines + settlements |
+| GET | `/invoices/{id}` | `invoice.view` | Detail with lines + settlements (incl. `proofUrl` per settlement) |
 | PUT | `/invoices/{id}` | `invoice.update` | Update while DRAFT (header or lines) |
 | POST | `/invoices/{id}/lines` | `invoice.update` | Add line `{description, quantity, unitPrice}` |
 | PUT | `/invoice-lines/{id}` | `invoice.update` | Edit a line |
 | DELETE | `/invoice-lines/{id}` | `invoice.update` | Remove a line |
 | POST | `/invoices/{id}/send` | `invoice.send` | `DRAFT → SENT` (locks editing, sets issue/due dates) |
-| POST | `/invoices/{id}/settlements` | `invoice.update` | Record payment `{amount, method, reference?}` → status auto-moves `SENT → PARTIALLY_SETTLED → SETTLED` |
+| POST | `/invoices/{id}/settlements` | `payment.verify` | Record payment `{amount, method, reference?, proofUrl?}` → status auto-moves `SENT → PARTIALLY_SETTLED → SETTLED`. `proofUrl` is an OPTIONAL data URL (image/PDF, ≤ 8 MB) of the customer's transfer slip / cash receipt — stored on the settlement row for audit. |
 
 ## Access control
 

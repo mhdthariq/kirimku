@@ -5,6 +5,9 @@ import { audit } from "@/lib/audit";
 
 type Params = { params: Promise<{ id: string }> };
 
+// data URL image/PDF receipt — same limit as top-up proofs (8 MB).
+const MAX_PROOF_LENGTH = 12_000_000;
+
 /**
  * Record a settlement payment against a SENT invoice.
  *
@@ -16,6 +19,11 @@ type Params = { params: Promise<{ id: string }> };
  *   + Marketing wallet credited.
  * Partial payments leave the commission PENDING; duplicate callbacks cannot
  * double-credit (unique businessRef + status guard).
+ *
+ * The caller MAY attach `proofUrl` — a data URL of the customer's transfer
+ * receipt / cash payment photo. Storing it on every settlement (even partial
+ * ones) lets Admin Kantor / Owner audit "who paid how much and with what
+ * proof" later.
  */
 export async function POST(req: NextRequest, { params }: Params) {
   return handle(req, async () => {
@@ -31,6 +39,16 @@ export async function POST(req: NextRequest, { params }: Params) {
     const amount = requireNum(body.amount, "amount", 1);
     const method = body.method === "TRANSFER" ? "TRANSFER" : "CASH";
     const reference = str(body.reference);
+    // Optional receipt: a data URL image/PDF of the transfer slip / cash receipt.
+    const proofUrl = str(body.proofUrl);
+    if (proofUrl != null) {
+      if (!proofUrl.startsWith("data:")) {
+        return fail(422, "Bukti pembayaran harus berupa file gambar/PDF (data URL).", { proofUrl: ["Format bukti tidak valid."] });
+      }
+      if (proofUrl.length > MAX_PROOF_LENGTH) {
+        return fail(422, "Ukuran bukti terlalu besar (maksimal 8 MB).", { proofUrl: ["Ukuran file maksimal 8 MB."] });
+      }
+    }
 
     const total = invoice.lines.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0);
     const settled = invoice.settlements.reduce((sum, s) => sum + s.amount, 0);
@@ -49,7 +67,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     // commission ledger credit — all-or-nothing (§30 B2B Commission).
     const { settlement, commissionReleased } = await db.$transaction(async (tx) => {
       const settlement = await tx.invoiceSettlement.create({
-        data: { invoiceId: invoice.id, amount, method, reference, recordedById: user.id },
+        data: { invoiceId: invoice.id, amount, method, reference, proofUrl, recordedById: user.id },
       });
       const updatedInvoice = await tx.invoice.update({ where: { id: invoice.id }, data: { status: newStatus } });
       void updatedInvoice;
@@ -103,7 +121,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     await audit({
       action: "settled", entityType: "invoice", entityId: invoice.id,
       entityLabel: `${invoice.invoiceNumber} · Rp${amount.toLocaleString("id-ID")}`, actor: user,
-      after: { status: newStatus, commissionReleased },
+      after: { status: newStatus, commissionReleased, proofAttached: !!proofUrl },
     });
     return ok({ settlement, invoice: updated, commissionReleased });
   });

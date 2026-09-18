@@ -522,6 +522,7 @@ CREATE TABLE "InvoiceSettlement" (
     "amount" DOUBLE PRECISION NOT NULL,
     "method" TEXT NOT NULL,
     "reference" TEXT,
+    "proofUrl" TEXT,
     "recordedById" INTEGER,
     "settledAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 

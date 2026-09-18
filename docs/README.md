@@ -72,6 +72,15 @@ Database and API were fully rebuilt and corrected in the process — details in 
 | R14 | **DP payment rule** — packages can only be picked up after ≥ 50% is paid; kurir records the balance at pickup; gudang can Notify Marketing about unpaid shipments | `POST /pickups/{id}/confirm` DP gate + `payment`; `POST /shipments/{id}/notify-marketing` |
 | R15 | **Warehouse scoping** — roles below Admin Gudang (new `staff-gudang` role, demo user `wawan`) only see their own gudang's queue/contents | `warehouse.scope_own` permission, `Employee.warehouseId`, `GET /gudang` scope filter |
 
+## Revision round 5 — B2B Master Resi scan, Owner Dashboard redesign, partial-payment profit clarification
+
+| # | Revision | Where it is implemented |
+|---|---|---|
+| R1 | **Owner can edit their own name & password** (previously the `/users/{id}` endpoint blocked all Owner edits, so the Owner had no way to self-serve) | New `PUT /api/v1/profile` endpoint accepts `{name?, currentPassword?, newPassword?}` for ANY user — including the Owner — and only touches the caller's own row. UI: Profile page now shows two new forms (Nama Tampilan + Password). The existing `/users/{id}` admin endpoint still guards the Owner row, because that path is for managing OTHER users. |
+| R2 | **Optional receipt upload on invoice settlement** — when recording a settlement payment (full or partial), the Admin Kantor / Owner can now attach an optional receipt (image/PDF, ≤ 8 MB). Stored on the new `InvoiceSettlement.proofUrl` column. | `prisma/schema.prisma` (`InvoiceSettlement.proofUrl`), migration `20260917090320_init/migration.sql`, `POST /api/v1/invoices/{id}/settlements` accepts `proofUrl`, `invoices-page.tsx` Settle dialog has a file picker + preview, settlement history shows a clickable "Bukti" chip |
+| R3 | **Partial invoice payments explicitly counted as company profit** — the finance dashboard now has a dedicated "Profit dari Pembayaran Invoice" section showing total realized (lunas + parsial), the SETTLED vs PARTIALLY_SETTLED split, the latest 8 settlement rows with proof badges, and a monthly timeline. Visible ONLY to `financial.report.view` (Admin Kantor + Owner). | `GET /api/v1/finance/summary` adds `totals.realizedInvoicePayments/settledInvoicePayments/partialInvoicePayments` + a full `invoicePayments` block; `finance-page.tsx` renders the new section with a "Hanya Admin Kantor & Owner" badge |
+| R4 | **Separate `db:push` and `db:seed` — operator-controlled** | Added `db:seed` script to `package.json` (runs `prisma/seed.ts` via Bun). The auto-seed-on-first-API-request behaviour is now OPT-IN via the `AUTO_SEED_ON_BOOT=true` env var (default off). Production tenants are NEVER auto-seeded regardless of the flag. RBAC bootstrap (`ensureRbac()`) still always runs. Docs: `06-seeding-and-demo-accounts.md`, `07-deployment.md`, `03-api-reference.md`, root `README.md`, `.env.example` |
+
 ## Document index
 
 | File | Contents |

@@ -36,21 +36,23 @@ Make sure you have:
 bun install
 ```
 
-### 2. Create the database
+### 2. Create the database schema (REQUIRED)
 
 ```bash
 bun run db:push
 ```
 
-This creates the local SQLite database at `db/custom.db`.
+This creates the local SQLite database at `db/custom.db` and syncs every table, index, and relation declared in `prisma/schema.prisma`. **Required before the app can run.**
 
-### 3. Add demo data
+### 3. Add demo data (OPTIONAL)
 
 ```bash
 bun run db:seed
 ```
 
-The seed command is optional. The application can seed an empty database automatically when the API is first used.
+The seed command is **optional** — it populates the database with demo accounts, gudang, vehicles, routes, tariffs, shipments, invoices, etc. As of Revision 6 the app **no longer auto-seeds on the first API request**; you must run `db:seed` explicitly if you want the demo dataset.
+
+To restore the previous "auto-seed on first request" behaviour (handy inside Docker containers), set `AUTO_SEED_ON_BOOT=true` in `.env`. Production / multi-tenant databases are never auto-seeded regardless of the flag.
 
 ### 4. Start the development server
 

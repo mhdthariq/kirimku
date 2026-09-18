@@ -29,15 +29,26 @@ export class HttpError extends Error {
   }
 }
 
-/** Guard: boots RBAC + demo data, resolves the session, enforces a permission. */
+/** Guard: boots RBAC + demo data, resolves the session, enforces a permission.
+ *
+ *  Revision 6 — auto-seeding demo business data on the first API request is
+ *  now OPT-IN via the `AUTO_SEED_ON_BOOT=true` env var. The previous
+ *  behaviour (always auto-seed in dev / default tenant) made it impossible
+ *  to test a truly empty database. RBAC bootstrapping (`ensureRbac()`) is
+ *  still always run, because the auth system cannot function without the
+ *  permission catalog; only the demo dataset is gated.
+ */
 export async function guard(
   req: NextRequest,
   permission?: string,
 ): Promise<AuthUser> {
   await ensureRbac();
   // Demo/local mode only — never auto-seed demo business data into a real
-  // corporate tenant's database.
-  if (isDefaultTenant()) await ensureSeed();
+  // corporate tenant's database. Even in dev mode, the seeder only runs
+  // when the operator explicitly opts in via AUTO_SEED_ON_BOOT=true.
+  if (isDefaultTenant() && process.env.AUTO_SEED_ON_BOOT === "true") {
+    await ensureSeed();
+  }
   const user = await getAuthUser(req);
   if (!user) throw new HttpError(401, "Unauthenticated.");
   if (permission && !hasPermission(user, permission)) {

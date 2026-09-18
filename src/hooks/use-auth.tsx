@@ -15,6 +15,10 @@ interface AuthContextValue {
   companyName: string | null;
   login: (corpId: string, username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  /** Re-fetch the current user from /auth/me — call after the user edits
+   *  their own profile (name, etc.) so the header/sidebar reflects the
+   *  change without requiring a re-login. */
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -82,9 +86,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setCompanyName(null);
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    if (!getToken()) return;
+    try {
+      const me = await apiGet<SessionUser & { company?: CompanyInfo }>("/auth/me");
+      setUser(me);
+      setCompanyName(me.company?.name ?? null);
+    } catch {
+      // keep the existing user object on refresh failure
+    }
+  }, []);
+
   const value = useMemo(
-    () => ({ user, loading, companyName, login, logout }),
-    [user, loading, companyName, login, logout],
+    () => ({ user, loading, companyName, login, logout, refreshUser }),
+    [user, loading, companyName, login, logout, refreshUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -7,8 +7,10 @@ import {
   CarFront,
   Coins,
   LayoutDashboard,
+  Paperclip,
   Receipt,
   TrendingUp,
+  Wallet,
   Wrench,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
@@ -22,6 +24,12 @@ import { cn } from "@/lib/utils";
 /**
  * Finance Dashboard (Revise.md §33/§34) — Admin Kantor / Owner Company:
  * aggregate wallet totals, pending workflows, partner overview, monthly ledger.
+ *
+ * Revision 6 — explicit "Invoice Payments" section: every Rupiah the
+ * customer paid against a B2B invoice (full settlement OR partial) is
+ * realized company profit at the moment it was received. The section breaks
+ * it down by SETTLED vs PARTIALLY_SETTLED, lists the latest settlement rows
+ * (with their proof attachment if any), and shows the monthly timeline.
  */
 export function FinancePage() {
   const { user } = useAuth();
@@ -49,6 +57,16 @@ export function FinancePage() {
     { label: "Withdrawal Selesai", value: formatRupiah(t.withdrawalsCompleted), sub: `${data.pending.withdrawals.length} in-flight`, icon: <Banknote className="h-4 w-4" /> },
   ];
 
+  const ip = data.invoicePayments;
+  const profitStats = ip
+    ? [
+        { label: "Pembayaran Invoice (Total)", value: formatRupiah(ip.realized), sub: "lunas + parsial — diterima perusahaan", icon: <Wallet className="h-4 w-4" /> },
+        { label: "Invoice LUNAS", value: formatRupiah(ip.settledTotal), sub: "pembayaran penuh diterima", icon: <Receipt className="h-4 w-4" /> },
+        { label: "Invoice PARTIAL", value: formatRupiah(ip.partialTotal), sub: "pembayaran parsial = profit perusahaan", icon: <Coins className="h-4 w-4" /> },
+        { label: "Komisi Belum Dirilis", value: formatRupiah(t.releasedCommissions), sub: "utang ke Marketing — hanya setelah lunas penuh", icon: <Briefcase className="h-4 w-4" /> },
+      ]
+    : [];
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -75,6 +93,84 @@ export function FinancePage() {
           </div>
         ))}
       </div>
+
+      {/* Revision 6 — Invoice payment profit (incl. partial) */}
+      {ip && (
+        <section className="rounded-xl border bg-card p-4">
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div>
+              <p className="flex items-center gap-2 text-sm font-semibold">
+                <Wallet className="h-4 w-4" /> Profit dari Pembayaran Invoice
+              </p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                Setiap Rupiah yang dibayar customer (lunas <b>atau parsial</b>) langsung menjadi <b>profit perusahaan</b> —
+                komisi Marketing baru dirilis saat invoice <b>lunas penuh</b> (§9), sehingga pembayaran parsial tetap
+                milik perusahaan dan bukan utang ke partner.
+              </p>
+            </div>
+            <span className="hidden rounded-md bg-primary/10 px-2 py-1 text-[10px] font-semibold text-primary sm:inline">
+              Hanya Admin Kantor & Owner
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {profitStats.map((s) => (
+              <div key={s.label} className="rounded-lg border bg-muted/30 p-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{s.label}</p>
+                  <span className="text-muted-foreground">{s.icon}</span>
+                </div>
+                <p className="mt-1 text-base font-bold">{s.value}</p>
+                <p className="mt-0.5 text-[10px] text-muted-foreground">{s.sub}</p>
+              </div>
+            ))}
+          </div>
+
+          {ip.recent.length > 0 && (
+            <div className="mt-4">
+              <p className="mb-1.5 text-xs font-semibold text-foreground">Pembayaran Terbaru</p>
+              <div className="overflow-x-auto rounded-lg border">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+                      <th className="px-3 py-2 font-semibold">Tanggal</th>
+                      <th className="px-3 py-2 font-semibold">Invoice</th>
+                      <th className="px-3 py-2 font-semibold">Customer</th>
+                      <th className="px-3 py-2 text-right font-semibold">Jumlah</th>
+                      <th className="px-3 py-2 font-semibold">Status</th>
+                      <th className="px-3 py-2 font-semibold">Bukti</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ip.recent.map((s) => (
+                      <tr key={s.id} className="border-b last:border-0">
+                        <td className="px-3 py-2 text-xs text-muted-foreground">{formatDate(s.settledAt, true)}</td>
+                        <td className="px-3 py-2 font-mono text-xs font-semibold">{s.invoiceNumber}</td>
+                        <td className="px-3 py-2 text-xs">{s.customerName}</td>
+                        <td className="px-3 py-2 text-right font-semibold">{formatRupiah(s.amount)}</td>
+                        <td className="px-3 py-2"><StatusBadge status={s.invoiceStatus} /></td>
+                        <td className="px-3 py-2">
+                          {s.hasProof ? (
+                            <span className="inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                              <Paperclip className="h-3 w-3" /> ada
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-1.5 text-[10px] text-muted-foreground">
+                Catatan: baris <b>PARTIAL</b> di atas tetap dihitung sebagai profit yang sudah diterima perusahaan —
+                bukan piutang yang ditunda. Sisa tagihan pada invoice PARTIAL tetap ditagihkan ke customer, tetapi
+                TIDAK menjadi kewajiban perusahaan ke partner Marketing sampai invoice <b>lunas penuh</b>.
+              </p>
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Pending queues */}
       <div className="grid gap-4 lg:grid-cols-2">

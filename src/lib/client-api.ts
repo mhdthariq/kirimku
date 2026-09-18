@@ -584,6 +584,7 @@ export interface InvoiceSettlement {
   amount: number;
   method: string;
   reference: string | null;
+  proofUrl: string | null;
   settledAt: string;
 }
 
@@ -1210,6 +1211,11 @@ export interface FinanceSummary {
     repairDeductions: number;
     withdrawalsCompleted: number;
     unsettledArrivedTransports: number;
+    /** Revision 6 — invoice payments (full + partial) are realized company
+     *  profit the moment they're received. */
+    realizedInvoicePayments: number;
+    settledInvoicePayments: number;
+    partialInvoicePayments: number;
   };
   pending: {
     topUps: { id: number; requestCode: string; partnerName: string; partnerType: string; amount: number; status: string; createdAt: string }[];
@@ -1218,6 +1224,24 @@ export interface FinanceSummary {
     commissions: { id: number; commissionCode: string; partnerName: string; invoiceNumber: string; commissionAmount: number; createdAt: string }[];
   };
   partners: { id: number; name: string; username: string; type: string; profitShare: { company: number; partner: number }; walletBalance: number; vehicleCount: number }[];
+  /** Revision 6 — explicit invoice payment profit (incl. partial). */
+  invoicePayments?: {
+    realized: number;
+    settledTotal: number;
+    partialTotal: number;
+    recent: {
+      id: number;
+      amount: number;
+      method: string;
+      reference: string | null;
+      hasProof: boolean;
+      settledAt: string;
+      invoiceNumber: string;
+      invoiceStatus: string;
+      customerName: string;
+    }[];
+    byMonth: { month: string; settled: number; partial: number }[];
+  };
   monthlyLedger: { month: string; byType: Record<string, number> }[];
 }
 

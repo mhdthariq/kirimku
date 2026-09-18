@@ -567,6 +567,7 @@ model InvoiceSettlement {
   amount       Float
   method       String
   reference    String?
+  proofUrl     String?
   recordedById Int?
   settledAt    DateTime @default(now())
   invoice      Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)

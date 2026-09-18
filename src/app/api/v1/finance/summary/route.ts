@@ -7,6 +7,18 @@ import { guard, ok, handle } from "@/lib/api-helpers";
  * aggregate partner wallet totals, pending workflows (top-ups, withdrawals,
  * repairs, commissions), monthly ledger breakdown. Requires
  * financial.report.view (Admin Kantor / Owner Company).
+ *
+ * PROFIT CLARIFICATION (Revision 6): Every Rupiah the customer pays against
+ * a B2B invoice — whether the invoice ends up FULLY SETTLED or stays
+ * PARTIALLY_SETTLED — is REALIZED COMPANY PROFIT at the moment it is
+ * received. The company owns the invoice (§2) and never owes the Marketing
+ * partner until the invoice is fully paid (§9), so partial payments sit in
+ * the company's bank and are NOT offset by any partner liability. To make
+ * this explicit in the dashboard, the summary now returns `invoicePayments`
+ * (totals grouped by SETTLED vs PARTIALLY_SETTLED + a list of the most
+ * recent settlement rows) and `totals.realizedInvoicePayments`.
+ *
+ * Visibility: only `financial.report.view` holders (Admin Kantor + Owner).
  */
 export async function GET(req: NextRequest) {
   return handle(req, async () => {
@@ -23,6 +35,10 @@ export async function GET(req: NextRequest) {
       transportShareAgg,
       repairDeductionAgg,
       withdrawalAgg,
+      // --- Revision 6: invoice payment profit (incl. partial) -----------------
+      settledInvoiceAgg,
+      partialInvoiceAgg,
+      recentInvoiceSettlements,
     ] = await Promise.all([
       db.partner.findMany({
         include: {
@@ -59,6 +75,23 @@ export async function GET(req: NextRequest) {
       db.transportSettlement.aggregate({ _sum: { ownerAmount: true, transportValue: true } }),
       db.vehicleRepair.aggregate({ where: { status: "VERIFIED" }, _sum: { amount: true } }),
       db.withdrawalRequest.aggregate({ where: { status: "COMPLETED" }, _sum: { amount: true } }),
+      // Total paid against SETTLED invoices (full payments).
+      db.invoiceSettlement.aggregate({
+        where: { invoice: { status: "SETTLED" } },
+        _sum: { amount: true },
+      }),
+      // Total paid against PARTIALLY_SETTLED invoices (partial payments —
+      // still realized company profit; the unpaid remainder is the
+      // outstanding receivable, NOT a partner liability).
+      db.invoiceSettlement.aggregate({
+        where: { invoice: { status: "PARTIALLY_SETTLED" } },
+        _sum: { amount: true },
+      }),
+      db.invoiceSettlement.findMany({
+        orderBy: { settledAt: "desc" },
+        take: 8,
+        include: { invoice: { select: { invoiceNumber: true, status: true, customer: { select: { name: true, companyName: true } } } } },
+      }),
     ]);
 
     const unsettledArrivedTransports = await db.transport.count({
@@ -88,6 +121,21 @@ export async function GET(req: NextRequest) {
       month[tx.type] = (month[tx.type] ?? 0) + (tx.direction === "CREDIT" ? tx.amount : -tx.amount);
     }
 
+    // Also break down invoice payments by month (realized company profit
+    // timeline — independent of the wallet ledger, because invoice payments
+    // are CASH the company keeps, not wallet balances that flow to partners).
+    const settledTotalSum = settledInvoiceAgg._sum.amount ?? 0;
+    const partialTotalSum = partialInvoiceAgg._sum.amount ?? 0;
+    const realizedInvoicePayments = settledTotalSum + partialTotalSum;
+    const invoicePaymentByMonth = new Map<string, { settled: number; partial: number }>();
+    for (const s of recentInvoiceSettlements) {
+      const key = `${s.settledAt.getFullYear()}-${String(s.settledAt.getMonth() + 1).padStart(2, "0")}`;
+      if (!invoicePaymentByMonth.has(key)) invoicePaymentByMonth.set(key, { settled: 0, partial: 0 });
+      const bucket = invoicePaymentByMonth.get(key)!;
+      if (s.invoice.status === "SETTLED") bucket.settled += s.amount;
+      else bucket.partial += s.amount;
+    }
+
     void user;
     return ok({
       totals: {
@@ -104,6 +152,11 @@ export async function GET(req: NextRequest) {
         repairDeductions: repairDeductionAgg._sum.amount ?? 0,
         withdrawalsCompleted: withdrawalAgg._sum.amount ?? 0,
         unsettledArrivedTransports,
+        // Revision 6 — invoice payments are realized company profit the
+        // moment they're received (full or partial).
+        realizedInvoicePayments,
+        settledInvoicePayments: settledTotalSum,
+        partialInvoicePayments: partialTotalSum,
       },
       pending: {
         topUps: pendingTopUps.map((t) => ({
@@ -153,6 +206,26 @@ export async function GET(req: NextRequest) {
         walletBalance: p.wallet?.balance ?? 0,
         vehicleCount: p._count.vehicles,
       })),
+      // Revision 6 — explicit invoice payment profit section. Partial
+      // payments are flagged so the dashboard can show them as already-
+      // realized cash, NOT as outstanding receivables.
+      invoicePayments: {
+        realized: realizedInvoicePayments,
+        settledTotal: settledTotalSum,
+        partialTotal: partialTotalSum,
+        recent: recentInvoiceSettlements.map((s) => ({
+          id: s.id,
+          amount: s.amount,
+          method: s.method,
+          reference: s.reference,
+          hasProof: !!s.proofUrl,
+          settledAt: s.settledAt,
+          invoiceNumber: s.invoice.invoiceNumber,
+          invoiceStatus: s.invoice.status,
+          customerName: s.invoice.customer.companyName ?? s.invoice.customer.name,
+        })),
+        byMonth: Array.from(invoicePaymentByMonth.entries()).map(([month, v]) => ({ month, ...v })),
+      },
       monthlyLedger: Array.from(byMonth.entries()).map(([month, byType]) => ({ month, byType })),
     });
   });

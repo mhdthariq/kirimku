@@ -1,17 +1,24 @@
 /**
  * Standalone database seeder (mock-up data).
  *
- * Usage:
- *   bun run db:seed        (recommended — resolves tsconfig paths)
+ * Usage (Revision 6):
+ *   bun run db:seed        # recommended — runs prisma/seed.ts via the
+ *                          # `db:seed` script in package.json
  *
  * The seeder is IDEMPOTENT: running it multiple times is safe.
  * It skips any entity that already exists, so it can be used to
  * re-sync missing demo data without duplicating rows.
  *
- * The app ALSO auto-seeds on the first API request after a fresh
- * `prisma db push` (see src/lib/seed.ts → ensureSeed), mirroring a
- * "migrate + seed on boot" docker workflow. This CLI script simply
- * exposes the same routine for manual / CI usage.
+ * As of Revision 6 the app NO LONGER auto-seeds on the first API request.
+ * The database schema and the demo dataset are now separate concerns:
+ *   1. `bun run db:push`  — syncs the Prisma schema to the database
+ *   2. `bun run db:seed`  — OPTIONAL: creates demo accounts, gudang,
+ *                           shipments, invoices, etc.
+ *   3. `bun run dev`      — start the dev server
+ * To restore the old auto-seed behaviour, set `AUTO_SEED_ON_BOOT=true` in
+ * `.env` — then a fresh `db:push` will trigger the seeder the first time
+ * any API request comes in (mirrors the Docker "migrate + seed on boot"
+ * entrypoint). Production tenants are NEVER auto-seeded.
  *
  * Demo dataset geography: Sumatra Island only — main corridor
  *   Medan → Banda Aceh (via Lhokseumawe mid-route).

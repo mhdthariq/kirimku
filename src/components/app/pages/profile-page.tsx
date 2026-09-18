@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Building2, Landmark, UserCircle2 } from "lucide-react";
+import { Building2, KeyRound, Landmark, UserCircle2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { apiGet, apiPut, hasPermission, type ProfileData } from "@/lib/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
@@ -14,14 +14,19 @@ import { Badge } from "@/components/ui/badge";
 /**
  * Profile (Revise.md §31/§32 menu "Profile") — every user sees their own
  * identity; partners (Marketing / Vehicle Owner) maintain their REGISTERED
- * BANK ACCOUNT used for withdrawals (§24).
+ * BANK ACCOUNT used for withdrawals (§24). EVERY user — including the
+ * Owner — can update their own name and password here.
  */
 export function ProfilePage() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { data, loading, reload } = useApiData<ProfileData>(() => apiGet<ProfileData>("/profile"), []);
   const [bank, setBank] = useState({ bankName: "", bankAccountName: "", bankAccountNumber: "" });
-  const [busy, setBusy] = useState(false);
-  // React-approved "adjust state when data arrives" pattern: reset the form
+  const [name, setName] = useState("");
+  const [pwd, setPwd] = useState({ current: "", next: "", confirm: "" });
+  const [busyBank, setBusyBank] = useState(false);
+  const [busyName, setBusyName] = useState(false);
+  const [busyPwd, setBusyPwd] = useState(false);
+  // React-approved "adjust state when data arrives" pattern: reset the forms
   // once per loaded profile id (no effect needed).
   const [syncedId, setSyncedId] = useState<number | null>(null);
   if (data && data.id !== syncedId) {
@@ -31,11 +36,12 @@ export function ProfilePage() {
       bankAccountName: data.partner?.bank.bankAccountName ?? "",
       bankAccountNumber: data.partner?.bank.bankAccountNumber ?? "",
     });
+    setName(data.name);
   }
 
   async function onSaveBank(e: React.FormEvent) {
     e.preventDefault();
-    setBusy(true);
+    setBusyBank(true);
     const ok = await runAction(() =>
       apiPut("/profile", {
         bankName: bank.bankName || null,
@@ -45,10 +51,49 @@ export function ProfilePage() {
       { success: "Rekening withdrawal tersimpan." },
     );
     if (ok) reload();
-    setBusy(false);
+    setBusyBank(false);
+  }
+
+  async function onSaveName(e: React.FormEvent) {
+    e.preventDefault();
+    if (name.trim().length < 2) return;
+    setBusyName(true);
+    const ok = await runAction(() => apiPut("/profile", { name: name.trim() }), {
+      success: "Nama berhasil diperbarui.",
+    });
+    if (ok) {
+      reload();
+      refreshUser?.();
+    }
+    setBusyName(false);
+  }
+
+  async function onSavePassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (pwd.next !== pwd.confirm) {
+      return;
+    }
+    if (pwd.next.length < 8) {
+      return;
+    }
+    setBusyPwd(true);
+    const ok = await runAction(
+      () =>
+        apiPut("/profile", {
+          currentPassword: pwd.current || null,
+          newPassword: pwd.next || null,
+        }),
+      { success: "Password berhasil diubah. Silakan login ulang dengan password baru." },
+    );
+    if (ok) {
+      setPwd({ current: "", next: "", confirm: "" });
+    }
+    setBusyPwd(false);
   }
 
   const isPartner = !!data?.partner;
+  const passwordMismatch = pwd.confirm.length > 0 && pwd.next !== pwd.confirm;
+  const passwordTooShort = pwd.next.length > 0 && pwd.next.length < 8;
 
   return (
     <div className="space-y-4">
@@ -62,7 +107,7 @@ export function ProfilePage() {
         <div className="h-40 animate-pulse rounded-xl border bg-muted/40" />
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
-          {/* Identity */}
+          {/* Identity (read-only summary) */}
           <section className="rounded-xl border bg-card p-5">
             <p className="mb-3 flex items-center gap-2 text-sm font-semibold">
               <UserCircle2 className="h-4 w-4" /> Identitas
@@ -109,8 +154,43 @@ export function ProfilePage() {
             )}
           </section>
 
-          {/* Bank account (partners only) */}
+          {/* Edit name + password — every user, including Owner */}
           <section className="rounded-xl border bg-card p-5">
+            <p className="mb-3 flex items-center gap-2 text-sm font-semibold">
+              <KeyRound className="h-4 w-4" /> Identitas & Keamanan
+            </p>
+            <p className="mb-3 text-xs text-muted-foreground">
+              Ubah nama tampilan dan password Anda di sini. Saat mengganti password, masukkan password saat ini untuk verifikasi.
+            </p>
+            <form onSubmit={onSaveName} className="space-y-3">
+              <Field label="Nama Tampilan" htmlFor="pf-name">
+                <Input id="pf-name" value={name} onChange={(e) => setName(e.target.value)} disabled={busyName} />
+              </Field>
+              <SubmitButton busy={busyName} className="w-full sm:w-auto">
+                Simpan Nama
+              </SubmitButton>
+            </form>
+
+            <div className="my-4 border-t" />
+
+            <form onSubmit={onSavePassword} className="space-y-3">
+              <Field label="Password Saat Ini" htmlFor="pf-cur">
+                <Input id="pf-cur" type="password" value={pwd.current} onChange={(e) => setPwd({ ...pwd, current: e.target.value })} required disabled={busyPwd} autoComplete="current-password" />
+              </Field>
+              <Field label="Password Baru" htmlFor="pf-next" hint={passwordTooShort ? "Minimal 8 karakter." : undefined}>
+                <Input id="pf-next" type="password" value={pwd.next} onChange={(e) => setPwd({ ...pwd, next: e.target.value })} required disabled={busyPwd} autoComplete="new-password" />
+              </Field>
+              <Field label="Konfirmasi Password Baru" htmlFor="pf-conf" hint={passwordMismatch ? "Konfirmasi tidak cocok." : undefined}>
+                <Input id="pf-conf" type="password" value={pwd.confirm} onChange={(e) => setPwd({ ...pwd, confirm: e.target.value })} required disabled={busyPwd} autoComplete="new-password" />
+              </Field>
+              <SubmitButton busy={busyPwd} disabled={passwordMismatch || passwordTooShort} className="w-full sm:w-auto">
+                <KeyRound className="mr-1.5 h-4 w-4" /> Ubah Password
+              </SubmitButton>
+            </form>
+          </section>
+
+          {/* Bank account (partners only) */}
+          <section className="rounded-xl border bg-card p-5 lg:col-span-2">
             <p className="mb-3 flex items-center gap-2 text-sm font-semibold">
               <Landmark className="h-4 w-4" /> Rekening Withdrawal
             </p>
@@ -119,16 +199,18 @@ export function ProfilePage() {
                 <p className="text-xs text-muted-foreground">
                   Rekening terdaftar dipakai untuk mencairkan saldo wallet (§24). Rekening di-snapshot pada setiap permintaan withdrawal.
                 </p>
-                <Field label="Nama Bank">
-                  <Input value={bank.bankName} onChange={(e) => setBank({ ...bank, bankName: e.target.value })} placeholder="Bank Mandiri" />
-                </Field>
-                <Field label="Nama Pemilik Rekening">
-                  <Input value={bank.bankAccountName} onChange={(e) => setBank({ ...bank, bankAccountName: e.target.value })} placeholder="Nama sesuai buku tabungan" />
-                </Field>
-                <Field label="Nomor Rekening">
-                  <Input value={bank.bankAccountNumber} onChange={(e) => setBank({ ...bank, bankAccountNumber: e.target.value })} placeholder="1234567890" />
-                </Field>
-                <SubmitButton busy={busy} className="w-full sm:w-auto">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <Field label="Nama Bank">
+                    <Input value={bank.bankName} onChange={(e) => setBank({ ...bank, bankName: e.target.value })} placeholder="Bank Mandiri" />
+                  </Field>
+                  <Field label="Nama Pemilik Rekening">
+                    <Input value={bank.bankAccountName} onChange={(e) => setBank({ ...bank, bankAccountName: e.target.value })} placeholder="Nama sesuai buku tabungan" />
+                  </Field>
+                  <Field label="Nomor Rekening">
+                    <Input value={bank.bankAccountNumber} onChange={(e) => setBank({ ...bank, bankAccountNumber: e.target.value })} placeholder="1234567890" />
+                  </Field>
+                </div>
+                <SubmitButton busy={busyBank} className="w-full sm:w-auto">
                   <Building2 className="mr-1.5 h-4 w-4" /> Simpan Rekening
                 </SubmitButton>
               </form>

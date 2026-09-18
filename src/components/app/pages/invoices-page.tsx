@@ -1,10 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, Printer, Receipt, Send, Trash2, Wallet } from "lucide-react";
+import { Paperclip, Plus, Printer, Receipt, Send, Trash2, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
-import { apiDelete, apiGet, apiPost, hasPermission, type Invoice, type InvoiceLine, type Options } from "@/lib/client-api";
+import { apiDelete, apiGet, apiPost, hasPermission, type Invoice, type InvoiceLine, type InvoiceSettlement, type Options } from "@/lib/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
@@ -64,6 +64,8 @@ export function InvoicesPage() {
   const [settleAmount, setSettleAmount] = useState("");
   const [settleMethod, setSettleMethod] = useState("TRANSFER");
   const [settleRef, setSettleRef] = useState("");
+  const [settleProof, setSettleProof] = useState<{ name: string; type: string; dataUrl: string } | null>(null);
+  const [settleProofError, setSettleProofError] = useState("");
   const [printOpen, setPrintOpen] = useState(false);
 
   const rows = useMemo(() => {
@@ -163,6 +165,7 @@ export function InvoicesPage() {
           amount,
           method: settleMethod,
           reference: settleRef || null,
+          proofUrl: settleProof?.dataUrl ?? null,
         }),
       {
         success:
@@ -177,10 +180,32 @@ export function InvoicesPage() {
       setSettleTarget(null);
       setSettleAmount("");
       setSettleRef("");
+      setSettleProof(null);
+      setSettleProofError("");
       reload();
       // Refresh the detail dialog if it's open on this same invoice.
       if (detail && detail.id === target.id) loadDetail(target);
     }
+  }
+
+  function onSettleProofChange(file: File | undefined) {
+    setSettleProofError("");
+    if (!file) {
+      setSettleProof(null);
+      return;
+    }
+    if (!file.type.startsWith("image/") && file.type !== "application/pdf") {
+      setSettleProofError("Pilih file gambar atau PDF.");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setSettleProofError("Ukuran file maksimal 8 MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setSettleProof({ name: file.name, type: file.type, dataUrl: String(reader.result) });
+    reader.onerror = () => setSettleProofError("File tidak bisa dibaca. Coba pilih file lain.");
+    reader.readAsDataURL(file);
   }
 
   if (!can.view) {
@@ -568,14 +593,25 @@ export function InvoicesPage() {
                 </div>
               )}
 
-              {((detailWithLines as Invoice & { settlements?: { id: number; amount: number; method: string; settledAt: string }[] }).settlements?.length ?? 0) > 0 && (
+              {((detailWithLines as Invoice & { settlements?: InvoiceSettlement[] }).settlements?.length ?? 0) > 0 && (
                 <div>
                   <p className="mb-1.5 text-xs font-semibold text-foreground">Riwayat Settlement</p>
                   <ul className="space-y-1 text-sm">
-                    {((detailWithLines as Invoice & { settlements?: { id: number; amount: number; method: string; settledAt: string }[] }).settlements ?? []).map((s) => (
-                      <li key={s.id} className="flex justify-between rounded-lg bg-muted/50 px-3 py-1.5">
+                    {((detailWithLines as Invoice & { settlements?: InvoiceSettlement[] }).settlements ?? []).map((s) => (
+                      <li key={s.id} className="flex flex-col gap-1 rounded-lg bg-muted/50 px-3 py-1.5 sm:flex-row sm:justify-between sm:items-center">
                         <span className="text-muted-foreground">
                           {formatDate(s.settledAt, true)} · {s.method}
+                          {s.reference && <span className="ml-1 text-xs">· {s.reference}</span>}
+                          {s.proofUrl && (
+                            <a
+                              href={s.proofUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="ml-2 inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary hover:bg-primary/20"
+                            >
+                              <Paperclip className="h-3 w-3" /> Bukti
+                            </a>
+                          )}
                         </span>
                         <span className="font-semibold">{formatRupiah(s.amount)}</span>
                       </li>
@@ -591,7 +627,7 @@ export function InvoicesPage() {
       {printOpen && detailWithLines && "lines" in detailWithLines && <InvoicePrint invoice={detailWithLines as Invoice & { lines: InvoiceLine[] }} onClose={() => setPrintOpen(false)} />}
 
       {/* Settle dialog */}
-      <Dialog open={settleOpen} onOpenChange={setSettleOpen}>
+      <Dialog open={settleOpen} onOpenChange={(open) => { setSettleOpen(open); if (!open) { setSettleProof(null); setSettleProofError(""); } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Settle {settleTarget?.invoiceNumber ?? detailWithLines?.invoiceNumber ?? ""}</DialogTitle>
@@ -616,6 +652,36 @@ export function InvoicesPage() {
                 <Input id="st-ref" value={settleRef} onChange={(e) => setSettleRef(e.target.value)} placeholder="No. bukti transfer" disabled={busy} />
               </Field>
             </div>
+            <Field label="Bukti Pembayaran (opsional)" htmlFor="st-proof" hint="Bukti transfer / kuitansi kasir. Maks 8 MB.">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md border bg-background px-3 text-sm font-medium hover:bg-accent hover:text-accent-foreground">
+                    <Paperclip className="h-4 w-4" />
+                    <span>{settleProof ? settleProof.name : "Pilih file…"}</span>
+                    <input
+                      id="st-proof"
+                      type="file"
+                      accept="image/*,application/pdf"
+                      className="hidden"
+                      onChange={(e) => onSettleProofChange(e.target.files?.[0])}
+                      disabled={busy}
+                    />
+                  </label>
+                  {settleProof && (
+                    <Button type="button" variant="ghost" size="sm" className="h-8 text-destructive" onClick={() => setSettleProof(null)} disabled={busy}>
+                      Hapus
+                    </Button>
+                  )}
+                </div>
+                {settleProof && settleProof.type.startsWith("image/") && (
+                  <img src={settleProof.dataUrl} alt="Pratinjau bukti" className="max-h-40 rounded-md border" />
+                )}
+                {settleProof && settleProof.type === "application/pdf" && (
+                  <p className="rounded-md border bg-muted/40 px-2 py-1.5 text-xs text-muted-foreground">PDF terpilih ({settleProof.name})</p>
+                )}
+                {settleProofError && <p className="text-xs text-destructive">{settleProofError}</p>}
+              </div>
+            </Field>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setSettleOpen(false)} disabled={busy}>
                 Batal

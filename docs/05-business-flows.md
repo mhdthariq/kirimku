@@ -82,7 +82,19 @@ DRAFT ──send──► SENT ──settlements──► PARTIALLY_SETTLED ─�
 
 - Created for a b2b customer with line items (typically referencing shipment codes/descriptions and amounts).
 - `send` locks the draft, stamps issue + due dates.
-- Each settlement records `{amount, method, reference}`; status auto-advances to `PARTIALLY_SETTLED` and then `SETTLED` when the settled total covers the invoice total.
+- Each settlement records `{amount, method, reference, proofUrl?}`; status auto-advances to `PARTIALLY_SETTLED` and then `SETTLED` when the settled total covers the invoice total. The optional `proofUrl` is a data URL of the customer's transfer slip / cash receipt (image or PDF, ≤ 8 MB) — stored on the `InvoiceSettlement.proofUrl` column so Admin Kantor / Owner can audit every payment later.
+
+### Profit recognition — full AND partial payments (Revision 6)
+
+**Rule:** Every Rupiah the customer pays against a B2B invoice is **realized company profit** at the moment it is received — whether the invoice ends up FULLY SETTLED or stays PARTIALLY_SETTLED.
+
+**Why:**
+
+1. The **company owns the invoice** (§2) — money paid by the customer belongs to the company.
+2. The **Marketing partner is owed nothing until the invoice is FULLY PAID** (§9 — the B2B commission stays `PENDING` and is only released to the Marketing wallet when `invoice.status` becomes `SETTLED`). A partial payment does NOT create a partner liability.
+3. Therefore partial payments sit in the company's bank with no offsetting partner debt. The unpaid remainder is an **outstanding receivable from the customer** (NOT a debt to the Marketing partner).
+
+**Visibility:** Only the Admin Kantor role (`financial.report.view` permission) and the Owner (full-access bypass) can see this breakdown — it appears in the Finance Dashboard under a dedicated **"Profit dari Pembayaran Invoice"** section. The `/api/v1/finance/summary` endpoint exposes the breakdown as `totals.realizedInvoicePayments / settledInvoicePayments / partialInvoicePayments` plus a full `invoicePayments` block (recent settlements with proof flags + monthly timeline). Marketing, Vehicle Owner, Admin Gudang, Kurir, Driver, Kenek — none of them see this section.
 
 ## Transport flow
 
