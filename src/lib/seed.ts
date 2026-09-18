@@ -70,8 +70,56 @@ async function seedBackfill(): Promise<void> {
     // the company-owned vehicles. Idempotent — uses upsert on employee number
     // + vehicle plate so re-runs are safe.
     await backfillExtraFleet();
+
+    // --- 5. Additional demo operations crew -------------------------------
+    await backfillExtraOperationsCrew();
   } catch {
     // backfill is best-effort — never block boot
+  }
+}
+
+async function backfillExtraOperationsCrew(): Promise<void> {
+  const staffPassword = hashPassword("Demo#Pass2026");
+  const [medan, bandaAceh, kurirRole, driverRole, kenekRole] = await Promise.all([
+    db.warehouse.findFirst({ where: { city: "Medan" } }),
+    db.warehouse.findFirst({ where: { city: "Banda Aceh" } }),
+    db.role.findUnique({ where: { slug: "kurir" } }),
+    db.role.findUnique({ where: { slug: "driver" } }),
+    db.role.findUnique({ where: { slug: "kenek" } }),
+  ]);
+  if (!medan || !kurirRole || !driverRole || !kenekRole) return;
+
+  const crew = [
+    { username: "farhan", name: "Farhan Maulana", position: "Kurir", roleId: kurirRole.id, employeeNumber: "EMP-000016", warehouseId: medan.id },
+    { username: "lina", name: "Lina Oktaviani", position: "Kurir", roleId: kurirRole.id, employeeNumber: "EMP-000017", warehouseId: bandaAceh?.id ?? medan.id },
+    { username: "bayu", name: "Bayu Saputra", position: "Driver", roleId: driverRole.id, employeeNumber: "EMP-000018", warehouseId: medan.id },
+    { username: "rudi", name: "Rudi Hartono", position: "Driver", roleId: driverRole.id, employeeNumber: "EMP-000019", warehouseId: bandaAceh?.id ?? medan.id },
+    { username: "fajar", name: "Fajar Nugroho", position: "Kenek", roleId: kenekRole.id, employeeNumber: "EMP-000020", warehouseId: medan.id },
+    { username: "yudi", name: "Yudi Kurniawan", position: "Kenek", roleId: kenekRole.id, employeeNumber: "EMP-000021", warehouseId: bandaAceh?.id ?? medan.id },
+  ];
+
+  for (const member of crew) {
+    const employee = await db.employee.upsert({
+      where: { employeeNumber: member.employeeNumber },
+      create: {
+        employeeNumber: member.employeeNumber,
+        name: member.name,
+        position: member.position,
+        phone: `06110000${member.employeeNumber.slice(-4)}`,
+        warehouseId: member.warehouseId,
+      },
+      update: { name: member.name, position: member.position, warehouseId: member.warehouseId, isActive: true },
+    });
+    const user = await db.user.upsert({
+      where: { username: member.username },
+      create: { username: member.username, name: member.name, passwordHash: staffPassword, employeeId: employee.id },
+      update: { name: member.name, employeeId: employee.id, isActive: true },
+    });
+    await db.userRole.upsert({
+      where: { userId_roleId: { userId: user.id, roleId: member.roleId } },
+      create: { userId: user.id, roleId: member.roleId },
+      update: {},
+    });
   }
 }
 
@@ -501,6 +549,12 @@ async function runSeed(): Promise<void> {
     { username: "rizky", name: "Rizky Hidayat", position: "Kurir", role: "kurir", employeeNumber: "EMP-000006", warehouseId: "Medan" },
     { username: "joko", name: "Joko Widodo", position: "Driver", role: "driver", employeeNumber: "EMP-000007", warehouseId: "Medan" },
     { username: "andi", name: "Andi Wijaya", position: "Kenek", role: "kenek", employeeNumber: "EMP-000008", warehouseId: "Medan" },
+    { username: "farhan", name: "Farhan Maulana", position: "Kurir", role: "kurir", employeeNumber: "EMP-000016", warehouseId: "Medan" },
+    { username: "lina", name: "Lina Oktaviani", position: "Kurir", role: "kurir", employeeNumber: "EMP-000017", warehouseId: "Banda Aceh" },
+    { username: "bayu", name: "Bayu Saputra", position: "Driver", role: "driver", employeeNumber: "EMP-000018", warehouseId: "Medan" },
+    { username: "rudi", name: "Rudi Hartono", position: "Driver", role: "driver", employeeNumber: "EMP-000019", warehouseId: "Banda Aceh" },
+    { username: "fajar", name: "Fajar Nugroho", position: "Kenek", role: "kenek", employeeNumber: "EMP-000020", warehouseId: "Medan" },
+    { username: "yudi", name: "Yudi Kurniawan", position: "Kenek", role: "kenek", employeeNumber: "EMP-000021", warehouseId: "Banda Aceh" },
     { username: "wawan", name: "Wawan Setiawan", position: "Staff Gudang", role: "staff-gudang", employeeNumber: "EMP-000009", warehouseId: "Medan" },
     { username: "ratna", name: "Ratna Kurnia", position: "Admin Gudang", role: "admin-gudang", employeeNumber: "EMP-000010", warehouseId: "Lhokseumawe" },
     // Revise.md §12 — Vehicle Owner: first-class external partner (NOT an

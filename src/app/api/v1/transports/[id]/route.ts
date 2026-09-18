@@ -5,6 +5,7 @@ import { hasPermission } from "@/lib/auth";
 import { audit, diffFields } from "@/lib/audit";
 import { aggregateTransport, detailAggregates, isExecutorOnly } from "@/lib/transport-totals";
 import { assertTransportScope } from "@/lib/gudang-scope";
+import { crewAssignmentMessage, findActiveCrewAssignment } from "@/lib/transport-crew";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -200,6 +201,20 @@ export async function PUT(req: NextRequest, { params }: Params) {
       return fail(422, "Rute wajib dipilih sebelum transport dikonfirmasi.", {
         routeId: ["Rute wajib dipilih."],
       });
+    }
+
+    const driverId = (data.driverId as number | null | undefined) ?? existing.driverId;
+    const kenekId = (data.kenekId as number | null | undefined) ?? existing.kenekId;
+    if (driverId != null && kenekId != null && driverId === kenekId) {
+      return fail(422, "Driver dan kenek tidak boleh orang yang sama.", { kenekId: ["Pilih kenek yang berbeda dari driver."] });
+    }
+    for (const assignment of [
+      { id: driverId, role: "Driver" as const },
+      { id: kenekId, role: "Kenek" as const },
+    ]) {
+      if (assignment.id == null) continue;
+      const activeTransport = await findActiveCrewAssignment(assignment.id, existing.id);
+      if (activeTransport) return fail(422, crewAssignmentMessage(assignment.role, activeTransport.transportCode));
     }
 
     const transport = await db.transport.update({ where: { id: existing.id }, data });

@@ -5,6 +5,7 @@ import { audit } from "@/lib/audit";
 import { nextCode } from "@/lib/code-generator";
 import { cityIndex, inScope, scopeForUser, transportGudangIds } from "@/lib/gudang-scope";
 import { aggregateTransport, detailAggregates, isExecutorOnly } from "@/lib/transport-totals";
+import { crewAssignmentMessage, findActiveCrewAssignment } from "@/lib/transport-crew";
 
 export async function GET(req: NextRequest) {
   return handle(req, async () => {
@@ -157,6 +158,14 @@ export async function POST(req: NextRequest) {
     const kenekId = num(body.kenekId);
     if (driverId != null && kenekId != null && driverId === kenekId) {
       return fail(422, "Driver dan kenek tidak boleh orang yang sama.", { kenekId: ["Pilih kenek yang berbeda dari driver."] });
+    }
+    for (const assignment of [
+      { id: driverId, role: "Driver" as const },
+      { id: kenekId, role: "Kenek" as const },
+    ]) {
+      if (assignment.id == null) continue;
+      const activeTransport = await findActiveCrewAssignment(assignment.id);
+      if (activeTransport) return fail(422, crewAssignmentMessage(assignment.role, activeTransport.transportCode));
     }
     const shipmentIds = Array.isArray(body.shipmentIds) ? body.shipmentIds.map(Number).filter(Boolean) : [];
 

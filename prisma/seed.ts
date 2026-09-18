@@ -71,6 +71,12 @@ async function main() {
   console.log("  rizky  / Demo#Pass2026        (kurir, Gudang Medan)");
   console.log("  joko   / Demo#Pass2026        (driver, Gudang Medan)");
   console.log("  andi   / Demo#Pass2026        (kenek, Gudang Medan)");
+  console.log("  farhan / Demo#Pass2026        (kurir, Gudang Medan)");
+  console.log("  lina   / Demo#Pass2026        (kurir, Gudang Banda Aceh)");
+  console.log("  bayu   / Demo#Pass2026        (driver, Gudang Medan)");
+  console.log("  rudi   / Demo#Pass2026        (driver, Gudang Banda Aceh)");
+  console.log("  fajar  / Demo#Pass2026        (kenek, Gudang Medan)");
+  console.log("  yudi   / Demo#Pass2026        (kenek, Gudang Banda Aceh)");
   console.log("  wawan  / Demo#Pass2026        (staff gudang, Gudang Medan)");
   console.log("");
   console.log("Demo B2B Master Resi scan:");
