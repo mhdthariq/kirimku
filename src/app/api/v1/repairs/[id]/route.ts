@@ -16,7 +16,7 @@ type Params = { params: Promise<{ id: string }> };
  * refund CREDIT. The ledger stays append-only / immutable (§29).
  */
 export async function PUT(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "repair.update");
     const { id } = await params;
     const repair = await db.vehicleRepair.findUnique({
@@ -154,7 +154,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
  * can always see that the record existed and was removed, by whom, and when.
  */
 export async function DELETE(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "repair.delete");
     const { id } = await params;
     const repair = await db.vehicleRepair.findUnique({

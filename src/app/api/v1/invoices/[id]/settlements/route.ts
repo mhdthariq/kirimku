@@ -18,7 +18,7 @@ type Params = { params: Promise<{ id: string }> };
  * double-credit (unique businessRef + status guard).
  */
 export async function POST(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "payment.verify");
     const { id } = await params;
     const invoice = await db.invoice.findUnique({ where: { id: Number(id) }, include: { lines: true, settlements: true, commission: true } });

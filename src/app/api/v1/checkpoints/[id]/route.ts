@@ -7,7 +7,7 @@ import { MIN_CHECKPOINTS } from "@/lib/shipment-flow";
 type Params = { params: Promise<{ id: string }> };
 
 export async function PUT(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "checkpoint.update");
     const { id } = await params;
     const existing = await db.checkpoint.findUnique({ where: { id: Number(id) }, include: { route: true } });
@@ -30,7 +30,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "checkpoint.delete");
     const { id } = await params;
     const existing = await db.checkpoint.findUnique({ where: { id: Number(id) }, include: { route: { include: { checkpoints: true, transports: true } } } });

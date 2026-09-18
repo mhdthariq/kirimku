@@ -8,7 +8,7 @@ import { walletSummary } from "@/lib/wallet";
  * "Partner Wallets"). Requires partner.view (Admin Kantor / Owner).
  */
 export async function GET(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "partner.view");
     const params = req.nextUrl.searchParams;
     const type = str(params.get("type"));

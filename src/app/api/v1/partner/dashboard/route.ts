@@ -11,7 +11,7 @@ import { requirePartner, walletSummary } from "@/lib/wallet";
  * Transactions — all scoped to the OWN partner (§39).
  */
 export async function GET(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "wallet.view_own");
     const partner = requirePartner(user, "VEHICLE_OWNER");
 

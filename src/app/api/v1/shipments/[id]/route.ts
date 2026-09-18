@@ -10,7 +10,7 @@ import { assertShipmentScope } from "@/lib/gudang-scope";
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "shipment.view");
     const { id } = await params;
     const shipment = await db.masterShipment.findUnique({
@@ -52,7 +52,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 }
 
 export async function PUT(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "shipment.update");
     const { id } = await params;
     const body = await req.json().catch(() => ({}));
@@ -101,7 +101,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "shipment.delete");
     const { id } = await params;
     const existing = await db.masterShipment.findUnique({ where: { id: Number(id) } });

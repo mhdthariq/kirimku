@@ -9,7 +9,7 @@ import { guard, ok, handle } from "@/lib/api-helpers";
  * financial.report.view (Admin Kantor / Owner Company).
  */
 export async function GET(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "financial.report.view");
 
     const [

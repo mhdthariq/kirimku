@@ -16,7 +16,7 @@ type Params = { params: Promise<{ id: string }> };
 const VEHICLE_STATUSES = ["ACTIVE", "MAINTENANCE", "INACTIVE"];
 
 export async function PUT(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "vehicle.update");
     const { id } = await params;
     const existing = await db.vehicle.findUnique({ where: { id: Number(id) } });
@@ -48,7 +48,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "vehicle.update");
     const { id } = await params;
     const existing = await db.vehicle.findUnique({ where: { id: Number(id) }, include: { transports: true } });

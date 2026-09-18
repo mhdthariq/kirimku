@@ -21,7 +21,7 @@ const MAX_PROOF_LENGTH = 12_000_000;
  * (Owner) credits the wallet. There is no separate PENDING_PAYMENT stage.
  */
 export async function GET(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req);
     const params = req.nextUrl.searchParams;
     const status = str(params.get("status"));
@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
 
 /** POST /api/v1/topups — Admin Kantor / Owner create a top-up request (with proof) for a Marketing partner. */
 export async function POST(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "wallet.topup.create");
     const body = await req.json().catch(() => ({}));
     const partnerId = requireNum(body.partnerId, "partnerId", 1);

@@ -8,7 +8,7 @@ import { totalsByMaster } from "@/lib/shipment-totals";
 import { cityIndex, inScope, shipmentGudangIds, scopeForUser } from "@/lib/gudang-scope";
 
 export async function GET(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "shipment.view");
     const params = req.nextUrl.searchParams;
     const search = str(params.get("search"))?.toLowerCase();
@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "shipment.create");
     const body = await req.json().catch(() => ({}));
     const customerId = num(body.customerId);

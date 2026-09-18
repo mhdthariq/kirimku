@@ -14,7 +14,7 @@ type Params = { params: Promise<{ id: string }> };
  * DELIVERED and tracking records who received the package.
  */
 export async function POST(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "delivery.confirm");
     const { id } = await params;
     const delivery = await db.delivery.findUnique({

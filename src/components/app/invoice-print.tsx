@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Printer, X } from "lucide-react";
 import { COMPANY_NAME, COMPANY_TAGLINE } from "@/lib/company";
+import { useAuth } from "@/hooks/use-auth";
 import { type Invoice, type InvoiceLine } from "@/lib/client-api";
 import { formatDate, formatNumber, formatRupiah } from "@/components/app/form-parts";
 import { StatusBadge } from "@/components/app/status-badge";
@@ -15,6 +16,8 @@ type PrintableInvoice = Invoice & {
 };
 
 export function InvoicePrint({ invoice, onClose }: { invoice: PrintableInvoice; onClose: () => void }) {
+  const { companyName: tenantCompanyName } = useAuth();
+  const displayCompanyName = tenantCompanyName ?? COMPANY_NAME;
   // Lock the page scroll behind the portal — exactly ONE scrollbar (the
   // portal's own) stays visible, even when opened from a long list page.
   useEffect(() => {
@@ -38,7 +41,7 @@ export function InvoicePrint({ invoice, onClose }: { invoice: PrintableInvoice; 
       </div>
       <article className="invoice-sheet mx-auto my-6 bg-white px-8 py-10 text-neutral-900 shadow-xl sm:px-12" aria-label={`Invoice ${invoice.invoiceNumber}`}>
         <header className="flex flex-col justify-between gap-8 border-b-2 border-neutral-900 pb-7 sm:flex-row">
-          <div><p className="text-2xl font-black tracking-tight">{COMPANY_NAME}</p><p className="mt-1 text-xs uppercase tracking-[0.2em] text-neutral-500">{COMPANY_TAGLINE}</p></div>
+          <div><p className="text-2xl font-black tracking-tight">{displayCompanyName}</p><p className="mt-1 text-xs uppercase tracking-[0.2em] text-neutral-500">{COMPANY_TAGLINE}</p></div>
           <div className="sm:text-right"><p className="text-3xl font-black tracking-tight text-emerald-700">INVOICE</p><p className="mt-1 font-mono text-sm font-bold">{invoice.invoiceNumber}</p><div className="mt-2 flex items-center gap-2 sm:justify-end"><StatusBadge status={invoice.status} />{invoice.isOverdue && <span className="text-[10px] font-bold text-red-600">TERLAMBAT</span>}</div></div>
         </header>
         <section className="grid gap-7 border-b py-7 text-sm sm:grid-cols-[1fr_1fr_160px]">

@@ -13,7 +13,7 @@ type Params = { params: Promise<{ id: string }> };
  * credit the Vehicle Owner wallet with TRANSPORT_PROFIT_SHARE atomically.
  */
 export async function POST(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "transport.settle");
     const { id } = await params;
     const transport = await db.transport.findUnique({

@@ -5,7 +5,7 @@ import { cityIndex, inScope, scopeForUser, shipmentGudangIds } from "@/lib/gudan
 
 /** Unpaid B2C shipments (priced, not yet settled) — scoped to the user's gudang. */
 export async function GET(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "payment.unpaid.view");
     const shipments = await db.masterShipment.findMany({
       where: {

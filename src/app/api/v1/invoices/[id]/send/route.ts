@@ -7,7 +7,7 @@ type Params = { params: Promise<{ id: string }> };
 
 /** Send / finalize a DRAFT invoice (locks its lines). */
 export async function POST(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "invoice.send");
     const { id } = await params;
     const invoice = await db.invoice.findUnique({ where: { id: Number(id) }, include: { lines: true } });

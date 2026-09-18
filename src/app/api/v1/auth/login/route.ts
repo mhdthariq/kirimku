@@ -5,12 +5,17 @@ import { ensureRbac } from "@/lib/rbac";
 import { ensureSeed } from "@/lib/seed";
 import { audit } from "@/lib/audit";
 import { ok, fail, handle, requireStr } from "@/lib/api-helpers";
+import { isDefaultTenant, currentCompanyName } from "@/lib/tenant-context";
 import type { AuthUser } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
+    // By the time we get here, `handle()` has already resolved the
+    // `x-corp-id` header against the license server and pointed `db` at the
+    // right company's database (or thrown a clear error if the Corporate ID
+    // is missing/invalid/inactive/expired) — see tenant-context.ts.
     await ensureRbac();
-    await ensureSeed();
+    if (isDefaultTenant()) await ensureSeed();
     const body = await req.json().catch(() => ({}));
     const username = requireStr(body.username, "username");
     const password = requireStr(body.password, "password");
@@ -51,6 +56,10 @@ export async function POST(req: NextRequest) {
 
     await audit({ action: "login", entityType: "auth", entityLabel: user.username, actor: sessionUser });
 
-    return ok({ token, expiresAt: expiresAt.toISOString(), user: sessionUser });
+    const company = {
+      name: currentCompanyName() ?? process.env.NEXT_PUBLIC_COMPANY_NAME ?? "KirimKu Logistics",
+    };
+
+    return ok({ token, expiresAt: expiresAt.toISOString(), user: sessionUser, company });
   });
 }

@@ -6,7 +6,7 @@ import { assertShipmentScope } from "@/lib/gudang-scope";
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "shipment.view_tracking");
     const { id } = await params;
     const shipment = await db.masterShipment.findUnique({ where: { id: Number(id) } });

@@ -16,7 +16,7 @@ type Params = { params: Promise<{ id: string }> };
  * minChargeableKg, rounded per tariff rounding settings.
  */
 export async function POST(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "shipment.view");
     // allowed: shipment editors, or staff who may initiate a pickup request
     if (!hasPermission(user, "shipment.update") && !hasPermission(user, "pickup.create")) {

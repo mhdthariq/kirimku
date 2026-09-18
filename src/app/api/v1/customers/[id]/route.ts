@@ -19,7 +19,7 @@ function assertCustomerScope(
 }
 
 export async function GET(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "customer.view");
     const { id } = await params;
     const customer = await db.customer.findUnique({
@@ -36,7 +36,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 }
 
 export async function PUT(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "customer.update");
     const { id } = await params;
     const body = await req.json().catch(() => ({}));
@@ -82,7 +82,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "customer.delete");
     const { id } = await params;
     const existing = await db.customer.findUnique({ where: { id: Number(id) } });

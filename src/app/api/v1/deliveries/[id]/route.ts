@@ -8,7 +8,7 @@ import { assertShipmentScope } from "@/lib/gudang-scope";
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "delivery.view");
     const { id } = await params;
     const delivery = await db.delivery.findUnique({
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 }
 
 export async function PUT(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "delivery.assign_kurir");
     const { id } = await params;
     const existing = await db.delivery.findUnique({ where: { id: Number(id) }, include: { master: true } });
@@ -46,7 +46,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "delivery.assign_kurir");
     const { id } = await params;
     const existing = await db.delivery.findUnique({ where: { id: Number(id) }, include: { master: true } });

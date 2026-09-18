@@ -27,7 +27,7 @@ const MAX_PHOTO_BYTES = 2_500_000; // ~2.5 MB after client-side compression
  *   completes the transport's arrival (Part N — no manual Arrived button).
  */
 export async function POST(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "transport.checkin");
     const { id } = await params;
     const transport = await db.transport.findUnique({

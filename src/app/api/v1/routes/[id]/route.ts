@@ -6,7 +6,7 @@ import { audit, diffFields } from "@/lib/audit";
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     await guard(req, "checkpoint.view");
     const { id } = await params;
     const route = await db.route.findUnique({
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 }
 
 export async function PUT(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "checkpoint.update");
     const { id } = await params;
     const existing = await db.route.findUnique({ where: { id: Number(id) } });
@@ -40,7 +40,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "checkpoint.delete");
     const { id } = await params;
     const existing = await db.route.findUnique({ where: { id: Number(id) }, include: { checkpoints: true, transports: true } });

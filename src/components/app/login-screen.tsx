@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Loader2, LockKeyhole, LogIn, MapPin, Package, ShieldCheck, Truck, User } from "lucide-react";
+import { Building2, Loader2, LockKeyhole, LogIn, MapPin, Package, ShieldCheck, Truck, User } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,7 @@ const DEMO_ACCOUNTS = [
 
 export function LoginScreen() {
   const { login } = useAuth();
+  const [corpId, setCorpId] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +34,7 @@ export function LoginScreen() {
     setBusy(true);
     setError(null);
     try {
-      await login(username.trim(), password);
+      await login(corpId.trim(), username.trim(), password);
       // always land on the dashboard — the previous user's hash (e.g. a
       // transport detail the new user has no access to) must not leak
       window.location.hash = "#/dashboard";
@@ -50,7 +51,9 @@ export function LoginScreen() {
     setBusy(true);
     setError(null);
     try {
-      await login(acc.username, acc.password);
+      // Demo accounts run against the local/default database — no
+      // Corporate ID needed.
+      await login("", acc.username, acc.password);
       window.location.hash = "#/dashboard";
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login gagal.");
@@ -168,6 +171,25 @@ export function LoginScreen() {
                   {error}
                 </div>
               )}
+
+              <div className="space-y-2">
+                <Label htmlFor="corpId">Corporate ID</Label>
+                <div className="relative">
+                  <Building2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/60" />
+                  <Input
+                    id="corpId"
+                    className="pl-9"
+                    placeholder="Corporate ID"
+                    autoComplete="organization"
+                    value={corpId}
+                    onChange={(e) => setCorpId(e.target.value)}
+                    disabled={busy}
+                  />
+                </div>
+                <p className="text-[11px] text-foreground/60">
+                  ID Perusahaan untuk menggunakan Aplikasi ini.
+                </p>
+              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="username">Username</Label>

@@ -9,7 +9,7 @@ import { db } from "@/lib/db";
  * ADJUSTMENT ledger rows, authorized only by wallet.adjustment.create.
  */
 export async function POST(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "wallet.adjustment.create");
     const body = await req.json().catch(() => ({}));
     const partnerId = requireNum(body.partnerId, "partnerId", 1);

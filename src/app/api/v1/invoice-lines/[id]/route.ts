@@ -6,7 +6,7 @@ import { audit } from "@/lib/audit";
 type Params = { params: Promise<{ id: string }> };
 
 export async function DELETE(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "invoice.update");
     const { id } = await params;
     const existing = await db.invoiceLine.findUnique({ where: { id: Number(id) }, include: { invoice: true } });

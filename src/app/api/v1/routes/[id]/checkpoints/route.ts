@@ -62,7 +62,7 @@ function parseCheckpoint(raw: unknown, index: number): CheckpointInput {
  * existing checkpoints.
  */
 export async function POST(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "checkpoint.create");
     const { id } = await params;
     const route = await db.route.findUnique({ where: { id: Number(id) }, include: { checkpoints: true } });
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest, { params }: Params) {
  * rewritten 1..N so reordering is supported. Minimum MIN_CHECKPOINTS enforced.
  */
 export async function PUT(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "checkpoint.update");
     const { id } = await params;
     const route = await db.route.findUnique({

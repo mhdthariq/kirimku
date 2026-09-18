@@ -7,7 +7,7 @@ import { assertShipmentScope } from "@/lib/gudang-scope";
 type Params = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "payment.verify");
     const { id } = await params;
     const payment = await db.payment.findUnique({ where: { id: Number(id) }, include: { master: true } });

@@ -19,7 +19,7 @@ type Params = { params: Promise<{ id: string }> };
  * terminal state, but defended anyway) does NOT double-credit.
  */
 export async function POST(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "shipment.cancel");
     const { id } = await params;
     const master = await db.masterShipment.findUnique({

@@ -16,7 +16,7 @@ import { guard, ok, handle, fail, str, num } from "@/lib/api-helpers";
  *   ?limit=…     — page size (default 50, max 200)
  */
 export async function GET(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req);
     const params = req.nextUrl.searchParams;
     const repairId = num(params.get("repairId"));

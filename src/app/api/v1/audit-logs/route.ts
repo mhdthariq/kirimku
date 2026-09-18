@@ -11,7 +11,7 @@ import { filterAuditEntriesForScope, scopeForUser } from "@/lib/gudang-scope";
  * they belong to — only the owner sees entries across all gudang.
  */
 export async function GET(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "audit_log.view");
     const scope = await scopeForUser(user);
     const params = req.nextUrl.searchParams;

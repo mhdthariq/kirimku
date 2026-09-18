@@ -11,7 +11,7 @@ type Params = { params: Promise<{ id: string }> };
  * only future settlements use the new values.
  */
 export async function PUT(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "partner.update");
     const { id } = await params;
     const partner = await db.partner.findUnique({ where: { id: Number(id) }, include: { user: { select: { username: true } } } });

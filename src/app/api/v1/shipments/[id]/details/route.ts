@@ -8,7 +8,7 @@ import { assertShipmentScope } from "@/lib/gudang-scope";
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "shipment_detail.view");
     const { id } = await params;
     const master = await db.masterShipment.findUnique({ where: { id: Number(id) } });
@@ -25,7 +25,7 @@ export async function GET(req: NextRequest, { params }: Params) {
  * the "All" table structure — the grouped view is pure UI aggregation.
  */
 export async function POST(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "shipment_detail.create");
     const { id } = await params;
     const master = await db.masterShipment.findUnique({ where: { id: Number(id) } });

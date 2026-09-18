@@ -4,7 +4,7 @@ import { guard, ok, handle, fail, requireStr, str, requireNum, num, bool, dateOr
 import { audit } from "@/lib/audit";
 
 export async function GET(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     await guard(req, "tariff.view");
     const params = req.nextUrl.searchParams;
     const search = str(params.get("search"))?.toLowerCase();
@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "tariff.create");
     const body = await req.json().catch(() => ({}));
     const origin = requireStr(body.origin, "origin");

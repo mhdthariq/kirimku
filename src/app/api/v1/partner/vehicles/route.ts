@@ -8,7 +8,7 @@ import { requirePartner } from "@/lib/wallet";
  * a Vehicle Owner can only access their own vehicles, never another owner's.
  */
 export async function GET(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "vehicle.view_own");
     const partner = requirePartner(user, "VEHICLE_OWNER");
     const vehicles = await db.vehicle.findMany({

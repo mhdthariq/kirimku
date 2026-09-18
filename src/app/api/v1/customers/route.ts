@@ -11,7 +11,7 @@ function marketingScope(user: { partnerType: string | null; partnerId: number | 
 }
 
 export async function GET(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "customer.view");
     const search = str(req.nextUrl.searchParams.get("search"))?.toLowerCase();
     const includeInactive = bool(req.nextUrl.searchParams.get("include_inactive"), true);
@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "customer.create");
     const body = await req.json().catch(() => ({}));
     const type = body.type === "b2b" ? "b2b" : "b2c";

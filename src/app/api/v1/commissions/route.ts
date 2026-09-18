@@ -10,7 +10,7 @@ import { str } from "@/lib/api-helpers";
  * A Marketing user only ever sees their OWN commissions (§39).
  */
 export async function GET(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "wallet.view_own");
     const partner = requirePartner(user, "MARKETING");
     const params = req.nextUrl.searchParams;

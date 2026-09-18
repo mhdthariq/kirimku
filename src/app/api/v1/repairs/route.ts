@@ -17,7 +17,7 @@ import { nextCode } from "@/lib/code-generator";
  *     (list + detail + logs) — read-only.
  */
 export async function GET(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req);
     const params = req.nextUrl.searchParams;
     const status = str(params.get("status"));
@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
  * created what and when.
  */
 export async function POST(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "repair.create");
     const body = await req.json().catch(() => ({}));
     const vehicleId = requireNum(body.vehicleId, "vehicleId", 1);

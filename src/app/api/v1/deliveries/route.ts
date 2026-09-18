@@ -13,7 +13,7 @@ function executorOnly(user: { isOwner: boolean; permissions: string[] }): boolea
 }
 
 export async function GET(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "delivery.view");
     const params = req.nextUrl.searchParams;
     const search = str(params.get("search"))?.toLowerCase();
@@ -98,7 +98,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "delivery.assign_kurir");
     const body = await req.json().catch(() => ({}));
     const masterId = num(body.masterId);

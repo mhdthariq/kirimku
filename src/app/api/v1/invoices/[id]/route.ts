@@ -6,7 +6,7 @@ import { audit, diffFields } from "@/lib/audit";
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     await guard(req, "invoice.view");
     const { id } = await params;
     const invoice = await db.invoice.findUnique({
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 }
 
 export async function PUT(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "invoice.update");
     const { id } = await params;
     const existing = await db.invoice.findUnique({ where: { id: Number(id) } });
@@ -44,7 +44,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "invoice.update");
     const { id } = await params;
     const existing = await db.invoice.findUnique({ where: { id: Number(id) }, include: { settlements: true } });

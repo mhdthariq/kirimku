@@ -7,7 +7,7 @@ import { cityIndex, inScope, scopeForUser, transportGudangIds } from "@/lib/guda
 import { aggregateTransport, detailAggregates, isExecutorOnly } from "@/lib/transport-totals";
 
 export async function GET(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "transport.view");
     const params = req.nextUrl.searchParams;
     const search = str(params.get("search"))?.toLowerCase();
@@ -136,7 +136,7 @@ export async function GET(req: NextRequest) {
  *         plannedDepartureAt?, plannedArrivalAt?, shipmentIds?[] }
  */
 export async function POST(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "transport.create");
     const body = await req.json().catch(() => ({}));
     const routeId = num(body.routeId);

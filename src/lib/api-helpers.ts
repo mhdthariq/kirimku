@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser, hasPermission, type AuthUser } from "@/lib/auth";
 import { ensureRbac } from "@/lib/rbac";
 import { ensureSeed } from "@/lib/seed";
+import { resolveTenantContext, runWithTenant, isDefaultTenant } from "@/lib/tenant-context";
+import { LicenseError } from "@/lib/license";
 
 export interface ApiEnvelope<T> {
   data: T;
@@ -13,8 +15,8 @@ export function ok<T>(data: T, meta?: Record<string, unknown>): NextResponse<Api
   return NextResponse.json({ data, ...(meta ? { meta } : {}) });
 }
 
-export function fail(status: number, message: string, errors?: Record<string, string[]>): NextResponse {
-  return NextResponse.json({ message, ...(errors ? { errors } : {}) }, { status });
+export function fail(status: number, message: string, errors?: Record<string, string[]>, code?: string): NextResponse {
+  return NextResponse.json({ message, ...(errors ? { errors } : {}), ...(code ? { code } : {}) }, { status });
 }
 
 export class HttpError extends Error {
@@ -33,7 +35,9 @@ export async function guard(
   permission?: string,
 ): Promise<AuthUser> {
   await ensureRbac();
-  await ensureSeed();
+  // Demo/local mode only — never auto-seed demo business data into a real
+  // corporate tenant's database.
+  if (isDefaultTenant()) await ensureSeed();
   const user = await getAuthUser(req);
   if (!user) throw new HttpError(401, "Unauthenticated.");
   if (permission && !hasPermission(user, permission)) {
@@ -42,10 +46,18 @@ export async function guard(
   return user;
 }
 
-export async function handle(fn: () => Promise<NextResponse>): Promise<NextResponse> {
+/**
+ * Wraps every API route. Resolves the tenant (Corporate ID → database) for
+ * this request from the `x-corp-id` header and runs `fn` with that tenant
+ * active, so every `db.*` call made inside `fn` (directly or transitively)
+ * transparently hits the right company's database.
+ */
+export async function handle(req: NextRequest, fn: () => Promise<NextResponse>): Promise<NextResponse> {
   try {
-    return await fn();
+    const tenant = await resolveTenantContext(req.headers);
+    return await runWithTenant(tenant, fn);
   } catch (error) {
+    if (error instanceof LicenseError) return fail(error.status, error.message, undefined, error.code);
     if (error instanceof HttpError) return fail(error.status, error.message, error.errors);
     if (error instanceof Error && error.name === "PrismaClientValidationError") {
       return fail(422, "Invalid request parameters.");

@@ -15,7 +15,7 @@ import { detailAggregates } from "@/lib/transport-totals";
  * - completed count + history summary within the selected period
  */
 export async function GET(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "transport.view");
     const params = req.nextUrl.searchParams;
 

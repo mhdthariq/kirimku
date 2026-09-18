@@ -12,7 +12,7 @@ type Params = { params: Promise<{ id: string }> };
  * the wallet is credited exactly once (§44).
  */
 export async function POST(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "wallet.topup.verify");
     const { id } = await params;
     const topUp = await db.topUpRequest.findUnique({ where: { id: Number(id) } });

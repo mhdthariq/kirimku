@@ -10,7 +10,7 @@ type Params = { params: Promise<{ id: string }> };
  * request (§26). The reservation stays active until completion.
  */
 export async function POST(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "wallet.withdrawal.approve");
     const { id } = await params;
     const withdrawal = await db.withdrawalRequest.findUnique({ where: { id: Number(id) } });

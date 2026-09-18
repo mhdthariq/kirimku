@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { hashPassword } from "@/lib/auth";
 import { ensureRbac } from "@/lib/rbac";
 import { computePricing } from "@/lib/pricing";
+import { tenantKey } from "@/lib/tenant-context";
 
 // Small placeholder transfer-proof image for demo top-ups (inline SVG data URL).
 const DEMO_PROOF_DATA_URL =
@@ -10,7 +11,10 @@ const DEMO_PROOF_DATA_URL =
     '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="160"><rect width="320" height="160" fill="#f8f9fa"/><text x="20" y="70" font-family="sans-serif" font-size="14" fill="#334155">Bukti Transfer — BCA</text><text x="20" y="100" font-family="sans-serif" font-size="12" fill="#64748b">Demo: bukti top up marketing partner</text></svg>',
   ).toString("base64");
 
-let seedPromise: Promise<void> | null = null;
+// Keyed per tenant so demo seeding is tracked separately for each database
+// (in practice this only ever runs for the default/local tenant — real
+// corporate tenants skip it entirely, see api-helpers.ts `guard()`).
+const seedPromises = new Map<string, Promise<void>>();
 
 /**
  * Idempotent demo backfill — safe to run on EVERY boot (fresh or seeded DB):
@@ -344,8 +348,16 @@ async function createB2BMasterResiShipment(budiPartner: { id: number } | null): 
  * once the demo dataset exists.
  */
 export function ensureSeed(): Promise<void> {
-  if (!seedPromise) seedPromise = runSeed().catch((e) => { seedPromise = null; throw e; });
-  return seedPromise;
+  const key = tenantKey();
+  let p = seedPromises.get(key);
+  if (!p) {
+    p = runSeed().catch((e) => {
+      seedPromises.delete(key);
+      throw e;
+    });
+    seedPromises.set(key, p);
+  }
+  return p;
 }
 
 async function runSeed(): Promise<void> {

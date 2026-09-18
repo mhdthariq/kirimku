@@ -6,7 +6,7 @@ import { audit, diffFields } from "@/lib/audit";
 type Params = { params: Promise<{ id: string }> };
 
 export async function PUT(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "role.update");
     const { id } = await params;
     const existing = await db.role.findUnique({ where: { id: Number(id) } });
@@ -57,7 +57,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "role.delete");
     const { id } = await params;
     const existing = await db.role.findUnique({ where: { id: Number(id) }, include: { users: true } });

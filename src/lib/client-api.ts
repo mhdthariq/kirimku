@@ -6,6 +6,7 @@
  */
 
 const TOKEN_KEY = "kirimku_token";
+const CORP_ID_KEY = "kirimku_corp_id";
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -18,14 +19,33 @@ export function setToken(token: string | null): void {
   else window.localStorage.removeItem(TOKEN_KEY);
 }
 
+/** Corporate ID entered at login — sent as the `x-corp-id` header on every
+ *  request so the backend knows which company's database to use. */
+export function getCorpId(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(CORP_ID_KEY);
+}
+
+export function setCorpId(corpId: string | null): void {
+  if (typeof window === "undefined") return;
+  if (corpId) window.localStorage.setItem(CORP_ID_KEY, corpId);
+  else window.localStorage.removeItem(CORP_ID_KEY);
+}
+
+/** Error codes that mean "this Corporate ID session is no longer valid" —
+ *  worth logging the user out for, same as an expired auth token. */
+const CORP_SESSION_INVALID_CODES = new Set(["INACTIVE", "EXPIRED", "NOT_FOUND", "NO_DATABASE", "MISSING_CORP_ID"]);
+
 export class ApiError extends Error {
   readonly status: number;
   readonly errors?: Record<string, string[]>;
-  constructor(status: number, message: string, errors?: Record<string, string[]>) {
+  readonly code?: string;
+  constructor(status: number, message: string, errors?: Record<string, string[]>, code?: string) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.errors = errors;
+    this.code = code;
   }
 }
 
@@ -34,10 +54,25 @@ interface RequestOptions {
   body?: unknown;
 }
 
-export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
+function authHeaders(): Record<string, string> {
   const headers: Record<string, string> = { Accept: "application/json" };
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
+  const corpId = getCorpId();
+  if (corpId) headers["x-corp-id"] = corpId;
+  return headers;
+}
+
+/** Session became invalid (expired token or Corporate ID no longer valid) —
+ *  clear local state and send the user back to the login screen. */
+function invalidateSession(): void {
+  if (typeof window === "undefined") return;
+  setToken(null);
+  window.location.reload();
+}
+
+export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const headers = authHeaders();
 
   let body: BodyInit | undefined;
   if (options.body !== undefined) {
@@ -52,20 +87,22 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
     cache: "no-store",
   });
 
-  if (response.status === 401 && typeof window !== "undefined" && getToken()) {
-    setToken(null);
-    window.location.reload();
-  }
-
   const payload = (await response.json().catch(() => null)) as
-    | { data?: T; meta?: Record<string, unknown>; message?: string; errors?: Record<string, string[]> }
+    | { data?: T; meta?: Record<string, unknown>; message?: string; errors?: Record<string, string[]>; code?: string }
     | null;
+
+  if (response.status === 401 && typeof window !== "undefined" && getToken()) {
+    invalidateSession();
+  } else if (payload?.code && CORP_SESSION_INVALID_CODES.has(payload.code) && typeof window !== "undefined" && getToken()) {
+    invalidateSession();
+  }
 
   if (!response.ok) {
     throw new ApiError(
       response.status,
       payload?.message ?? `Permintaan gagal (${response.status}).`,
       payload?.errors,
+      payload?.code,
     );
   }
   return (payload?.data ?? undefined) as T;
@@ -73,19 +110,18 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
 
 /** Like apiGet but also exposes the envelope `meta` (pagination / filter options). */
 export async function apiGetWithMeta<T>(path: string): Promise<{ data: T; meta: Record<string, unknown> | undefined }> {
-  const headers: Record<string, string> = { Accept: "application/json" };
-  const token = getToken();
-  if (token) headers.Authorization = `Bearer ${token}`;
+  const headers = authHeaders();
   const response = await fetch(`/api/v1${path}`, { headers, cache: "no-store" });
-  if (response.status === 401 && typeof window !== "undefined" && getToken()) {
-    setToken(null);
-    window.location.reload();
-  }
   const payload = (await response.json().catch(() => null)) as
-    | { data?: T; meta?: Record<string, unknown>; message?: string }
+    | { data?: T; meta?: Record<string, unknown>; message?: string; code?: string }
     | null;
+  if (response.status === 401 && typeof window !== "undefined" && getToken()) {
+    invalidateSession();
+  } else if (payload?.code && CORP_SESSION_INVALID_CODES.has(payload.code) && typeof window !== "undefined" && getToken()) {
+    invalidateSession();
+  }
   if (!response.ok) {
-    throw new ApiError(response.status, payload?.message ?? `Permintaan gagal (${response.status}).`);
+    throw new ApiError(response.status, payload?.message ?? `Permintaan gagal (${response.status}).`, undefined, payload?.code);
   }
   return { data: payload?.data as T, meta: payload?.meta };
 }

@@ -8,7 +8,7 @@ import { db } from "@/lib/db";
  * Ownership isolation: a partner only ever receives their own ledger rows.
  */
 export async function GET(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "wallet.transaction.view_own");
     const partner = requirePartner(user);
     const wallet = await getOrCreateWallet(partner.id);

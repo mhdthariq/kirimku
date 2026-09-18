@@ -4,7 +4,7 @@ import { guard, ok, handle, fail, requireStr, slugify, str } from "@/lib/api-hel
 import { audit } from "@/lib/audit";
 
 export async function GET(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     await guard(req, "role.view");
     const roles = await db.role.findMany({
       orderBy: { id: "asc" },
@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "role.create");
     const body = await req.json().catch(() => ({}));
     const name = requireStr(body.name, "name");

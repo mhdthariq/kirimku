@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { tenantKey } from "@/lib/tenant-context";
 
 // ---------------------------------------------------------------------------
 // Permission catalog (module -> [permission slug, description])
@@ -243,10 +244,14 @@ export const ROLE_TEMPLATES: { slug: string; name: string; description: string; 
 // performs actual work only once (or when the catalog changes).
 // ---------------------------------------------------------------------------
 
-let rbacReady = false;
+// Keyed per tenant (Corporate ID) — each company's database needs its own
+// RBAC catalog bootstrapped, so a flag for one tenant must not skip it for
+// another.
+const rbacReadyFor = new Set<string>();
 
 export async function ensureRbac(): Promise<void> {
-  if (rbacReady) return;
+  const key = tenantKey();
+  if (rbacReadyFor.has(key)) return;
   const existingCount = await db.permission.count();
   // Re-apply system role templates whenever the permission catalog changes
   // (e.g. new scan permissions shipped with an app update) so seeded roles
@@ -303,5 +308,5 @@ export async function ensureRbac(): Promise<void> {
       await db.rolePermission.createMany({ data: permissionIds });
     }
   }
-  rbacReady = true;
+  rbacReadyFor.add(key);
 }

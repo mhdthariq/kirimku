@@ -24,7 +24,7 @@ import { walletSummary, requirePartner } from "@/lib/wallet";
  * Commission cards.
  */
 export async function GET(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req);
     const can = (p: string) => hasPermission(user, p);
 

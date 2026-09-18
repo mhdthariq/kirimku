@@ -24,7 +24,7 @@ type Params = { params: Promise<{ id: string }> };
  *   needing gudang scope.
  */
 export async function GET(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req);
     const { id } = await params;
     const transport = await db.transport.findUnique({
@@ -152,7 +152,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 }
 
 export async function PUT(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "transport.create");
     const { id } = await params;
     const existing = await db.transport.findUnique({
@@ -209,7 +209,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "transport.create");
     const { id } = await params;
     const existing = await db.transport.findUnique({

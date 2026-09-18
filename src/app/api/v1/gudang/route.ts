@@ -19,7 +19,7 @@ import { computeTotals } from "@/lib/shipment-totals";
  *   gudang (employee.warehouseId); only the owner sees every gudang.
  */
 export async function GET(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "shipment.view");
     const scope = await scopeForUser(user);
 

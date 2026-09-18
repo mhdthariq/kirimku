@@ -10,7 +10,7 @@ type Params = { params: Promise<{ id: string }> };
  * amount is released back to available and NO wallet debit ever happened.
  */
 export async function POST(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "wallet.withdrawal.process");
     const { id } = await params;
     const withdrawal = await db.withdrawalRequest.findUnique({ where: { id: Number(id) } });

@@ -15,7 +15,7 @@ type Params = { params: Promise<{ id: string }> };
  * The code itself is never echoed back in messages (anti copy-paste).
  */
 export async function POST(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "pickup.scan");
     const { id } = await params;
     const pickup = await db.pickup.findUnique({ where: { id: Number(id) }, include: { master: { include: { customer: { select: { type: true } }, details: true } } } });

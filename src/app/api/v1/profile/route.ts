@@ -8,7 +8,7 @@ import { guard, ok, handle, str } from "@/lib/api-helpers";
  * for withdrawals (§24 "Select/use their registered bank account").
  */
 export async function GET(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req);
     const full = await db.user.findUniqueOrThrow({
       where: { id: user.id },
@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
 
 /** PUT /api/v1/profile — partner maintains own withdrawal bank account. */
 export async function PUT(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req);
     if (!user.partnerId) {
       return ok({ updated: false, message: "Bukan akun partner — tidak ada rekening yang perlu diperbarui." });

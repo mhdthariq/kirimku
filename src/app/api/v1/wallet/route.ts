@@ -8,7 +8,7 @@ import { db } from "@/lib/db";
  * Marketing and Vehicle Owner see ONLY their own wallet (§39).
  */
 export async function GET(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "wallet.view_own");
     const partner = requirePartner(user);
     const partnerRow = await db.partner.findUniqueOrThrow({

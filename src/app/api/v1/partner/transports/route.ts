@@ -10,7 +10,7 @@ import { requirePartner } from "@/lib/wallet";
  * Unsettled transports show the current profit-share config as a preview.
  */
 export async function GET(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "transport.view_own_vehicles");
     const partner = requirePartner(user, "VEHICLE_OWNER");
     const partnerRow = await db.partner.findUniqueOrThrow({ where: { id: partner.id } });

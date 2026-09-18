@@ -7,7 +7,7 @@ type Params = { params: Promise<{ id: string }> };
 
 /** Replace the full permission set of a role. */
 export async function PUT(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "role.update");
     const { id } = await params;
     const role = await db.role.findUnique({ where: { id: Number(id) } });

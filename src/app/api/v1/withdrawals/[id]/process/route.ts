@@ -11,7 +11,7 @@ type Params = { params: Promise<{ id: string }> };
  * attaching the transfer proof (wallet.withdrawal.proof.upload).
  */
 export async function POST(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "wallet.withdrawal.process");
     const { id } = await params;
     const withdrawal = await db.withdrawalRequest.findUnique({ where: { id: Number(id) } });

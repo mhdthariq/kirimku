@@ -28,7 +28,7 @@ type Params = { params: Promise<{ id: string }> };
  * "Picked-up by [Kurir Name]".
  */
 export async function POST(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "pickup.confirm");
     const { id } = await params;
     const pickup = await db.pickup.findUnique({

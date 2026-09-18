@@ -33,7 +33,7 @@ type Params = { params: Promise<{ id: string }> };
  *   after a partial failure does NOT double-debit.
  */
 export async function POST(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "shipment.view");
     if (!hasPermission(user, "shipment.update") && !hasPermission(user, "pickup.create")) {
       return fail(403, "Missing permission: shipment.update");

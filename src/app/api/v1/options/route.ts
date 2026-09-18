@@ -1,10 +1,11 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { guard, ok, handle } from "@/lib/api-helpers";
+import { currentCompanyName } from "@/lib/tenant-context";
 
 /** Lightweight dropdown options for any authenticated user (ids + labels only). */
 export async function GET(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req);
     const marketingOwner = user.partnerType === "MARKETING" ? user.partnerId : null;
     const [employees, vehicles, routes, warehouses, customers, tariffs, permissions, vehicleOwners, marketingPartners, b2bShipments] = await Promise.all([
@@ -60,7 +61,7 @@ export async function GET(req: NextRequest) {
         },
       }),
     ]);
-    const company = { name: process.env.NEXT_PUBLIC_COMPANY_NAME ?? "KirimKu Logistics" };
+    const company = { name: currentCompanyName() ?? process.env.NEXT_PUBLIC_COMPANY_NAME ?? "KirimKu Logistics" };
     return ok({
       company, employees, vehicles, routes, warehouses, customers, tariffs, permissions,
       vehicleOwners: vehicleOwners.map((p) => ({ id: p.id, name: p.user.name, username: p.user.username, profitShare: { company: p.companyPercent, partner: p.partnerPercent } })),

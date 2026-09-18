@@ -6,7 +6,7 @@ import { audit } from "@/lib/audit";
 import { ensurePartnerProfile } from "@/lib/partner";
 
 export async function GET(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     await guard(req, "user.view");
     const params = req.nextUrl.searchParams;
     const search = str(params.get("search"))?.toLowerCase();
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "user.create");
     const body = await req.json().catch(() => ({}));
     const username = requireStr(body.username, "username").toLowerCase();

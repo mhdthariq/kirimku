@@ -6,7 +6,7 @@ import { audit } from "@/lib/audit";
 const VEHICLE_STATUSES = ["ACTIVE", "MAINTENANCE", "INACTIVE"];
 
 export async function GET(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     await guard(req, "vehicle.view");
     const params = req.nextUrl.searchParams;
     const search = str(params.get("search"))?.toLowerCase();
@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "vehicle.create");
     const body = await req.json().catch(() => ({}));
     const vehicleNumber = requireStr(body.vehicleNumber, "vehicleNumber");

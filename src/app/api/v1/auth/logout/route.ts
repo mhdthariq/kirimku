@@ -4,7 +4,7 @@ import { audit } from "@/lib/audit";
 import { ok, handle } from "@/lib/api-helpers";
 
 export async function POST(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const token = getTokenFromRequest(req);
     const user = token ? await getAuthUser(req) : null;
     if (token) await destroySession(token).catch(() => undefined);

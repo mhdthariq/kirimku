@@ -15,7 +15,7 @@ type Params = { params: Promise<{ id: string }> };
  *    delivery.
  */
 export async function GET(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "shipment.view");
     const { id } = await params;
     const master = await db.masterShipment.findUnique({ where: { id: Number(id) } });
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest, { params }: Params) {
  * back (anti copy-paste).
  */
 export async function POST(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "shipment.confirm_arrival");
     const { id } = await params;
     const master = await db.masterShipment.findUnique({ where: { id: Number(id) } , include: { customer: { select: { type: true } }, details: true } });

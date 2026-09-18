@@ -11,7 +11,7 @@ import { nextCode } from "@/lib/code-generator";
  * requested twice concurrently.
  */
 export async function GET(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req);
     const params = req.nextUrl.searchParams;
     const status = str(params.get("status"));
@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
  * and becomes reserved while the request is in flight (§27).
  */
 export async function POST(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "wallet.withdrawal.create");
     const partner = requirePartner(user);
     const body = await req.json().catch(() => ({}));

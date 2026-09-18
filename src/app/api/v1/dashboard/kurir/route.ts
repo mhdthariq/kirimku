@@ -14,7 +14,7 @@ import { guard, ok, handle, str, num } from "@/lib/api-helpers";
  *   still-active task regardless of period so nothing urgent is hidden.
  */
 export async function GET(req: NextRequest) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "pickup.view");
     const params = req.nextUrl.searchParams;
 

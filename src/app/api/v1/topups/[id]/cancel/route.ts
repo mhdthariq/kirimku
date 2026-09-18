@@ -11,7 +11,7 @@ type Params = { params: Promise<{ id: string }> };
  * the wallet. Marketing has no cancel access (no Top Up menu for Marketing).
  */
 export async function POST(req: NextRequest, { params }: Params) {
-  return handle(async () => {
+  return handle(req, async () => {
     const user = await guard(req, "wallet.topup.cancel");
     const { id } = await params;
     const topUp = await db.topUpRequest.findUnique({ where: { id: Number(id) } });
