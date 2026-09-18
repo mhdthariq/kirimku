@@ -1129,6 +1129,8 @@ export interface PartnerRow {
   notes: string | null;
   wallet: { balance: number; reserved: number; available: number };
   totals: { transportEarnings: number; commissions: number; repairDeductions: number; withdrawals: number };
+  /** Combined earnings breakdown — shipment commission + transport profit share. */
+  earningsSummary: { shipment: number; transport: number; total: number };
   counts: { vehicles: number; commissions: number; settlements: number; topUps: number; withdrawals: number; repairs: number };
 }
 

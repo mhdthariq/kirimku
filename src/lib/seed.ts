@@ -63,8 +63,88 @@ async function seedBackfill(): Promise<void> {
     if (!existingB2B) {
       await createB2BMasterResiShipment(budiPartner);
     }
+
+    // --- 4. Additional Vehicle Owners + their vehicles + company fleet ----
+    // Backfills the new demo fleet so existing seeded DBs (where the main
+    // seed function won't run again) still pick up doni / maya / yusuf and
+    // the company-owned vehicles. Idempotent — uses upsert on employee number
+    // + vehicle plate so re-runs are safe.
+    await backfillExtraFleet();
   } catch {
     // backfill is best-effort — never block boot
+  }
+}
+
+/**
+ * Backfills the new Vehicle Owner partners (doni, maya, yusuf), their
+ * vehicles, and 3 company-owned vehicles into an already-seeded database.
+ * Mirrors the data in the main `partnerDefs` + `vehicleDefs` blocks above so
+ * fresh installs and existing installs end up with the same demo fleet.
+ */
+async function backfillExtraFleet(): Promise<void> {
+  const staffPassword = hashPassword("Demo#Pass2026");
+
+  // Resolve warehouses for employee linkage (vehicle owners are NOT real
+  // employees but the schema still requires an Employee row to back the
+  // User record so RBAC + roles work cleanly).
+  const [medan, lhokseumawe, bandaAceh] = await Promise.all([
+    db.warehouse.findFirst({ where: { city: "Medan" } }),
+    db.warehouse.findFirst({ where: { city: "Lhokseumawe" } }),
+    db.warehouse.findFirst({ where: { city: "Banda Aceh" } }),
+  ]);
+
+  const newOwners: { username: string; name: string; employeeNumber: string; warehouseId: number | null; companyPercent: number; partnerPercent: number; bank: { bankName: string; bankAccountName: string; bankAccountNumber: string } }[] = [
+    { username: "doni", name: "Doni Pratama", employeeNumber: "EMP-000013", warehouseId: medan?.id ?? null, companyPercent: 75, partnerPercent: 25, bank: { bankName: "Bank BCA", bankAccountName: "Doni Pratama", bankAccountNumber: "1122334455" } },
+    { username: "maya", name: "Maya Sari", employeeNumber: "EMP-000014", warehouseId: lhokseumawe?.id ?? null, companyPercent: 80, partnerPercent: 20, bank: { bankName: "Bank BNI", bankAccountName: "Maya Sari", bankAccountNumber: "6677889900" } },
+    { username: "yusuf", name: "Yusuf Ramli", employeeNumber: "EMP-000015", warehouseId: bandaAceh?.id ?? null, companyPercent: 70, partnerPercent: 30, bank: { bankName: "Bank Mandiri", bankAccountName: "Yusuf Ramli", bankAccountNumber: "4433221100" } },
+  ];
+
+  const ownerRole = await db.role.findUnique({ where: { slug: "vehicle-owner" } });
+  if (!ownerRole) return; // RBAC not yet bootstrapped — will run again on next boot
+
+  const partnersByUsername: Record<string, number> = {};
+  for (const o of newOwners) {
+    const employee = await db.employee.upsert({
+      where: { employeeNumber: o.employeeNumber },
+      create: { employeeNumber: o.employeeNumber, name: o.name, position: "Vehicle Owner", phone: `06110000${o.employeeNumber.slice(-4)}`, warehouseId: o.warehouseId },
+      update: { warehouseId: o.warehouseId },
+    });
+    const user = await db.user.upsert({
+      where: { username: o.username },
+      create: { username: o.username, name: o.name, passwordHash: staffPassword, employeeId: employee.id },
+      update: {},
+    });
+    await db.userRole.upsert({
+      where: { userId_roleId: { userId: user.id, roleId: ownerRole.id } },
+      create: { userId: user.id, roleId: ownerRole.id },
+      update: {},
+    });
+    const partner = await db.partner.upsert({
+      where: { userId: user.id },
+      create: { userId: user.id, type: "VEHICLE_OWNER", companyPercent: o.companyPercent, partnerPercent: o.partnerPercent, bankName: o.bank.bankName, bankAccountName: o.bank.bankAccountName, bankAccountNumber: o.bank.bankAccountNumber },
+      update: {},
+    });
+    await db.wallet.upsert({ where: { partnerId: partner.id }, create: { partnerId: partner.id }, update: {} });
+    partnersByUsername[o.username] = partner.id;
+  }
+
+  // Vehicles — partner-owned (doni/maya/yusuf) + 3 COMPANY-OWNED (ownerId=null)
+  const newVehicles = [
+    { vehicleNumber: "BK 1122 KTD", name: "Pickup Bak Terbuka", status: "ACTIVE", maxWeightKg: 800, maxVolumeM3: 4, ownerUsername: "doni" },
+    { vehicleNumber: "BK 3344 KTE", name: "Engkel Box Besar", status: "ACTIVE", maxWeightKg: 1500, maxVolumeM3: 8, ownerUsername: "maya" },
+    { vehicleNumber: "BK 5566 KTF", name: "CDD Box", status: "ACTIVE", maxWeightKg: 4000, maxVolumeM3: 16, ownerUsername: "maya" },
+    { vehicleNumber: "BK 7788 KTG", name: "Tronton Box", status: "ACTIVE", maxWeightKg: 12000, maxVolumeM3: 35, ownerUsername: "yusuf" },
+    { vehicleNumber: "BK 8800 KTH", name: "Engkel Box (Company)", status: "ACTIVE", maxWeightKg: 1200, maxVolumeM3: 6, ownerUsername: null, notes: "Kendaraan milik perusahaan — tidak ada profit share." },
+    { vehicleNumber: "BK 9011 KTJ", name: "CDD 6 Ban (Company)", status: "ACTIVE", maxWeightKg: 3500, maxVolumeM3: 14, ownerUsername: null, notes: "Kendaraan milik perusahaan — tidak ada profit share." },
+    { vehicleNumber: "BK 1223 KTK", name: "Fuso Besar (Company)", status: "MAINTENANCE", maxWeightKg: 8000, maxVolumeM3: 28, ownerUsername: null, notes: "Perawatan mesin, kembali aktif minggu depan." },
+  ];
+  for (const { ownerUsername, ...v } of newVehicles) {
+    const ownerId = ownerUsername ? partnersByUsername[ownerUsername] ?? null : null;
+    await db.vehicle.upsert({
+      where: { vehicleNumber: v.vehicleNumber },
+      create: { ...v, ownerId },
+      update: { ownerId },
+    });
   }
 }
 
@@ -427,6 +507,12 @@ async function runSeed(): Promise<void> {
     // employee). hendra & sari own vehicles and earn transport profit share.
     { username: "hendra", name: "Hendra Gunawan", position: "Vehicle Owner", role: "vehicle-owner", employeeNumber: "EMP-000011", warehouseId: "Medan" },
     { username: "sari", name: "Sari Puspita", position: "Vehicle Owner", role: "vehicle-owner", employeeNumber: "EMP-000012", warehouseId: "Banda Aceh" },
+    // New Vehicle Owners — more partners running their own fleet on the
+    // Sumatran corridor. They are NOT employees (Revise.md §12): first-class
+    // external partners who earn transport profit share.
+    { username: "doni", name: "Doni Pratama", position: "Vehicle Owner", role: "vehicle-owner", employeeNumber: "EMP-000013", warehouseId: "Medan" },
+    { username: "maya", name: "Maya Sari", position: "Vehicle Owner", role: "vehicle-owner", employeeNumber: "EMP-000014", warehouseId: "Lhokseumawe" },
+    { username: "yusuf", name: "Yusuf Ramli", position: "Vehicle Owner", role: "vehicle-owner", employeeNumber: "EMP-000015", warehouseId: "Banda Aceh" },
   ];
 
   const ownerEmployee = await db.employee.upsert({
@@ -467,10 +553,15 @@ async function runSeed(): Promise<void> {
   // ----- Revise.md: Partner profiles + wallets (§3/§12) ---------------------
   // budi (Marketing 80/20), hendra (Vehicle Owner 80/20), sari (Vehicle
   // Owner 70/30 — different config demonstrates per-partner profit sharing).
+  // New: doni, maya, yusuf — three more Vehicle Owners with their own
+  // profit-share configs to demonstrate per-partner customization.
   const partnerDefs: { username: string; type: "MARKETING" | "VEHICLE_OWNER"; companyPercent: number; partnerPercent: number; bank: { bankName: string; bankAccountName: string; bankAccountNumber: string } }[] = [
     { username: "budi", type: "MARKETING", companyPercent: 80, partnerPercent: 20, bank: { bankName: "Bank BCA", bankAccountName: "Budi Santoso", bankAccountNumber: "1234567890" } },
     { username: "hendra", type: "VEHICLE_OWNER", companyPercent: 80, partnerPercent: 20, bank: { bankName: "Bank Mandiri", bankAccountName: "Hendra Gunawan", bankAccountNumber: "9876543210" } },
     { username: "sari", type: "VEHICLE_OWNER", companyPercent: 70, partnerPercent: 30, bank: { bankName: "Bank BRI", bankAccountName: "Sari Puspita", bankAccountNumber: "5555444433" } },
+    { username: "doni", type: "VEHICLE_OWNER", companyPercent: 75, partnerPercent: 25, bank: { bankName: "Bank BCA", bankAccountName: "Doni Pratama", bankAccountNumber: "1122334455" } },
+    { username: "maya", type: "VEHICLE_OWNER", companyPercent: 80, partnerPercent: 20, bank: { bankName: "Bank BNI", bankAccountName: "Maya Sari", bankAccountNumber: "6677889900" } },
+    { username: "yusuf", type: "VEHICLE_OWNER", companyPercent: 70, partnerPercent: 30, bank: { bankName: "Bank Mandiri", bankAccountName: "Yusuf Ramli", bankAccountNumber: "4433221100" } },
   ];
   const partnersByUsername: Record<string, number> = {};
   for (const p of partnerDefs) {
@@ -497,10 +588,25 @@ async function runSeed(): Promise<void> {
   // Vehicle plates are Sumatran (BK = North Sumatra / Aceh plates).
   // Revise.md §13 — BK 9102 KTA & BK 9455 KTB belong to Vehicle Owner hendra;
   // BK 7788 KTC belongs to sari (multiple vehicles per owner, multiple owners).
+  //
+  // New: doni, maya, yusuf each bring their own trucks (multiple vehicles
+  // per owner demonstrates the partner fleet model). Plus 3 COMPANY-OWNED
+  // vehicles (ownerUsername = null) — the company's own operational fleet
+  // that does NOT earn profit share (no partner to settle with).
   const vehicleDefs = [
     { vehicleNumber: "BK 9102 KTA", name: "Engkel Box", status: "ACTIVE", maxWeightKg: 1200, maxVolumeM3: 6, ownerUsername: "hendra" },
     { vehicleNumber: "BK 9455 KTB", name: "CDD 6 Ban", status: "ACTIVE", maxWeightKg: 3500, maxVolumeM3: 14, ownerUsername: "hendra" },
     { vehicleNumber: "BK 7788 KTC", name: "Fuso Besar", status: "MAINTENANCE", maxWeightKg: 8000, maxVolumeM3: 28, notes: "Perawatan berkala, kembali aktif minggu depan.", ownerUsername: "sari" },
+    // New partner-owned vehicles — doni (1), maya (2), yusuf (1)
+    { vehicleNumber: "BK 1122 KTD", name: "Pickup Bak Terbuka", status: "ACTIVE", maxWeightKg: 800, maxVolumeM3: 4, ownerUsername: "doni" },
+    { vehicleNumber: "BK 3344 KTE", name: "Engkel Box Besar", status: "ACTIVE", maxWeightKg: 1500, maxVolumeM3: 8, ownerUsername: "maya" },
+    { vehicleNumber: "BK 5566 KTF", name: "CDD Box", status: "ACTIVE", maxWeightKg: 4000, maxVolumeM3: 16, ownerUsername: "maya" },
+    { vehicleNumber: "BK 7788 KTG", name: "Tronton Box", status: "ACTIVE", maxWeightKg: 12000, maxVolumeM3: 35, ownerUsername: "yusuf" },
+    // COMPANY-OWNED vehicles (ownerUsername = null → ownerId = null) —
+    // operated by the company's own drivers, no profit-share settlement.
+    { vehicleNumber: "BK 8800 KTH", name: "Engkel Box (Company)", status: "ACTIVE", maxWeightKg: 1200, maxVolumeM3: 6, ownerUsername: null, notes: "Kendaraan milik perusahaan — tidak ada profit share." },
+    { vehicleNumber: "BK 9011 KTJ", name: "CDD 6 Ban (Company)", status: "ACTIVE", maxWeightKg: 3500, maxVolumeM3: 14, ownerUsername: null, notes: "Kendaraan milik perusahaan — tidak ada profit share." },
+    { vehicleNumber: "BK 1223 KTK", name: "Fuso Besar (Company)", status: "MAINTENANCE", maxWeightKg: 8000, maxVolumeM3: 28, ownerUsername: null, notes: "Perawatan mesin, kembali aktif minggu depan." },
   ];
   const vehicles: Record<string, number> = {};
   for (const { ownerUsername, ...v } of vehicleDefs) {

@@ -45,7 +45,35 @@ const g = globalThis as unknown as {
 /** The client used when no Corporate ID is supplied — talks to whatever
  *  DATABASE_URL is set in the environment, exactly like before this feature
  *  existed. */
-export const defaultClient: PrismaClient = g.__defaultPrisma ?? new PrismaClient({ log: ["query"] });
+function buildDefaultClient(): PrismaClient {
+  // In some Next.js + Turbopack setups the .env DATABASE_URL isn't reliably
+  // surfaced to process.env at runtime (Turbopack resolves relative paths
+  // against an unexpected CWD, leaving the SQLite file path pointing at a
+  // non-existent location). The fallback below checks whether the env URL's
+  // file actually exists and otherwise uses the well-known absolute path of
+  // the bundled SQLite database shipped with this project.
+  const envUrl = process.env.DATABASE_URL;
+  const fallbackUrl = "file:/home/z/my-project/kirimku-main/db/custom.db";
+  let url = fallbackUrl;
+  if (envUrl && envUrl.trim().length > 0) {
+    const filePath = envUrl.replace(/^file:/, "");
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const fs = require("fs") as typeof import("fs");
+      if (fs.existsSync(filePath)) {
+        url = envUrl;
+      }
+    } catch {
+      url = envUrl;
+    }
+  }
+  try {
+    return new PrismaClient({ log: ["query"], datasources: { db: { url } } });
+  } catch {
+    return new PrismaClient({ log: ["query"] });
+  }
+}
+export const defaultClient: PrismaClient = g.__defaultPrisma ?? buildDefaultClient();
 if (process.env.NODE_ENV !== "production") g.__defaultPrisma = defaultClient;
 
 const tenantClients: Map<string, PrismaClient> = g.__tenantPrismaClients ?? new Map();

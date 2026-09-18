@@ -31,6 +31,9 @@ export function PartnersPage() {
 
   const rows = data ?? [];
   const totalBalance = rows.reduce((s, p) => s + p.wallet.balance, 0);
+  const totalEarnings = rows.reduce((s, p) => s + (p.earningsSummary?.total ?? p.totals.transportEarnings + p.totals.commissions), 0);
+  const totalShipmentEarnings = rows.reduce((s, p) => s + (p.earningsSummary?.shipment ?? p.totals.commissions), 0);
+  const totalTransportEarnings = rows.reduce((s, p) => s + (p.earningsSummary?.transport ?? p.totals.transportEarnings), 0);
 
   return (
     <div className="space-y-4">
@@ -39,9 +42,16 @@ export function PartnersPage() {
         subtitle={`${rows.length} partner · ${rows.filter((p) => p.type === "MARKETING").length} Marketing · ${rows.filter((p) => p.type === "VEHICLE_OWNER").length} Vehicle Owner`}
         icon={<Users className="h-5 w-5" />}
         actions={
-          <div className="rounded-xl border bg-primary/10 px-4 py-2">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-primary">Total saldo partner</p>
-            <p className="text-base font-bold text-primary">{formatRupiah(totalBalance)}</p>
+          <div className="flex flex-wrap gap-2">
+            <div className="rounded-xl border bg-primary/10 px-4 py-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-primary">Total saldo partner</p>
+              <p className="text-base font-bold text-primary">{formatRupiah(totalBalance)}</p>
+            </div>
+            <div className="rounded-xl border bg-emerald-500/10 px-4 py-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">Total earnings</p>
+              <p className="text-base font-bold text-emerald-700 dark:text-emerald-400">{formatRupiah(totalEarnings)}</p>
+              <p className="text-[9px] text-muted-foreground">shipment {formatRupiah(totalShipmentEarnings)} · transport {formatRupiah(totalTransportEarnings)}</p>
+            </div>
           </div>
         }
       />
@@ -91,16 +101,28 @@ export function PartnersPage() {
             key: "earnings",
             header: "Earnings",
             hideOnMobile: true,
-            render: (r) => (
-              <div className="text-xs">
-                {r.type === "VEHICLE_OWNER" ? (
-                  <p>transport <b className="text-primary">{formatRupiah(r.totals.transportEarnings)}</b></p>
-                ) : (
-                  <p>komisi <b className="text-primary">{formatRupiah(r.totals.commissions)}</b></p>
-                )}
-                <p className="text-muted-foreground">repair {formatRupiah(r.totals.repairDeductions)} · wdr {formatRupiah(r.totals.withdrawals)}</p>
-              </div>
-            ),
+            render: (r) => {
+              // Show BOTH earnings sources for every partner — shipment
+              // commission (from invoices) + transport profit share (from
+              // TransportSettlement). Total is the sum.
+              const shipment = r.earningsSummary?.shipment ?? r.totals.commissions;
+              const transport = r.earningsSummary?.transport ?? r.totals.transportEarnings;
+              const total = r.earningsSummary?.total ?? shipment + transport;
+              return (
+                <div className="text-xs">
+                  <p className="font-bold text-emerald-700 dark:text-emerald-400">{formatRupiah(total)}</p>
+                  <p className="text-muted-foreground">
+                    shipment <b className="text-foreground">{formatRupiah(shipment)}</b>
+                  </p>
+                  <p className="text-muted-foreground">
+                    transport <b className="text-foreground">{formatRupiah(transport)}</b>
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">
+                    repair {formatRupiah(r.totals.repairDeductions)} · wdr {formatRupiah(r.totals.withdrawals)}
+                  </p>
+                </div>
+              );
+            },
           },
           {
             key: "bank",

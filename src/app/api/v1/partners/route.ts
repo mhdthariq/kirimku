@@ -40,6 +40,11 @@ export async function GET(req: NextRequest) {
           where: { wallet: { partnerId: p.id }, type: "WITHDRAWAL", direction: "DEBIT" },
           _sum: { amount: true },
         });
+        // Per-source earnings breakdown — shipment (commission) vs transport
+        // (profit share). Both come from the wallet ledger; their sum is the
+        // partner's total earnings from the company.
+        const shipmentEarnings = commissions._sum.amount ?? 0;
+        const transportEarnings = earnings._sum.amount ?? 0;
         return {
           id: p.id,
           userId: p.user.id,
@@ -53,10 +58,18 @@ export async function GET(req: NextRequest) {
           notes: p.notes,
           wallet: summary,
           totals: {
-            transportEarnings: earnings._sum.amount ?? 0,
-            commissions: commissions._sum.amount ?? 0,
+            transportEarnings,
+            commissions: shipmentEarnings,
             repairDeductions: repairs._sum.amount ?? 0,
             withdrawals: withdrawals._sum.amount ?? 0,
+          },
+          // Combined earnings summary — shows BOTH sources regardless of
+          // partner type so the company can see at a glance how much each
+          // partner earned from shipment commission AND from transport.
+          earningsSummary: {
+            shipment: shipmentEarnings,
+            transport: transportEarnings,
+            total: Math.round((shipmentEarnings + transportEarnings) * 100) / 100,
           },
           counts: {
             vehicles: p._count.vehicles,
