@@ -27,8 +27,21 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (body.name !== undefined) data.name = str(body.name);
     if (body.status !== undefined && VEHICLE_STATUSES.includes(body.status)) data.status = body.status;
     if (body.maxWeightKg !== undefined) data.maxWeightKg = requireNum(body.maxWeightKg, "maxWeightKg", 1);
-    if (body.maxVolumeM3 !== undefined) data.maxVolumeM3 = requireNum(body.maxVolumeM3, "maxVolumeM3", 0.1);
     if (body.notes !== undefined) data.notes = str(body.notes);
+    // Revise round 9 — physical cargo box dimensions (meters). When all three
+    // are present and positive, maxVolumeM3 is auto-computed as L × W × H.
+    const lengthM = body.lengthM === null ? null : num(body.lengthM);
+    const widthM = body.widthM === null ? null : num(body.widthM);
+    const heightM = body.heightM === null ? null : num(body.heightM);
+    if (body.lengthM !== undefined) data.lengthM = lengthM;
+    if (body.widthM !== undefined) data.widthM = widthM;
+    if (body.heightM !== undefined) data.heightM = heightM;
+    const dimsComplete = lengthM != null && widthM != null && heightM != null && lengthM > 0 && widthM > 0 && heightM > 0;
+    if (dimsComplete) {
+      data.maxVolumeM3 = Math.round(lengthM! * widthM! * heightM! * 1000) / 1000;
+    } else if (body.maxVolumeM3 !== undefined) {
+      data.maxVolumeM3 = requireNum(body.maxVolumeM3, "maxVolumeM3", 0.1);
+    }
     // Revise.md §13 — link the vehicle to its Vehicle Owner (null = company).
     if (body.ownerId !== undefined) {
       const ownerId = body.ownerId === null || body.ownerId === "" ? null : num(body.ownerId);

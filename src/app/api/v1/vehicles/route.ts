@@ -51,13 +51,29 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Revise round 9 — auto-compute maxVolumeM3 from L × W × H when all three
+    // dimensions are present and positive. This makes the form's maxVolumeM3
+    // field optional in practice (the client disables it when dimensions are
+    // complete). If the client sends a maxVolumeM3 AND dimensions, the
+    // computed value wins (dimensions are the source of truth).
+    const lengthM = num(body.lengthM);
+    const widthM = num(body.widthM);
+    const heightM = num(body.heightM);
+    const dimsComplete = lengthM != null && widthM != null && heightM != null && lengthM > 0 && widthM > 0 && heightM > 0;
+    const computedVolume = dimsComplete ? Math.round(lengthM! * widthM! * heightM! * 1000) / 1000 : null;
+
     const vehicle = await db.vehicle.create({
       data: {
         vehicleNumber,
         name: str(body.name),
         status,
         maxWeightKg: requireNum(body.maxWeightKg, "maxWeightKg", 1),
-        maxVolumeM3: requireNum(body.maxVolumeM3, "maxVolumeM3", 0.1),
+        // Use computed volume when dimensions are complete; otherwise require
+        // maxVolumeM3 to be sent explicitly.
+        maxVolumeM3: computedVolume ?? requireNum(body.maxVolumeM3, "maxVolumeM3", 0.1),
+        lengthM,
+        widthM,
+        heightM,
         notes: str(body.notes),
         ownerId,
       },

@@ -103,6 +103,18 @@ Full details in [`08-revision-round-7.md`](08-revision-round-7.md).
 
 Full details in [`09-revision-round-8.md`](09-revision-round-8.md).
 
+## Revision round 9 — DIRECT Form Flow, Photo Detail Buttons, Vehicle Dimensions
+
+| # | Revision | Where it is implemented |
+|---|---|---|
+| R1 | **Shipment form restructure for DIRECT mode** — `Mode Fulfillment` dropdown moved BEFORE `Gudang Asal / Gudang Tujuan`. The gudang fields are hidden when `DIRECT` is selected (DIRECT doesn't use company warehouses). A violet info banner explains the DIRECT mode. | `src/components/app/pages/shipments-page.tsx` |
+| R2 | **DIRECT shipments eligible for transport** — transport creation API now accepts DIRECT shipments in `CREATED` / `READY_FOR_PICKUP` status (STANDARD still requires `RECEIVED_AT_GUDANG`). The transport-form-dialog fetches from three status pools. | `src/app/api/v1/transports/route.ts`, `src/components/app/transport-form-dialog.tsx` |
+| R3 | **Photo Detail buttons** — new reusable `PhotoDetailDialog` component. Pickups + Deliveries pages now have a "Detail Foto" button. Transport-detail checkpoint thumbnails are clickable to open the dialog. Display gated by `proof_photo.view` (Admin Gudang + Owner). | `src/components/app/photo-detail-dialog.tsx` (new), `src/components/app/pages/pickups-page.tsx`, `src/components/app/pages/deliveries-page.tsx`, `src/components/app/pages/transport-detail-page.tsx` |
+| R4 | **Transport shipment selector cleanup** — removed the redundant "(status RECEIVED_AT_GUDANG)" text and replaced it with a compact DIRECT/STANDARD badge per row. Trimmed several over-explained UI banners in the shipments page. | `src/components/app/transport-form-dialog.tsx`, `src/components/app/pages/shipments-page.tsx` |
+| R5 | **Vehicle dimensions (Panjang/Lebar/Tinggi in meters)** — added `lengthM`, `widthM`, `heightM` to Vehicle schema. When all three are set, `maxVolumeM3` is auto-computed as L × W × H. New "Ukuran" column appears BEFORE "Kapasitas" on the Vehicles page. | `prisma/schema.prisma`, `src/app/api/v1/vehicles/route.ts`, `src/app/api/v1/vehicles/[id]/route.ts`, `src/app/api/v1/options/route.ts`, `src/lib/client-api.ts`, `src/components/app/pages/vehicles-page.tsx` |
+
+Full details in [`10-revision-round-9.md`](10-revision-round-9.md).
+
 ## Document index
 
 | File | Contents |
@@ -116,6 +128,7 @@ Full details in [`09-revision-round-8.md`](09-revision-round-8.md).
 | [`07-deployment.md`](07-deployment.md) | Dev, production build, Docker with migrate-on-boot, hosting notes |
 | [`08-revision-round-7.md`](08-revision-round-7.md) | **Preview mode, Partner Alignment, Customer Gudang attachment, Customer marker, Pickup address** |
 | [`09-revision-round-8.md`](09-revision-round-8.md) | **Fulfillment Mode (STANDARD/DIRECT) + proof_photo.view permission** |
+| [`10-revision-round-9.md`](10-revision-round-9.md) | **DIRECT form flow, Photo Detail buttons, Vehicle dimensions** |
 
 ## Where the code lives (map)
 

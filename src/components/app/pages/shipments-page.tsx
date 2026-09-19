@@ -420,31 +420,21 @@ function ShipmentList() {
           const activeW = gudangOptions.find((g) => gudangTabValue(g.id) === v) ?? null;
           return (
             <TabsContent key={v} value={v} className="mt-3 space-y-3">
-              {v === "direct" && (
-                <p className="rounded-lg border border-violet-300 bg-violet-50/70 px-3 py-2 text-xs text-violet-800 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-300">
-                  <b>Direct fulfillment</b> — driver ambil langsung di gudang asal dan kirim langsung ke gudang tujuan, tanpa lewat scan gudang.
-                </p>
-              )}
-              {v === "regular" && (
-                <p className="rounded-lg border border-sky-200 bg-sky-50/40 px-3 py-2 text-[11px] text-sky-700 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-300">
-                  <b>Regular</b> — kurir pickup → gudang → transport → gudang tujuan → kurir delivery (flow standar).
-                </p>
-              )}
+              {/* Revise round 9 — trimmed the over-explained banners.
+                  Each banner is now a single short line. */}
               {activeW && (
-                <p className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-foreground/80">
-                  Menampilkan data <b>{activeW.name}</b> — hanya shipment <b>Regular (STANDARD)</b>. Shipment Direct ada di tab <b>Direct</b>.
+                <p className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs text-foreground/80">
+                  Gudang <b>{activeW.name}</b> — Regular only.
                 </p>
               )}
               {statusFilter === "PICKED_UP" && can.confirmArrival && (
-                <p className="rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-2 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300">
-                  Shipment <b>PICKED UP</b> sedang dibawa kurir kembali ke gudang. Klik <b>Terima / Scan</b> pada baris untuk scan tiap paketnya
-                  (kamera / reader / manual) lalu konfirmasi <b>Tiba di Gudang</b>.
+                <p className="rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-1.5 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300">
+                  Shipment <b>PICKED UP</b> — klik <b>Terima / Scan</b> untuk konfirmasi kedatangan paket di gudang.
                 </p>
               )}
               {(statusFilter === "AT_DEST_GUDANG" || statusFilter === "ARRIVED_AT_GUDANG") && can.confirmArrival && (
-                <p className="rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-2 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300">
-                  Shipment <b>TIBA DI GUDANG TUJUAN</b> — driver transport sudah check-in di checkpoint akhir; paket menunggu <b>Terima / Scan</b>{" "}
-                  oleh Admin Gudang sebelum berstatus <b>Arrived at (nama gudang)</b> dan bisa ditugaskan ke kurir delivery.
+                <p className="rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-1.5 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300">
+                  <b>TIBA DI GUDANG TUJUAN</b> — klik <b>Terima / Scan</b> untuk menerima paket.
                 </p>
               )}
               <DataTable
@@ -553,7 +543,7 @@ function ShipmentList() {
                     {s.priceAmount != null ? (
                       <p className="text-sm font-semibold">{formatRupiah(s.priceAmount)}</p>
                     ) : (
-                      <p className="text-sm font-medium text-muted-foreground">— belum dihitung</p>
+                      <p className="text-sm font-medium text-muted-foreground">Belum dihitung</p>
                     )}
                     {s.chargeableWeightKg != null && <p className="text-[11px] text-muted-foreground">{formatNumber(s.chargeableWeightKg)} kg cw</p>}
                   </div>
@@ -725,55 +715,69 @@ function ShipmentList() {
                   </p>
                 </div>
               )}*/}
-              <Field
-                label="Gudang Asal"
-                htmlFor="s-warehouse-from"
-                hint={selectedTariff ? "Otomatis dari rute — dapat diubah" : "Otomatis terisi saat rute dipilih"}
-              >
-                <FormSelect
-                  value={form.originWarehouseId}
-                  onValueChange={(v) => setForm({ ...form, originWarehouseId: v })}
-                  placeholder="—"
-                  options={(options?.warehouses ?? []).map((w) => ({ value: String(w.id), label: w.name }))}
-                  disabled={busy}
-                />
-              </Field>
-              <Field
-                label="Gudang Tujuan"
-                htmlFor="s-warehouse-to"
-                hint={selectedTariff ? "Otomatis dari rute — dapat diubah" : "Otomatis terisi saat rute dipilih"}
-              >
-                <FormSelect
-                  value={form.destinationWarehouseId}
-                  onValueChange={(v) => setForm({ ...form, destinationWarehouseId: v })}
-                  placeholder="—"
-                  options={(options?.warehouses ?? []).map((w) => ({ value: String(w.id), label: w.name }))}
-                  disabled={busy}
-                />
-              </Field>
-              {/* Revise round 8 — Fulfillment Mode.
-                  STANDARD = kurir → company warehouse → transport → destination warehouse → kurir delivery (existing flow).
-                  DIRECT   = driver picks up directly at the origin warehouse and delivers directly to the destination warehouse (no company warehouse scan). */}
+              {/* Revise round 9 — Mode Fulfillment moved BEFORE Gudang Asal/Tujuan.
+                  Reason: when DIRECT is selected, the Gudang Asal/Tujuan fields
+                  are hidden (DIRECT doesn't use company warehouses — the driver
+                  picks up at the customer's location directly), so the user
+                  needs to pick the mode FIRST to know which fields appear. */}
               <Field
                 label="Mode Fulfillment"
                 htmlFor="s-fulfillment-mode"
                 className="sm:col-span-2"
                 hint={
                   form.fulfillmentMode === "DIRECT"
-                    ? "DIRECT — driver ambil langsung di gudang asal, kirim langsung ke gudang tujuan. Tidak lewat scan gudang."
-                    : "STANDARD — kurir pickup → gudang → transport → gudang tujuan → kurir delivery (default)."
+                    ? "DIRECT — driver ambil langsung di lokasi customer, kirim langsung ke penerima. Tidak lewat gudang."
+                    : "STANDARD — kurir pickup → gudang → transport → gudang tujuan → kurir delivery."
                 }
               >
                 <FormSelect
                   value={form.fulfillmentMode}
                   onValueChange={(v) => setForm({ ...form, fulfillmentMode: v as "STANDARD" | "DIRECT" })}
                   options={[
-                    { value: "STANDARD", label: "STANDARD — Lewat gudang (kurir pickup → gudang → transport → gudang tujuan)" },
-                    { value: "DIRECT", label: "DIRECT — Driver langsung (pickup di gudang asal → delivery ke gudang tujuan)" },
+                    { value: "STANDARD", label: "STANDARD — Lewat gudang" },
+                    { value: "DIRECT", label: "DIRECT — Driver langsung (tanpa gudang)" },
                   ]}
                   disabled={busy}
                 />
               </Field>
+              {/* Gudang Asal / Gudang Tujuan — only shown for STANDARD fulfillment.
+                  DIRECT shipments skip the company warehouse flow entirely, so
+                  these fields are irrelevant and hidden to keep the form clean. */}
+              {form.fulfillmentMode === "STANDARD" && (
+                <>
+                  <Field
+                    label="Gudang Asal"
+                    htmlFor="s-warehouse-from"
+                    hint={selectedTariff ? "Otomatis dari rute — dapat diubah" : "Otomatis terisi saat rute dipilih"}
+                  >
+                    <FormSelect
+                      value={form.originWarehouseId}
+                      onValueChange={(v) => setForm({ ...form, originWarehouseId: v })}
+                      placeholder="—"
+                      options={(options?.warehouses ?? []).map((w) => ({ value: String(w.id), label: w.name }))}
+                      disabled={busy}
+                    />
+                  </Field>
+                  <Field
+                    label="Gudang Tujuan"
+                    htmlFor="s-warehouse-to"
+                    hint={selectedTariff ? "Otomatis dari rute — dapat diubah" : "Otomatis terisi saat rute dipilih"}
+                  >
+                    <FormSelect
+                      value={form.destinationWarehouseId}
+                      onValueChange={(v) => setForm({ ...form, destinationWarehouseId: v })}
+                      placeholder="—"
+                      options={(options?.warehouses ?? []).map((w) => ({ value: String(w.id), label: w.name }))}
+                      disabled={busy}
+                    />
+                  </Field>
+                </>
+              )}
+              {form.fulfillmentMode === "DIRECT" && (
+                <div className="sm:col-span-2 rounded-lg border border-violet-300 bg-violet-50/60 px-3 py-2 text-xs text-violet-800 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-300">
+                  <b>Mode DIRECT</b> — shipment tidak melalui gudang. Driver akan pickup langsung di lokasi pengirim dan mengantar langsung ke penerima. Pastikan alamat Pengirim & Penerima diisi dengan lengkap.
+                </div>
+              )}
               {/* Discount is entered in Rupiah; the backend derives its percentage. */}
               {canAddDiscount && (
                 <Field
@@ -1056,7 +1060,7 @@ function ScanArrivalPickerDialog({
     return list.filter(
       (a) => matches(q, a.masterCode, a.customerName, a.kurirName),
     );
-     
+
   }, [data, search]);
 
   const transportArrivals = useMemo(() => {
@@ -1065,7 +1069,7 @@ function ScanArrivalPickerDialog({
     return list.filter(
       (a) => matches(q, a.masterCode, a.customerName, a.originWarehouseName, a.origin, a.driverName, a.transportCode),
     );
-     
+
   }, [data, search]);
 
   const warehouses = (options?.warehouses ?? []).map((w) => ({ id: w.id, name: w.name }));

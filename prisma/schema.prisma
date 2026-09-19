@@ -343,7 +343,17 @@ model Vehicle {
   name          String?
   status        String                @default("ACTIVE")
   maxWeightKg   Float
+  /// Maximum cargo volume in m³. Revise round 9: when lengthM/widthM/heightM
+  /// are all set, this is auto-computed as (L × W × H) and the form field
+  /// becomes read-only. The user can still override by clearing the
+  /// dimensions and typing a value directly.
   maxVolumeM3   Float
+  /// Revise round 9 — physical cargo box dimensions in meters.
+  /// When all three are set, maxVolumeM3 is auto-computed as L × W × H.
+  /// Displayed on the Vehicles page as "Ukuran" before "Kapasitas".
+  lengthM       Float?
+  widthM        Float?
+  heightM       Float?
   notes         String?
   ownerId       Int?
   createdAt     DateTime              @default(now())

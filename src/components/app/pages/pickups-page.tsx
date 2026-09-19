@@ -8,6 +8,7 @@ import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
 import { ItemAuditDialog } from "@/components/app/item-audit-dialog";
+import { PhotoDetailDialog } from "@/components/app/photo-detail-dialog";
 import { StatusBadge } from "@/components/app/status-badge";
 import { Field, FormSelect, SubmitButton, Textarea, formatDate } from "@/components/app/form-parts";
 import { QrScanDialog, type ScanTaskInfo } from "@/components/app/qr-scan-dialog";
@@ -60,6 +61,10 @@ export function PickupsPage() {
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<PickupTask | null>(null);
   const [scanTask, setScanTask] = useState<ScanTaskInfo | null>(null);
+  // Revise round 9 — Photo detail dialog state. Opens when the user clicks
+  // "Detail Foto" on a pickup row. Shows the pickup photo at full size,
+  // gated by proof_photo.view (Admin Gudang + Owner).
+  const [photoPickup, setPhotoPickup] = useState<PickupTask | null>(null);
 
   // Owner per-gudang tabs (Daftar | Gudang A | Gudang B | … | Log Aktivitas):
   // filter the already-fetched rows to the selected gudang. Non-owner users
@@ -313,6 +318,22 @@ export function PickupsPage() {
           render: (p) => (
             <div className="flex flex-wrap gap-1.5">
               <ItemAuditDialog entityType="pickup" entityId={p.id} itemLabel={p.pickupCode} />
+              {/* Revise round 9 — Detail Foto button. Opens a dialog showing the
+                  pickup photo (proof of pickup) at full size. Display is gated
+                  by proof_photo.view (Admin Gudang + Owner). The button is
+                  always visible to admins/owner; if no photo is set, the dialog
+                  shows a "belum ada foto" placeholder. */}
+              {(can.viewProofPhoto || !isExecutor) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7"
+                  onClick={() => setPhotoPickup(p)}
+                  title={p.photoUrl ? "Lihat foto bukti pickup" : "Detail foto (belum ada foto)"}
+                >
+                  <Camera className="h-3.5 w-3.5" /> Detail Foto
+                </Button>
+              )}
               {p.status !== "COMPLETED" && p.status !== "CANCELLED" && (can.confirm || can.scan) && (
                 <Button size="sm" className="h-7" onClick={() => openScan(p)}>
                   <QrCode className="h-3.5 w-3.5" /> {isExecutor ? "Proses / Scan QR" : "Selesaikan (Scan QR)"}
@@ -443,6 +464,24 @@ export function PickupsPage() {
         mode="pickup"
         task={scanTask}
         onDone={reload}
+      />
+
+      {/* Revise round 9 — Photo Detail Dialog for pickups. Shows the pickup
+          photo (proof of pickup) at full size, gated by proof_photo.view. */}
+      <PhotoDetailDialog
+        open={!!photoPickup}
+        onOpenChange={(open) => !open && setPhotoPickup(null)}
+        title={`Foto Bukti Pickup — ${photoPickup?.pickupCode ?? ""}`}
+        description="Foto bukti penjemputan paket oleh kurir di lokasi customer."
+        photos={
+          photoPickup?.photoUrl
+            ? [{
+                url: photoPickup.photoUrl,
+                label: `Pickup ${photoPickup.pickupCode}`,
+                recordedAt: photoPickup.completedAt,
+              }]
+            : []
+        }
       />
     </div>
   );

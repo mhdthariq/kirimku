@@ -85,9 +85,36 @@ export function TransportFormDialog({
       });
     } else {
       setForm(EMPTY);
-      apiGet<Shipment[]>("/shipments?status=RECEIVED_AT_GUDANG")
-        .then(setReadyShipments)
-        .catch(() => undefined);
+      // Revise round 9 — fetch BOTH STANDARD (RECEIVED_AT_GUDANG) and DIRECT
+      // (CREATED / READY_FOR_PICKUP) shipments so the user can pick from
+      // either fulfillment mode when loading a transport. The server-side
+      // POST /transports endpoint enforces the actual eligibility rules.
+      Promise.all([
+        apiGet<Shipment[]>("/shipments?status=RECEIVED_AT_GUDANG").catch(() => [] as Shipment[]),
+        apiGet<Shipment[]>("/shipments?status=CREATED").catch(() => [] as Shipment[]),
+        apiGet<Shipment[]>("/shipments?status=READY_FOR_PICKUP").catch(() => [] as Shipment[]),
+      ]).then(([std, dirCreated, dirReady]) => {
+        // Merge + dedupe by id + keep only DIRECT entries from the CREATED /
+        // READY_FOR_PICKUP pools (STANDARD ones come only from RECEIVED_AT_GUDANG).
+        const seen = new Set<number>();
+        const merged: Shipment[] = [];
+        for (const s of [...std, ...dirCreated, ...dirReady]) {
+          if (seen.has(s.id)) continue;
+          seen.add(s.id);
+          // Exclude DIRECT shipments from the RECEIVED_AT_GUDANG pool (they
+          // shouldn't have that status anyway, but defensive): they're
+          // already merged from the DIRECT pools above.
+          // Also exclude STANDARD shipments from the CREATED/READY_FOR_PICKUP
+          // pools — they need to go through the warehouse scan flow first.
+          const isDirect = (s.fulfillmentMode ?? "STANDARD") === "DIRECT";
+          if (std.includes(s) && !isDirect) {
+            merged.push(s);
+          } else if (isDirect) {
+            merged.push(s);
+          }
+        }
+        setReadyShipments(merged);
+      });
     }
   }, [open, editing]);
 
@@ -240,32 +267,50 @@ export function TransportFormDialog({
 
           {!editing && (
             <div className="space-y-2">
-              <p className="text-sm font-medium text-foreground">Muat shipment (status RECEIVED_AT_GUDANG)</p>
+              {/* Revise round 9 — removed the over-explained "(status RECEIVED_AT_GUDANG)"
+                  text. Each shipment row now shows a compact DIRECT / STANDARD
+                  badge so the user can tell at a glance which flow the shipment
+                  belongs to. */}
+              <p className="text-sm font-medium text-foreground">Muat shipment</p>
               {readyShipments.length === 0 ? (
                 <p className="rounded-lg border border-dashed px-3.5 py-3 text-sm text-muted-foreground">
-                  Tidak ada shipment siap dimuat saat ini — transport tetap bisa dibuat kosong.
+                  Tidak ada shipment siap dimuat.
                 </p>
               ) : (
                 <div className="max-h-40 space-y-1.5 overflow-y-auto rounded-lg border p-2.5">
-                  {readyShipments.map((s) => (
-                    <label key={s.id} className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm hover:bg-accent">
-                      <input
-                        type="checkbox"
-                        checked={form.shipmentIds.includes(s.id)}
-                        onChange={(e) =>
-                          setForm((f) => ({
-                            ...f,
-                            shipmentIds: e.target.checked ? [...f.shipmentIds, s.id] : f.shipmentIds.filter((id) => id !== s.id),
-                          }))
-                        }
-                        className="h-4 w-4 rounded border-input accent-primary"
-                      />
-                      <span className="font-mono text-xs font-semibold">{s.masterCode}</span>
-                      <span className="truncate text-xs text-muted-foreground">
-                        {s.customer?.name} · {s.destination}
-                      </span>
-                    </label>
-                  ))}
+                  {readyShipments.map((s) => {
+                    const isDirect = (s.fulfillmentMode ?? "STANDARD") === "DIRECT";
+                    return (
+                      <label key={s.id} className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm hover:bg-accent">
+                        <input
+                          type="checkbox"
+                          checked={form.shipmentIds.includes(s.id)}
+                          onChange={(e) =>
+                            setForm((f) => ({
+                              ...f,
+                              shipmentIds: e.target.checked ? [...f.shipmentIds, s.id] : f.shipmentIds.filter((id) => id !== s.id),
+                            }))
+                          }
+                          className="h-4 w-4 rounded border-input accent-primary"
+                        />
+                        <span className="font-mono text-xs font-semibold">{s.masterCode}</span>
+                        <span
+                          className={
+                            "inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold " +
+                            (isDirect
+                              ? "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300"
+                              : "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300")
+                          }
+                          title={isDirect ? "DIRECT — driver langsung, tanpa gudang" : "STANDARD — lewat gudang"}
+                        >
+                          {isDirect ? "DIRECT" : "STANDARD"}
+                        </span>
+                        <span className="truncate text-xs text-muted-foreground">
+                          {s.customer?.name} · {s.destination}
+                        </span>
+                      </label>
+                    );
+                  })}
                 </div>
               )}
             </div>

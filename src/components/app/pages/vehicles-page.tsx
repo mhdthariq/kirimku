@@ -20,11 +20,16 @@ interface VehicleForm {
   status: string;
   maxWeightKg: string;
   maxVolumeM3: string;
+  // Revise round 9 — physical cargo box dimensions in meters.
+  // When all three are set, maxVolumeM3 is auto-computed as L × W × H.
+  lengthM: string;
+  widthM: string;
+  heightM: string;
   notes: string;
   ownerId: string;
 }
 
-const EMPTY: VehicleForm = { vehicleNumber: "", name: "", status: "ACTIVE", maxWeightKg: "", maxVolumeM3: "", notes: "", ownerId: "" };
+const EMPTY: VehicleForm = { vehicleNumber: "", name: "", status: "ACTIVE", maxWeightKg: "", maxVolumeM3: "", lengthM: "", widthM: "", heightM: "", notes: "", ownerId: "" };
 
 export function VehiclesPage() {
   const { user } = useAuth();
@@ -63,6 +68,9 @@ export function VehiclesPage() {
       status: v.status,
       maxWeightKg: String(v.maxWeightKg),
       maxVolumeM3: String(v.maxVolumeM3),
+      lengthM: v.lengthM != null ? String(v.lengthM) : "",
+      widthM: v.widthM != null ? String(v.widthM) : "",
+      heightM: v.heightM != null ? String(v.heightM) : "",
       notes: v.notes ?? "",
       ownerId: v.ownerId ? String(v.ownerId) : "",
     });
@@ -72,12 +80,23 @@ export function VehiclesPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
+    // Revise round 9 — auto-compute maxVolumeM3 from L × W × H when all
+    // three dimensions are entered. The form's maxVolumeM3 field becomes
+    // read-only in that case (see the field below).
+    const L = Number(form.lengthM || 0);
+    const W = Number(form.widthM || 0);
+    const H = Number(form.heightM || 0);
+    const dimsComplete = form.lengthM !== "" && form.widthM !== "" && form.heightM !== "" && L > 0 && W > 0 && H > 0;
+    const computedVolume = dimsComplete ? Math.round(L * W * H * 1000) / 1000 : Number(form.maxVolumeM3);
     const payload = {
       vehicleNumber: form.vehicleNumber,
       name: form.name || null,
       status: form.status,
       maxWeightKg: Number(form.maxWeightKg),
-      maxVolumeM3: Number(form.maxVolumeM3),
+      maxVolumeM3: computedVolume,
+      lengthM: form.lengthM === "" ? null : Number(form.lengthM),
+      widthM: form.widthM === "" ? null : Number(form.widthM),
+      heightM: form.heightM === "" ? null : Number(form.heightM),
       notes: form.notes || null,
       // Revise.md §13 — optional Vehicle Owner (empty = company-owned)
       ownerId: form.ownerId ? Number(form.ownerId) : null,
@@ -144,6 +163,23 @@ export function VehiclesPage() {
                     {v.name && <p className="text-xs text-muted-foreground">{v.name}</p>}
                   </div>
                 ),
+              },
+              {
+                // Revise round 9 — Ukuran column shown BEFORE Kapasitas.
+                // Displays P × L × T in meters when dimensions are set.
+                key: "dimensions",
+                header: "Ukuran",
+                hideOnMobile: true,
+                render: (v) =>
+                  v.lengthM != null && v.widthM != null && v.heightM != null ? (
+                    <div className="text-xs text-muted-foreground">
+                      <p>P {formatNumber(v.lengthM, 3)}m</p>
+                      <p>L {formatNumber(v.widthM, 3)}m</p>
+                      <p>T {formatNumber(v.heightM, 3)}m</p>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  ),
               },
               {
                 key: "capacity",
@@ -237,14 +273,85 @@ export function VehiclesPage() {
                   disabled={busy}
                 />
               </Field>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Max Berat (kg)" htmlFor="v-weight">
-                  <NumberInput id="v-weight" value={form.maxWeightKg} onChange={(e) => setForm({ ...form, maxWeightKg: e.target.value })} placeholder="3500" required disabled={busy} />
-                </Field>
-                <Field label="Max Volume (m³)" htmlFor="v-volume">
-                  <NumberInput id="v-volume" value={form.maxVolumeM3} onChange={(e) => setForm({ ...form, maxVolumeM3: e.target.value })} placeholder="14" required disabled={busy} />
-                </Field>
-              </div>
+              <Field label="Max Berat (kg)" htmlFor="v-weight">
+                <NumberInput id="v-weight" value={form.maxWeightKg} onChange={(e) => setForm({ ...form, maxWeightKg: e.target.value })} placeholder="3500" required disabled={busy} />
+              </Field>
+              {/* Revise round 9 — physical cargo box dimensions in meters.
+                  When all three are set, maxVolumeM3 is auto-computed as L × W × H
+                  and the volume field below becomes read-only. */}
+              <Field
+                label="Ukuran — Panjang (m)"
+                htmlFor="v-length"
+                className="sm:col-span-2"
+                hint="Isi Panjang × Lebar × Tinggi (m) untuk menghitung volume otomatis."
+              >
+                <div className="grid grid-cols-3 gap-2">
+                  <NumberInput
+                    id="v-length"
+                    value={form.lengthM}
+                    onChange={(e) => setForm({ ...form, lengthM: e.target.value })}
+                    placeholder="4.906"
+                    step="0.001"
+                    min="0"
+                    disabled={busy}
+                  />
+                  <NumberInput
+                    id="v-width"
+                    value={form.widthM}
+                    onChange={(e) => setForm({ ...form, widthM: e.target.value })}
+                    placeholder="1.993"
+                    step="0.001"
+                    min="0"
+                    disabled={busy}
+                  />
+                  <NumberInput
+                    id="v-height"
+                    value={form.heightM}
+                    onChange={(e) => setForm({ ...form, heightM: e.target.value })}
+                    placeholder="2.050"
+                    step="0.001"
+                    min="0"
+                    disabled={busy}
+                  />
+                </div>
+                <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
+                  <span>P</span>
+                  <span>·</span>
+                  <span>L</span>
+                  <span>·</span>
+                  <span>T</span>
+                  <span className="ml-auto">
+                    {form.lengthM !== "" && form.widthM !== "" && form.heightM !== "" && Number(form.lengthM) > 0 && Number(form.widthM) > 0 && Number(form.heightM) > 0
+                      ? `= ${Math.round(Number(form.lengthM) * Number(form.widthM) * Number(form.heightM) * 1000) / 1000} m³`
+                      : "isi ketiganya untuk auto-volume"}
+                  </span>
+                </div>
+              </Field>
+              <Field
+                label="Max Volume (m³)"
+                htmlFor="v-volume"
+                hint={
+                  form.lengthM !== "" && form.widthM !== "" && form.heightM !== "" && Number(form.lengthM) > 0 && Number(form.widthM) > 0 && Number(form.heightM) > 0
+                    ? "Auto-computed dari ukuran — clear ukuran untuk override manual."
+                    : "Boleh diisi manual jika ukuran tidak diisi."
+                }
+              >
+                <NumberInput
+                  id="v-volume"
+                  value={
+                    form.lengthM !== "" && form.widthM !== "" && form.heightM !== "" && Number(form.lengthM) > 0 && Number(form.widthM) > 0 && Number(form.heightM) > 0
+                      ? String(Math.round(Number(form.lengthM) * Number(form.widthM) * Number(form.heightM) * 1000) / 1000)
+                      : form.maxVolumeM3
+                  }
+                  onChange={(e) => setForm({ ...form, maxVolumeM3: e.target.value })}
+                  placeholder="14"
+                  required
+                  disabled={
+                    busy ||
+                    (form.lengthM !== "" && form.widthM !== "" && form.heightM !== "" && Number(form.lengthM) > 0 && Number(form.widthM) > 0 && Number(form.heightM) > 0)
+                  }
+                />
+              </Field>
               <Field label="Catatan" htmlFor="v-notes" className="sm:col-span-2">
                 <Textarea id="v-notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} placeholder="Opsional" disabled={busy} />
               </Field>

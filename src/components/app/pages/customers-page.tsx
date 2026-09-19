@@ -142,15 +142,15 @@ export function CustomersPage() {
 
   const marketingPartnerOptions = [
     // "none" sentinel — Radix Select forbids empty-string item values
-    { value: "none", label: "— Belum terhubung (umum) —" },
+    { value: "none", label: "Tidak terhubung (umum)" },
     ...(options?.marketingPartners ?? []).map((p) => ({
       value: String(p.id),
-      label: p.warehouseName ? `${p.name} · ${p.warehouseName}` : `${p.name} · Umum`,
+      label: p.warehouseName ? `${p.name} · ${p.warehouseName}` : `${p.name}`,
     })),
   ];
   // Revise round 7 — Gudang dropdown for Customer attachment.
   const gudangOptions = [
-    { value: "none", label: "— Umum (terlihat oleh semua gudang) —" },
+    { value: "none", label: "Umum (terlihat oleh semua gudang)" },
     ...(options?.warehouses ?? []).map((w) => ({ value: String(w.id), label: w.name + (w.city ? ` · ${w.city}` : "") })),
   ];
 
@@ -286,7 +286,7 @@ export function CustomersPage() {
                 <FormSelect
                   value={form.type}
                   onValueChange={(value) => setForm({ ...form, type: value as "b2b" | "b2c" })}
-                  options={[{ value: "b2c", label: "B2C — individu" }, { value: "b2b", label: "B2B — perusahaan" }]}
+                  options={[{ value: "b2c", label: "B2C" }, { value: "b2b", label: "B2B" }]}
                   disabled={busy}
                 />
               </Field>
@@ -302,7 +302,7 @@ export function CustomersPage() {
                   label="Marketing (PIC)"
                   htmlFor="c-marketing"
                   className="sm:col-span-2"
-                  hint="Customer hanya terlihat oleh marketing ini — khususnya penting untuk B2B."
+                  hint="Customer hanya terlihat oleh marketing yang dipilih."
                 >
                   <FormSelect
                     value={form.marketingPartnerId}

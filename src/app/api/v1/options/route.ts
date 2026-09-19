@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
         };
     const [employees, vehicles, routes, warehouses, customers, tariffs, permissions, vehicleOwners, marketingPartners, b2bShipments] = await Promise.all([
       db.employee.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true, position: true, warehouseId: true } }),
-      db.vehicle.findMany({ where: { status: "ACTIVE" }, orderBy: { vehicleNumber: "asc" }, select: { id: true, vehicleNumber: true, name: true, maxWeightKg: true } }),
+      db.vehicle.findMany({ where: { status: "ACTIVE" }, orderBy: { vehicleNumber: "asc" }, select: { id: true, vehicleNumber: true, name: true, maxWeightKg: true, maxVolumeM3: true, lengthM: true, widthM: true, heightM: true } }),
       db.route.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true, origin: true, destination: true } }),
       db.warehouse.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, code: true, name: true, city: true, customerSupportContact: true } }),
       // Marketing data separation: a Marketing partner only gets THEIR customers

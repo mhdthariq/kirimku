@@ -32,6 +32,7 @@ import { StatusBadge } from "@/components/app/status-badge";
 import { formatDate, formatNumber, formatRupiah } from "@/components/app/form-parts";
 import { CheckpointCheckinDialog } from "@/components/app/checkpoint-checkin-dialog";
 import { TransportFormDialog } from "@/components/app/transport-form-dialog";
+import { PhotoDetailDialog, type PhotoDetail } from "@/components/app/photo-detail-dialog";
 import type { TransportMapCheckpoint } from "@/components/app/transport-map";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -87,6 +88,10 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
   const [checkinOpen, setCheckinOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Revise round 9 — checkpoint photos dialog state. When the user clicks a
+  // checkpoint record photo, we open the PhotoDetailDialog with all records
+  // for that checkpoint so they can browse them at full size.
+  const [photoRecords, setPhotoRecords] = useState<PhotoDetail[] | null>(null);
 
   const can = {
     checkin: hasPermission(user, "transport.checkin"),
@@ -328,23 +333,40 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
                       <div className="mt-2.5 flex flex-wrap gap-2">
                         {records.slice(0, 4).map((r) => (
                           <div key={r.id} className="w-[104px] space-y-1">
-                            {r.photoUrl ? (
-                              canViewProofPhotos ? (
-                                <a href={r.photoUrl} target="_blank" rel="noreferrer" title="Lihat foto bukti">
+                            {/* Revise round 9 — checkpoint record photo. Click opens
+                                the PhotoDetailDialog (full-size view). Display is
+                                gated by proof_photo.view (Admin Gudang + Owner). */}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setPhotoRecords(
+                                  records.map((rec) => ({
+                                    url: rec.photoUrl ?? "",
+                                    label: `${r.checkpointName} · CP ${r.checkpointSequence}`,
+                                    recordedAt: rec.recordedAt,
+                                    recordedBy: rec.recordedBy?.name ?? null,
+                                  })),
+                                )
+                              }
+                              className="block w-full"
+                              title={r.photoUrl ? "Klik untuk lihat foto lebih besar" : "Belum ada foto"}
+                            >
+                              {r.photoUrl ? (
+                                canViewProofPhotos ? (
                                   <img src={r.photoUrl} alt={`Bukti ${r.checkpointName}`} className="h-16 w-full rounded-md border object-cover" />
-                                </a>
+                                ) : (
+                                  <div
+                                    className="flex h-16 w-full flex-col items-center justify-center gap-1 rounded-md border bg-muted/60 px-1 text-center text-[9px] font-medium text-muted-foreground"
+                                    title="Foto bukti hanya dapat dilihat oleh Admin Gudang / Owner (proof_photo.view)"
+                                  >
+                                    <Camera className="h-4 w-4" />
+                                    foto terkunci
+                                  </div>
+                                )
                               ) : (
-                                <div
-                                  className="flex h-16 w-full flex-col items-center justify-center gap-1 rounded-md border bg-muted/60 px-1 text-center text-[9px] font-medium text-muted-foreground"
-                                  title="Foto bukti hanya dapat dilihat oleh Admin Gudang / Owner (proof_photo.view)"
-                                >
-                                  <Camera className="h-4 w-4" />
-                                  foto terkunci
-                                </div>
-                              )
-                            ) : (
-                              <div className="flex h-16 w-full items-center justify-center rounded-md border bg-muted text-[10px] text-muted-foreground">tanpa foto</div>
-                            )}
+                                <div className="flex h-16 w-full items-center justify-center rounded-md border bg-muted text-[10px] text-muted-foreground">tanpa foto</div>
+                              )}
+                            </button>
                             <p className="text-[10px] leading-tight text-muted-foreground">
                               {new Date(r.recordedAt).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                               <br />
@@ -507,6 +529,17 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Revise round 9 — Photo Detail Dialog for checkpoint records.
+          Opens when the user clicks a checkpoint photo thumbnail. Shows
+          all photos for that checkpoint at full size, gated by proof_photo.view. */}
+      <PhotoDetailDialog
+        open={!!photoRecords}
+        onOpenChange={(open) => !open && setPhotoRecords(null)}
+        title={`Foto Bukti Checkpoint — ${transport?.transportCode ?? ""}`}
+        description="Foto bukti check-in driver/kenek di setiap checkpoint sepanjang rute transport."
+        photos={photoRecords ?? []}
+      />
     </div>
   );
 }

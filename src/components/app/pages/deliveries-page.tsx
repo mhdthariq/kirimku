@@ -8,6 +8,7 @@ import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
 import { ItemAuditDialog } from "@/components/app/item-audit-dialog";
+import { PhotoDetailDialog } from "@/components/app/photo-detail-dialog";
 import { StatusBadge } from "@/components/app/status-badge";
 import { Field, FormSelect, SubmitButton, Textarea, formatDate, formatRupiah } from "@/components/app/form-parts";
 import { QrScanDialog, type ScanTaskInfo } from "@/components/app/qr-scan-dialog";
@@ -63,6 +64,10 @@ export function DeliveriesPage() {
   const [editTarget, setEditTarget] = useState<DeliveryTask | null>(null);
   const [detailTarget, setDetailTarget] = useState<DeliveryTask | null>(null);
   const [scanTask, setScanTask] = useState<ScanTaskInfo | null>(null);
+  // Revise round 9 — Photo detail dialog state. Opens when the user clicks
+  // "Detail Foto" on a delivery row. Shows the delivery photo at full size,
+  // gated by proof_photo.view (Admin Gudang + Owner).
+  const [photoDelivery, setPhotoDelivery] = useState<DeliveryTask | null>(null);
   const [form, setForm] = useState<DeliveryForm>(EMPTY);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<DeliveryTask | null>(null);
@@ -276,6 +281,20 @@ export function DeliveriesPage() {
                 render: (d) => (
                   <div className="flex flex-wrap gap-1.5">
                     <ItemAuditDialog entityType="delivery" entityId={d.id} itemLabel={d.deliveryCode} />
+                    {/* Revise round 9 — Detail Foto button. Opens a dialog showing
+                        the delivery photo (proof of delivery) at full size.
+                        Display is gated by proof_photo.view (Admin Gudang + Owner). */}
+                    {(can.viewProofPhoto || !isExecutor) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7"
+                        onClick={() => setPhotoDelivery(d)}
+                        title={d.photoUrl ? "Lihat foto bukti serah terima" : "Detail foto (belum ada foto)"}
+                      >
+                        <Camera className="h-3.5 w-3.5" /> Detail Foto
+                      </Button>
+                    )}
                     {d.status !== "COMPLETED" && d.status !== "FAILED" && (can.confirm || can.scan) && (
                       <Button size="sm" className="h-7" onClick={() => openScan(d)}>
                         <QrCode className="h-3.5 w-3.5" /> {isExecutor ? "Antar / Scan QR" : "Selesaikan (Scan QR)"}
@@ -442,6 +461,25 @@ export function DeliveriesPage() {
         mode="delivery"
         task={scanTask}
         onDone={reload}
+      />
+
+      {/* Revise round 9 — Photo Detail Dialog for deliveries. Shows the
+          delivery photo (proof of delivery image) at full size, gated by
+          proof_photo.view (Admin Gudang + Owner). */}
+      <PhotoDetailDialog
+        open={!!photoDelivery}
+        onOpenChange={(open) => !open && setPhotoDelivery(null)}
+        title={`Foto Bukti Delivery — ${photoDelivery?.deliveryCode ?? ""}`}
+        description="Foto bukti serah terima paket kepada penerima di lokasi tujuan."
+        photos={
+          photoDelivery?.photoUrl
+            ? [{
+                url: photoDelivery.photoUrl,
+                label: `Delivery ${photoDelivery.deliveryCode}`,
+                recordedAt: photoDelivery.completedAt,
+              }]
+            : []
+        }
       />
     </div>
   );

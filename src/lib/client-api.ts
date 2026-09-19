@@ -405,6 +405,11 @@ export interface Vehicle {
   status: string;
   maxWeightKg: number;
   maxVolumeM3: number;
+  /** Revise round 9 — physical cargo box dimensions in meters.
+   *  When all three are set, maxVolumeM3 = L × W × H (computed on save). */
+  lengthM?: number | null;
+  widthM?: number | null;
+  heightM?: number | null;
   notes: string | null;
   /** Revise.md §13 — linked Vehicle Owner (null = company-owned) */
   ownerId: number | null;
@@ -707,7 +712,7 @@ export interface Permission {
 export interface Options {
   company: { name: string };
   employees: { id: number; name: string; position: string | null; warehouseId: number | null }[];
-  vehicles: { id: number; vehicleNumber: string; name: string | null; maxWeightKg: number }[];
+  vehicles: { id: number; vehicleNumber: string; name: string | null; maxWeightKg: number; maxVolumeM3?: number; lengthM?: number | null; widthM?: number | null; heightM?: number | null }[];
   routes: { id: number; name: string; origin: string | null; destination: string | null }[];
   warehouses: { id: number; code: string; name: string; city: string | null; customerSupportContact?: string | null }[];
   customers: { id: number; code: string; name: string; type: string; phone: string | null; email: string | null; address: string | null; marketingPartnerId?: number | null; warehouseId?: number | null; warehouseName?: string | null }[];

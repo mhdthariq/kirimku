@@ -171,8 +171,22 @@ export async function POST(req: NextRequest) {
 
     const shipments = await db.masterShipment.findMany({ where: { id: { in: shipmentIds } } });
     for (const s of shipments) {
-      if (s.status !== "RECEIVED_AT_GUDANG") {
-        return fail(422, `Shipment ${s.masterCode} harus berstatus RECEIVED_AT_GUDANG (saat ini: ${s.status}).`);
+      // Revise round 9 — DIRECT shipments skip the company warehouse scan flow,
+      // so they don't go through RECEIVED_AT_GUDANG. They're eligible for
+      // transport as soon as they're CREATED (or READY_FOR_PICKUP for DIRECT).
+      // STANDARD shipments must still go through the warehouse scan flow
+      // and be RECEIVED_AT_GUDANG before they can be loaded onto a transport.
+      const isDirect = (s.fulfillmentMode ?? "STANDARD") === "DIRECT";
+      const allowedStatuses = isDirect
+        ? ["CREATED", "READY_FOR_PICKUP"]
+        : ["RECEIVED_AT_GUDANG"];
+      if (!allowedStatuses.includes(s.status)) {
+        return fail(
+          422,
+          isDirect
+            ? `Shipment DIRECT ${s.masterCode} harus berstatus CREATED atau READY_FOR_PICKUP (saat ini: ${s.status}).`
+            : `Shipment ${s.masterCode} harus berstatus RECEIVED_AT_GUDANG (saat ini: ${s.status}).`,
+        );
       }
     }
 
