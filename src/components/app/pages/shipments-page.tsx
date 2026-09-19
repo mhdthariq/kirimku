@@ -59,6 +59,11 @@ interface ShipmentForm {
   tariffId: string;
   originWarehouseId: string;
   destinationWarehouseId: string;
+  // Revise round 8 — Fulfillment Mode. "STANDARD" = the existing
+  // kurir → company warehouse → transport → destination warehouse →
+  // kurir delivery flow. "DIRECT" = driver picks up directly at the
+  // origin warehouse and delivers directly to the destination warehouse.
+  fulfillmentMode: "STANDARD" | "DIRECT";
   penerimaName: string;
   penerimaAddress: string;
   penerimaContact: string;
@@ -85,6 +90,8 @@ const EMPTY_SHIPMENT: ShipmentForm = {
   tariffId: "",
   originWarehouseId: "",
   destinationWarehouseId: "",
+  // Revise round 8 — default to STANDARD (existing flow).
+  fulfillmentMode: "STANDARD",
   penerimaName: "",
   penerimaAddress: "",
   penerimaContact: "",
@@ -141,7 +148,7 @@ function ShipmentList() {
   );
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [tab, setTab] = useState("list");
+  const [tab, setTab] = useState("regular");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState<ShipmentForm>(EMPTY_SHIPMENT);
   const [busy, setBusy] = useState(false);
@@ -150,12 +157,20 @@ function ShipmentList() {
   const [rowScanTask, setRowScanTask] = useState<GudangArrivalQueueItem | null>(null);
   const [rowTransportTask, setRowTransportTask] = useState<GudangTransportArrivalItem | null>(null);
 
-  // Owner per-gudang tabs (Daftar | Gudang A | Gudang B | … | Log Aktivitas):
-  // filter the fetched rows to the selected gudang. Non-owner users only
-  // ever receive their own gudang's data from the API.
+  // Owner per-gudang tabs (Regular | Direct | Gudang A | Gudang B | … | Log Aktivitas):
+  // - "regular" = all STANDARD shipments (the existing flow).
+  // - "direct"  = all DIRECT shipments (the new driver-direct flow).
+  // - "wh-{id}" = STANDARD shipments belonging to that specific gudang.
+  //   Owner's per-gudang tabs do NOT include DIRECT shipments — DIRECT
+  //   shipments live only in the Direct tab so they aren't merged into
+  //   the regular per-gudang view.
+  // Non-owner users see Regular | Direct only — their data is already
+  // scoped server-side to their own gudang.
   const isOwner = !!user?.isOwner;
   const gudangOptions = options?.warehouses ?? [];
   const activeGudangId = parseGudangTabValue(tab);
+  const isRegularTab = tab === "regular";
+  const isDirectTab = tab === "direct";
 
   const rows = useMemo(() => {
     if (!data) return [];
@@ -163,7 +178,18 @@ function ShipmentList() {
     return data.filter(
       (s) =>
         (statusFilter === "all" || s.status === statusFilter) &&
-        (activeGudangId == null || (s.gudangIds ?? []).includes(activeGudangId)) &&
+        // Revise round 8 — Fulfillment Mode filter:
+        //  - "regular" tab → only STANDARD
+        //  - "direct"  tab → only DIRECT
+        //  - per-gudang tab (owner) → only STANDARD + that gudang
+        //    (DIRECT shipments are NOT merged into per-gudang tabs)
+        (isRegularTab ? (s.fulfillmentMode ?? "STANDARD") === "STANDARD" : true) &&
+        (isDirectTab ? (s.fulfillmentMode ?? "STANDARD") === "DIRECT" : true) &&
+        (activeGudangId == null
+          ? true
+          : (s.gudangIds ?? []).includes(activeGudangId) &&
+            // per-gudang tab never includes DIRECT
+            (s.fulfillmentMode ?? "STANDARD") === "STANDARD") &&
         (!q ||
           s.masterCode.toLowerCase().includes(q) ||
           (s.customer?.name ?? "").toLowerCase().includes(q) ||
@@ -171,7 +197,7 @@ function ShipmentList() {
           s.destination.toLowerCase().includes(q) ||
           (s.penerimaName ?? "").toLowerCase().includes(q)),
     );
-  }, [data, search, statusFilter, activeGudangId]);
+  }, [data, search, statusFilter, activeGudangId, isRegularTab, isDirectTab]);
 
   /** Auto-pick Gudang Asal & Gudang Tujuan from the selected rute (tariff):
    *  the warehouse whose city matches the tariff's origin/destination is
@@ -236,6 +262,8 @@ function ShipmentList() {
       tariffId: Number(form.tariffId),
       originWarehouseId: form.originWarehouseId ? Number(form.originWarehouseId) : null,
       destinationWarehouseId: form.destinationWarehouseId ? Number(form.destinationWarehouseId) : null,
+      // Revise round 8 — Fulfillment Mode (STANDARD / DIRECT).
+      fulfillmentMode: form.fulfillmentMode,
       penerimaName: form.penerimaName || null,
       // Revise.md §6 — discount entered as AMOUNT; % derived by the backend
       discountAmount: form.discountAmount ? Number(form.discountAmount) : 0,
@@ -374,17 +402,39 @@ function ShipmentList() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="list">Daftar</TabsTrigger>
+          {/* Revise round 8 — Regular / Direct top-level tabs.
+              "Regular" = STANDARD fulfillment (kurir → gudang → transport → gudang → kurir).
+              "Direct"  = DIRECT fulfillment (driver picks up at origin warehouse → delivers to destination).
+              These two tabs are visible to every role with shipment.view.
+              The owner additionally gets per-gudang tabs AFTER these two —
+              per-gudang tabs show only STANDARD shipments (DIRECT stays in the Direct tab
+              so the per-gudang view doesn't accidentally mix in DIRECT shipments). */}
+          <TabsTrigger value="regular">Regular</TabsTrigger>
+          <TabsTrigger value="direct">Direct</TabsTrigger>
           {isOwner && <GudangTabsTriggers warehouses={gudangOptions} />}
           {/* Log Aktivitas reads the audit trail — hidden for users without
               audit_log.view (e.g. Marketing) so they never see an empty log. */}
           {can.viewLog && <TabsTrigger value="activity">Log Aktivitas</TabsTrigger>}
         </TabsList>
-        {["list", ...(isOwner ? gudangOptions.map((g) => gudangTabValue(g.id)) : [])].map((v) => {
+        {["regular", "direct", ...(isOwner ? gudangOptions.map((g) => gudangTabValue(g.id)) : [])].map((v) => {
           const activeW = gudangOptions.find((g) => gudangTabValue(g.id) === v) ?? null;
           return (
             <TabsContent key={v} value={v} className="mt-3 space-y-3">
-              {activeW && <GudangTabBanner gudangName={activeW.name} count={rows.length} />}
+              {v === "direct" && (
+                <p className="rounded-lg border border-violet-300 bg-violet-50/70 px-3 py-2 text-xs text-violet-800 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-300">
+                  <b>Direct fulfillment</b> — driver ambil langsung di gudang asal dan kirim langsung ke gudang tujuan, tanpa lewat scan gudang.
+                </p>
+              )}
+              {v === "regular" && (
+                <p className="rounded-lg border border-sky-200 bg-sky-50/40 px-3 py-2 text-[11px] text-sky-700 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-300">
+                  <b>Regular</b> — kurir pickup → gudang → transport → gudang tujuan → kurir delivery (flow standar).
+                </p>
+              )}
+              {activeW && (
+                <p className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-foreground/80">
+                  Menampilkan data <b>{activeW.name}</b> — hanya shipment <b>Regular (STANDARD)</b>. Shipment Direct ada di tab <b>Direct</b>.
+                </p>
+              )}
               {statusFilter === "PICKED_UP" && can.confirmArrival && (
                 <p className="rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-2 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300">
                   Shipment <b>PICKED UP</b> sedang dibawa kurir kembali ke gudang. Klik <b>Terima / Scan</b> pada baris untuk scan tiap paketnya
@@ -454,6 +504,17 @@ function ShipmentList() {
                       {s.customer?.type === "b2b" && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-950 dark:text-sky-300" title="B2B — cukup scan Master Resi sekali">
                           B2B · Master Resi
+                        </span>
+                      )}
+                      {/* Revise round 8 — Fulfillment Mode badge so users can
+                          tell at a glance whether this shipment is Regular
+                          (STANDARD) or Direct (DIRECT). */}
+                      {(s.fulfillmentMode ?? "STANDARD") === "DIRECT" && (
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 dark:bg-violet-950 dark:text-violet-300"
+                          title="DIRECT — driver ambil langsung di gudang asal, kirim langsung ke gudang tujuan"
+                        >
+                          DIRECT
                         </span>
                       )}
                     </p>
@@ -608,6 +669,35 @@ function ShipmentList() {
                   disabled={busy}
                 />
               </Field>
+              {/* Revise round 7 — Customer marker.
+                  When a customer is selected we show a small panel listing
+                  the customer's DB-record data so the user can quickly see
+                  the difference between what's in the database and what
+                  they've typed into the Pengirim fields below. This is a
+                  UI-only marker — nothing here is added to the resi or
+                  stored on the shipment. The "per-shipment override" hint
+                  shows next to each Pengirim field when it diverges. */}
+              {selectedCustomer && (
+                <div className="sm:col-span-2">
+                  <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5 text-xs">
+                    <p className="flex items-center gap-1.5 font-semibold text-primary">
+                      <UserRound className="h-3.5 w-3.5" />
+                      Customer terpilih (dari database)
+                    </p>
+                    <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-0.5 text-foreground/80">
+                      <p><span className="font-medium">Kode:</span> <span className="font-mono">{selectedCustomer.code}</span></p>
+                      <p><span className="font-medium">Tipe:</span> {selectedCustomer.type.toUpperCase()}</p>
+                      <p><span className="font-medium">Nama DB:</span> {selectedCustomer.name || "—"}</p>
+                      <p><span className="font-medium">Telp DB:</span> {selectedCustomer.phone || "—"}</p>
+                      <p className="col-span-2"><span className="font-medium">Email DB:</span> {selectedCustomer.email || "—"}</p>
+                      <p className="col-span-2"><span className="font-medium">Alamat DB:</span> {selectedCustomer.address || "—"}</p>
+                    </div>
+                    <p className="mt-1.5 text-[10px] text-foreground/55">
+                      Bidang Pengirim di bawah otomatis terisi dari data customer — bidang yang <span className="rounded bg-amber-100 px-1 font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">diubah</span> menandakan override per-shipment. Tidak dicetak pada resi.
+                    </p>
+                  </div>
+                </div>
+              )}
               <Field
                 label="Rute (dari daftar tarif)"
                 htmlFor="s-tariff"
@@ -661,6 +751,29 @@ function ShipmentList() {
                   disabled={busy}
                 />
               </Field>
+              {/* Revise round 8 — Fulfillment Mode.
+                  STANDARD = kurir → company warehouse → transport → destination warehouse → kurir delivery (existing flow).
+                  DIRECT   = driver picks up directly at the origin warehouse and delivers directly to the destination warehouse (no company warehouse scan). */}
+              <Field
+                label="Mode Fulfillment"
+                htmlFor="s-fulfillment-mode"
+                className="sm:col-span-2"
+                hint={
+                  form.fulfillmentMode === "DIRECT"
+                    ? "DIRECT — driver ambil langsung di gudang asal, kirim langsung ke gudang tujuan. Tidak lewat scan gudang."
+                    : "STANDARD — kurir pickup → gudang → transport → gudang tujuan → kurir delivery (default)."
+                }
+              >
+                <FormSelect
+                  value={form.fulfillmentMode}
+                  onValueChange={(v) => setForm({ ...form, fulfillmentMode: v as "STANDARD" | "DIRECT" })}
+                  options={[
+                    { value: "STANDARD", label: "STANDARD — Lewat gudang (kurir pickup → gudang → transport → gudang tujuan)" },
+                    { value: "DIRECT", label: "DIRECT — Driver langsung (pickup di gudang asal → delivery ke gudang tujuan)" },
+                  ]}
+                  disabled={busy}
+                />
+              </Field>
               {/* Discount is entered in Rupiah; the backend derives its percentage. */}
               {canAddDiscount && (
                 <Field
@@ -700,7 +813,11 @@ function ShipmentList() {
               </Field>
               {/* Pengirim (sender) — auto-filled from Customer when the customer
                   is picked, but every field is editable so the user can override
-                  the contact person / phone / email / address per-shipment. */}
+                  the contact person / phone / email / address per-shipment.
+                  Revise round 7: each field shows a "diubah" (overridden) badge
+                  when it diverges from the customer's DB record, so the user
+                  can see at a glance which values are overrides and which are
+                  still the customer's master data. */}
               <div className="sm:col-span-2">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pengirim (dicetak pada resi)</p>
@@ -709,25 +826,60 @@ function ShipmentList() {
                   </span>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Nama Pengirim" htmlFor="s-pengirim-name" className="sm:col-span-2">
+                  <Field
+                    label="Nama Pengirim"
+                    htmlFor="s-pengirim-name"
+                    className="sm:col-span-2"
+                    hint={
+                      selectedCustomer && form.pengirimName !== (selectedCustomer.name ?? "")
+                        ? "Diubah dari data customer — override per-shipment."
+                        : undefined
+                    }
+                  >
                     <Input
                       id="s-pengirim-name"
                       value={form.pengirimName}
                       onChange={(e) => setForm({ ...form, pengirimName: e.target.value })}
                       placeholder="mis. Andi Wijaya"
                       disabled={busy}
+                      className={
+                        selectedCustomer && form.pengirimName !== (selectedCustomer.name ?? "")
+                          ? "border-amber-400/60 bg-amber-50 dark:border-amber-500/40 dark:bg-amber-950/30"
+                          : undefined
+                      }
                     />
                   </Field>
-                  <Field label="Telepon Pengirim" htmlFor="s-pengirim-phone">
+                  <Field
+                    label="Telepon Pengirim"
+                    htmlFor="s-pengirim-phone"
+                    hint={
+                      selectedCustomer && form.pengirimPhone !== (selectedCustomer.phone ?? "")
+                        ? "Diubah dari data customer — override per-shipment."
+                        : undefined
+                    }
+                  >
                     <Input
                       id="s-pengirim-phone"
                       value={form.pengirimPhone}
                       onChange={(e) => setForm({ ...form, pengirimPhone: e.target.value })}
                       placeholder="0812-xxxx-xxxx"
                       disabled={busy}
+                      className={
+                        selectedCustomer && form.pengirimPhone !== (selectedCustomer.phone ?? "")
+                          ? "border-amber-400/60 bg-amber-50 dark:border-amber-500/40 dark:bg-amber-950/30"
+                          : undefined
+                      }
                     />
                   </Field>
-                  <Field label="Email Pengirim" htmlFor="s-pengirim-email" hint="Kosongkan bila tidak ada.">
+                  <Field
+                    label="Email Pengirim"
+                    htmlFor="s-pengirim-email"
+                    hint={
+                      selectedCustomer && form.pengirimEmail !== (selectedCustomer.email ?? "")
+                        ? "Diubah dari data customer — override per-shipment."
+                        : "Kosongkan bila tidak ada."
+                    }
+                  >
                     <Input
                       id="s-pengirim-email"
                       type="email"
@@ -735,9 +887,23 @@ function ShipmentList() {
                       onChange={(e) => setForm({ ...form, pengirimEmail: e.target.value })}
                       placeholder="pengirim@example.com"
                       disabled={busy}
+                      className={
+                        selectedCustomer && form.pengirimEmail !== (selectedCustomer.email ?? "")
+                          ? "border-amber-400/60 bg-amber-50 dark:border-amber-500/40 dark:bg-amber-950/30"
+                          : undefined
+                      }
                     />
                   </Field>
-                  <Field label="Alamat Pengirim" htmlFor="s-pengirim-address" className="sm:col-span-2">
+                  <Field
+                    label="Alamat Pengirim"
+                    htmlFor="s-pengirim-address"
+                    className="sm:col-span-2"
+                    hint={
+                      selectedCustomer && form.pengirimAddress !== (selectedCustomer.address ?? "")
+                        ? "Diubah dari data customer — override per-shipment."
+                        : undefined
+                    }
+                  >
                     <Textarea
                       id="s-pengirim-address"
                       value={form.pengirimAddress}
@@ -745,6 +911,11 @@ function ShipmentList() {
                       placeholder="mis. Jl. Asia Afrika No. 8, Bandung"
                       rows={2}
                       disabled={busy}
+                      className={
+                        selectedCustomer && form.pengirimAddress !== (selectedCustomer.address ?? "")
+                          ? "border-amber-400/60 bg-amber-50 dark:border-amber-500/40 dark:bg-amber-950/30"
+                          : undefined
+                      }
                     />
                   </Field>
                 </div>

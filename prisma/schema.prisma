@@ -114,8 +114,13 @@ model Partner {
   bankAccountNumber    String?
   isActive             Boolean               @default(true)
   notes                String?
+  /// Revise round 7 — Partner Alignment: optional gudang this marketing
+  /// partner is aligned to. Null = "umum" (general — serves every gudang).
+  /// Used to clarify which gudang a marketing affiliate belongs to.
+  warehouseId          Int?
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
+  warehouse            Warehouse?            @relation("PartnerAlignmentWarehouse", fields: [warehouseId], references: [id])
   customers            Customer[]            @relation("CustomerMarketingOwner")
   commissions          MarketingCommission[]
   shipmentsCreated     MasterShipment[]      @relation("ShipmentCreatorPartner")
@@ -223,9 +228,15 @@ model Customer {
   address            String?
   isActive           Boolean          @default(true)
   marketingPartnerId Int?
+  /// Revise round 7 — Gudang attachment for customers. Null = "umum"
+  /// (general — visible to every gudang). When set, the customer is
+  /// attached to a specific gudang and only that gudang's admin/staff
+  /// see it in their customer list (gudang data separation).
+  warehouseId        Int?
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
   marketingPartner   Partner?         @relation("CustomerMarketingOwner", fields: [marketingPartnerId], references: [id])
+  warehouse          Warehouse?       @relation("CustomerWarehouse", fields: [warehouseId], references: [id])
   invoices           Invoice[]
   shipments          MasterShipment[]
 }
@@ -237,6 +248,13 @@ model MasterShipment {
   customerId             Int
   tariffId               Int?
   status                 String              @default("CREATED")
+  /// Revise round 8 — Fulfillment Mode. "STANDARD" = the existing
+  /// kurir → company warehouse → transport → destination warehouse →
+  /// kurir delivery flow. "DIRECT" = driver picks up directly at the
+  /// origin warehouse (external or own) and delivers directly to the
+  /// destination warehouse, bypassing the company warehouse scan flow.
+  /// Existing rows default to "STANDARD" — no data migration required.
+  fulfillmentMode        String              @default("STANDARD")
   origin                 String
   destination            String
   originWarehouseId      Int?
@@ -303,7 +321,7 @@ model Warehouse {
   id                     Int        @id @default(autoincrement())
   code                   String     @unique
   name                   String
-  city                   String?
+  city                    String?
   address                String?
   latitude               Float?
   longitude              Float?
@@ -313,6 +331,10 @@ model Warehouse {
   createdAt              DateTime   @default(now())
   updatedAt              DateTime   @updatedAt
   employees              Employee[]
+  /// Revise round 7 — marketing partners aligned to this gudang (Partner Alignment).
+  alignedPartners        Partner[]  @relation("PartnerAlignmentWarehouse")
+  /// Revise round 7 — customers attached to this gudang (gudang data separation for customers).
+  customers              Customer[]  @relation("CustomerWarehouse")
 }
 
 model Vehicle {
@@ -445,6 +467,9 @@ model Pickup {
   kurirId     Int?
   status      String         @default("ASSIGNED")
   notes       String?
+  /// Revise round 8 — optional pickup photo (proof of pickup). Display is
+  /// gated by proof_photo.view (Admin Gudang + Owner by default).
+  photoUrl    String?
   createdAt   DateTime       @default(now())
   completedAt DateTime?
   updatedAt   DateTime       @updatedAt
@@ -491,7 +516,14 @@ model Delivery {
   masterId        Int
   kurirId         Int?
   status          String         @default("ASSIGNED")
+  /// Free-text proof of delivery — typically the receiver's name as typed
+  /// by the kurir at handover. NOT a photo URL.
   proofOfDelivery String?
+  /// Revise round 8 — optional delivery photo (proof of delivery image).
+  /// Display is gated by proof_photo.view (Admin Gudang + Owner default).
+  /// When set, the deliveries page renders it as a thumbnail instead of
+  /// (or in addition to) the text `proofOfDelivery`.
+  photoUrl        String?
   notes           String?
   createdAt       DateTime       @default(now())
   completedAt     DateTime?

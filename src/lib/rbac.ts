@@ -23,6 +23,13 @@ export const PERMISSIONS: { slug: string; module: string; description: string }[
   // Shipment Resi / Detail Resi stickers. Granted to Admin Gudang (and the
   // Owner bypasses permissions); Marketing & others do NOT get it by default.
   { slug: "shipment.print_resi", module: "Shipments", description: "Cetak resi shipment & label paket (Admin Gudang & Owner)" },
+  // Revise round 8 — Proof photo viewing. Photo evidence is sensitive
+  // (proof of delivery, checkpoint selfies, pickup scans). Default grant
+  // is ONLY Admin Gudang + Owner — Kurir / Driver / Marketing / public
+  // do not see photo thumbnails even if they can see the row that owns
+  // the photo. They still see the text metadata (timestamp, recorded-by
+  // name); only the image is hidden.
+  { slug: "proof_photo.view", module: "Proof Photos", description: "Lihat foto bukti (pickup, checkpoint, delivery PoD) — Admin Gudang & Owner" },
   { slug: "shipment_detail.view", module: "Shipments", description: "View detail shipments" },
   { slug: "shipment_detail.create", module: "Shipments", description: "Add detail shipments" },
   { slug: "shipment_detail.update", module: "Shipments", description: "Update detail shipments" },
@@ -192,6 +199,9 @@ export const ROLE_TEMPLATES: { slug: string; name: string; description: string; 
       "shipment.create", "shipment.update", "shipment_detail.view", "shipment_detail.create", "shipment_detail.update", "shipment_detail.delete",
       // Admin Gudang may print resi (Owner always may via the owner bypass)
       "shipment.print_resi",
+      // Revise round 8 — Admin Gudang may view proof photos (checkpoint,
+      // pickup, delivery PoD). Owner bypasses permissions anyway.
+      "proof_photo.view",
       "delivery.view", "delivery.assign_kurir",
       "pickup.view", "pickup.create", "pickup.assign_kurir", "pickup.confirm",
       "payment.view",

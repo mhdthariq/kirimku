@@ -3,11 +3,30 @@ import { db } from "@/lib/db";
 import { guard, ok, handle, fail, requireStr, str, bool, num } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
 import { nextCode } from "@/lib/code-generator";
+import { scopeForUser } from "@/lib/gudang-scope";
 
 /** Helper: marketing partners only ever see / manage customers connected to
  *  them (Customer.marketingPartnerId). Admin/owner accounts see everyone. */
 function marketingScope(user: { partnerType: string | null; partnerId: number | null }) {
   return user.partnerType === "MARKETING" && user.partnerId != null ? user.partnerId : null;
+}
+
+/** Helper: gudang-scoped customer filter. Customers with warehouseId set are
+ *  only visible to that gudang's admins; general customers (warehouseId=null)
+ *  are visible to everyone. Owners / unscoped users see all customers. */
+async function customerGudangClause(user: {
+  isOwner: boolean;
+  permissions: string[];
+  employeeId: number | null;
+}) {
+  const scope = await scopeForUser(user);
+  if (scope.unscoped) return {};
+  return {
+    OR: [
+      { warehouseId: null },
+      ...(scope.warehouseId != null ? [{ warehouseId: scope.warehouseId }] : []),
+    ],
+  };
 }
 
 export async function GET(req: NextRequest) {
@@ -17,9 +36,12 @@ export async function GET(req: NextRequest) {
     const includeInactive = bool(req.nextUrl.searchParams.get("include_inactive"), true);
     // Marketing data separation: a marketing partner only sees THEIR customers.
     const partnerId = marketingScope(user);
+    // Revise round 7 — Gudang scoping for customers.
+    const gudangClause = await customerGudangClause(user);
     const customers = await db.customer.findMany({
       where: {
         ...(partnerId != null ? { marketingPartnerId: partnerId } : {}),
+        ...gudangClause,
         ...(includeInactive ? {} : { isActive: true }),
         ...(search
           ? {
@@ -33,13 +55,18 @@ export async function GET(req: NextRequest) {
           : {}),
       },
       orderBy: { id: "desc" },
-      include: { marketingPartner: { select: { id: true, user: { select: { name: true } } } } },
+      include: {
+        marketingPartner: { select: { id: true, user: { select: { name: true } } } },
+        warehouse: { select: { id: true, name: true } },
+      },
     });
     return ok(
       customers.map((c) => ({
         ...c,
         marketingPartnerName: c.marketingPartner?.user?.name ?? null,
         marketingPartner: undefined,
+        warehouseName: c.warehouse?.name ?? null,
+        warehouse: undefined,
       })),
     );
   });
@@ -70,6 +97,24 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Revise round 7 — Gudang attachment for customers. Optional: when set,
+    // only that gudang's admins/staff see this customer in their lists.
+    // null / "general" / "none" → umum (visible to all gudangs).
+    let warehouseId: number | null = null;
+    if (body.warehouseId !== undefined && body.warehouseId !== null && body.warehouseId !== "") {
+      if (body.warehouseId !== "general" && body.warehouseId !== "none") {
+        const wid = num(body.warehouseId);
+        if (wid == null) {
+          return fail(422, "Gudang tidak valid.", { warehouseId: ["Gudang tidak valid."] });
+        }
+        const warehouse = await db.warehouse.findUnique({ where: { id: wid } });
+        if (!warehouse || !warehouse.isActive) {
+          return fail(422, "Gudang tidak ditemukan / tidak aktif.", { warehouseId: ["Gudang tidak ditemukan / tidak aktif."] });
+        }
+        warehouseId = warehouse.id;
+      }
+    }
+
     const code = await nextCode("customer", "CUS-", "code");
     const customer = await db.customer.create({
       data: {
@@ -82,6 +127,7 @@ export async function POST(req: NextRequest) {
         address: str(body.address),
         isActive: true,
         marketingPartnerId,
+        warehouseId,
       },
     });
     await audit({ action: "created", entityType: "customer", entityId: customer.id, entityLabel: customer.name, actor: user, after: customer });

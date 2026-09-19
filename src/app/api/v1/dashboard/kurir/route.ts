@@ -46,6 +46,7 @@ export async function GET(req: NextRequest) {
         master: {
           select: {
             masterCode: true, status: true, origin: true, destination: true,
+            pengirimName: true, pengirimPhone: true, pengirimAddress: true,
             customer: { select: { name: true, phone: true } },
             _count: { select: { details: true } },
           },
@@ -111,6 +112,10 @@ export async function GET(req: NextRequest) {
         scannedCount: scannedCount(p.scans),
         createdAt: p.createdAt,
         completedAt: p.completedAt,
+        // Revise round 7 — Pickup address shown to the kurir.
+        pickupAddress: p.master.pengirimAddress ?? null,
+        pickupContact: p.master.pengirimPhone ?? null,
+        pickupSenderName: p.master.pengirimName ?? null,
       })),
       deliveries: deliveries.slice(0, 30).map((d) => ({
         id: d.id,

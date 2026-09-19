@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ClipboardList, PackageCheck, Pencil, Plus, QrCode, XCircle } from "lucide-react";
+import { Camera, ClipboardList, PackageCheck, Pencil, Plus, QrCode, XCircle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { apiDelete, apiGet, apiPost, apiPut, hasPermission, employeesByPosition, type DeliveryTask, type Options, type Shipment } from "@/lib/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
@@ -33,6 +33,10 @@ export function DeliveriesPage() {
     assign: hasPermission(user, "delivery.assign_kurir"),
     scan: hasPermission(user, "delivery.scan"),
     confirm: hasPermission(user, "delivery.confirm"),
+    // Revise round 8 — proof photo viewing. Only Admin Gudang + Owner see
+    // the delivery photo (when present). Other roles see the text PoD
+    // (receiver name) but not the image.
+    viewProofPhoto: hasPermission(user, "proof_photo.view"),
   };
   // Kurir executor view: without assign capability, only show my own tasks.
   const isExecutor = !can.assign && !user?.isOwner;
@@ -385,9 +389,34 @@ export function DeliveriesPage() {
             )}
           </div>
           {detailTarget?.status === "COMPLETED" && (
-            <p className="rounded-lg border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-              Delivery selesai {detailTarget.completedAt ? formatDate(detailTarget.completedAt) : ""} — PoD: {detailTarget.proofOfDelivery ?? "—"}
-            </p>
+            <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+              <p>
+                Delivery selesai {detailTarget.completedAt ? formatDate(detailTarget.completedAt) : ""} — PoD (nama penerima): <b className="text-foreground">{detailTarget.proofOfDelivery ?? "—"}</b>
+              </p>
+              {/* Revise round 8 — optional delivery photo (proof of delivery image).
+                  Display gated by proof_photo.view (Admin Gudang + Owner). */}
+              {detailTarget.photoUrl && (
+                <div className="mt-2">
+                  {can.viewProofPhoto ? (
+                    <a href={detailTarget.photoUrl} target="_blank" rel="noreferrer" title="Lihat foto bukti serah terima">
+                      <img
+                        src={detailTarget.photoUrl}
+                        alt="Bukti serah terima"
+                        className="h-32 w-auto rounded-md border object-cover"
+                      />
+                    </a>
+                  ) : (
+                    <div
+                      className="flex h-20 items-center gap-2 rounded-md border bg-muted/60 px-3 text-[11px] font-medium text-muted-foreground"
+                      title="Foto bukti hanya dapat dilihat oleh Admin Gudang / Owner (proof_photo.view)"
+                    >
+                      <Camera className="h-4 w-4" />
+                      Foto bukti tersedia — terkunci. Hubungi Admin Gudang / Owner untuk melihat.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           )}
         </DialogContent>
       </Dialog>

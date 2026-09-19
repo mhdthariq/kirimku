@@ -2,23 +2,46 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Building2, Loader2, LockKeyhole, LogIn, MapPin, Package, ShieldCheck, Truck, User } from "lucide-react";
+import { Building2, Eye, Loader2, LockKeyhole, LogIn, MapPin, Package, Search, ShieldCheck, Truck, User } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LogoMark } from "@/components/app/logo";
 import { ThemeToggle } from "@/components/app/theme-toggle";
+import {
+  NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS,
+  NEXT_PUBLIC_SHOW_CORP_ID,
+  NEXT_PUBLIC_SHOW_TRACKING_LINK,
+  NEXT_PUBLIC_MODE_LABEL,
+  NEXT_PUBLIC_IS_PREVIEW,
+  NEXT_PUBLIC_IS_DEV,
+  NEXT_PUBLIC_PREVIEW_CORP_ID,
+} from "@/lib/runtime-mode";
 
 /**
- * Dev-mode flag. In `next dev` (NODE_ENV === "development") the Corporate
- * ID field is hidden — the app talks straight to whatever DATABASE_URL is
- * set in .env, which is what we want when pushing schema with Prisma.
- * After `next build` (NODE_ENV === "production") this evaluates to false
- * and the Corporate ID field is shown again, so each tenant is routed to
- * its own database via the license server.
+ * Runtime mode (Revise round 7): the app now ships with THREE modes:
+ *
+ *   - Development (NEXT_PUBLIC_RUNTIME_MODE === "development"):
+ *       The Corporate ID field is HIDDEN (license server never contacted),
+ *       the Demo Account panel is SHOWN.
+ *   - Preview (NEXT_PUBLIC_RUNTIME_MODE === "preview"):
+ *       BOTH the Corporate ID field and the Demo Account panel are shown.
+ *       The Corporate ID is pre-filled with PREVIEW_CORP_ID (default "TRIAL")
+ *       so testers can log in with one click but the request still goes
+ *       through the license server (Preview is a real compiled build).
+ *   - Production (NEXT_PUBLIC_RUNTIME_MODE === "production"):
+ *       The Corporate ID field is shown, the Demo Account panel is HIDDEN
+ *       (demo users don't exist in a real tenant's database).
+ *
+ * The "Lacak Paket" / Track-a-Package link below the form is shown in Dev
+ * and Preview only — production users reach the public tracking page via
+ * the standalone `/tracking-paket` URL.
  */
-const IS_DEV_MODE = process.env.NODE_ENV !== "production";
+const SHOW_DEMO_ACCOUNTS = NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS;
+const SHOW_CORP_ID = NEXT_PUBLIC_SHOW_CORP_ID;
+const SHOW_TRACKING_LINK = NEXT_PUBLIC_SHOW_TRACKING_LINK;
+const MODE_LABEL = NEXT_PUBLIC_MODE_LABEL;
 
 const DEMO_ACCOUNTS = [
   { username: "owner", password: "ChangeMeOwner#2026", label: "Owner", hint: "Akses penuh, semua gudang" },
@@ -33,7 +56,10 @@ const DEMO_ACCOUNTS = [
 
 export function LoginScreen() {
   const { login } = useAuth();
-  const [corpId, setCorpId] = useState("");
+  // In Preview, pre-fill the Corporate ID with the TRIAL sentinel so the
+  // tester doesn't have to type it every time. The field stays editable so
+  // they can override it (e.g. to test a different corporate tenant).
+  const [corpId, setCorpId] = useState<string>(NEXT_PUBLIC_IS_PREVIEW ? NEXT_PUBLIC_PREVIEW_CORP_ID : "");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -44,10 +70,9 @@ export function LoginScreen() {
     setBusy(true);
     setError(null);
     try {
-      // In dev mode the Corporate ID is always empty — the backend will
-      // skip the license lookup and use the regular DATABASE_URL so we
-      // can push schema with Prisma without involving the license server.
-      await login(IS_DEV_MODE ? "" : corpId.trim(), username.trim(), password);
+      // Dev mode never sends a Corporate ID (license server is bypassed
+      // server-side). Preview & Production both send it.
+      await login(NEXT_PUBLIC_IS_DEV ? "" : corpId.trim(), username.trim(), password);
       // always land on the dashboard — the previous user's hash (e.g. a
       // transport detail the new user has no access to) must not leak
       window.location.hash = "#/dashboard";
@@ -64,10 +89,10 @@ export function LoginScreen() {
     setBusy(true);
     setError(null);
     try {
-      // In dev mode there is no Corporate ID — demo accounts log straight
-      // into the local DATABASE_URL. In production we keep whatever corp
-      // id the user has typed in so the license lookup still happens.
-      await login(IS_DEV_MODE ? "" : corpId.trim(), acc.username, acc.password);
+      // Dev → no Corporate ID; Preview → keep the TRIAL prefill; Production
+      // → use whatever the user typed (Production hides the quick-fill
+      // panel anyway, so this branch only runs in Dev / Preview).
+      await login(NEXT_PUBLIC_IS_DEV ? "" : corpId.trim(), acc.username, acc.password);
       window.location.hash = "#/dashboard";
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login gagal.");
@@ -186,12 +211,15 @@ export function LoginScreen() {
                 </div>
               )}
 
-              {/* Corporate ID is only required in production (post-build)
-                  deployments, where it routes the request to the right
-                  tenant database via the license server. In `next dev`
-                  the field is hidden — the app uses the regular
-                  DATABASE_URL so we can push schema with Prisma. */}
-              {!IS_DEV_MODE && (
+              {/* Corporate ID — visible in Preview AND Production.
+                  In Preview the field is pre-filled with PREVIEW_CORP_ID
+                  (default "TRIAL") so testers don't have to type it every
+                  time. In Production the field starts empty and the user
+                  must type their own Corporate ID (which routes the request
+                  to the right tenant's database via the license server).
+                  In Development the field is hidden — license check is
+                  bypassed server-side and the regular DATABASE_URL is used. */}
+              {SHOW_CORP_ID && (
                 <div className="space-y-2">
                   <Label htmlFor="corpId">Corporate ID</Label>
                   <div className="relative">
@@ -208,14 +236,40 @@ export function LoginScreen() {
                     />
                   </div>
                   <p className="text-[11px] text-foreground/60">
-                    ID Perusahaan untuk menggunakan Aplikasi ini.
+                    {NEXT_PUBLIC_IS_PREVIEW ? (
+                      <>
+                        ID Perusahaan untuk Preview. Default <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">TRIAL</code> —
+                        dapat diganti bila ingin login ke tenant lain.
+                      </>
+                    ) : (
+                      <>ID Perusahaan untuk menggunakan Aplikasi ini.</>
+                    )}
                   </p>
                 </div>
               )}
 
-              {IS_DEV_MODE && (
-                <div className="rounded-lg border border-primary/30 bg-primary/5 px-3.5 py-2.5 text-[12px] text-foreground/80">
-                  <span className="font-semibold text-primary">DEV Mode</span>{" "}
+              {/* Runtime-mode banner — DEV / PREVIEW / Production so the
+                  tester always knows which build they're looking at. The
+                  Production variant is hidden so end users don't see it. */}
+              {(NEXT_PUBLIC_IS_DEV || NEXT_PUBLIC_IS_PREVIEW) && (
+                <div
+                  className={
+                    "flex items-center gap-2 rounded-lg border px-3.5 py-2.5 text-[12px] " +
+                    (NEXT_PUBLIC_IS_PREVIEW
+                      ? "border-amber-400/50 bg-amber-50 text-amber-800 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-300"
+                      : "border-primary/30 bg-primary/5 text-foreground/80")
+                  }
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                  <span>
+                    <span className="font-semibold">{MODE_LABEL}</span>
+                    {NEXT_PUBLIC_IS_PREVIEW && (
+                      <> — build staging/UAT. Akun demo aktif, license server tetap dihubungi.</>
+                    )}
+                    {NEXT_PUBLIC_IS_DEV && (
+                      <> — tanpa Corporate ID, license server dilewati (pakai DATABASE_URL lokal).</>
+                    )}
+                  </span>
                 </div>
               )}
 
@@ -260,12 +314,12 @@ export function LoginScreen() {
               </Button>
             </form>
 
-            {/* Demo accounts are dev-only. In production every login must
-                come from a real user row in the tenant's own database —
-                the demo users (owner/budi/hendra/…) only exist in the
-                seeded local DB, so showing them in prod would just lead
+            {/* Demo accounts are visible in Dev + Preview. In production every
+                login must come from a real user row in the tenant's own
+                database — the demo users (owner/budi/hendra/…) only exist in
+                the seeded local DB, so showing them in prod would just lead
                 to "username atau password salah" errors. */}
-            {IS_DEV_MODE && (
+            {SHOW_DEMO_ACCOUNTS && (
               <div className="mt-8">
                 <div className="flex items-center gap-3">
                   <div className="h-px flex-1 bg-border" />
@@ -297,6 +351,28 @@ export function LoginScreen() {
                     </button>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* "Lacak Paket" / Track a Package link — Dev + Preview only.
+                In production the public tracking page is reachable only via
+                the standalone /tracking-paket URL (no link inside the app),
+                so end customers don't see this button when the app is in
+                production mode. */}
+            {SHOW_TRACKING_LINK && (
+              <div className="mt-6 border-t pt-5">
+                <a
+                  href="/tracking-paket"
+                  className="flex items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3.5 py-2.5 text-xs font-semibold text-primary transition hover:border-primary/60 hover:bg-primary/10"
+                >
+                  <Search className="h-3.5 w-3.5" />
+                  Lacak Paket — pelacakan kiriman untuk customer
+                </a>
+                <p className="mt-1.5 text-center text-[10px] text-foreground/55">
+                  Tautan ini hanya tampil di {MODE_LABEL}. Di production, customer membuka
+                  <code className="mx-1 rounded bg-muted px-1 py-0.5 font-mono">/tracking-paket</code>
+                  secara langsung.
+                </p>
               </div>
             )}
           </motion.div>

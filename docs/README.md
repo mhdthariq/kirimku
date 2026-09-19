@@ -81,6 +81,28 @@ Database and API were fully rebuilt and corrected in the process — details in 
 | R3 | **Partial invoice payments explicitly counted as company profit** — the finance dashboard now has a dedicated "Profit dari Pembayaran Invoice" section showing total realized (lunas + parsial), the SETTLED vs PARTIALLY_SETTLED split, the latest 8 settlement rows with proof badges, and a monthly timeline. Visible ONLY to `financial.report.view` (Admin Kantor + Owner). | `GET /api/v1/finance/summary` adds `totals.realizedInvoicePayments/settledInvoicePayments/partialInvoicePayments` + a full `invoicePayments` block; `finance-page.tsx` renders the new section with a "Hanya Admin Kantor & Owner" badge |
 | R4 | **Separate `db:push` and `db:seed` — operator-controlled** | Added `db:seed` script to `package.json` (runs `prisma/seed.ts` via Bun). The auto-seed-on-first-API-request behaviour is now OPT-IN via the `AUTO_SEED_ON_BOOT=true` env var (default off). Production tenants are NEVER auto-seeded regardless of the flag. RBAC bootstrap (`ensureRbac()`) still always runs. Docs: `06-seeding-and-demo-accounts.md`, `07-deployment.md`, `03-api-reference.md`, root `README.md`, `.env.example` |
 
+## Revision round 7 — Preview mode, Partner Alignment, Customer Gudang, Pickup Address
+
+| # | Revision | Where it is implemented |
+|---|---|---|
+| R1 | **Preview mode** — new third runtime mode (Dev / Preview / Production). Preview is a compiled build that still shows the Demo Account panel AND routes through the license server, with the Corporate ID pre-filled `"TRIAL"` | `src/lib/runtime-mode.ts` (new), `src/components/app/login-screen.tsx`, `src/lib/tenant-context.ts`, `package.json` (`build:preview` / `start:preview` scripts), `.env.example`. Docs: [`08-revision-round-7.md`](08-revision-round-7.md) |
+| R2 | **"Lacak Paket" link** — visible in the login screen + the account dropdown in Dev + Preview; hidden in Production (customers reach `/tracking-paket` via URL only) | `src/components/app/login-screen.tsx`, `src/components/app/app-shell.tsx` |
+| R3 | **Partner Alignment** — Marketing partners can be aligned to a specific Gudang (or "Umum" / general). Helps answer "which gudang is this marketing affiliate tied to?" | `prisma/schema.prisma` (`Partner.warehouseId`), `src/app/api/v1/partners/route.ts`, `src/app/api/v1/partners/[id]/route.ts`, `src/components/app/pages/partners-page.tsx` |
+| R4 | **Customer Gudang attachment** — Customers can be attached to a specific Gudang (or "Umum") for gudang-scoped customer lists. Admin Gudang of other gudangs can NOT see customers attached to a different gudang. | `prisma/schema.prisma` (`Customer.warehouseId`), `src/app/api/v1/customers/route.ts`, `src/app/api/v1/customers/[id]/route.ts`, `src/app/api/v1/options/route.ts`, `src/components/app/pages/customers-page.tsx` |
+| R5 | **Customer marker on shipment creation** — visual panel showing the customer's DB record, plus amber highlighting on Pengirim fields when they're overridden per-shipment. NOT printed on the resi. | `src/components/app/pages/shipments-page.tsx` |
+| R6 | **Pickup address shown to kurir** — kurir sees the pickup address (sourced from `MasterShipment.pengirimAddress`) on the Pickups list, Kurir Dashboard, and the QR scan dialog. Includes sender name + tel: link. | `src/app/api/v1/pickups/route.ts`, `src/app/api/v1/dashboard/kurir/route.ts`, `src/components/app/pages/pickups-page.tsx`, `src/components/app/pages/kurir-dashboard-page.tsx`, `src/components/app/qr-scan-dialog.tsx` |
+
+Full details in [`08-revision-round-7.md`](08-revision-round-7.md).
+
+## Revision round 8 — Fulfillment Mode + Proof Photo Permission
+
+| # | Revision | Where it is implemented |
+|---|---|---|
+| R1 | **Shipment Fulfillment Mode (STANDARD / DIRECT)** — new `fulfillmentMode` field on `MasterShipment`. Exposed as top-level `Regular` / `Direct` tabs on the Shipments page. Owner's per-gudang tabs are kept separate — they show only STANDARD shipments (DIRECT is NOT merged into per-gudang view). New `DIRECT` badge on each row. `Mode Fulfillment` dropdown in the create-shipment dialog. | `prisma/schema.prisma` (`MasterShipment.fulfillmentMode`), `src/app/api/v1/shipments/route.ts` (filter + body), `src/lib/client-api.ts` (type), `src/components/app/pages/shipments-page.tsx` (tabs + form + badge) |
+| R2 | **`proof_photo.view` permission** — new RBAC permission that gates display of photo evidence (pickup, checkpoint, delivery PoD). Default grant: Admin Gudang + Owner only. Other roles see "foto terkunci" placeholder. New `Pickup.photoUrl` and `Delivery.photoUrl` columns added for future photo uploads. | `prisma/schema.prisma` (`Pickup.photoUrl`, `Delivery.photoUrl`), `src/lib/rbac.ts` (new permission + Admin Gudang grant), `src/lib/client-api.ts` (types), `src/components/app/pages/transport-detail-page.tsx`, `src/components/app/pages/pickups-page.tsx`, `src/components/app/pages/deliveries-page.tsx` (display gating) |
+
+Full details in [`09-revision-round-8.md`](09-revision-round-8.md).
+
 ## Document index
 
 | File | Contents |
@@ -92,6 +114,8 @@ Database and API were fully rebuilt and corrected in the process — details in 
 | [`05-business-flows.md`](05-business-flows.md) | Shipment lifecycle state machine, **QR handover scan flows (pickup & delivery)**, pricing & invoicing, RBAC editing |
 | [`06-seeding-and-demo-accounts.md`](06-seeding-and-demo-accounts.md) | What the seeder creates, demo accounts, how to reset / customize |
 | [`07-deployment.md`](07-deployment.md) | Dev, production build, Docker with migrate-on-boot, hosting notes |
+| [`08-revision-round-7.md`](08-revision-round-7.md) | **Preview mode, Partner Alignment, Customer Gudang attachment, Customer marker, Pickup address** |
+| [`09-revision-round-8.md`](09-revision-round-8.md) | **Fulfillment Mode (STANDARD/DIRECT) + proof_photo.view permission** |
 
 ## Where the code lives (map)
 

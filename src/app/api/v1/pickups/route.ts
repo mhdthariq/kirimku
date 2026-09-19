@@ -63,6 +63,9 @@ export async function GET(req: NextRequest) {
         status: p.status,
         kurirId: p.kurirId,
         notes: p.notes,
+        // Revise round 8 — pickup photo (proof of pickup). Display is gated
+        // by proof_photo.view on the client.
+        photoUrl: p.photoUrl ?? null,
         createdAt: p.createdAt,
         completedAt: p.completedAt,
         masterCode: p.master.masterCode,
@@ -71,6 +74,13 @@ export async function GET(req: NextRequest) {
         destination: p.master.destination,
         customerName: p.master.customer.name,
         customerType: p.master.customer.type,
+        // Revise round 7 — Pickup address shown to the kurir so they know
+        // where to go. Sourced from the shipment's per-shipment sender
+        // fields (pengirim*) — NOT the customer's master DB record — so the
+        // kurir sees the actual address the staff entered for this shipment.
+        pickupAddress: p.master.pengirimAddress ?? null,
+        pickupContact: p.master.pengirimPhone ?? null,
+        pickupSenderName: p.master.pengirimName ?? null,
         detailsCount: p.master._count.details,
         scannedCount: new Set(p.scans.filter((s) => s.detailId != null && s.result !== "unexpected").map((s) => s.detailId)).size,
         gudangIds,

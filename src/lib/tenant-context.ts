@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { PrismaClient } from "@prisma/client";
 import { checkCorporateLicense, buildTenantConnectionUrl } from "@/lib/license";
+import { IS_DEV, PREVIEW_CORP_ID, RUNTIME_MODE } from "@/lib/runtime-mode";
 
 /** Header the client sends on every request once a Corporate ID has been
  *  entered at login. Absent = "default" (single-tenant / local dev / demo)
@@ -11,15 +12,27 @@ export const CORP_ID_HEADER = "x-corp-id";
 export const DEFAULT_TENANT_KEY = "__default__";
 
 /**
- * Dev-mode flag. In `next dev` (NODE_ENV === "development") the app is
- * being used to push database schema with Prisma against the regular
- * DATABASE_URL — there is no license server involved, no per-tenant
- * database, and the Corporate ID field on the login screen is hidden.
- * In production (after `next build`), the app expects a Corporate ID
- * at login, validates it against the license server, and connects to
- * that company's own database.
+ * Runtime mode (Revise round 7). The app now has THREE modes instead of
+ * two:
+ *
+ *   - `development` (NODE_ENV !== "production") — license check bypassed,
+ *     Corporate ID hidden on the login screen, demo accounts visible.
+ *   - `preview`     (NODE_ENV === "production" && PREVIEW_MODE === "true")
+ *                   — a compiled build that still shows the demo account
+ *                   quick-fill panel BUT also routes every request through
+ *     the license server (just like production). The Corporate ID field
+ *     is pre-filled with the constant `PREVIEW_CORP_ID` (default "TRIAL")
+ *     but the user can override it before login.
+ *   - `production`   (NODE_ENV === "production" otherwise) — the original
+ *                   strict multi-tenant mode: Corporate ID required, demo
+ *                   accounts hidden.
+ *
+ * Use `IS_DEV` from `runtime-mode.ts` for the "should we bypass the
+ * license check?" branch below — it correctly returns false for both
+ * Preview and Production, so both compiled modes route through the
+ * license server.
  */
-export const IS_DEV_MODE = process.env.NODE_ENV !== "production";
+export { IS_DEV, IS_PREVIEW, IS_PROD, RUNTIME_MODE, PREVIEW_CORP_ID } from "@/lib/runtime-mode";
 
 export interface TenantContext {
   /** null in default/local mode */
@@ -49,10 +62,10 @@ function buildDefaultClient(): PrismaClient {
   return new PrismaClient({ log: ["query"] });
 }
 export const defaultClient: PrismaClient = g.__defaultPrisma ?? buildDefaultClient();
-if (process.env.NODE_ENV !== "production") g.__defaultPrisma = defaultClient;
+if (IS_DEV) g.__defaultPrisma = defaultClient;
 
 const tenantClients: Map<string, PrismaClient> = g.__tenantPrismaClients ?? new Map();
-if (process.env.NODE_ENV !== "production") g.__tenantPrismaClients = tenantClients;
+if (IS_DEV) g.__tenantPrismaClients = tenantClients;
 
 function getOrCreateTenantClient(connectionUrl: string): PrismaClient {
   let client = tenantClients.get(connectionUrl);
@@ -84,7 +97,11 @@ export async function resolveTenantContext(headers: {
   // not collected on the login screen in dev mode, but even if a stale
   // value arrives (e.g. leftover header in a long-lived browser tab),
   // we ignore it so dev sessions never break on a license lookup.
-  if (IS_DEV_MODE) {
+  //
+  // Preview and Production both route through the license server —
+  // the difference is purely a UI/login-screen concern (Preview pre-fills
+  // the Corporate ID with PREVIEW_CORP_ID = "TRIAL" by default).
+  if (IS_DEV) {
     return { corpId: null, companyName: null, dueDate: null, prisma: defaultClient };
   }
 

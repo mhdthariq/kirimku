@@ -72,6 +72,11 @@ export function KurirDashboard() {
       route: `${p.origin} → ${p.destination}`,
       status: p.status,
       completedAt: p.completedAt,
+      // Revise round 7 — pass pickup address so the QR scan dialog can
+      // show the kurir where to go.
+      pickupAddress: (p as { pickupAddress?: string | null }).pickupAddress ?? null,
+      pickupContact: (p as { pickupContact?: string | null }).pickupContact ?? null,
+      pickupSenderName: (p as { pickupSenderName?: string | null }).pickupSenderName ?? null,
     });
   }
 
@@ -172,7 +177,16 @@ export function KurirDashboard() {
               </p>
             ) : (
               <ul className="space-y-2">
-                {data.pickups.slice(0, 8).map((p) => (
+                {data.pickups.slice(0, 8).map((p) => {
+                  // Revise round 7 — pickup address from the shipment's
+                  // pengirim fields. Cast because the kurir-dashboard type
+                  // doesn't carry these yet.
+                  const pp = p as typeof p & {
+                    pickupAddress?: string | null;
+                    pickupContact?: string | null;
+                    pickupSenderName?: string | null;
+                  };
+                  return (
                   <li key={p.id} className="rounded-lg border px-3.5 py-2.5 transition hover:border-primary/40">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="min-w-0">
@@ -197,13 +211,41 @@ export function KurirDashboard() {
                         )}
                       </div>
                     </div>
-                    {p.customerPhone && (
-                      <a href={`tel:${p.customerPhone}`} className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline">
-                        <Phone className="h-3 w-3" /> {p.customerPhone}
-                      </a>
+                    {/* Revise round 7 — Pickup address so the kurir knows where
+                        to go. Falls back to the customer's phone (master DB)
+                        if no per-shipment sender phone was typed. */}
+                    {pp.pickupAddress ? (
+                      <div className="mt-1.5 rounded-md border border-primary/30 bg-primary/5 px-2 py-1.5 text-[11px]">
+                        <p className="flex items-start gap-1.5 text-primary">
+                          <MapPin className="mt-0.5 h-3 w-3 shrink-0" />
+                          <span className="font-medium">{pp.pickupAddress}</span>
+                        </p>
+                        {(pp.pickupSenderName || pp.pickupContact || p.customerPhone) && (
+                          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 pl-4 text-foreground/80">
+                            {pp.pickupSenderName && (
+                              <span className="text-[10px]">Nama: {pp.pickupSenderName}</span>
+                            )}
+                            {(pp.pickupContact || p.customerPhone) && (
+                              <a
+                                href={`tel:${(pp.pickupContact ?? p.customerPhone ?? "").replace(/[^+\d]/g, "")}`}
+                                className="flex items-center gap-1 text-primary hover:underline"
+                              >
+                                <Phone className="h-3 w-3" /> {pp.pickupContact ?? p.customerPhone}
+                              </a>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      p.customerPhone && (
+                        <a href={`tel:${p.customerPhone}`} className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline">
+                          <Phone className="h-3 w-3" /> {p.customerPhone}
+                        </a>
+                      )
                     )}
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             )}
           </CardContent>

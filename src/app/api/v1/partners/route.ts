@@ -17,6 +17,7 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: "asc" },
       include: {
         user: { select: { id: true, name: true, username: true, isActive: true } },
+        warehouse: { select: { id: true, name: true, city: true } },
         _count: { select: { vehicles: true, commissions: true, transportSettlements: true, topUps: true, withdrawals: true, repairs: true } },
       },
     });
@@ -56,6 +57,11 @@ export async function GET(req: NextRequest) {
           bank: { bankName: p.bankName, bankAccountName: p.bankAccountName, bankAccountNumber: p.bankAccountNumber },
           isActive: p.isActive,
           notes: p.notes,
+          // Revise round 7 — Partner Alignment. Null = "umum" (general —
+          // serves every gudang). When set, this marketing partner is
+          // affiliated with the named gudang.
+          warehouseId: p.warehouseId ?? null,
+          warehouseName: p.warehouse?.name ?? null,
           wallet: summary,
           totals: {
             transportEarnings,

@@ -27,11 +27,18 @@ export async function GET(req: NextRequest, { params }: Params) {
       include: {
         shipments: { orderBy: { createdAt: "desc" }, take: 10 },
         marketingPartner: { select: { id: true, user: { select: { name: true } } } },
+        warehouse: { select: { id: true, name: true } },
       },
     });
     if (!customer) return fail(404, "Customer tidak ditemukan.");
     assertCustomerScope(user, customer);
-    return ok({ ...customer, marketingPartnerName: customer.marketingPartner?.user?.name ?? null, marketingPartner: undefined });
+    return ok({
+      ...customer,
+      marketingPartnerName: customer.marketingPartner?.user?.name ?? null,
+      marketingPartner: undefined,
+      warehouseName: customer.warehouse?.name ?? null,
+      warehouse: undefined,
+    });
   });
 }
 
@@ -69,6 +76,25 @@ export async function PUT(req: NextRequest, { params }: Params) {
           });
         }
         data.marketingPartnerId = partner.id;
+      }
+    }
+
+    // Revise round 7 — Gudang attachment for customers.
+    // null / "" / "general" / "none" → umum (general).
+    if (body.warehouseId !== undefined && !isMarketingUser) {
+      const raw = body.warehouseId;
+      if (raw === null || raw === "" || raw === "general" || raw === "none") {
+        data.warehouseId = null;
+      } else {
+        const wid = num(raw);
+        if (wid == null) {
+          return fail(422, "Gudang tidak valid.", { warehouseId: ["Gudang tidak valid."] });
+        }
+        const warehouse = await db.warehouse.findUnique({ where: { id: wid } });
+        if (!warehouse || !warehouse.isActive) {
+          return fail(422, "Gudang tidak ditemukan / tidak aktif.", { warehouseId: ["Gudang tidak ditemukan / tidak aktif."] });
+        }
+        data.warehouseId = warehouse.id;
       }
     }
 

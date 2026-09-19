@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Pencil, Plus, Trash2, UserRoundCheck, Users } from "lucide-react";
+import { MapPin, Pencil, Plus, Trash2, UserRoundCheck, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type Customer, type Options } from "@/lib/client-api";
@@ -23,9 +23,12 @@ interface CustomerForm {
   email: string;
   address: string;
   marketingPartnerId: string;
+  /** Revise round 7 — Gudang attachment. "none" = umum (general — visible to
+   *  every gudang). When set, only that gudang's admins see this customer. */
+  warehouseId: string;
 }
 
-const EMPTY: CustomerForm = { name: "", type: "b2c", companyName: "", phone: "", email: "", address: "", marketingPartnerId: "none" };
+const EMPTY: CustomerForm = { name: "", type: "b2c", companyName: "", phone: "", email: "", address: "", marketingPartnerId: "none", warehouseId: "none" };
 
 export function CustomersPage() {
   const { user } = useAuth();
@@ -59,7 +62,8 @@ export function CustomersPage() {
         c.code.toLowerCase().includes(q) ||
         (c.companyName ?? "").toLowerCase().includes(q) ||
         (c.phone ?? "").includes(q) ||
-        (c.marketingPartnerName ?? "").toLowerCase().includes(q),
+        (c.marketingPartnerName ?? "").toLowerCase().includes(q) ||
+        (c.warehouseName ?? "").toLowerCase().includes(q),
     );
   }, [data, search]);
 
@@ -80,6 +84,7 @@ export function CustomersPage() {
       email: c.email ?? "",
       address: c.address ?? "",
       marketingPartnerId: c.marketingPartnerId != null ? String(c.marketingPartnerId) : "none",
+      warehouseId: c.warehouseId != null ? String(c.warehouseId) : "none",
     });
     setFieldErrors({});
     setDialogOpen(true);
@@ -97,7 +102,12 @@ export function CustomersPage() {
       address: form.address || null,
       // PIC assignment is admin/owner-only — Marketing users create customers
       // that are automatically connected to themselves (handled server-side).
-      ...(isMarketing ? {} : { marketingPartnerId: form.marketingPartnerId !== "none" ? Number(form.marketingPartnerId) : null }),
+      ...(isMarketing
+        ? {}
+        : {
+            marketingPartnerId: form.marketingPartnerId !== "none" ? Number(form.marketingPartnerId) : null,
+            warehouseId: form.warehouseId !== "none" ? Number(form.warehouseId) : null,
+          }),
     };
     const ok = await runAction(
       () => (editing ? apiPut(`/customers/${editing.id}`, payload) : apiPost("/customers", payload)),
@@ -105,6 +115,7 @@ export function CustomersPage() {
         success: editing ? "Customer diperbarui." : "Customer dibuat.",
         onError: (message) => {
           if (message.includes("wajib")) setFieldErrors({ name: message });
+          if (message.includes("Gudang tidak")) setFieldErrors({ warehouseId: message });
         },
       },
     );
@@ -132,7 +143,15 @@ export function CustomersPage() {
   const marketingPartnerOptions = [
     // "none" sentinel — Radix Select forbids empty-string item values
     { value: "none", label: "— Belum terhubung (umum) —" },
-    ...(options?.marketingPartners ?? []).map((p) => ({ value: String(p.id), label: p.name })),
+    ...(options?.marketingPartners ?? []).map((p) => ({
+      value: String(p.id),
+      label: p.warehouseName ? `${p.name} · ${p.warehouseName}` : `${p.name} · Umum`,
+    })),
+  ];
+  // Revise round 7 — Gudang dropdown for Customer attachment.
+  const gudangOptions = [
+    { value: "none", label: "— Umum (terlihat oleh semua gudang) —" },
+    ...(options?.warehouses ?? []).map((w) => ({ value: String(w.id), label: w.name + (w.city ? ` · ${w.city}` : "") })),
   ];
 
   return (
@@ -142,7 +161,7 @@ export function CustomersPage() {
         subtitle={
           isMarketing
             ? "Customer Anda sendiri — setiap marketing hanya melihat customer yang terhubung dengannya."
-            : "Master data pelanggan B2B dan B2C beserta Marketing pengelolanya (PIC)."
+            : "Master data pelanggan B2B dan B2C beserta Marketing pengelolanya (PIC) dan Gudang-nya."
         }
         icon={<Users className="h-5 w-5" />}
         actions={
@@ -171,7 +190,7 @@ export function CustomersPage() {
             loading={loading}
             search={search}
             onSearchChange={setSearch}
-            searchPlaceholder="Cari nama / kode / telp / marketing…"
+            searchPlaceholder="Cari nama / kode / telp / marketing / gudang…"
             emptyMessage={isMarketing ? "Belum ada customer Anda. Klik “Tambah Customer” untuk membuat." : "Belum ada customer. Klik “Tambah Customer” untuk membuat."}
             columns={[
               { key: "code", header: "Kode", primary: true, render: (c) => <span className="font-mono text-xs">{c.code}</span> },
@@ -193,6 +212,18 @@ export function CustomersPage() {
                   c.marketingPartnerName ? (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
                       <UserRoundCheck className="h-3.5 w-3.5" /> {c.marketingPartnerName}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">— umum —</span>
+                  ),
+              },
+              {
+                key: "warehouse",
+                header: "Gudang",
+                render: (c) =>
+                  c.warehouseName ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-chart-2/10 px-2 py-0.5 text-[11px] font-semibold text-chart-2">
+                      <MapPin className="h-3.5 w-3.5" /> {c.warehouseName}
                     </span>
                   ) : (
                     <span className="text-xs text-muted-foreground">— umum —</span>
@@ -278,6 +309,25 @@ export function CustomersPage() {
                     onValueChange={(v) => setForm({ ...form, marketingPartnerId: v })}
                     placeholder="Pilih marketing pengelola…"
                     options={marketingPartnerOptions}
+                    disabled={busy}
+                  />
+                </Field>
+              )}
+              {/* Revise round 7 — Gudang attachment.
+                  Admin/owner only: when set, only that gudang's admins see
+                  this customer. "Umum" = visible to every gudang. */}
+              {!isMarketing && (
+                <Field
+                  label="Gudang"
+                  htmlFor="c-warehouse"
+                  className="sm:col-span-2"
+                  error={fieldErrors.warehouseId}
+                  hint="Pilih gudang jika customer ini hanya boleh dilihat admin gudang tersebut. 'Umum' = terlihat semua gudang."
+                >
+                  <FormSelect
+                    value={form.warehouseId}
+                    onValueChange={(v) => setForm({ ...form, warehouseId: v })}
+                    options={gudangOptions}
                     disabled={busy}
                   />
                 </Field>

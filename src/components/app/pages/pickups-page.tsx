@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Pencil, Plus, QrCode, Truck, XCircle } from "lucide-react";
+import { Camera, MapPin, Pencil, Phone, Plus, QrCode, Truck, User, XCircle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { apiDelete, apiGet, apiPost, apiPut, hasPermission, employeesByPosition, type PickupTask, type Options, type Shipment } from "@/lib/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
@@ -33,6 +33,9 @@ export function PickupsPage() {
     assign: hasPermission(user, "pickup.assign_kurir"),
     scan: hasPermission(user, "pickup.scan"),
     confirm: hasPermission(user, "pickup.confirm"),
+    // Revise round 8 — proof photo viewing. Only Admin Gudang + Owner see
+    // the pickup photo (when present).
+    viewProofPhoto: hasPermission(user, "proof_photo.view"),
   };
   // Kurir executor view: without assign capability, only show my own tasks.
   const isExecutor = !can.assign && !user?.isOwner;
@@ -117,6 +120,11 @@ export function PickupsPage() {
       route: `${p.origin} → ${p.destination}`,
       status: p.status,
       completedAt: p.completedAt,
+      // Revise round 7 — pass the pickup address + sender contact so the
+      // QR scan dialog can show the kurir where to go.
+      pickupAddress: p.pickupAddress ?? null,
+      pickupContact: p.pickupContact ?? null,
+      pickupSenderName: p.pickupSenderName ?? null,
     });
   }
 
@@ -183,9 +191,9 @@ export function PickupsPage() {
         },
         {
           key: "customer",
-          header: "Customer & Rute",
+          header: "Customer & Alamat Pickup",
           render: (p) => (
-            <div>
+            <div className="space-y-1">
               <p className="flex items-center gap-1.5 text-sm font-medium text-foreground">
                 {p.customerName}
                 {p.customerType === "b2b" && (
@@ -197,6 +205,41 @@ export function PickupsPage() {
               <p className="text-xs text-muted-foreground">
                 {p.origin} → {p.destination}
               </p>
+              {/* Revise round 7 — Pickup address so the kurir knows where to go.
+                  Source: MasterShipment.pengirimAddress (the per-shipment
+                  sender address the staff typed). Shows the contact phone
+                  and sender name too so the kurir can ask for the right
+                  person on arrival. */}
+              {p.pickupAddress ? (
+                <div className="mt-1.5 rounded-md border border-primary/30 bg-primary/5 px-2 py-1.5 text-[11px]">
+                  <p className="flex items-start gap-1.5 text-primary">
+                    <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <span className="font-medium">{p.pickupAddress}</span>
+                  </p>
+                  {(p.pickupSenderName || p.pickupContact) && (
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 pl-5 text-foreground/80">
+                      {p.pickupSenderName && (
+                        <span className="flex items-center gap-1">
+                          <User className="h-3 w-3" /> {p.pickupSenderName}
+                        </span>
+                      )}
+                      {p.pickupContact && (
+                        <a
+                          href={`tel:${p.pickupContact.replace(/[^+\d]/g, "")}`}
+                          className="flex items-center gap-1 text-primary hover:underline"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Phone className="h-3 w-3" /> {p.pickupContact}
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="mt-1 text-[10px] text-amber-600 dark:text-amber-400">
+                  Alamat pickup belum diisi pada shipment — isi di halaman Shipments (Pengirim → Alamat Pengirim).
+                </p>
+              )}
             </div>
           ),
         },
@@ -207,6 +250,34 @@ export function PickupsPage() {
             const kurir = options?.employees?.find((e) => e.id === p.kurirId);
             return <span className="text-sm text-muted-foreground">{kurir?.name ?? "—"}</span>;
           },
+        },
+        {
+          // Revise round 8 — pickup photo (proof of pickup).
+          // Display gated by proof_photo.view (Admin Gudang + Owner).
+          key: "photo",
+          header: "Foto Bukti",
+          hideOnMobile: true,
+          render: (p) =>
+            p.photoUrl ? (
+              can.viewProofPhoto ? (
+                <a href={p.photoUrl} target="_blank" rel="noreferrer" title="Lihat foto bukti pickup">
+                  <img
+                    src={p.photoUrl}
+                    alt={`Bukti ${p.pickupCode}`}
+                    className="h-12 w-16 rounded-md border object-cover"
+                  />
+                </a>
+              ) : (
+                <div
+                  className="flex h-12 w-16 items-center justify-center rounded-md border bg-muted/60 text-muted-foreground"
+                  title="Foto bukti hanya dapat dilihat oleh Admin Gudang / Owner (proof_photo.view)"
+                >
+                  <Camera className="h-4 w-4" />
+                </div>
+              )
+            ) : (
+              <span className="text-[10px] text-muted-foreground">—</span>
+            ),
         },
         { key: "createdAt", header: "Dibuat", hideOnMobile: true, render: (p) => formatDate(p.createdAt, true) },
         {

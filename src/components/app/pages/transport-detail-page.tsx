@@ -75,6 +75,11 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string;
  */
 export function TransportDetailPage({ transportId }: { transportId: number }) {
   const { user } = useAuth();
+  // Revise round 8 — Proof photo viewing is permission-gated. Only Admin
+  // Gudang + Owner see the actual checkpoint photo thumbnails; other roles
+  // see a "foto terkunci" placeholder so they still know a photo exists but
+  // cannot view the image itself.
+  const canViewProofPhotos = hasPermission(user, "proof_photo.view");
   const { data: transport, loading, reload } = useApiData<TransportDetail>(
     () => apiGet<TransportDetail>(`/transports/${transportId}`),
     [transportId],
@@ -324,9 +329,19 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
                         {records.slice(0, 4).map((r) => (
                           <div key={r.id} className="w-[104px] space-y-1">
                             {r.photoUrl ? (
-                              <a href={r.photoUrl} target="_blank" rel="noreferrer" title="Lihat foto bukti">
-                                <img src={r.photoUrl} alt={`Bukti ${r.checkpointName}`} className="h-16 w-full rounded-md border object-cover" />
-                              </a>
+                              canViewProofPhotos ? (
+                                <a href={r.photoUrl} target="_blank" rel="noreferrer" title="Lihat foto bukti">
+                                  <img src={r.photoUrl} alt={`Bukti ${r.checkpointName}`} className="h-16 w-full rounded-md border object-cover" />
+                                </a>
+                              ) : (
+                                <div
+                                  className="flex h-16 w-full flex-col items-center justify-center gap-1 rounded-md border bg-muted/60 px-1 text-center text-[9px] font-medium text-muted-foreground"
+                                  title="Foto bukti hanya dapat dilihat oleh Admin Gudang / Owner (proof_photo.view)"
+                                >
+                                  <Camera className="h-4 w-4" />
+                                  foto terkunci
+                                </div>
+                              )
                             ) : (
                               <div className="flex h-16 w-full items-center justify-center rounded-md border bg-muted text-[10px] text-muted-foreground">tanpa foto</div>
                             )}

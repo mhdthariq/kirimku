@@ -13,6 +13,7 @@ import {
   Package,
   Receipt,
   Route,
+  Search,
   ShieldCheck,
   Tag,
   TrendingUp,
@@ -27,6 +28,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { hasAnyPermission } from "@/lib/client-api";
+import { NEXT_PUBLIC_SHOW_TRACKING_LINK } from "@/lib/runtime-mode";
 import { Logo } from "@/components/app/logo";
 import { ThemeToggle } from "@/components/app/theme-toggle";
 import { InstallAppMenuItem } from "@/components/app/pwa";
@@ -386,6 +388,20 @@ export function AppShell({
                   <p className="text-sm font-semibold">{user.name}</p>
                   <p className="text-xs font-normal text-muted-foreground">@{user.username}</p>
                 </DropdownMenuLabel>
+                {/* "Lacak Paket" customer-facing tracking link — only shown in
+                    Dev + Preview. In production the public /tracking-paket page
+                    is reachable directly via URL but never advertised from the
+                    authenticated UI. */}
+                {NEXT_PUBLIC_SHOW_TRACKING_LINK && (
+                  <>
+                    <DropdownMenuItem asChild>
+                      <a href="/tracking-paket" target="_blank" rel="noopener noreferrer">
+                        <Search className="h-4 w-4" /> Lacak Paket
+                      </a>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
                 <InstallAppMenuItem />
                 <DropdownMenuSeparator />
                 <DropdownMenuItem variant="destructive" onClick={handleLogout}>

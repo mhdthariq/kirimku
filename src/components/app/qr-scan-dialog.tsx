@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, PackageCheck, QrCode, ScanLine, TriangleAlert } from "lucide-react";
+import { CheckCircle2, MapPin, PackageCheck, Phone, QrCode, ScanLine, TriangleAlert, User } from "lucide-react";
 import { toast } from "sonner";
 import { apiGet, apiPost, type PaymentSummary, type ScanProgress, type ScanResponse } from "@/lib/client-api";
 import { ScanConsole, type ScanMethod } from "@/components/app/scan-console";
@@ -19,6 +19,12 @@ export interface ScanTaskInfo {
   route: string; // "origin → destination" or destination
   status: string;
   completedAt?: string | null;
+  /** Revise round 7 — Pickup-only. Address where the kurir should go to
+   *  pick up the package. Sourced from MasterShipment.pengirimAddress.
+   *  Null/absent for delivery scans. */
+  pickupAddress?: string | null;
+  pickupContact?: string | null;
+  pickupSenderName?: string | null;
 }
 
 interface QrScanDialogProps {
@@ -163,6 +169,43 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
             </DialogDescription>
           )}
         </DialogHeader>
+
+        {/* Revise round 7 — Pickup address panel.
+            For pickups, show the address where the kurir needs to go to pick
+            up the package. Sourced from MasterShipment.pengirimAddress (the
+            per-shipment sender address the staff typed — NOT the customer's
+            master DB record, which may differ). Helps the kurir know where
+            to go and who to ask for on arrival. Hidden for deliveries. */}
+        {isPickup && task?.pickupAddress && (
+          <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5 text-xs">
+            <p className="flex items-center gap-1.5 font-semibold text-primary">
+              <MapPin className="h-3.5 w-3.5" /> Alamat Pickup
+            </p>
+            <p className="mt-1 pl-5 font-medium text-foreground">{task.pickupAddress}</p>
+            {(task.pickupSenderName || task.pickupContact) && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 pl-5 text-foreground/80">
+                {task.pickupSenderName && (
+                  <span className="flex items-center gap-1">
+                    <User className="h-3 w-3" /> {task.pickupSenderName}
+                  </span>
+                )}
+                {task.pickupContact && (
+                  <a
+                    href={`tel:${task.pickupContact.replace(/[^+\d]/g, "")}`}
+                    className="flex items-center gap-1 text-primary hover:underline"
+                  >
+                    <Phone className="h-3 w-3" /> {task.pickupContact}
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+        {isPickup && !task?.pickupAddress && (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+            <strong>Alamat pickup belum diisi.</strong> Hubungi admin gudang / staff untuk alamat penjemputan sebelum berangkat.
+          </div>
+        )}
 
         {/* Progress */}
         <div className="space-y-2">

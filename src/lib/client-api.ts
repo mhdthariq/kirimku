@@ -176,6 +176,11 @@ export interface Customer {
    *  to who") — drives the marketing data separation. */
   marketingPartnerId?: number | null;
   marketingPartnerName?: string | null;
+  /** Revise round 7 — Gudang attachment. null = "umum" (general —
+   *  visible to every gudang). When set, only that gudang's admin/staff
+   *  see this customer in their customer list. */
+  warehouseId?: number | null;
+  warehouseName?: string | null;
 }
 
 export interface DetailShipment {
@@ -219,6 +224,11 @@ export interface Shipment {
   originWarehouseName?: string | null;
   destinationWarehouseName?: string | null;
   arrivedWarehouseName?: string | null;
+  /** Revise round 8 — Fulfillment Mode.
+   *  - "STANDARD" = kurir → company warehouse → transport → destination warehouse → kurir delivery
+   *  - "DIRECT"    = driver picks up directly at the origin warehouse and delivers directly to the destination warehouse
+   *  Defaults to "STANDARD" on the server for rows created before this revision. */
+  fulfillmentMode?: "STANDARD" | "DIRECT";
   /** when Admin Gudang scan-verified receipt at the destination gudang
    *  (transport drop-off). null + ARRIVED_AT_GUDANG = awaiting scan-in. */
   destReceivedAt?: string | null;
@@ -336,6 +346,19 @@ export interface PickupTask {
   destination: string;
   customerName: string;
   customerType: string;
+  /** Revise round 7 — Pickup address shown to the kurir so they know where
+   *  to pick up the package. Sourced from MasterShipment.pengirimAddress
+   *  (the per-shipment sender address the staff typed, which may differ
+   *  from the customer's master DB record). */
+  pickupAddress?: string | null;
+  /** Sender contact phone — paired with pickupAddress so the kurir can
+   *  call the customer on arrival. */
+  pickupContact?: string | null;
+  /** Sender name as typed into the shipment (for the kurir to ask for). */
+  pickupSenderName?: string | null;
+  /** Revise round 8 — pickup photo (proof of pickup). Display gated by
+   *  proof_photo.view (Admin Gudang + Owner default). */
+  photoUrl?: string | null;
   detailsCount: number;
   scannedCount: number;
   /** gudang(s) this pickup belongs to (origin side of the master shipment) */
@@ -348,7 +371,12 @@ export interface DeliveryTask {
   status: string;
   kurirId: number | null;
   notes: string | null;
+  /** Free-text proof of delivery — typically the receiver's name as typed
+   *  by the kurir at handover. NOT a photo. */
   proofOfDelivery: string | null;
+  /** Revise round 8 — optional delivery photo (proof of delivery image).
+   *  Display is gated by proof_photo.view (Admin Gudang + Owner default). */
+  photoUrl?: string | null;
   createdAt: string;
   completedAt: string | null;
   masterCode: string;
@@ -682,7 +710,7 @@ export interface Options {
   vehicles: { id: number; vehicleNumber: string; name: string | null; maxWeightKg: number }[];
   routes: { id: number; name: string; origin: string | null; destination: string | null }[];
   warehouses: { id: number; code: string; name: string; city: string | null; customerSupportContact?: string | null }[];
-  customers: { id: number; code: string; name: string; type: string; phone: string | null; email: string | null; address: string | null; marketingPartnerId?: number | null }[];
+  customers: { id: number; code: string; name: string; type: string; phone: string | null; email: string | null; address: string | null; marketingPartnerId?: number | null; warehouseId?: number | null; warehouseName?: string | null }[];
   tariffs: { id: number; origin: string; destination: string; customerType: string | null; ratePerKg: number; minChargeableKg: number; volumetricMultiplier: number; roundingMode: string; roundingUnitKg: number; effectiveFrom: string; effectiveTo: string | null }[];
   permissions: { id: number; slug: string; module: string; description: string | null }[];
   /** Revise.md §13 — vehicle-owner partners (vehicle ownership dropdown) */
@@ -1128,6 +1156,9 @@ export interface PartnerRow {
   bank: { bankName: string | null; bankAccountName: string | null; bankAccountNumber: string | null };
   isActive: boolean;
   notes: string | null;
+  /** Revise round 7 — Partner Alignment. null = "umum" (general). */
+  warehouseId?: number | null;
+  warehouseName?: string | null;
   wallet: { balance: number; reserved: number; available: number };
   totals: { transportEarnings: number; commissions: number; repairDeductions: number; withdrawals: number };
   /** Combined earnings breakdown — shipment commission + transport profit share. */

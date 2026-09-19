@@ -67,6 +67,10 @@ export async function GET(req: NextRequest) {
           kurirId: d.kurirId,
           notes: d.notes,
           proofOfDelivery: d.proofOfDelivery,
+          // Revise round 8 — optional delivery photo (proof of delivery image).
+          // Display is gated by proof_photo.view on the client (Admin Gudang +
+          // Owner by default). Other roles see the metadata but not the image.
+          photoUrl: d.photoUrl ?? null,
           createdAt: d.createdAt,
           completedAt: d.completedAt,
           masterCode: d.master.masterCode,

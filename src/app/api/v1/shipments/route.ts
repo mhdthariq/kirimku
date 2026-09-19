@@ -14,6 +14,10 @@ export async function GET(req: NextRequest) {
     const search = str(params.get("search"))?.toLowerCase();
     const status = str(params.get("status"));
     const customerType = str(params.get("customerType"));
+    // Revise round 8 — optional filter by fulfillment mode (STANDARD / DIRECT).
+    // Used by the Shipments page Regular / Direct tabs.
+    const modeParam = str(params.get("fulfillmentMode"))?.toUpperCase();
+    const fulfillmentMode = modeParam === "DIRECT" || modeParam === "STANDARD" ? modeParam : null;
     const marketingOwner = user.partnerType === "MARKETING" ? user.partnerId : null;
 
     const shipments = await db.masterShipment.findMany({
@@ -22,6 +26,7 @@ export async function GET(req: NextRequest) {
           ? { createdByPartnerId: marketingOwner ?? -1 }
           : {}),
         ...(status ? { status } : {}),
+        ...(fulfillmentMode ? { fulfillmentMode } : {}),
         ...(customerType ? { customer: { type: customerType } } : {}),
         ...(search
           ? {
@@ -152,6 +157,14 @@ export async function POST(req: NextRequest) {
     const originWarehouseId = num(body.originWarehouseId);
     const destinationWarehouseId = num(body.destinationWarehouseId);
 
+    // Revise round 8 — Fulfillment Mode. Optional on the body, defaults to
+    // "STANDARD" (the existing kurir → company warehouse → transport flow).
+    // When "DIRECT", the shipment skips the company warehouse scan flow:
+    // the driver picks up directly at the origin warehouse and delivers
+    // directly to the destination warehouse.
+    const fulfillmentModeRaw = typeof body.fulfillmentMode === "string" ? body.fulfillmentMode.toUpperCase() : "STANDARD";
+    const fulfillmentMode = fulfillmentModeRaw === "DIRECT" ? "DIRECT" : "STANDARD";
+
     // Revise.md — attribute the shipment to the Marketing partner that
     // created it (drives B2B commission + discount validation). Non-partner
     // users (owner/admin) create unattributed shipments.
@@ -178,6 +191,7 @@ export async function POST(req: NextRequest) {
           customerId,
           tariffId: tariff?.id ?? null,
           status: "CREATED",
+          fulfillmentMode,
           origin,
           destination,
           originWarehouseId: originWarehouseId ?? null,
