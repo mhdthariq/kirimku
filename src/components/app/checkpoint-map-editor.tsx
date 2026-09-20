@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { CheckCircle2, Crosshair, GripVertical, Info, MapPin, Plus, Trash2 } from "lucide-react";
+import { CheckCircle2, Crosshair, ExternalLink, GripVertical, Info, MapPin, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -370,6 +370,18 @@ export function CheckpointMapEditor({
                 Radius: <span className="font-mono">{formatNumber(metersToKm(selected.cp.radiusMeters), 2)} KM</span>
                 <span className="ml-1 opacity-70">({formatNumber(selected.cp.radiusMeters, 0)} m)</span>
               </span>
+              {/* Revise round 11 — Google Maps redirect button.
+                  Opens Google Maps at this checkpoint's coordinate in a new tab.
+                  URL: https://www.google.com/maps/search/?api=1&query=LAT,LNG */}
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${selected.cp.latitude},${selected.cp.longitude}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-primary/5 px-2 py-0.5 text-[11px] font-medium text-primary transition hover:border-primary/60 hover:bg-primary/10"
+                title="Buka lokasi checkpoint ini di Google Maps"
+              >
+                <ExternalLink className="h-3 w-3" /> Buka di Google Maps
+              </a>
             </div>
           </div>
         </div>

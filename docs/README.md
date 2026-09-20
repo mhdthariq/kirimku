@@ -126,6 +126,17 @@ Full details in [`10-revision-round-9.md`](10-revision-round-9.md).
 
 Full details in [`11-revision-round-10.md`](11-revision-round-10.md).
 
+## Revision round 11 — Volume Column, Direct Volume Entry, Vehicle Formatting, Google Maps
+
+| # | Revision | Where it is implemented |
+|---|---|---|
+| R1 | **Volume (m³) column in shipment detail** — both "Semua" and "Ringkas" detail barang tables now show a "Volume (m³)" column after "Dimensi (cm)". Uses `volumeM3` when set, otherwise computes L×W×H/1.000.000. | `src/components/app/pages/shipments-page.tsx` |
+| R2 | **Direct volume entry (skip dimensions)** — new `volumeM3` field on `DetailShipment`. When set, used directly instead of L×W×H computation. New "Volume langsung (m³) — opsional" field in the detail form. When dimensions are absent, "Dimensi" shows "—". | `prisma/schema.prisma`, `src/lib/shipment-totals.ts`, `src/lib/pricing.ts`, `src/app/api/v1/shipments/route.ts`, `src/app/api/v1/shipments/[id]/details/route.ts`, `src/app/api/v1/shipment-details/[id]/route.ts`, `src/lib/client-api.ts`, `src/components/app/pages/shipments-page.tsx` |
+| R3 | **Vehicle volume formatting (2 decimals)** — `maxVolumeM3` now shows 2 decimal places (e.g., `12,89 m³` instead of `13 m³`) on Vehicles page and My Vehicles page. | `src/components/app/pages/vehicles-page.tsx`, `src/components/app/pages/my-vehicles-page.tsx` |
+| R4 | **Google Maps redirect button on checkpoints** — every checkpoint in the route editor and transport detail page has a "Buka di Google Maps" button that opens Google Maps at the checkpoint's coordinates. | `src/components/app/checkpoint-map-editor.tsx`, `src/components/app/pages/transport-detail-page.tsx` |
+
+Full details in [`12-revision-round-11.md`](12-revision-round-11.md).
+
 ## Document index
 
 | File | Contents |
@@ -141,6 +152,7 @@ Full details in [`11-revision-round-10.md`](11-revision-round-10.md).
 | [`09-revision-round-8.md`](09-revision-round-8.md) | **Fulfillment Mode (STANDARD/DIRECT) + proof_photo.view permission** |
 | [`10-revision-round-9.md`](10-revision-round-9.md) | **DIRECT form flow, Photo Detail buttons, Vehicle dimensions** |
 | [`11-revision-round-10.md`](11-revision-round-10.md) | **Marketing Gudang alignment, Admin Gudang customer CRUD, Seed updates** |
+| [`12-revision-round-11.md`](12-revision-round-11.md) | **Volume column, Direct volume entry, Vehicle formatting, Google Maps** |
 
 ## Where the code lives (map)
 

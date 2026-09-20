@@ -186,7 +186,8 @@ export function VehiclesPage() {
                 header: "Kapasitas",
                 render: (v) => (
                   <span className="text-sm text-muted-foreground">
-                    {formatNumber(v.maxWeightKg, 0)} kg · {formatNumber(v.maxVolumeM3, 0)} m³
+                    {/* Revise round 11 — volume now shows 2 decimal places (e.g., 12.89 m³). */}
+                    {formatNumber(v.maxWeightKg, 0)} kg · {formatNumber(v.maxVolumeM3, 2)} m³
                   </span>
                 ),
               },

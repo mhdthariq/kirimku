@@ -9,6 +9,7 @@ import {
   CarFront,
   CheckCircle2,
   Clock,
+  ExternalLink,
   MapPin,
   Package,
   PackageCheck,
@@ -320,6 +321,17 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
                         <p className="mt-1 text-[11px] text-muted-foreground">
                           Radius {formatNumber(c.radiusMeters / 1000, 2)} KM · <span className="font-mono">{c.latitude.toFixed(5)}, {c.longitude.toFixed(5)}</span>
                         </p>
+                        {/* Revise round 11 — Google Maps redirect button.
+                            Opens Google Maps at this checkpoint's coordinate in a new tab. */}
+                        <a
+                          href={`https://www.google.com/maps/search/?api=1&query=${c.latitude},${c.longitude}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-1.5 inline-flex items-center gap-1 rounded-md border border-primary/30 bg-primary/5 px-2 py-0.5 text-[11px] font-medium text-primary transition hover:border-primary/60 hover:bg-primary/10"
+                          title={`Buka ${c.name} di Google Maps`}
+                        >
+                          <ExternalLink className="h-3 w-3" /> Buka di Google Maps
+                        </a>
                       </div>
                       {c.checkedIn ? (
                         <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">

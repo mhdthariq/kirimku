@@ -20,6 +20,9 @@ export interface PricedDetailInput {
   widthCm?: number | null;
   heightCm?: number | null;
   actualWeightKg: number;
+  /** Revise round 11 — optional direct volume entry (m³). When set (> 0),
+   *  this value is used directly instead of computing L×W×H/1.000.000. */
+  volumeM3?: number | null;
 }
 
 export interface TariffLike {
@@ -30,14 +33,19 @@ export interface TariffLike {
   roundingUnitKg: number;
 }
 
-export function volumetricKgFor(
-  l: number | null | undefined,
-  w: number | null | undefined,
-  h: number | null | undefined,
-  multiplier: number,
-): number {
-  const volumeM3 = ((l ?? 0) * (w ?? 0) * (h ?? 0)) / 1_000_000;
-  return volumeM3 * multiplier;
+/** Compute the volume (m³) of a single detail row.
+ *  - If `volumeM3` is set (non-null, > 0), use it directly.
+ *  - Otherwise, fall back to L×W×H/1.000.000 (existing behavior).
+ *  - Returns 0 when neither path yields a positive number. */
+function detailVolumeM3(d: PricedDetailInput): number {
+  if (d.volumeM3 != null && d.volumeM3 > 0) return d.volumeM3;
+  return ((d.lengthCm ?? 0) * (d.widthCm ?? 0) * (d.heightCm ?? 0)) / 1_000_000;
+}
+
+/** Volumetric kg for a single package — uses `volumeM3` when set, otherwise
+ *  falls back to the L×W×H computation. Multiplier = kg per m³ (per tariff). */
+export function volumetricKgForDetail(d: PricedDetailInput, multiplier: number): number {
+  return detailVolumeM3(d) * multiplier;
 }
 
 export interface PricingResult {
@@ -51,7 +59,9 @@ export interface PricingResult {
 export function computePricing(details: PricedDetailInput[], tariff: TariffLike): PricingResult {
   const actualKg = details.reduce((sum, d) => sum + (d.actualWeightKg || 0), 0);
   const multiplier = tariff.volumetricMultiplier > 0 ? tariff.volumetricMultiplier : DEFAULT_VOLUMETRIC_MULTIPLIER;
-  const volumetricKg = details.reduce((sum, d) => sum + volumetricKgFor(d.lengthCm, d.widthCm, d.heightCm, multiplier), 0);
+  // Revise round 11 — use volumetricKgForDetail so packages with `volumeM3`
+  // set use that value directly instead of L×W×H.
+  const volumetricKg = details.reduce((sum, d) => sum + volumetricKgForDetail(d, multiplier), 0);
 
   let chargeable = Math.max(actualKg, volumetricKg);
   chargeable = Math.max(chargeable, tariff.minChargeableKg);

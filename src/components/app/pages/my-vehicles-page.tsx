@@ -7,6 +7,7 @@ import { apiGet, hasPermission, type Vehicle } from "@/lib/client-api";
 import { useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { StatusBadge } from "@/components/app/status-badge";
+import { formatNumber } from "@/components/app/form-parts";
 import { Button } from "@/components/ui/button";
 
 interface MyVehicleRow extends Vehicle {
@@ -63,7 +64,8 @@ export function MyVehiclesPage() {
             render: (r) => (
               <div>
                 <p className="text-sm">{r.maxWeightKg.toLocaleString("id-ID")} kg</p>
-                <p className="text-xs text-muted-foreground">{r.maxVolumeM3} m³</p>
+                {/* Revise round 11 — volume shows 2 decimal places. */}
+                <p className="text-xs text-muted-foreground">{formatNumber(r.maxVolumeM3, 2)} m³</p>
               </div>
             ),
           },

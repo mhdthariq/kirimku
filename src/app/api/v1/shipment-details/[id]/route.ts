@@ -22,6 +22,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (body.lengthCm !== undefined) data.lengthCm = num(body.lengthCm);
     if (body.widthCm !== undefined) data.widthCm = num(body.widthCm);
     if (body.heightCm !== undefined) data.heightCm = num(body.heightCm);
+    // Revise round 11 — direct volume entry (m³). null clears it.
+    if (body.volumeM3 !== undefined) data.volumeM3 = num(body.volumeM3);
     if (body.actualWeightKg !== undefined) data.actualWeightKg = num(body.actualWeightKg) ?? 0;
     const detail = await db.detailShipment.update({ where: { id: existing.id }, data });
     await audit({ action: "updated", entityType: "shipment_detail", entityId: detail.id, entityLabel: detail.detailCode, actor: user, before: existing, after: detail });

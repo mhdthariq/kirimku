@@ -82,6 +82,10 @@ interface DetailForm {
   lengthCm: string;
   widthCm: string;
   heightCm: string;
+  // Revise round 11 — optional direct volume entry (m³). When set, used
+  // directly instead of computing L×W×H/1.000.000. Lets the user skip
+  // dimensions for irregularly-shaped packages.
+  volumeM3: string;
   actualWeightKg: string;
 }
 
@@ -102,13 +106,16 @@ const EMPTY_SHIPMENT: ShipmentForm = {
   discountAmount: "",
   insuranceAmount: "",
 };
-const EMPTY_DETAIL: DetailForm = { description: "", quantity: "1", lengthCm: "", widthCm: "", heightCm: "", actualWeightKg: "" };
+const EMPTY_DETAIL: DetailForm = { description: "", quantity: "1", lengthCm: "", widthCm: "", heightCm: "", volumeM3: "", actualWeightKg: "" };
 
 /** Row type for the "Ringkas" (grouped) detail view — pure UI aggregation. */
 interface DetailGroupRow {
   id: string;
   description: string;
   dims: string;
+  // Revise round 11 — per-group volume (m³). Computed from L×W×H OR the
+  // explicit volumeM3 field if dimensions are absent.
+  volumeM3: number;
   quantity: number;
   weightKg: number;
   totalKg: number;
@@ -1422,6 +1429,8 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
       lengthCm: d.lengthCm != null ? String(d.lengthCm) : "",
       widthCm: d.widthCm != null ? String(d.widthCm) : "",
       heightCm: d.heightCm != null ? String(d.heightCm) : "",
+      // Revise round 11 — pre-fill the direct volume entry (m³).
+      volumeM3: d.volumeM3 != null ? String(d.volumeM3) : "",
       actualWeightKg: String(d.actualWeightKg),
     });
     setDetailOpen(true);
@@ -1442,6 +1451,9 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
       lengthCm: detailForm.lengthCm === "" ? null : Number(detailForm.lengthCm),
       widthCm: detailForm.widthCm === "" ? null : Number(detailForm.widthCm),
       heightCm: detailForm.heightCm === "" ? null : Number(detailForm.heightCm),
+      // Revise round 11 — optional direct volume entry (m³). When set,
+      // the server uses it directly instead of computing L×W×H/1.000.000.
+      volumeM3: detailForm.volumeM3 === "" ? null : Number(detailForm.volumeM3),
       actualWeightKg: Number(detailForm.actualWeightKg) || 0,
     };
     const payload = editingDetail ? base : { ...base, quantity: Math.round(Number(detailForm.quantity) || 1) };
@@ -1483,12 +1495,16 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
       const l = d.lengthCm ?? 0;
       const w = d.widthCm ?? 0;
       const h = d.heightCm ?? 0;
-      const key = `${d.description}|${l}|${w}|${h}|${d.actualWeightKg}`;
+      const vol = d.volumeM3 ?? 0;
+      const key = `${d.description}|${l}|${w}|${h}|${vol}|${d.actualWeightKg}`;
+      // Revise round 11 — per-package volume: use volumeM3 when set, otherwise L×W×H/1e6.
+      const pkgVolume = vol > 0 ? vol : (l * w * h) / 1_000_000;
       if (!acc[key]) {
         acc[key] = {
           id: key,
           description: d.description,
           dims: l || w || h ? `${formatNumber(l, 0)}×${formatNumber(w, 0)}×${formatNumber(h, 0)}` : "—",
+          volumeM3: 0,
           quantity: 0,
           weightKg: d.actualWeightKg,
           totalKg: 0,
@@ -1496,6 +1512,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
       }
       acc[key].quantity += 1;
       acc[key].totalKg += d.actualWeightKg;
+      acc[key].volumeM3 += pkgVolume;
       return acc;
     }, {}),
   );
@@ -1801,6 +1818,20 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
                       hideOnMobile: true,
                       render: (d) => (d.lengthCm ? `${formatNumber(d.lengthCm, 0)}×${formatNumber(d.widthCm, 0)}×${formatNumber(d.heightCm, 0)}` : "—"),
                     },
+                    // Revise round 11 — Volume (m³) column. Uses volumeM3 when
+                    // set, otherwise computed from L×W×H/1.000.000. Shows "—"
+                    // when neither path yields a positive volume.
+                    {
+                      key: "volume",
+                      header: "Volume (m³)",
+                      hideOnMobile: true,
+                      render: (d) => {
+                        const vol = (d.volumeM3 ?? 0) > 0
+                          ? d.volumeM3!
+                          : ((d.lengthCm ?? 0) * (d.widthCm ?? 0) * (d.heightCm ?? 0)) / 1_000_000;
+                        return <span className="text-sm tabular-nums">{vol > 0 ? vol.toFixed(3) : "—"}</span>;
+                      },
+                    },
                     { key: "weight", header: "Berat", render: (d) => `${formatNumber(d.actualWeightKg)} kg` },
                     ...(isEditable && (can.detailUpdate || can.detailDelete)
                       ? [
@@ -1834,6 +1865,17 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
                   columns={[
                     { key: "desc", header: "Deskripsi", primary: true, render: (g) => <span className="font-medium">{g.description}</span> },
                     { key: "dims", header: "Dimensi (cm)", render: (g) => g.dims },
+                    // Revise round 11 — Volume (m³) column for grouped view.
+                    {
+                      key: "volume",
+                      header: "Volume (m³)",
+                      render: (g) => (
+                        <span className="tabular-nums">
+                          {g.volumeM3 > 0 ? `${(g.volumeM3 * g.quantity).toFixed(3)} m³` : "—"}
+                          {g.volumeM3 > 0 && <span className="ml-1 text-[10px] text-muted-foreground">({g.volumeM3.toFixed(3)}/paket)</span>}
+                        </span>
+                      ),
+                    },
                     { key: "qty", header: "Jumlah", render: (g) => <span className="font-semibold">{g.quantity} paket</span> },
                     {
                       key: "weight",
@@ -1894,6 +1936,26 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
                   <NumberInput id="d-h" value={detailForm.heightCm} onChange={(e) => setDetailForm({ ...detailForm, heightCm: e.target.value })} placeholder="15" disabled={busy} />
                 </Field>
               </div>
+              {/* Revise round 11 — optional direct volume entry (m³).
+                  Use case: irregularly-shaped packages where entering dimensions
+                  is impractical. When set, volume is used directly instead of
+                  L×W×H/1.000.000. Leave empty to compute from dimensions. */}
+              <Field
+                label="Volume langsung (m³) — opsional"
+                htmlFor="d-volume"
+                className="sm:col-span-2"
+                hint="Isi jika paket berbentuk tidak beraturan (skip dimensi). Kosongkan untuk hitung otomatis dari P×L×T."
+              >
+                <NumberInput
+                  id="d-volume"
+                  value={detailForm.volumeM3}
+                  onChange={(e) => setDetailForm({ ...detailForm, volumeM3: e.target.value })}
+                  placeholder="mis. 0.009 (opsional)"
+                  step="0.001"
+                  min="0"
+                  disabled={busy}
+                />
+              </Field>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDetailOpen(false)} disabled={busy}>

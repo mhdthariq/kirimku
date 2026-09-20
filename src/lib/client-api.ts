@@ -191,6 +191,9 @@ export interface DetailShipment {
   lengthCm: number | null;
   widthCm: number | null;
   heightCm: number | null;
+  /** Revise round 11 — optional direct volume entry (m³). When set, used
+   *  directly instead of computing L×W×H/1.000.000. */
+  volumeM3?: number | null;
   actualWeightKg: number;
 }
 

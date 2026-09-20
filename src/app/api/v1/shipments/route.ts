@@ -230,6 +230,8 @@ export async function POST(req: NextRequest) {
             lengthCm: num(d.lengthCm),
             widthCm: num(d.widthCm),
             heightCm: num(d.heightCm),
+            // Revise round 11 — optional direct volume entry (m³).
+            volumeM3: num(d.volumeM3),
             actualWeightKg: num(d.actualWeightKg) ?? 0,
           })),
         });

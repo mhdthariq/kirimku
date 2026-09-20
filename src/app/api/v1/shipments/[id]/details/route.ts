@@ -49,6 +49,9 @@ export async function POST(req: NextRequest, { params }: Params) {
       lengthCm: num(body.lengthCm),
       widthCm: num(body.widthCm),
       heightCm: num(body.heightCm),
+      // Revise round 11 — optional direct volume entry (m³). When set,
+      // volume is used directly instead of computing L×W×H/1.000.000.
+      volumeM3: num(body.volumeM3),
       actualWeightKg: num(body.actualWeightKg) ?? 0,
     }));
     await db.detailShipment.createMany({ data: rows });

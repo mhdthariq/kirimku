@@ -300,6 +300,12 @@ model DetailShipment {
   lengthCm       Float?
   widthCm        Float?
   heightCm       Float?
+  /// Revise round 11 — optional direct volume entry (m³). When set, this
+  /// value is used directly for the package volume (no L×W×H computation).
+  /// Use case: irregularly-shaped packages where entering dimensions is
+  /// impractical — the user just measures the volume and enters it.
+  /// When null, volume is computed from L×W×H/1.000.000 (existing behavior).
+  volumeM3       Float?
   actualWeightKg Float          @default(0)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
