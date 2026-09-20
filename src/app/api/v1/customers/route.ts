@@ -100,8 +100,22 @@ export async function POST(req: NextRequest) {
     // Revise round 7 — Gudang attachment for customers. Optional: when set,
     // only that gudang's admins/staff see this customer in their lists.
     // null / "general" / "none" → umum (visible to all gudangs).
+    //
+    // Revise round 10 — when the caller is a Marketing partner aligned to a
+    // specific gudang (Partner.warehouseId != null), the customer they
+    // create auto-inherits that gudang UNLESS the body explicitly overrides
+    // it. When the marketing partner is "umum" (warehouseId = null), the
+    // customer gets warehouseId = null too (unless explicitly set) — the UI
+    // is expected to require manual gudang pick in that case.
+    //
+    // Revise round 10 — Admin Gudang creating a customer (no marketing link)
+    // auto-assigns the customer to the admin gudang's own gudang, so the
+    // customer is visible only to their gudang. Owner / Admin Kantor callers
+    // are not affected — they must explicitly pass warehouseId.
     let warehouseId: number | null = null;
+    let autoInherited = false;
     if (body.warehouseId !== undefined && body.warehouseId !== null && body.warehouseId !== "") {
+      // Explicit body override — validate the warehouse.
       if (body.warehouseId !== "general" && body.warehouseId !== "none") {
         const wid = num(body.warehouseId);
         if (wid == null) {
@@ -112,6 +126,25 @@ export async function POST(req: NextRequest) {
           return fail(422, "Gudang tidak ditemukan / tidak aktif.", { warehouseId: ["Gudang tidak ditemukan / tidak aktif."] });
         }
         warehouseId = warehouse.id;
+      }
+    } else if (selfPartnerId != null) {
+      // Marketing partner caller, no explicit warehouseId — inherit from
+      // the partner's alignment. Aligned → use partner.warehouseId; umum
+      // → stays null (the UI requires manual gudang pick for umum marketing).
+      const partner = await db.partner.findUnique({ where: { id: selfPartnerId }, select: { warehouseId: true } });
+      if (partner?.warehouseId != null) {
+        warehouseId = partner.warehouseId;
+        autoInherited = true;
+      }
+    } else if (user.employeeId != null) {
+      // Admin Gudang / Staff Gudang caller (no marketing link) — auto-assign
+      // to the user's own gudang so the customer is visible only to them.
+      // Owner / unscoped callers skip this branch (scopeForUser returns
+      // unscoped) and the customer stays "umum" unless explicitly set.
+      const employee = await db.employee.findUnique({ where: { id: user.employeeId }, select: { warehouseId: true } });
+      if (employee?.warehouseId != null) {
+        warehouseId = employee.warehouseId;
+        autoInherited = true;
       }
     }
 
@@ -130,7 +163,7 @@ export async function POST(req: NextRequest) {
         warehouseId,
       },
     });
-    await audit({ action: "created", entityType: "customer", entityId: customer.id, entityLabel: customer.name, actor: user, after: customer });
+    await audit({ action: "created", entityType: "customer", entityId: customer.id, entityLabel: customer.name, actor: user, after: { ...customer, autoInheritedWarehouse: autoInherited } });
     return ok(customer, undefined);
   });
 }

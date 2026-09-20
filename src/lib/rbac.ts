@@ -189,7 +189,7 @@ export const ROLE_TEMPLATES: { slug: string; name: string; description: string; 
   {
     slug: "admin-gudang",
     name: "Admin Gudang",
-    description: "Warehouse operations: arrival scanning, fleet, routes, transports — data terbatas ke gudang tempatnya bertugas",
+    description: "Warehouse operations: arrival scanning, fleet, routes, transports, customers — data terbatas ke gudang tempatnya bertugas",
     permissions: [
       "warehouse.view", "warehouse.create", "warehouse.update", "warehouse.delete",
       "vehicle.view", "vehicle.create", "vehicle.update",
@@ -206,6 +206,12 @@ export const ROLE_TEMPLATES: { slug: string; name: string; description: string; 
       "pickup.view", "pickup.create", "pickup.assign_kurir", "pickup.confirm",
       "payment.view",
       "audit_log.view",
+      // Revise round 10 — Admin Gudang gets full customer CRUD. Customers
+      // they create auto-attach to their own gudang (handled in
+      // POST /customers — see customers/route.ts). They still respect the
+      // marketing data separation (cannot see another marketing's customers)
+      // and gudang data separation (cannot see another gudang's customers).
+      "customer.view", "customer.create", "customer.update", "customer.delete",
     ],
   },
   {

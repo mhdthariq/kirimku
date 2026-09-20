@@ -103,7 +103,14 @@ export function CustomersPage() {
       // PIC assignment is admin/owner-only — Marketing users create customers
       // that are automatically connected to themselves (handled server-side).
       ...(isMarketing
-        ? {}
+        ? // Revise round 10 — Marketing users send warehouseId ONLY when they
+          // picked one manually (i.e. they're "umum" and the form requires a
+          // manual gudang pick). When the marketing partner is aligned to a
+          // gudang, we OMIT warehouseId so the server auto-inherits the
+          // partner's gudang. Sending warehouseId="none" would force umum.
+          form.warehouseId !== "none"
+          ? { warehouseId: Number(form.warehouseId) }
+          : {}
         : {
             marketingPartnerId: form.marketingPartnerId !== "none" ? Number(form.marketingPartnerId) : null,
             warehouseId: form.warehouseId !== "none" ? Number(form.warehouseId) : null,
@@ -142,15 +149,15 @@ export function CustomersPage() {
 
   const marketingPartnerOptions = [
     // "none" sentinel — Radix Select forbids empty-string item values
-    { value: "none", label: "Tidak terhubung (umum)" },
+    { value: "none", label: "— Belum terhubung (umum) —" },
     ...(options?.marketingPartners ?? []).map((p) => ({
       value: String(p.id),
-      label: p.warehouseName ? `${p.name} · ${p.warehouseName}` : `${p.name}`,
+      label: p.warehouseName ? `${p.name} · ${p.warehouseName}` : `${p.name} · Umum`,
     })),
   ];
   // Revise round 7 — Gudang dropdown for Customer attachment.
   const gudangOptions = [
-    { value: "none", label: "Umum (terlihat oleh semua gudang)" },
+    { value: "none", label: "— Umum (terlihat oleh semua gudang) —" },
     ...(options?.warehouses ?? []).map((w) => ({ value: String(w.id), label: w.name + (w.city ? ` · ${w.city}` : "") })),
   ];
 
@@ -286,7 +293,7 @@ export function CustomersPage() {
                 <FormSelect
                   value={form.type}
                   onValueChange={(value) => setForm({ ...form, type: value as "b2b" | "b2c" })}
-                  options={[{ value: "b2c", label: "B2C" }, { value: "b2b", label: "B2B" }]}
+                  options={[{ value: "b2c", label: "B2C — individu" }, { value: "b2b", label: "B2B — perusahaan" }]}
                   disabled={busy}
                 />
               </Field>
@@ -302,7 +309,7 @@ export function CustomersPage() {
                   label="Marketing (PIC)"
                   htmlFor="c-marketing"
                   className="sm:col-span-2"
-                  hint="Customer hanya terlihat oleh marketing yang dipilih."
+                  hint="Customer hanya terlihat oleh marketing ini — khususnya penting untuk B2B."
                 >
                   <FormSelect
                     value={form.marketingPartnerId}
@@ -315,7 +322,13 @@ export function CustomersPage() {
               )}
               {/* Revise round 7 — Gudang attachment.
                   Admin/owner only: when set, only that gudang's admins see
-                  this customer. "Umum" = visible to every gudang. */}
+                  this customer. "Umum" = visible to every gudang.
+
+                  Revise round 10 — Marketing users with an aligned gudang
+                  auto-inherit it (no selector shown, just an info banner).
+                  Marketing users who are "umum" must pick a gudang manually
+                  so their customer doesn't default to umum (otherwise the
+                  customer would be visible to every gudang). */}
               {!isMarketing && (
                 <Field
                   label="Gudang"
@@ -331,6 +344,15 @@ export function CustomersPage() {
                     disabled={busy}
                   />
                 </Field>
+              )}
+              {isMarketing && (
+                <CustomerMarketingGudangHint
+                  marketingPartners={options?.marketingPartners ?? []}
+                  gudangOptions={gudangOptions}
+                  form={form}
+                  setForm={setForm}
+                  busy={busy}
+                />
               )}
               <Field label="Telepon" htmlFor="c-phone">
                 <Input id="c-phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="08xxxxxxxxxx" disabled={busy} />
@@ -370,5 +392,62 @@ export function CustomersPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+// Revise round 10 — Customer marketing gudang hint.
+// Marketing users with an aligned gudang auto-inherit it on customer create
+// (handled server-side in POST /customers). This component shows an info
+// banner telling the marketing user which gudang their customer will get.
+// If the marketing user is "umum" (no gudang alignment), this component
+// shows a Gudang selector so they MUST pick a gudang for the new customer.
+//
+// We detect the marketing partner's alignment from `options.marketingPartners`
+// (the current user is implicitly the marketing partner — their own row is
+// the one matching their partnerId, but since the dropdown only returns
+// marketing partners and the user IS one of them, we just look at the
+// FIRST entry whose id matches user.partnerId).
+function CustomerMarketingGudangHint({
+  marketingPartners,
+  gudangOptions,
+  form,
+  setForm,
+  busy,
+}: {
+  marketingPartners: { id: number; name: string; username: string; warehouseId?: number | null; warehouseName?: string | null }[];
+  gudangOptions: { value: string; label: string }[];
+  form: CustomerForm;
+  setForm: (f: CustomerForm) => void;
+  busy: boolean;
+}) {
+  // The marketing partner's own row — they're the only one in the list
+  // (server-side filter on partnerType === "MARKETING" + user.partnerId).
+  // If we can't find their row, default to "umum" behavior.
+  const me = marketingPartners[0] ?? null;
+  const alignedWarehouseName = me?.warehouseName ?? null;
+
+  if (alignedWarehouseName) {
+    // Aligned marketing — server will auto-assign this gudang. Show banner.
+    return (
+      <div className="sm:col-span-2 rounded-lg border border-emerald-300 bg-emerald-50/60 px-3 py-2 text-xs text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
+        Gudang otomatis: <b>{alignedWarehouseName}</b> — customer akan terikat ke gudang afiliasi marketing Anda.
+      </div>
+    );
+  }
+  // Umum marketing — must pick a gudang manually.
+  return (
+    <Field
+      label="Gudang (wajib — marketing umum)"
+      htmlFor="c-warehouse-marketing"
+      className="sm:col-span-2"
+      hint="Marketing Anda berstatus 'Umum'. Pilih gudang untuk customer ini — bila tidak dipilih, customer akan terlihat oleh semua gudang."
+    >
+      <FormSelect
+        value={form.warehouseId}
+        onValueChange={(v) => setForm({ ...form, warehouseId: v })}
+        options={gudangOptions}
+        disabled={busy}
+      />
+    </Field>
   );
 }

@@ -689,6 +689,9 @@ export interface UserAccount {
   employee?: { name: string; employeeNumber: string } | null;
   partnerId?: number | null;
   partnerType?: "MARKETING" | "VEHICLE_OWNER" | null;
+  /** Revise round 10 — marketing partner's gudang alignment. null = umum. */
+  partnerWarehouseId?: number | null;
+  partnerWarehouseName?: string | null;
   roles: { role: { id: number; name: string; slug: string } }[];
 }
 
@@ -721,7 +724,7 @@ export interface Options {
   /** Revise.md §13 — vehicle-owner partners (vehicle ownership dropdown) */
   vehicleOwners?: { id: number; name: string; username: string; profitShare: { company: number; partner: number } }[];
   /** Marketing partners — "customer connected to who" dropdown (Customers page) */
-  marketingPartners?: { id: number; name: string; username: string }[];
+  marketingPartners?: { id: number; name: string; username: string; warehouseId?: number | null; warehouseName?: string | null }[];
   /** Revise.md §7.1 — B2B shipments available for invoice line linking */
   b2bShipments?: { id: number; masterCode: string; priceAmount: number | null; finalPriceAmount: number | null; customerId: number; createdByPartnerId: number | null; origin: string; destination: string; invoiceLines: { invoice: { id: number; invoiceNumber: string; status: string } }[] }[];
 }

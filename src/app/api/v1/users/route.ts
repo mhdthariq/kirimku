@@ -17,9 +17,21 @@ export async function GET(req: NextRequest) {
         ...(search ? { OR: [{ name: { contains: search } }, { username: { contains: search } }] } : {}),
       },
       orderBy: { id: "asc" },
-      include: { employee: true, roles: { include: { role: true } }, partner: true },
+      include: {
+        employee: true,
+        roles: { include: { role: true } },
+        partner: { include: { warehouse: { select: { id: true, name: true } } } },
+      },
     });
-    return ok(users.map((u) => ({ ...u, passwordHash: undefined, partnerId: u.partner?.id ?? null, partnerType: u.partner?.type ?? null })));
+    return ok(users.map((u) => ({
+      ...u,
+      passwordHash: undefined,
+      partnerId: u.partner?.id ?? null,
+      partnerType: u.partner?.type ?? null,
+      // Revise round 10 — include marketing partner's gudang alignment.
+      partnerWarehouseId: u.partner?.warehouseId ?? null,
+      partnerWarehouseName: u.partner?.warehouse?.name ?? null,
+    })));
   });
 }
 
@@ -67,7 +79,36 @@ export async function POST(req: NextRequest) {
     // wallet (individual profit sharing can be configured later by Owner).
     const companyPercent = num(body.companyPercent) ?? undefined;
     const partnerPercent = num(body.partnerPercent) ?? undefined;
-    await ensurePartnerProfile(created.id, assignedSlugs, { companyPercent, partnerPercent });
+    // Revise round 10 — marketing partner gudang alignment at creation.
+    // body.warehouseId accepts: number | null | "general" | "none" | "".
+    // null/general/none/"" → "umum" (no gudang alignment).
+    // For VEHICLE_OWNER, the warehouseId is silently ignored (alignment is
+    // marketing-only — see lib/partner.ts ensurePartnerProfile).
+    let partnerWarehouseId: number | null | undefined = undefined;
+    if (body.warehouseId !== undefined) {
+      const raw = body.warehouseId;
+      if (raw === null || raw === "" || raw === "general" || raw === "none") {
+        partnerWarehouseId = null;
+      } else {
+        const wid = num(raw);
+        if (wid == null) {
+          return fail(422, "Gudang tidak valid.", { warehouseId: ["Gudang tidak valid."] });
+        }
+        partnerWarehouseId = wid;
+      }
+    }
+    try {
+      await ensurePartnerProfile(created.id, assignedSlugs, {
+        companyPercent,
+        partnerPercent,
+        warehouseId: partnerWarehouseId,
+      });
+    } catch (e) {
+      if (e instanceof Error && e.message === "WAREHOUSE_NOT_FOUND") {
+        return fail(422, "Gudang tidak ditemukan / tidak aktif.", { warehouseId: ["Gudang tidak ditemukan / tidak aktif."] });
+      }
+      throw e;
+    }
 
     await audit({ action: "created", entityType: "user", entityId: created.id, entityLabel: created.username, actor: user, after: { username, name } });
 
@@ -88,7 +129,17 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const full = await db.user.findUnique({ where: { id: created.id }, include: { employee: true, roles: { include: { role: true } }, partner: true } });
-    return ok({ ...full, passwordHash: undefined, partnerId: full?.partner?.id ?? null, partnerType: full?.partner?.type ?? null });
+    const full = await db.user.findUnique({
+      where: { id: created.id },
+      include: { employee: true, roles: { include: { role: true } }, partner: { include: { warehouse: { select: { id: true, name: true } } } } },
+    });
+    return ok({
+      ...full,
+      passwordHash: undefined,
+      partnerId: full?.partner?.id ?? null,
+      partnerType: full?.partner?.type ?? null,
+      partnerWarehouseId: full?.partner?.warehouseId ?? null,
+      partnerWarehouseName: full?.partner?.warehouse?.name ?? null,
+    });
   });
 }

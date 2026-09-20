@@ -71,12 +71,15 @@ export function AccessPage() {
 function PartnersTab({ can }: { can: { userCreate: boolean; userUpdate: boolean; userDisable: boolean } }) {
   const { data, loading, reload } = useApiData<UserAccount[]>(() => apiGet<UserAccount[]>('/users'), []);
   const { data: roles } = useApiData<Role[]>(() => apiGet<Role[]>('/roles'), []);
+  // Revise round 10 — load warehouses so we can offer a Gudang dropdown
+  // for marketing partner alignment at creation time.
+  const { data: options } = useApiData<Options>(() => apiGet<Options>('/options'), []);
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editFor, setEditFor] = useState<UserAccount | null>(null);
   const [confirmDisable, setConfirmDisable] = useState<UserAccount | null>(null);
-  const [createForm, setCreateForm] = useState({ username: '', name: '', password: '', type: 'MARKETING' as 'MARKETING' | 'VEHICLE_OWNER' });
-  const [editForm, setEditForm] = useState({ name: '', password: '', isActive: true });
+  const [createForm, setCreateForm] = useState({ username: '', name: '', password: '', type: 'MARKETING' as 'MARKETING' | 'VEHICLE_OWNER', warehouseId: 'none' });
+  const [editForm, setEditForm] = useState({ name: '', password: '', isActive: true, warehouseId: 'none' });
   const [busy, setBusy] = useState(false);
 
   const partnerRows = useMemo(() => {
@@ -86,6 +89,13 @@ function PartnersTab({ can }: { can: { userCreate: boolean; userUpdate: boolean;
     );
   }, [data, search]);
 
+  // Revise round 10 — warehouse options for the Gudang selector (shown only
+  // when partner type is MARKETING). "none" sentinel = umum / general.
+  const warehouseOptions = [
+    { value: 'none', label: '— Umum (tidak terikat gudang) —' },
+    ...(options?.warehouses ?? []).map((w) => ({ value: String(w.id), label: w.name + (w.city ? ` · ${w.city}` : '') })),
+  ];
+
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
     const role = roles?.find((r) => r.slug === (createForm.type === 'MARKETING' ? 'marketing' : 'vehicle-owner'));
@@ -94,31 +104,63 @@ function PartnersTab({ can }: { can: { userCreate: boolean; userUpdate: boolean;
       return;
     }
     setBusy(true);
+    // Revise round 10 — forward warehouseId only when the partner type is
+    // MARKETING. For VEHICLE_OWNER the server silently ignores it.
+    const payload: Record<string, unknown> = {
+      username: createForm.username,
+      name: createForm.name,
+      password: createForm.password,
+      employeeId: null,
+      roleIds: [role.id],
+    };
+    if (createForm.type === 'MARKETING') {
+      payload.warehouseId = createForm.warehouseId === 'none' ? null : Number(createForm.warehouseId);
+    }
     const ok = await runAction(
-      () => apiPost('/users', { username: createForm.username, name: createForm.name, password: createForm.password, employeeId: null, roleIds: [role.id] }),
+      () => apiPost('/users', payload),
       { success: `${createForm.type === 'MARKETING' ? 'Marketing' : 'Vehicle Owner'} dibuat.` },
     );
     setBusy(false);
     if (ok) {
       setDialogOpen(false);
-      setCreateForm({ username: '', name: '', password: '', type: 'MARKETING' });
+      setCreateForm({ username: '', name: '', password: '', type: 'MARKETING', warehouseId: 'none' });
       reload();
     }
   }
 
   function openEdit(u: UserAccount) {
     setEditFor(u);
-    setEditForm({ name: u.name, password: '', isActive: u.isActive });
+    setEditForm({
+      name: u.name,
+      password: '',
+      isActive: u.isActive,
+      // Revise round 10 — pre-fill the gudang alignment from the partner.
+      warehouseId: u.partnerWarehouseId != null ? String(u.partnerWarehouseId) : 'none',
+    });
   }
 
   async function onEdit(e: React.FormEvent) {
     e.preventDefault();
     if (!editFor?.partnerId) return;
     setBusy(true);
-    const payload: Record<string, unknown> = { name: editForm.name, isActive: editForm.isActive };
-    if (editForm.password) payload.password = editForm.password;
-    const ok = await runAction(
-      () => apiPut(`/partners/${editFor.partnerId}/profile`, payload),
+    // For Marketing partners, update name/password via /partners/{id}/profile
+    // AND update warehouseId via /users/{id} (which forwards to
+    // ensurePartnerProfile). For Vehicle Owner, just update profile.
+    const profilePayload: Record<string, unknown> = { name: editForm.name, isActive: editForm.isActive };
+    if (editForm.password) profilePayload.password = editForm.password;
+    let ok = true;
+    if (editFor.partnerType === 'MARKETING') {
+      // Update the gudang alignment via PUT /users/{id} — that's where
+      // ensurePartnerProfile lives and where warehouseId is honored.
+      const warehousePayload = editForm.warehouseId === 'none' ? null : Number(editForm.warehouseId);
+      ok = await runAction(
+        () => apiPut(`/users/${editFor.id}`, { warehouseId: warehousePayload }),
+        { success: 'Gudang alignment diperbarui.' },
+      );
+      if (!ok) { setBusy(false); return; }
+    }
+    ok = await runAction(
+      () => apiPut(`/partners/${editFor.partnerId}/profile`, profilePayload),
       { success: 'Profil partner diperbarui.' },
     );
     setBusy(false);
@@ -155,6 +197,22 @@ function PartnersTab({ can }: { can: { userCreate: boolean; userUpdate: boolean;
           { key: 'username', header: 'Username', primary: true, render: (u) => <span className="font-mono text-xs font-semibold">@{u.username}</span> },
           { key: 'name', header: 'Nama', render: (u) => <span className="font-medium">{u.name}</span> },
           { key: 'type', header: 'Tipe', render: (u) => <Badge variant={u.partnerType === 'MARKETING' ? 'secondary' : 'outline'}>{u.partnerType === 'MARKETING' ? 'Marketing' : 'Vehicle Owner'}</Badge> },
+          // Revise round 10 — show the marketing partner's gudang alignment
+          // (or "Umum" badge) in the table.
+          {
+            key: 'gudang',
+            header: 'Gudang',
+            render: (u) =>
+              u.partnerType === 'MARKETING' ? (
+                u.partnerWarehouseName ? (
+                  <Badge variant="outline" className="bg-chart-2/10 text-chart-2">{u.partnerWarehouseName}</Badge>
+                ) : (
+                  <span className="text-xs text-muted-foreground">Umum</span>
+                )
+              ) : (
+                <span className="text-xs text-muted-foreground">—</span>
+              ),
+          },
           { key: 'status', header: 'Status', render: (u) => <ActiveBadge active={u.isActive} /> },
           ...(can.userUpdate || can.userDisable
             ? [{
@@ -194,6 +252,24 @@ function PartnersTab({ can }: { can: { userCreate: boolean; userUpdate: boolean;
             <Field label="Tipe Partner" htmlFor="p-type">
               <FormSelect value={createForm.type} onValueChange={(v) => setCreateForm({ ...createForm, type: v as 'MARKETING' | 'VEHICLE_OWNER' })} options={[{ value: 'MARKETING', label: 'Marketing' }, { value: 'VEHICLE_OWNER', label: 'Vehicle Owner' }]} disabled={busy} />
             </Field>
+            {/* Revise round 10 — Gudang selector shown only for MARKETING partners.
+                When not selected (Umum), customers they create will need a
+                manual gudang pick. When aligned to a gudang, customers they
+                create auto-inherit that gudang. */}
+            {createForm.type === 'MARKETING' && (
+              <Field
+                label="Gudang (afiliasi marketing)"
+                htmlFor="p-warehouse"
+                hint="Pilih gudang jika marketing ini khusus melayani satu gudang. 'Umum' = melayani semua gudang."
+              >
+                <FormSelect
+                  value={createForm.warehouseId}
+                  onValueChange={(v) => setCreateForm({ ...createForm, warehouseId: v })}
+                  options={warehouseOptions}
+                  disabled={busy}
+                />
+              </Field>
+            )}
             <Field label="Password (min. 8 karakter)" htmlFor="p-password"><Input id="p-password" type="password" value={createForm.password} onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })} required minLength={8} disabled={busy} autoComplete="new-password" /></Field>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} disabled={busy}>Batal</Button>
@@ -219,6 +295,21 @@ function PartnersTab({ can }: { can: { userCreate: boolean; userUpdate: boolean;
             <Field label="Password baru (opsional, min. 8 karakter)" htmlFor="ep-password">
               <Input id="ep-password" type="password" value={editForm.password} onChange={(e) => setEditForm({ ...editForm, password: e.target.value })} disabled={busy} minLength={8} autoComplete="new-password" placeholder="••••••••" />
             </Field>
+            {/* Revise round 10 — Gudang selector for marketing partners (edit). */}
+            {editFor?.partnerType === 'MARKETING' && (
+              <Field
+                label="Gudang (afiliasi marketing)"
+                htmlFor="ep-warehouse"
+                hint="Pilih gudang untuk auto-assign ke customer yang dibuat marketing ini. 'Umum' = manual per customer."
+              >
+                <FormSelect
+                  value={editForm.warehouseId}
+                  onValueChange={(v) => setEditForm({ ...editForm, warehouseId: v })}
+                  options={warehouseOptions}
+                  disabled={busy}
+                />
+              </Field>
+            )}
             <label className="flex items-center gap-2.5 rounded-lg border p-2.5 text-sm">
               <input type="checkbox" checked={editForm.isActive} onChange={(e) => setEditForm({ ...editForm, isActive: e.target.checked })} className="h-4 w-4 accent-primary" disabled={busy} />
               <span>Akun aktif (login diizinkan)</span>

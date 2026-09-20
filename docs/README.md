@@ -115,6 +115,17 @@ Full details in [`09-revision-round-8.md`](09-revision-round-8.md).
 
 Full details in [`10-revision-round-9.md`](10-revision-round-9.md).
 
+## Revision round 10 — Marketing Gudang Alignment, Admin Gudang Customer CRUD, Seed Updates
+
+| # | Revision | Where it is implemented |
+|---|---|---|
+| R1 | **Marketing partner Gudang affiliation on creation** — when creating a Marketing partner from the Access UI, you can now select their Gudang affiliation (or "Umum"). Also editable from the partner edit form. `ensurePartnerProfile` accepts `warehouseId`. `POST/PUT /users` forward it. New "Gudang" column on the Partners table. | `src/lib/partner.ts`, `src/app/api/v1/users/route.ts`, `src/app/api/v1/users/[id]/route.ts`, `src/lib/client-api.ts`, `src/components/app/pages/access-page.tsx` |
+| R2 | **Customer Gudang auto-inheritance** — customers created by a Marketing partner aligned to a gudang auto-inherit that gudang. Marketing "umum" partners must pick a gudang manually (UI shows a "wajib" selector). Admin Gudang creating a customer auto-attaches it to their own gudang. | `src/app/api/v1/customers/route.ts`, `src/components/app/pages/customers-page.tsx` |
+| R3 | **Admin Gudang customer CRUD** — Admin Gudang now has `customer.view/create/update/delete` permissions. Auto-applied by `ensureRbac()` on next API request. | `src/lib/rbac.ts` |
+| R4 | **Seed data updates** — all 5 customers now have `email` + `warehouseId` (attached to the gudang matching their city). All 7 shipmentDefs now carry explicit `pengirim*` snapshot. New DIRECT shipment `MKT-000009` + transport `TRP-2026-000004` demo the DIRECT flow. New "umum" marketing partner `adit`. Budi aligned to Gudang Medan. | `src/lib/seed.ts`, `prisma/seed.ts` |
+
+Full details in [`11-revision-round-10.md`](11-revision-round-10.md).
+
 ## Document index
 
 | File | Contents |
@@ -129,6 +140,7 @@ Full details in [`10-revision-round-9.md`](10-revision-round-9.md).
 | [`08-revision-round-7.md`](08-revision-round-7.md) | **Preview mode, Partner Alignment, Customer Gudang attachment, Customer marker, Pickup address** |
 | [`09-revision-round-8.md`](09-revision-round-8.md) | **Fulfillment Mode (STANDARD/DIRECT) + proof_photo.view permission** |
 | [`10-revision-round-9.md`](10-revision-round-9.md) | **DIRECT form flow, Photo Detail buttons, Vehicle dimensions** |
+| [`11-revision-round-10.md`](11-revision-round-10.md) | **Marketing Gudang alignment, Admin Gudang customer CRUD, Seed updates** |
 
 ## Where the code lives (map)
 

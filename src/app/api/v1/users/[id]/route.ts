@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { hashPassword } from "@/lib/auth";
-import { guard, ok, handle, fail, str } from "@/lib/api-helpers";
+import { guard, ok, handle, fail, str, num } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
 import { ensurePartnerProfile } from "@/lib/partner";
 
@@ -43,12 +43,75 @@ export async function PUT(req: NextRequest, { params }: Params) {
         }
       }
       // Revise.md — granting a partner role provisions the partner + wallet.
-      await ensurePartnerProfile(existing.id, assignedSlugs);
+      // Revise round 10 — also forward warehouseId so the user edit form can
+      // change the marketing partner's gudang alignment (when roleIds is sent
+      // together with warehouseId). If only warehouseId changed (without
+      // roleIds), we still need to re-call ensurePartnerProfile so it updates
+      // the alignment — we use the EXISTING assignedSlugs in that case.
+      const slugsForProfile = assignedSlugs.length > 0
+        ? assignedSlugs
+        : (await db.userRole.findMany({ where: { userId: existing.id }, include: { role: { select: { slug: true } } } })).map((ur) => ur.role.slug);
+      // Compute partnerWarehouseId from body.warehouseId (same logic as POST).
+      let partnerWarehouseId: number | null | undefined = undefined;
+      if (body.warehouseId !== undefined) {
+        const raw = body.warehouseId;
+        if (raw === null || raw === "" || raw === "general" || raw === "none") {
+          partnerWarehouseId = null;
+        } else {
+          const wid = num(raw);
+          if (wid == null) {
+            return fail(422, "Gudang tidak valid.", { warehouseId: ["Gudang tidak valid."] });
+          }
+          partnerWarehouseId = wid;
+        }
+      }
+      try {
+        await ensurePartnerProfile(existing.id, slugsForProfile, { warehouseId: partnerWarehouseId });
+      } catch (e) {
+        if (e instanceof Error && e.message === "WAREHOUSE_NOT_FOUND") {
+          return fail(422, "Gudang tidak ditemukan / tidak aktif.", { warehouseId: ["Gudang tidak ditemukan / tidak aktif."] });
+        }
+        throw e;
+      }
+    } else if (body.warehouseId !== undefined) {
+      // Revise round 10 — warehouseId can be updated standalone (without
+      // roleIds). Use the existing role slugs to invoke ensurePartnerProfile
+      // — it will update the warehouseId on the partner profile.
+      const existingSlugs = (await db.userRole.findMany({ where: { userId: existing.id }, include: { role: { select: { slug: true } } } })).map((ur) => ur.role.slug);
+      let partnerWarehouseId: number | null;
+      const raw = body.warehouseId;
+      if (raw === null || raw === "" || raw === "general" || raw === "none") {
+        partnerWarehouseId = null;
+      } else {
+        const wid = num(raw);
+        if (wid == null) {
+          return fail(422, "Gudang tidak valid.", { warehouseId: ["Gudang tidak valid."] });
+        }
+        partnerWarehouseId = wid;
+      }
+      try {
+        await ensurePartnerProfile(existing.id, existingSlugs, { warehouseId: partnerWarehouseId });
+      } catch (e) {
+        if (e instanceof Error && e.message === "WAREHOUSE_NOT_FOUND") {
+          return fail(422, "Gudang tidak ditemukan / tidak aktif.", { warehouseId: ["Gudang tidak ditemukan / tidak aktif."] });
+        }
+        throw e;
+      }
     }
 
-    await audit({ action: "updated", entityType: "user", entityId: updated.id, entityLabel: updated.username, actor: user, after: { name: updated.name, roles: body.roleIds } });
-    const full = await db.user.findUnique({ where: { id: updated.id }, include: { employee: true, roles: { include: { role: true } }, partner: true } });
-    return ok({ ...full, passwordHash: undefined, partnerId: full?.partner?.id ?? null, partnerType: full?.partner?.type ?? null });
+    await audit({ action: "updated", entityType: "user", entityId: updated.id, entityLabel: updated.username, actor: user, after: { name: updated.name, roles: body.roleIds, warehouseId: body.warehouseId } });
+    const full = await db.user.findUnique({
+      where: { id: updated.id },
+      include: { employee: true, roles: { include: { role: true } }, partner: { include: { warehouse: { select: { id: true, name: true } } } } },
+    });
+    return ok({
+      ...full,
+      passwordHash: undefined,
+      partnerId: full?.partner?.id ?? null,
+      partnerType: full?.partner?.type ?? null,
+      partnerWarehouseId: full?.partner?.warehouseId ?? null,
+      partnerWarehouseName: full?.partner?.warehouse?.name ?? null,
+    });
   });
 }
 

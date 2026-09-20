@@ -567,6 +567,10 @@ async function runSeed(): Promise<void> {
     { username: "doni", name: "Doni Pratama", position: "Vehicle Owner", role: "vehicle-owner", employeeNumber: "EMP-000013", warehouseId: "Medan" },
     { username: "maya", name: "Maya Sari", position: "Vehicle Owner", role: "vehicle-owner", employeeNumber: "EMP-000014", warehouseId: "Lhokseumawe" },
     { username: "yusuf", name: "Yusuf Ramli", position: "Vehicle Owner", role: "vehicle-owner", employeeNumber: "EMP-000015", warehouseId: "Banda Aceh" },
+    // Revise round 10 — second marketing partner (adit) WITHOUT a gudang
+    // alignment (umum). Used to demo the manual-gudang-pick customer flow.
+    // EMP-000022 is the next free number after the existing backfill range.
+    { username: "adit", name: "Adit Nugroho", position: "Marketing", role: "marketing", employeeNumber: "EMP-000022", warehouseId: "Medan" },
   ];
 
   const ownerEmployee = await db.employee.upsert({
@@ -609,8 +613,18 @@ async function runSeed(): Promise<void> {
   // Owner 70/30 — different config demonstrates per-partner profit sharing).
   // New: doni, maya, yusuf — three more Vehicle Owners with their own
   // profit-share configs to demonstrate per-partner customization.
-  const partnerDefs: { username: string; type: "MARKETING" | "VEHICLE_OWNER"; companyPercent: number; partnerPercent: number; bank: { bankName: string; bankAccountName: string; bankAccountNumber: string } }[] = [
-    { username: "budi", type: "MARKETING", companyPercent: 80, partnerPercent: 20, bank: { bankName: "Bank BCA", bankAccountName: "Budi Santoso", bankAccountNumber: "1234567890" } },
+  //
+  // Revise round 10 — budi is now aligned to the Medan gudang
+  // (Partner.warehouseId = gudang.Medan). Customers budi creates will
+  // auto-inherit this gudang. To demo the "umum" path, the seeder also
+  // creates a second marketing partner (maya-marketing) WITHOUT a gudang
+  // alignment — that partner is intentionally left "umum".
+  const partnerDefs: { username: string; type: "MARKETING" | "VEHICLE_OWNER"; companyPercent: number; partnerPercent: number; bank: { bankName: string; bankAccountName: string; bankAccountNumber: string }; warehouseId?: string | null }[] = [
+    // Revise round 10 — budi aligned to Medan gudang.
+    { username: "budi", type: "MARKETING", companyPercent: 80, partnerPercent: 20, bank: { bankName: "Bank BCA", bankAccountName: "Budi Santoso", bankAccountNumber: "1234567890" }, warehouseId: "Medan" },
+    // Revise round 10 — adit is a Marketing partner WITHOUT a gudang alignment
+    // (umum). Customers adit creates will need a manual gudang pick.
+    { username: "adit", type: "MARKETING", companyPercent: 80, partnerPercent: 20, bank: { bankName: "Bank BNI", bankAccountName: "Adit Nugroho", bankAccountNumber: "9988776655" }, warehouseId: null },
     { username: "hendra", type: "VEHICLE_OWNER", companyPercent: 80, partnerPercent: 20, bank: { bankName: "Bank Mandiri", bankAccountName: "Hendra Gunawan", bankAccountNumber: "9876543210" } },
     { username: "sari", type: "VEHICLE_OWNER", companyPercent: 70, partnerPercent: 30, bank: { bankName: "Bank BRI", bankAccountName: "Sari Puspita", bankAccountNumber: "5555444433" } },
     { username: "doni", type: "VEHICLE_OWNER", companyPercent: 75, partnerPercent: 25, bank: { bankName: "Bank BCA", bankAccountName: "Doni Pratama", bankAccountNumber: "1122334455" } },
@@ -621,6 +635,9 @@ async function runSeed(): Promise<void> {
   for (const p of partnerDefs) {
     const userId = usersByHandle[p.username]?.id;
     if (!userId) continue;
+    // Revise round 10 — resolve warehouseId from the def (string key in
+    // gudang map). null/undefined → umum.
+    const partnerWarehouseId = p.warehouseId ? gudang[p.warehouseId] : null;
     const partner = await db.partner.upsert({
       where: { userId },
       create: {
@@ -631,8 +648,17 @@ async function runSeed(): Promise<void> {
         bankName: p.bank.bankName,
         bankAccountName: p.bank.bankAccountName,
         bankAccountNumber: p.bank.bankAccountNumber,
+        // Revise round 10 — only marketing partners get the gudang alignment
+        // (vehicle owners are unaligned by design).
+        warehouseId: p.type === "MARKETING" ? partnerWarehouseId : null,
       },
-      update: {},
+      update: {
+        // Re-sync warehouseId on existing rows so the seed stays in sync
+        // after a schema change. (Upset update is fine — this only runs on
+        // already-seeded databases, and the warehouseId is the source of truth
+        // for the demo.)
+        ...(p.type === "MARKETING" ? { warehouseId: partnerWarehouseId } : {}),
+      },
     });
     partnersByUsername[p.username] = partner.id;
     await db.wallet.upsert({ where: { partnerId: partner.id }, create: { partnerId: partner.id }, update: {} });
@@ -745,21 +771,45 @@ async function runSeed(): Promise<void> {
   }
 
   // ----- Customers -------------------------------------------------------------
+  // Revise round 10 — customer defs now include `email` (was missing before).
+  // All 5 demo customers get a complete contact record so the resi prints
+  // the full sender block (Name / Phone / Email / Address) snapshot.
+  // Revise round 10 — customers are now attached to the gudang matching their
+  // city, so the gudang data separation demo works. Customers in Medan are
+  // visible to Admin Gudang Medan only; customers in Banda Aceh are visible
+  // to Admin Gudang Banda Aceh only; etc. The owner sees all of them.
   const customerDefs = [
-    { code: "CUS-000001", type: "b2c", name: "Rina Amelia", phone: "081234000001", address: "Jl. T. Iskandar No. 12, Banda Aceh" },
-    { code: "CUS-000002", type: "b2b", name: "PT Maju Bersama", companyName: "PT Maju Bersama", phone: "081234000002", address: "Jl. Gatot Subroto No. 21, Medan" },
-    { code: "CUS-000003", type: "b2b", name: "CV Sinar Jaya", companyName: "CV Sinar Jaya", phone: "081234000003", address: "Jl. Merdeka No. 5, Lhokseumawe" },
-    { code: "CUS-000004", type: "b2c", name: "Tono Susilo", phone: "081234000004", address: "Jl. Kenanga No. 9, Banda Aceh" },
-    { code: "CUS-000005", type: "b2c", name: "Sari Indah", phone: "081234000005", address: "Jl. Anggrek No. 3, Banda Aceh" },
+    { code: "CUS-000001", type: "b2c", name: "Rina Amelia", phone: "081234000001", email: "rina.amelia@example.com", address: "Jl. T. Iskandar No. 12, Banda Aceh", warehouseId: "Banda Aceh" },
+    { code: "CUS-000002", type: "b2b", name: "PT Maju Bersama", companyName: "PT Maju Bersama", phone: "081234000002", email: "admin@ptmajubersama.co.id", address: "Jl. Gatot Subroto No. 21, Medan", warehouseId: "Medan" },
+    { code: "CUS-000003", type: "b2b", name: "CV Sinar Jaya", companyName: "CV Sinar Jaya", phone: "081234000003", email: "ops@cvsinarjaya.co.id", address: "Jl. Merdeka No. 5, Lhokseumawe", warehouseId: "Lhokseumawe" },
+    { code: "CUS-000004", type: "b2c", name: "Tono Susilo", phone: "081234000004", email: "tono.susilo@example.com", address: "Jl. Kenanga No. 9, Banda Aceh", warehouseId: "Banda Aceh" },
+    { code: "CUS-000005", type: "b2c", name: "Sari Indah", phone: "081234000005", email: "sari.indah@example.com", address: "Jl. Anggrek No. 3, Banda Aceh", warehouseId: "Banda Aceh" },
   ];
   const customers: Record<string, { id: number; type: string }> = {};
   for (const c of customerDefs) {
-    const customer = await db.customer.upsert({ where: { code: c.code }, create: c, update: {} });
+    // Revise round 10 — update email + warehouseId on existing rows so
+    // re-seeding after these additions actually backfills the fields.
+    // Resolve the warehouseId string key → gudang id (Int).
+    const customerWarehouseId = gudang[c.warehouseId!] ?? null;
+    const { warehouseId: _whKey, ...customerData } = c;
+    const customer = await db.customer.upsert({
+      where: { code: c.code },
+      create: { ...customerData, warehouseId: customerWarehouseId },
+      update: {
+        email: c.email, phone: c.phone, address: c.address, name: c.name, type: c.type,
+        companyName: c.companyName ?? null,
+        warehouseId: customerWarehouseId,
+      },
+    });
     customers[c.name] = { id: customer.id, type: c.type };
   }
 
   // ----- Shipments lifecycle -----------------------------------------------------
   if ((await db.masterShipment.count()) === 0) {
+    // Revise round 10 — shipmentDefs now includes `pengirim` (sender snapshot)
+    // for each shipment so the resi prints the explicit sender block instead
+    // of relying on the runtime customer fallback. Also added `fulfillmentMode`
+    // (defaults to STANDARD) and a new MKT-000009 DIRECT shipment.
     const shipmentDefs: {
       masterCode: string;
       customer: string;
@@ -768,6 +818,10 @@ async function runSeed(): Promise<void> {
       destination: string;
       priced: boolean;
       createdDaysAgo: number;
+      // Revise round 8 — fulfillment mode (STANDARD = via gudang, DIRECT = driver direct).
+      fulfillmentMode?: "STANDARD" | "DIRECT";
+      // Revise round 10 — explicit sender snapshot (printed on resi).
+      pengirim: { name: string; phone: string; email: string; address: string };
       penerima: { name: string; address: string; contact: string };
       details: { description: string; quantity: number; weightKg: number; l: number; w: number; h: number }[];
     }[] = [
@@ -776,6 +830,7 @@ async function runSeed(): Promise<void> {
         // confirmed. Aturan baru: B2C tidak ada DP — biaya ditanggung Marketing.
         masterCode: "MKT-000001", customer: "Rina Amelia", status: "READY_FOR_PICKUP",
         origin: "Medan", destination: "Banda Aceh", priced: true, createdDaysAgo: 1,
+        pengirim: { name: "Rina Amelia", phone: "081234000001", email: "rina.amelia@example.com", address: "Jl. T. Iskandar No. 12, Banda Aceh" },
         penerima: { name: "Laksmi Dewi", address: "Jl. T. Iskandar No. 12, Banda Aceh", contact: "0813-2222-3333" },
         details: [
           { description: "Paket pakaian", quantity: 1, weightKg: 2, l: 35, w: 25, h: 12 },
@@ -789,6 +844,7 @@ async function runSeed(): Promise<void> {
         // Sudah masuk ke invoice INV-2026-000001 — requirement pickup B2B OK.
         masterCode: "MKT-000002", customer: "PT Maju Bersama", status: "PICKED_UP",
         origin: "Medan", destination: "Banda Aceh", priced: true, createdDaysAgo: 2,
+        pengirim: { name: "PT Maju Bersama", phone: "081234000002", email: "admin@ptmajubersama.co.id", address: "Jl. Gatot Subroto No. 21, Medan" },
         penerima: { name: "Hendra Gunawan", address: "Jl. T. Iskandar No. 88, Banda Aceh", contact: "0814-4444-5555" },
         details: [{ description: "Karton Tulis", quantity: 10, weightKg: 2.5, l: 25, w: 20, h: 20 }],
       },
@@ -796,6 +852,7 @@ async function runSeed(): Promise<void> {
         // B2B RECEIVED_AT_GUDANG — penagihan via invoice (INV-2026-000003).
         masterCode: "MKT-000003", customer: "CV Sinar Jaya", status: "RECEIVED_AT_GUDANG",
         origin: "Medan", destination: "Lhokseumawe", priced: true, createdDaysAgo: 4,
+        pengirim: { name: "CV Sinar Jaya", phone: "081234000003", email: "ops@cvsinarjaya.co.id", address: "Jl. Merdeka No. 5, Lhokseumawe" },
         penerima: { name: "Bagian Gudang CV Sinar Jaya", address: "Jl. Merdeka No. 5, Lhokseumawe", contact: "0815-5555-6666" },
         details: [
           { description: "Mesin bubut mini", quantity: 1, weightKg: 40, l: 60, w: 45, h: 40 },
@@ -807,6 +864,7 @@ async function runSeed(): Promise<void> {
         // berbeda dari pengirim (Tono Susilo) — bukan diri sendiri.
         masterCode: "MKT-000004", customer: "Tono Susilo", status: "IN_TRANSPORT",
         origin: "Medan", destination: "Banda Aceh", priced: true, createdDaysAgo: 3,
+        pengirim: { name: "Tono Susilo", phone: "081234000004", email: "tono.susilo@example.com", address: "Jl. Kenanga No. 9, Banda Aceh" },
         penerima: { name: "Dewi Susilo", address: "Jl. Kenanga No. 9, Banda Aceh", contact: "0813-4444-1234" },
         details: [{ description: "Kipas angin", quantity: 1, weightKg: 3, l: 30, w: 25, h: 12 }],
       },
@@ -814,6 +872,7 @@ async function runSeed(): Promise<void> {
         // B2B DELIVERED — sudah masuk ke invoice INV-2026-000001.
         masterCode: "MKT-000005", customer: "PT Maju Bersama", status: "DELIVERED",
         origin: "Medan", destination: "Banda Aceh", priced: true, createdDaysAgo: 6,
+        pengirim: { name: "PT Maju Bersama", phone: "081234000002", email: "admin@ptmajubersama.co.id", address: "Jl. Gatot Subroto No. 21, Medan" },
         penerima: { name: "Bagian Gudang PT Maju Bersama", address: "Jl. Gatot Subroto No. 21, Medan", contact: "0812-3456-0002" },
         details: [{ description: "Paket promosi", quantity: 8, weightKg: 5, l: 30, w: 20, h: 15 }],
       },
@@ -823,8 +882,25 @@ async function runSeed(): Promise<void> {
         // Penerima (Adik Indah) berbeda dari pengirim (Sari Indah).
         masterCode: "MKT-000006", customer: "Sari Indah", status: "CREATED",
         origin: "Medan", destination: "Banda Aceh", priced: false, createdDaysAgo: 0,
+        pengirim: { name: "Sari Indah", phone: "081234000005", email: "sari.indah@example.com", address: "Jl. Anggrek No. 3, Banda Aceh" },
         penerima: { name: "Adik Indah", address: "Jl. Anggrek No. 3, Banda Aceh", contact: "0813-3300-0006" },
         details: [{ description: "Kosmetik", quantity: 2, weightKg: 1, l: 20, w: 15, h: 10 }],
+      },
+      {
+        // Revise round 10 — DIRECT shipment (MKT-000009).
+        // Created by adit (Marketing, umum). fulfillmentMode = DIRECT.
+        // Status CREATED + priced so it's eligible for transport assignment
+        // (DIRECT shipments can be loaded onto a transport without going
+        // through RECEIVED_AT_GUDANG — see /api/v1/transports POST).
+        // Origin/destination are the customer's pickup address and the
+        // penerima's address — NO originWarehouseId / destinationWarehouseId
+        // (DIRECT skips the company warehouse flow entirely).
+        masterCode: "MKT-000009", customer: "Rina Amelia", status: "CREATED",
+        origin: "Medan", destination: "Banda Aceh", priced: true, createdDaysAgo: 0,
+        fulfillmentMode: "DIRECT",
+        pengirim: { name: "Rina Amelia", phone: "081234000001", email: "rina.amelia@example.com", address: "Jl. T. Iskandar No. 12, Banda Aceh" },
+        penerima: { name: "Laksmi Dewi", address: "Jl. T. Iskandar No. 12, Banda Aceh", contact: "0813-2222-3333" },
+        details: [{ description: "Dokumen penting", quantity: 1, weightKg: 0.5, l: 30, w: 22, h: 2 }],
       },
     ];
     const priceByCode: Record<string, number> = {};
@@ -838,17 +914,33 @@ async function runSeed(): Promise<void> {
       const tariff = tariffByRoute[`${s.origin}|${s.destination}|${cust.type}`] ?? null;
       // All demo shipments are created by the Marketing partner budi (§8 —
       // attribution drives the B2B commission on the demo invoice).
-      const createdByPartnerId = partnersByUsername["budi"] ?? null;
+      // Revise round 10 — DIRECT shipment MKT-000009 is created by adit
+      // (Marketing, umum) instead, to demo the umum partner path.
+      const createdByPartnerId = s.fulfillmentMode === "DIRECT"
+        ? (partnersByUsername["adit"] ?? partnersByUsername["budi"] ?? null)
+        : (partnersByUsername["budi"] ?? null);
+      // Revise round 10 — DIRECT shipments skip the warehouse flow entirely
+      // (no originWarehouseId / destinationWarehouseId / arrivedWarehouseId).
+      const isDirect = (s.fulfillmentMode ?? "STANDARD") === "DIRECT";
       const shipment = await db.masterShipment.create({
         data: {
           masterCode: s.masterCode, resi: s.masterCode,
           customerId: cust.id,
           tariffId: tariff?.id ?? null,
           status: s.status,
+          // Revise round 8 — fulfillment mode (STANDARD / DIRECT).
+          fulfillmentMode: s.fulfillmentMode ?? "STANDARD",
           origin: s.origin, destination: s.destination,
-          originWarehouseId: gudang["Medan"],
-          destinationWarehouseId: gudang[s.destination],
-          arrivedWarehouseId: ["RECEIVED_AT_GUDANG", "ARRIVED_AT_GUDANG"].includes(s.status) ? gudang["Medan"] : null,
+          // Revise round 10 — DIRECT shipments have no warehouse assignment.
+          originWarehouseId: isDirect ? null : gudang["Medan"],
+          destinationWarehouseId: isDirect ? null : gudang[s.destination],
+          arrivedWarehouseId: isDirect ? null : (["RECEIVED_AT_GUDANG", "ARRIVED_AT_GUDANG"].includes(s.status) ? gudang["Medan"] : null),
+          // Revise round 10 — explicit sender snapshot (was relying on runtime
+          // customer fallback before; now stored on the shipment record).
+          pengirimName: s.pengirim.name,
+          pengirimPhone: s.pengirim.phone,
+          pengirimEmail: s.pengirim.email,
+          pengirimAddress: s.pengirim.address,
           penerimaName: s.penerima.name,
           penerimaAddress: s.penerima.address,
           penerimaContact: s.penerima.contact,
@@ -1011,6 +1103,37 @@ async function runSeed(): Promise<void> {
       },
     });
     await db.transportShipment.create({ data: { transportId: transport.id, shipmentId: mkt4.id } });
+
+    // Revise round 10 — DIRECT transport (TRP-2026-000004) carrying MKT-000009.
+    // DIRECT shipments skip RECEIVED_AT_GUDANG — they're loaded directly onto
+    // a transport from CREATED status. The transport uses the same Medan →
+    // Banda Aceh route + a company-owned vehicle (BK 8800 KTH — no profit
+    // share settlement needed) + driver joko (no kenek — DIRECT shipments
+    // are typically lighter, single-driver runs).
+    const mkt9 = await db.masterShipment.findUniqueOrThrow({ where: { masterCode: "MKT-000009" } });
+    const directTransport = await db.transport.create({
+      data: {
+        transportCode: "TRP-2026-000004", routeId: routes["MDN - BNA Aceh Timur"],
+        vehicleId: vehicles["BK 8800 KTH"],
+        driverId: usersByHandle.joko.employeeId,
+        status: "PLANNED", createdAt: daysAgo(0.1),
+        origin: "Medan", destination: "Banda Aceh",
+        plannedDepartureAt: daysAgo(-1), plannedArrivalAt: daysAgo(-0.5),
+      },
+    });
+    await db.transportShipment.create({ data: { transportId: directTransport.id, shipmentId: mkt9.id } });
+    // Mark the DIRECT shipment as IN_TRANSPORT (same as STANDARD shipments
+    // do once they're loaded). This lets the owner/admin see it in the
+    // Transports list under the PLANNED transport.
+    await db.masterShipment.update({ where: { id: mkt9.id }, data: { status: "IN_TRANSPORT" } });
+    // Tracking event for the DIRECT pickup → transport handover.
+    await db.trackingEvent.create({
+      data: {
+        masterId: mkt9.id, event: "IN_TRANSPORT",
+        description: "Shipment DIRECT dimuat ke transport TRP-2026-000004 (driver langsung, tanpa gudang)",
+        actorId: usersByHandle.adit.id, occurredAt: daysAgo(0.05),
+      },
+    });
 
     // Open pickup task assigned to kurir Rizky (MKT-000001 — READY_FOR_PICKUP).
     // Demo path for the QR handover scan flow: login as rizky, scan every

@@ -543,7 +543,7 @@ function ShipmentList() {
                     {s.priceAmount != null ? (
                       <p className="text-sm font-semibold">{formatRupiah(s.priceAmount)}</p>
                     ) : (
-                      <p className="text-sm font-medium text-muted-foreground">Belum dihitung</p>
+                      <p className="text-sm font-medium text-muted-foreground">— belum dihitung</p>
                     )}
                     {s.chargeableWeightKg != null && <p className="text-[11px] text-muted-foreground">{formatNumber(s.chargeableWeightKg)} kg cw</p>}
                   </div>
@@ -1060,7 +1060,7 @@ function ScanArrivalPickerDialog({
     return list.filter(
       (a) => matches(q, a.masterCode, a.customerName, a.kurirName),
     );
-
+     
   }, [data, search]);
 
   const transportArrivals = useMemo(() => {
@@ -1069,7 +1069,7 @@ function ScanArrivalPickerDialog({
     return list.filter(
       (a) => matches(q, a.masterCode, a.customerName, a.originWarehouseName, a.origin, a.driverName, a.transportCode),
     );
-
+     
   }, [data, search]);
 
   const warehouses = (options?.warehouses ?? []).map((w) => ({ id: w.id, name: w.name }));
