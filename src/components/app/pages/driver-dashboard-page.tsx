@@ -10,6 +10,7 @@ import {
   CarFront,
   CheckCircle2,
   Clock,
+  ExternalLink,
   History,
   MapPin,
   Package,
@@ -220,9 +221,27 @@ export function DriverDashboard() {
                       {current.origin ?? "?"} → {current.destination ?? "?"} · {current.routeName ?? "—"}
                     </p>
                   </div>
-                  <Button size="sm" onClick={() => (window.location.hash = `#/transports/${current.id}`)}>
-                    <ArrowRight className="h-3.5 w-3.5" /> Buka Transport
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    {current.nextCheckpoint && (
+                      <Button
+                        asChild
+                        variant="outline"
+                        size="sm"
+                        title={`Buka ${current.nextCheckpoint.name} di Google Maps`}
+                      >
+                        <a
+                          href={`https://www.google.com/maps/search/?api=1&query=${current.nextCheckpoint.latitude},${current.nextCheckpoint.longitude}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" /> Google Maps
+                        </a>
+                      </Button>
+                    )}
+                    <Button size="sm" onClick={() => (window.location.hash = `#/transports/${current.id}`)}>
+                      <ArrowRight className="h-3.5 w-3.5" /> Buka Transport
+                    </Button>
+                  </div>
                 </div>
 
                 {/* current position map */}
@@ -267,9 +286,24 @@ export function DriverDashboard() {
                       </p>
                     </div>
                     {current.nextCheckpoint && (
-                      <Button onClick={() => setCheckinOpen(true)} className="shrink-0">
-                        <Camera className="h-4 w-4" /> Check-in Selfie
-                      </Button>
+                      <div className="flex shrink-0 flex-wrap items-center gap-2">
+                        <Button
+                          asChild
+                          variant="outline"
+                          title={`Buka ${current.nextCheckpoint.name} di Google Maps`}
+                        >
+                          <a
+                            href={`https://www.google.com/maps/search/?api=1&query=${current.nextCheckpoint.latitude},${current.nextCheckpoint.longitude}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <ExternalLink className="h-4 w-4" /> Buka di Google Maps
+                          </a>
+                        </Button>
+                        <Button onClick={() => setCheckinOpen(true)}>
+                          <Camera className="h-4 w-4" /> Check-in Selfie
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </div>
