@@ -489,6 +489,53 @@ export function ensureSeed(): Promise<void> {
 }
 
 /**
+ * Idempotent OWNER-ONLY seed — creates just the RBAC catalog and the single
+ * Owner login (employee + user). No gudang, no staff, no partners, no
+ * wallets, no transactional demo data. Use this when you want a TRULY empty
+ * database where only the owner can log in — the owner then builds
+ * everything (gudang, staff, customers, shipments) from scratch via the UI.
+ *
+ * Why this exists separately from `seedAccountsOnly()`:
+ *   The accounts-only seeder creates 22 users + 3 gudang + 7 partners + 7
+ *   wallets, which is useful for demoing role-based access but still
+ *   pollutes the Users / Gudang / Partners list pages with demo rows. The
+ *   other 21 accounts also pull in related rows (employees → warehouses,
+ *   partners → wallets, role assignments) that aren't strictly "operational
+ *   data" but aren't empty either. This seeder goes one step further: it
+ *   creates ONLY the owner, so every page is genuinely empty on first login.
+ *
+ * The owner's employee row has `warehouseId = null` (the owner sees ALL
+ * gudang regardless of assignment), so this works without any gudang
+ * existing. The owner's `isOwner = true` flag bypasses RBAC permission
+ * checks, but the RBAC catalog is still seeded via `ensureRbac()` because
+ * (a) it's idempotent and cheap, (b) it self-heals on every API boot
+ * anyway, and (c) the owner may want to assign roles to staff later, which
+ * requires the role catalog to exist.
+ *
+ * Exposed via `prisma/seed-owner.ts` and the `db:seed:owner` script.
+ */
+export async function seedOwnerOnly(): Promise<void> {
+  await ensureRbac();
+
+  const ownerPassword = hashPassword("ChangeMeOwner#2026");
+
+  // Owner employee — warehouseId is intentionally null. The owner sees ALL
+  // gudang regardless of assignment (the `isOwner` flag on the user row
+  // bypasses the per-gudang data isolation that applies to staff).
+  const ownerEmployee = await db.employee.upsert({
+    where: { employeeNumber: "EMP-000001" },
+    create: { employeeNumber: "EMP-000001", name: "Owner Utama", position: "Owner", phone: "061100000001" },
+    update: {},
+  });
+
+  await db.user.upsert({
+    where: { username: "owner" },
+    create: { username: "owner", name: "Owner Utama", passwordHash: ownerPassword, isOwner: true, employeeId: ownerEmployee.id },
+    update: {},
+  });
+}
+
+/**
  * Idempotent ACCOUNTS-ONLY seed — creates just the RBAC catalog, the demo
  * gudang (warehouses), and the demo accounts (owner + staff + partners +
  * wallets). Skips all transactional demo data (vehicles, routes, tariffs,

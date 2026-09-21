@@ -14,16 +14,20 @@
  *   transports, invoices, etc. — which gets in the way when you just want
  *   to test a fresh workflow end-to-end with your own data.
  *
- *   This script gives you a clean database with working logins and the three
- *   demo gudang (Medan / Banda Aceh / Lhokseumawe) so role-based access
- *   control, per-gudang data isolation, and partner wallets all work —
- *   nothing else.
+ *   This script gives you a clean database with all 22 demo logins working
+ *   (owner + 21 staff/partner) plus the three demo gudang (Medan / Banda
+ *   Aceh / Lhokseumawe) so role-based access control, per-gudang data
+ *   isolation, and partner wallets all work — nothing else.
+ *
+ * Need an even more minimal seed? Use `bun run db:seed:owner` — it creates
+ * ONLY the owner login (no gudang, no staff, no partners). See
+ * `prisma/seed-owner.ts`.
  *
  * Idempotent: every upsert is keyed by a natural identifier
  * (warehouse.code, employee.employeeNumber, user.username, partner.userId),
  * so running this multiple times is safe. It is also safe to run BEFORE or
- * AFTER the full `bun run db:seed` — both seeders converge on the same
- * account set.
+ * AFTER the full `bun run db:seed` or the owner-only `bun run db:seed:owner`
+ * — all three seeders converge on the same account set.
  *
  * Demo accounts created (passwords are shown in docs/06-seeding-and-demo-accounts.md):
  *   owner  / ChangeMeOwner#2026   (akses penuh — satu-satunya yang melihat data SEMUA gudang)

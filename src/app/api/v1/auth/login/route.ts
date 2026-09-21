@@ -15,7 +15,17 @@ export async function POST(req: NextRequest) {
     // right company's database (or thrown a clear error if the Corporate ID
     // is missing/invalid/inactive/expired) — see tenant-context.ts.
     await ensureRbac();
-    if (isDefaultTenant()) await ensureSeed();
+    // Demo/local mode only — never auto-seed demo business data into a real
+    // corporate tenant's database. Even in dev mode, the seeder only runs
+    // when the operator explicitly opts in via AUTO_SEED_ON_BOOT=true.
+    // This matches the gating in api-helpers.ts:guard() — without it, the
+    // login route would backfill the full demo dataset (9 shipments, 4
+    // pickups, 3 invoices, …) on the first login attempt against the default
+    // tenant, defeating the purpose of `bun run db:seed:owner` (which is
+    // supposed to leave the database truly empty).
+    if (isDefaultTenant() && process.env.AUTO_SEED_ON_BOOT === "true") {
+      await ensureSeed();
+    }
     const body = await req.json().catch(() => ({}));
     const username = requireStr(body.username, "username");
     const password = requireStr(body.password, "password");

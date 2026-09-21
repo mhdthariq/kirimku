@@ -6,7 +6,8 @@
 |---|---|---|
 | 1. **Push schema** | `bun run db:push` | Creates / syncs every table, index, and relation declared in `prisma/schema.prisma`. **Required** before the app can store anything. |
 | 2a. **Seed demo data** *(optional — full)* | `bun run db:seed` | Idempotently inserts the full mock-up dataset: demo accounts, gudang, vehicles, routes, tariffs, customers, shipments, invoices, etc. |
-| 2b. **Seed accounts only** *(optional — minimal)* | `bun run db:seed:accounts` | Idempotently inserts **only** the demo accounts (owner + 21 staff/partner), the 3 demo gudang, partner wallets, and the RBAC catalog. **No** transactional demo data (no vehicles, routes, tariffs, customers, shipments, invoices, audit logs). Use this when you want a clean database with working logins but no clutter. |
+| 2b. **Seed accounts only** *(optional — middle)* | `bun run db:seed:accounts` | Idempotently inserts the demo accounts (owner + 21 staff/partner), 3 demo gudang, partner wallets, and the RBAC catalog. **No** transactional demo data (no vehicles, routes, tariffs, customers, shipments, invoices, audit logs). Use this when you want a clean database with all demo logins but no clutter. |
+| 2c. **Seed owner only** *(optional — minimal)* | `bun run db:seed:owner` | Idempotently inserts **only** the single Owner login (employee + user) plus the RBAC catalog. **No** gudang, **no** staff, **no** partners, **no** wallets, **no** transactional data. Use this when you want a truly empty database — the owner logs in and builds everything from scratch via the UI. |
 | 3. **Run the app** | `bun run dev` | Starts the Next.js dev server on `http://localhost:3000`. |
 
 > **Revision 6 (new behaviour).** The app **no longer auto-seeds on the first
@@ -14,13 +15,19 @@
 > dataset) and made it impossible to test a truly empty database. The seeder
 > is now an explicit, opt-in CLI step.
 
-> **Accounts-only seeder.** `bun run db:seed:accounts` is the right choice
-> when you want to log in as `owner` / `siti` / `budi` / etc. and build your
-> own operational data from scratch — without 9 mock shipments, 4 pickups,
-> transports, and invoices polluting every list page. Both seeders are
-> idempotent and converge on the same account set, so you can also run
-> `db:seed:accounts` first to set up logins, then later run `db:seed` to
-> backfill the full demo dataset.
+> **Three seed levels.** Pick the one that matches what you're testing:
+> - `db:seed:owner` — only the owner can log in; every page is empty. Best for
+>   building your own dataset from scratch with the UI.
+> - `db:seed:accounts` — all 22 demo logins work + 3 gudang + partner wallets;
+>   operational pages (Shipments, Invoices, …) are empty. Best for testing
+>   role-based access without shipment clutter.
+> - `db:seed` — full demo dataset (9 shipments across the lifecycle, 4
+>   pickups, 4 transports, 3 invoices, 13 audit logs). Best for first-time
+>   demos and smoke-testing every page.
+>
+> All three seeders are idempotent and converge on the same rows, so you can
+> run them in any order or combine them (e.g. `db:seed:owner` first, then
+> later `db:seed` to backfill the full demo dataset).
 
 To restore the old "migrate + seed on boot" Docker behaviour — useful when
 running inside a container where you can't SSH in to run `db:seed` manually
@@ -30,11 +37,21 @@ exactly once per default tenant. **Production / multi-tenant databases are
 NEVER auto-seeded**, even with the flag set — the auto-seed only runs for
 the default (local-dev) tenant.
 
-Both seeders are fully idempotent: every insert is an upsert or existence
-check, so running them on an already-seeded database is a no-op except for
-printing the summary.
+All three seeders are fully idempotent: every insert is an upsert or
+existence check, so running them on an already-seeded database is a no-op
+except for printing the summary.
 
 ## What gets created
+
+### Owner-only seed (`bun run db:seed:owner`)
+
+Creates **only** the single Owner login + the foundational RBAC catalog:
+
+- **RBAC catalog** — 8 system roles + 122 role-permission links. Needed so the owner can later assign roles to staff they create via the UI. Also self-heals on every API boot.
+- **1 Employee + 1 User** — the owner account. `username: owner`, `password: ChangeMeOwner#2026`, `isOwner: true`.
+- The owner's employee row has `warehouseId = null` — the owner sees ALL gudang regardless of assignment (the `isOwner` flag bypasses per-gudang data isolation).
+
+Skipped: gudang, staff, partners, wallets, vehicles, routes, tariffs, customers, shipments, pickups, deliveries, transports, invoices, payments, audit logs. Build everything yourself via the UI.
 
 ### Accounts-only seed (`bun run db:seed:accounts`)
 
@@ -116,18 +133,29 @@ bun run db:seed     # step 2 — populate demo data (optional but recommended fo
 bun run dev         # step 3 — start the app
 ```
 
-**Reset to a clean accounts-only state (working logins, no demo shipments):**
+**Reset to a clean accounts-only state (all demo logins, no demo shipments):**
 
 ```bash
 rm db/custom.db
 bun run db:push              # step 1 — create schema
-bun run db:seed:accounts     # step 2 — demo accounts + gudang + RBAC only (no shipments / invoices / etc.)
+bun run db:seed:accounts     # step 2 — 22 demo accounts + 3 gudang + RBAC only (no shipments / invoices / etc.)
 bun run dev                  # step 3 — start the app
 ```
 
-This is the recommended starting point if you want to test a fresh workflow end-to-end with your own data — you can log in as `owner`, `siti`, `budi`, etc. immediately, but every operational page (Shipments, Pickups, Invoices, …) will be empty.
+You can log in as `owner`, `siti`, `budi`, etc. immediately, and every operational page (Shipments, Pickups, Invoices, …) will be empty.
 
-**Reset on Supabase:** Dashboard → Database → *Reset database*, then `bun run db:push && bun run db:seed` (or `bun run db:push && bun run db:seed:accounts` for the minimal setup).
+**Reset to a truly empty state (only the owner, nothing else):**
+
+```bash
+rm db/custom.db
+bun run db:push           # step 1 — create schema
+bun run db:seed:owner     # step 2 — owner login ONLY (no gudang, no staff, no partners, no wallets, no shipments)
+bun run dev               # step 3 — start the app
+```
+
+This is the recommended starting point if you want to build the entire dataset from scratch via the UI — only the owner can log in, and every page (Users, Gudang, Partners, Shipments, …) is genuinely empty. The owner then creates gudang, staff, partners, vehicles, routes, customers, and shipments in that order.
+
+**Reset on Supabase:** Dashboard → Database → *Reset database*, then `bun run db:push && bun run db:seed` (or `bun run db:push && bun run db:seed:accounts` / `bun run db:push && bun run db:seed:owner` for the smaller setups).
 
 **Run with an empty database (no demo data):**
 
@@ -139,20 +167,20 @@ bun run dev         # start — login will fail because no users exist yet;
                     # or by inserting into User with isOwner=true.
 ```
 
-**Change the mock data:** edit `src/lib/seed.ts` (the single source for both the CLI seeder and — when `AUTO_SEED_ON_BOOT=true` — the auto-seed path). Useful spots:
+**Change the mock data:** edit `src/lib/seed.ts` (the single source for all three CLI seeders and — when `AUTO_SEED_ON_BOOT=true` — the auto-seed path). Useful spots:
 
-| Want to change | Where |
-|---|---|
-| Staff accounts / roles | `staff` array inside `seedAccountsAndGudang()` |
-| Owner credentials | `ownerPassword` / the owner upsert block |
-| Gudang list | `gudangDefs` |
-| Partner profiles & wallets | `partnerDefs` (inside `seedAccountsAndGudang()`) |
-| Vehicles | `vehicleDefs` (inside `runSeed()`) |
-| Routes & checkpoints | `routeDefs` (add a 4th checkpoint to see the editor light up) |
-| Tariffs / customers | `tariffDefs` / `customerDefs` |
-| Shipments & lifecycle coverage | `shipmentDefs` |
+| Want to change | Where | Affects |
+|---|---|---|
+| Owner credentials / name | `ownerPassword` / the owner upsert block inside `seedOwnerOnly()` AND `seedAccountsAndGudang()` (both define the same owner row — keep them in sync) | `db:seed:owner`, `db:seed:accounts`, `db:seed` |
+| Staff accounts / roles | `staff` array inside `seedAccountsAndGudang()` | `db:seed:accounts`, `db:seed` (NOT `db:seed:owner`) |
+| Gudang list | `gudangDefs` inside `seedAccountsAndGudang()` | `db:seed:accounts`, `db:seed` (NOT `db:seed:owner`) |
+| Partner profiles & wallets | `partnerDefs` inside `seedAccountsAndGudang()` | `db:seed:accounts`, `db:seed` (NOT `db:seed:owner`) |
+| Vehicles | `vehicleDefs` inside `runSeed()` | `db:seed` only |
+| Routes & checkpoints | `routeDefs` (add a 4th checkpoint to see the editor light up) | `db:seed` only |
+| Tariffs / customers | `tariffDefs` / `customerDefs` | `db:seed` only |
+| Shipments & lifecycle coverage | `shipmentDefs` | `db:seed` only |
 
-The shared `seedAccountsAndGudang()` helper is called by BOTH `seedAccountsOnly()` (the `db:seed:accounts` script) and `runSeed()` (the full `db:seed` script), so any change to accounts / gudang / partners / wallets automatically applies to both seeders. Changes to vehicles / routes / tariffs / customers / shipments only affect the full `db:seed` script.
+The three seeders stack: `seedOwnerOnly()` creates the owner only; `seedAccountsAndGudang()` creates the owner + gudang + staff + partners + wallets (it does NOT call `seedOwnerOnly()` — it has its own owner upsert, kept in sync); `runSeed()` calls `seedAccountsAndGudang()` first, then adds vehicles / routes / tariffs / customers / shipments / invoices / audit logs.
 
 After editing, reset the database (above) so the new dataset is created.
 

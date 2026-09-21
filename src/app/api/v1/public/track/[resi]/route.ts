@@ -28,7 +28,9 @@ export async function GET(req: NextRequest, { params }: Params) {
     // Boot RBAC + (default tenant only) demo seed so the endpoint works on a
     // fresh database the same way the authed API does.
     await ensureRbac();
-    if (isDefaultTenant()) await ensureSeed();
+    if (isDefaultTenant() && process.env.AUTO_SEED_ON_BOOT === "true") {
+      await ensureSeed();
+    }
 
     const { resi } = await params;
     const code = str(resi);
