@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { toast } from "sonner";
 import { CheckCircle2, Crosshair, ExternalLink, GripVertical, Info, MapPin, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +31,116 @@ function seqIcon(sequence: number, highlight = false) {
     iconSize: [30, 30],
     iconAnchor: [15, 15],
   });
+}
+
+/**
+ * Editable coordinate input — lets the user TYPE or PASTE a latitude /
+ * longitude value directly instead of having to drag the marker on the
+ * Leaflet map (which is fiddly for precise coordinates).
+ *
+ * Maintains a local text buffer so the user can type partial values like
+ * "3." or "-" without the parent state forcing a reformat mid-keystroke.
+ * The buffer is committed to the parent on blur or Enter, parsed with
+ * `Number(...)`, clamped to `[min, max]`, and the clamped value is written
+ * back to the buffer so the user always sees the canonical value.
+ *
+ * External changes to `value` (e.g. marker drag, paste-coords helper, or
+ * selecting a different checkpoint) re-sync the buffer via useEffect.
+ */
+function CoordinateInput({
+  id,
+  label,
+  value,
+  onChange,
+  min,
+  max,
+  placeholder,
+}: {
+  id: string;
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+  min: number;
+  max: number;
+  placeholder?: string;
+}) {
+  const [text, setText] = useState(String(value));
+
+  // Sync from parent when the parent value changes externally (marker drag,
+  // paste-coords helper, selection change, etc.).
+  useEffect(() => {
+    setText(String(value));
+  }, [value]);
+
+  function commit() {
+    const trimmed = text.trim();
+    if (trimmed === "") {
+      // Reset to parent value on empty.
+      setText(String(value));
+      return;
+    }
+    const v = Number(trimmed);
+    if (Number.isNaN(v)) {
+      setText(String(value));
+      return;
+    }
+    const clamped = Math.min(max, Math.max(min, v));
+    onChange(clamped);
+    // Reflect any clamping / normalization back to the text buffer.
+    setText(String(clamped));
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <label htmlFor={id} className="text-xs font-medium text-foreground">
+        {label}
+      </label>
+      <Input
+        id={id}
+        type="text"
+        inputMode="decimal"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commit();
+            (e.target as HTMLInputElement).blur();
+          }
+        }}
+        className="font-mono text-xs"
+        placeholder={placeholder}
+        aria-label={label}
+      />
+    </div>
+  );
+}
+
+/**
+ * Parse a pasted "lat, lng" string into a validated {latitude, longitude}
+ * pair. Accepts a wide range of separators (",", ";", whitespace, or any
+ * combination) so users can paste coordinates copied from Google Maps,
+ * OpenStreetMap, spreadsheets, or any other source without reformatting.
+ *
+ * Returns `null` if the input cannot be parsed or the values are out of
+ * range. The caller is responsible for surfacing the error to the user.
+ */
+function parsePastedCoords(raw: string): { latitude: number; longitude: number } | null {
+  const val = raw.trim();
+  if (!val) return null;
+  // Strip wrapping parentheses / brackets if the user pasted "(3.5, 4.2)" or "[3.5, 4.2]".
+  const stripped = val.replace(/^[\[\(]\s*/, "").replace(/\s*[\]\)]$/, "");
+  // Accept "lat, lng", "lat,lng", "lat lng", "lat;lng", "lat\nlng" — anything
+  // that's a number, separator (one or more of , ; whitespace), then another number.
+  const m = stripped.match(/^(-?\d+(?:\.\d+)?)\s*[;,\s]+\s*(-?\d+(?:\.\d+)?)$/);
+  if (!m) return null;
+  const lat = Number(m[1]);
+  const lng = Number(m[2]);
+  if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
+  if (lat < -90 || lat > 90) return null;
+  if (lng < -180 || lng > 180) return null;
+  return { latitude: lat, longitude: lng };
 }
 
 /**
@@ -363,9 +474,90 @@ export function CheckpointMapEditor({
                 />
               </div>
             </div>
+
+            {/* Editable Latitude — type or paste a precise value directly
+                instead of dragging the marker on the Leaflet map. The
+                marker auto-syncs to whatever you type here. */}
+            <CoordinateInput
+              id="cp-lat"
+              label="Latitude"
+              value={selected.cp.latitude}
+              onChange={(v) => updateCheckpoint(selected.key, { latitude: v })}
+              min={-90}
+              max={90}
+              placeholder="mis. 3.5952"
+            />
+            {/* Editable Longitude — same as Latitude above. */}
+            <CoordinateInput
+              id="cp-lng"
+              label="Longitude"
+              value={selected.cp.longitude}
+              onChange={(v) => updateCheckpoint(selected.key, { longitude: v })}
+              min={-180}
+              max={180}
+              placeholder="mis. 98.6722"
+            />
+
+            {/* Paste-coordinates helper — accept "lat, lng" (or "lat lng",
+                "lat;lng", "(lat, lng)", etc.) and split into the two
+                coordinate inputs above. Handy when copying coordinates from
+                Google Maps, OpenStreetMap, or a spreadsheet. */}
+            <div className="sm:col-span-2 space-y-1.5">
+              <label htmlFor="cp-coords-paste" className="text-xs font-medium text-foreground">
+                Tempel koordinat (lat, lng)
+              </label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="cp-coords-paste"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="mis. 3.5952, 98.6722 — tekan Enter untuk terapkan"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      const input = e.currentTarget;
+                      const parsed = parsePastedCoords(input.value);
+                      if (!parsed) {
+                        if (input.value.trim() !== "") {
+                          toast.error("Format koordinat tidak valid. Gunakan format: lat, lng (mis. 3.5952, 98.6722).");
+                        }
+                        return;
+                      }
+                      updateCheckpoint(selected.key, parsed);
+                      input.value = "";
+                      toast.success(`Koordinat diterapkan: ${parsed.latitude}, ${parsed.longitude}`);
+                    }
+                  }}
+                  className="font-mono text-xs"
+                  aria-label="Tempel pasangan koordinat latitude dan longitude"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    const input = (e.currentTarget.previousSibling as HTMLInputElement);
+                    const parsed = parsePastedCoords(input.value);
+                    if (!parsed) {
+                      if (input.value.trim() !== "") {
+                        toast.error("Format koordinat tidak valid. Gunakan format: lat, lng (mis. 3.5952, 98.6722).");
+                      }
+                      return;
+                    }
+                    updateCheckpoint(selected.key, parsed);
+                    input.value = "";
+                    toast.success(`Koordinat diterapkan: ${parsed.latitude}, ${parsed.longitude}`);
+                  }}
+                >
+                  Terapkan
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Menerima format <span className="font-mono">lat, lng</span> / <span className="font-mono">lat lng</span> / <span className="font-mono">lat;lng</span>. Marker di peta akan otomatis pindah ke koordinat yang Anda ketik atau tempel.
+              </p>
+            </div>
+
             <div className="sm:col-span-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
-              <span>Latitude: <span className="font-mono">{selected.cp.latitude.toFixed(7)}</span></span>
-              <span>Longitude: <span className="font-mono">{selected.cp.longitude.toFixed(7)}</span></span>
               <span>
                 Radius: <span className="font-mono">{formatNumber(metersToKm(selected.cp.radiusMeters), 2)} KM</span>
                 <span className="ml-1 opacity-70">({formatNumber(selected.cp.radiusMeters, 0)} m)</span>

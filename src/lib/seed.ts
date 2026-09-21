@@ -488,7 +488,40 @@ export function ensureSeed(): Promise<void> {
   return p;
 }
 
-async function runSeed(): Promise<void> {
+/**
+ * Idempotent ACCOUNTS-ONLY seed — creates just the RBAC catalog, the demo
+ * gudang (warehouses), and the demo accounts (owner + staff + partners +
+ * wallets). Skips all transactional demo data (vehicles, routes, tariffs,
+ * customers, shipments, invoices, audit logs). Use this when you want a
+ * clean database with working logins but no demo shipments cluttering the
+ * operational pages.
+ *
+ * Safe to run before OR after the full `bun run db:seed`. Both seeders
+ * share the same upsert keys (warehouse.code, employee.employeeNumber,
+ * user.username, partner.userId) so they converge on the same account set.
+ *
+ * Exposed via `prisma/seed-accounts.ts` and the `db:seed:accounts` script.
+ */
+export async function seedAccountsOnly(): Promise<void> {
+  await seedAccountsAndGudang();
+}
+
+/**
+ * Shared helper used by BOTH `seedAccountsOnly()` and `runSeed()`. Creates
+ * everything needed for the demo accounts to work: RBAC, gudang, owner +
+ * staff employees + users, partner profiles + wallets. Returns the lookup
+ * maps the full transactional seed needs (gudang IDs, user IDs, partner IDs).
+ *
+ * Idempotent — every upsert is keyed by a natural identifier (warehouse.code,
+ * employee.employeeNumber, user.username, partner.userId) so running this on
+ * an already-seeded database is a no-op except for re-syncing a few
+ * warehouseId columns on existing rows.
+ */
+async function seedAccountsAndGudang(): Promise<{
+  gudang: Record<string, number>;
+  usersByHandle: Record<string, { id: number; employeeId: number | null }>;
+  partnersByUsername: Record<string, number>;
+}> {
   await ensureRbac();
 
   // ----- Gudang (Sumatra Island — main corridor Medan → Banda Aceh) --------
@@ -519,19 +552,6 @@ async function runSeed(): Promise<void> {
   if (unbound.length > 0) {
     await db.employee.updateMany({ where: { id: { in: unbound.map((e) => e.id) } }, data: { warehouseId: gudang["Medan"] } });
   }
-
-  const ownerExists = await db.user.findFirst({ where: { username: "owner" } });
-  const shipmentCount = await db.masterShipment.count();
-  if (ownerExists && shipmentCount >= 6) {
-    // Already seeded — still run the idempotent backfill (customer ↔ marketing
-    // linkage + the transport-arrival demo shipment + B2B Master Resi demo)
-    // so upgraded DBs get the new demo data without touching existing rows.
-    await seedBackfill();
-    return;
-  }
-
-  const now = new Date();
-  const daysAgo = (d: number) => new Date(now.getTime() - d * 24 * 60 * 60 * 1000);
 
   // ----- Employees + users -------------------------------------------------
   // EVERY karyawan is stationed at one gudang (warehouseId) — operational data
@@ -663,6 +683,37 @@ async function runSeed(): Promise<void> {
     partnersByUsername[p.username] = partner.id;
     await db.wallet.upsert({ where: { partnerId: partner.id }, create: { partnerId: partner.id }, update: {} });
   }
+
+  return { gudang, usersByHandle, partnersByUsername };
+}
+
+/**
+ * Full demo seed — calls `seedAccountsAndGudang()` first (RBAC + gudang +
+ * owner + staff + partners + wallets), then creates the transactional demo
+ * data: vehicles, routes, tariffs, customers, shipments, pickups, deliveries,
+ * transports, invoices, payments, audit logs, plus the idempotent backfill
+ * (customer ↔ marketing linkage, transport-arrival demo, B2B Master Resi demo).
+ *
+ * Idempotent — short-circuits with `seedBackfill()` once the demo shipment
+ * count reaches 6, so re-running on an already-seeded database is a no-op
+ * except for the backfill (which adds new demo rows without touching
+ * existing ones).
+ */
+async function runSeed(): Promise<void> {
+  const { gudang, usersByHandle, partnersByUsername } = await seedAccountsAndGudang();
+
+  const ownerExists = await db.user.findFirst({ where: { username: "owner" } });
+  const shipmentCount = await db.masterShipment.count();
+  if (ownerExists && shipmentCount >= 6) {
+    // Already seeded — still run the idempotent backfill (customer ↔ marketing
+    // linkage + the transport-arrival demo shipment + B2B Master Resi demo)
+    // so upgraded DBs get the new demo data without touching existing rows.
+    await seedBackfill();
+    return;
+  }
+
+  const now = new Date();
+  const daysAgo = (d: number) => new Date(now.getTime() - d * 24 * 60 * 60 * 1000);
 
   // ----- Vehicles -----------------------------------------------------------
   // Vehicle plates are Sumatran (BK = North Sumatra / Aceh plates).
