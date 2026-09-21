@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Camera, MapPin, Pencil, Phone, Plus, QrCode, Truck, User, XCircle } from "lucide-react";
+import { Camera, CheckCircle2, MapPin, Pencil, Phone, Plus, QrCode, Truck, User, XCircle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { apiDelete, apiGet, apiPost, apiPut, hasPermission, employeesByPosition, type PickupTask, type Options, type Shipment } from "@/lib/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
@@ -204,6 +204,28 @@ export function PickupsPage() {
                 {p.customerType === "b2b" && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-950 dark:text-sky-300" title="B2B — cukup scan Master Resi sekali">
                     B2B · Master Resi
+                  </span>
+                )}
+                {/* Step 2 — DIRECT fulfillment badge (mirrors the shipments-page
+                    row badge). Violet color matches the shipments page so users
+                    can recognize DIRECT shipments at a glance across pages. */}
+                {(p.fulfillmentMode ?? "STANDARD") === "DIRECT" && (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 dark:bg-violet-950 dark:text-violet-300"
+                    title="DIRECT — driver ambil langsung di lokasi customer, kirim langsung ke penerima"
+                  >
+                    DIRECT
+                  </span>
+                )}
+                {/* Step 2 — "Already picked up from checkpoint 1" badge for
+                    DIRECT shipments. Only shown for DIRECT (STANDARD pickups
+                    happen at the customer address, never at a checkpoint). */}
+                {(p.fulfillmentMode ?? "STANDARD") === "DIRECT" && p.pickedUpFromCheckpoint1 && (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                    title="Driver sudah check-in di checkpoint 1 — paket sudah diambil dari titik penjemputan"
+                  >
+                    <CheckCircle2 className="h-3 w-3" /> Sudah Diambil CP1
                   </span>
                 )}
               </p>

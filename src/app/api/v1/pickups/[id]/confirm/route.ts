@@ -67,6 +67,24 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     const body = await req.json().catch(() => ({}));
     const notes = str(body.notes) ?? pickup.notes;
+    // Step 5 — proof photo (REQUIRED). Captured in the QR scan dialog as a
+    // JPEG data URL (downscaled to ~720px, ~0.72 quality — same cap the
+    // checkpoint check-in uses). Stored verbatim on `Pickup.photoUrl` and
+    // surfaced in the pickups list / detail dialog gated by
+    // `proof_photo.view` (Admin Gudang + Owner). Validation mirrors the
+    // checkpoint check-in route: must be a non-empty JPEG / PNG data URL
+    // under 2.5MB.
+    const MAX_PHOTO_BYTES = 2_500_000;
+    const photoUrl = typeof body.photoUrl === "string" ? body.photoUrl : "";
+    if (!photoUrl) {
+      return fail(422, "Foto bukti pickup wajib disertakan sebelum konfirmasi.");
+    }
+    if (!photoUrl.startsWith("data:image/jpeg;base64,") && !photoUrl.startsWith("data:image/png;base64,")) {
+      return fail(422, "Format foto tidak didukung — gunakan JPEG atau PNG.");
+    }
+    if (photoUrl.length > MAX_PHOTO_BYTES) {
+      return fail(422, "Foto terlalu besar (maks ±2.5 MB setelah kompresi).");
+    }
 
     // Aturan baru: kurir tidak menarik pembayaran dari customer. B2C ditanggung
     // Marketing, B2B via invoice. Body `payment` diabaikan jika dikirim (untuk
@@ -82,16 +100,41 @@ export async function POST(req: NextRequest, { params }: Params) {
       // Revision Part A: the kurir picking up the package moves the task to
       // PICKED_UP — NOT COMPLETED. Completion happens later, when Admin
       // Gudang confirms the package arrived at the gudang (arrival workflow).
-      data: { status: "PICKED_UP", notes },
+      // Step 5 — also persist the proof photo URL on the pickup row.
+      data: { status: "PICKED_UP", notes, photoUrl },
     });
     if (pickup.master.status === "READY_FOR_PICKUP") {
       await db.masterShipment.update({ where: { id: pickup.masterId }, data: { status: "PICKED_UP" } });
+    }
+
+    // Step 3 — DIRECT shipments: the driver is physically at checkpoint 1 of
+    // the transport carrying this master (they just scanned the MasterResi /
+    // packages there). Look up the most-recent checkpoint record for that
+    // transport to get the checkpoint name, then build the customer-facing
+    // tracking description "Picked up from '{checkpoint name}'" the user
+    // requested. STANDARD pickups happen at the customer address (no
+    // transport checkpoint), so they keep the existing "Picked-up by
+    // [kurir name]" wording.
+    const isDirect = (pickup.master.fulfillmentMode ?? "STANDARD") === "DIRECT";
+    let trackingDescription = `Picked-up by ${kurirName}`;
+    if (isDirect) {
+      const transport = await db.transport.findFirst({
+        where: { shipments: { some: { shipmentId: pickup.masterId } } },
+        include: {
+          route: { include: { checkpoints: { orderBy: { sequence: "asc" } } } },
+          checkpointRecords: { orderBy: { recordedAt: "desc" }, take: 1, include: { checkpoint: true } },
+        },
+      });
+      const latestCheckpointName = transport?.checkpointRecords[0]?.checkpoint?.name ?? null;
+      if (latestCheckpointName) {
+        trackingDescription = `Picked up from '${latestCheckpointName}'`;
+      }
     }
     await db.trackingEvent.create({
       data: {
         masterId: pickup.masterId,
         event: "PICKED_UP",
-        description: `Picked-up by ${kurirName}`,
+        description: trackingDescription,
         actorId: user.id,
       },
     });
@@ -101,8 +144,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       entityId: pickup.id,
       entityLabel: `${pickup.pickupCode} → PICKED_UP`,
       actor: user,
-      after: { packagesScanned: `${progress.scanned}/${progress.total}`, kurir: kurirName },
+      after: { packagesScanned: `${progress.scanned}/${progress.total}`, kurir: kurirName, hasPhoto: true },
     });
-    return ok({ ...updated, tracking: `Picked-up by ${kurirName}` });
+    return ok({ ...updated, tracking: trackingDescription });
   });
 }

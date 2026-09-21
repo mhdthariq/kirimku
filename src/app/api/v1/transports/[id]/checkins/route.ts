@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { guard, ok, handle, fail } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
+import { nextCode } from "@/lib/code-generator";
 import { haversineMeters, metersToKmDisplay } from "@/lib/transport-totals";
 import { shipmentDestinationGudangIds, cityIndex } from "@/lib/gudang-scope";
 
@@ -137,11 +138,19 @@ export async function POST(req: NextRequest, { params }: Params) {
           if (s.master.status === "RECEIVED_AT_GUDANG") {
             await tx.masterShipment.update({ where: { id: s.shipmentId }, data: { status: "IN_TRANSPORT" } });
           }
+          const isDirect = (s.master.fulfillmentMode ?? "STANDARD") === "DIRECT";
+          // Step 1 — DIRECT shipments get a checkpoint-name tracking event
+          // ("Driver tiba di 'Checkpoint 1 name'") so the customer's tracking
+          // page shows the driver's progress in their own words. STANDARD
+          // shipments keep the existing "Transport {code} berangkat
+          // melalui check-in checkpoint {name}" wording.
           await tx.trackingEvent.create({
             data: {
               masterId: s.shipmentId,
               event: "IN_TRANSPORT",
-              description: `Transport ${transport.transportCode} berangkat melalui check-in checkpoint ${checkpoint.name}`,
+              description: isDirect
+                ? `Driver tiba di '${checkpoint.name}'`
+                : `Transport ${transport.transportCode} berangkat melalui check-in checkpoint ${checkpoint.name}`,
               actorId: user.id,
             },
           });
@@ -171,6 +180,51 @@ export async function POST(req: NextRequest, { params }: Params) {
         for (const s of transport.shipments) {
           const destIds = shipmentDestinationGudangIds(s.master, cityIdx);
           const arrivedWarehouseId = s.master.destinationWarehouseId ?? destIds[0] ?? null;
+          const isDirect = (s.master.fulfillmentMode ?? "STANDARD") === "DIRECT";
+          if (isDirect) {
+            // Step 3 — DIRECT shipments skip the Admin Gudang reception scan
+            // step entirely: the driver IS the receiver for this package.
+            // Move the master shipment straight to ARRIVED_AT_GUDANG (with
+            // destReceivedAt stamped now) so it's immediately eligible for
+            // delivery assignment. Auto-create a Delivery row assigned to
+            // this transport's driver — they will hand the package to the
+            // customer (or the customer's warehouse contact) and scan each
+            // package + upload a photo as proof of delivery.
+            await tx.masterShipment.update({
+              where: { id: s.shipmentId },
+              data: {
+                status: "ARRIVED_AT_GUDANG",
+                arrivedWarehouseId,
+                destReceivedAt: new Date(),
+              },
+            });
+            // Idempotent: skip if a Delivery row already exists for this master.
+            const existingDelivery = await tx.delivery.findFirst({ where: { masterId: s.shipmentId }, select: { id: true } });
+            if (!existingDelivery && transport.driverId != null) {
+              const deliveryCode = await nextCode("delivery", "DLV-2026-", "deliveryCode");
+              await tx.delivery.create({
+                data: {
+                  deliveryCode,
+                  masterId: s.shipmentId,
+                  kurirId: transport.driverId,
+                  status: "ASSIGNED",
+                  notes: `Auto-assigned dari transport ${transport.transportCode} (DIRECT — driver antar langsung ke penerima)`,
+                },
+              });
+            }
+            await tx.trackingEvent.create({
+              data: {
+                masterId: s.shipmentId,
+                event: "ARRIVED_AT_GUDANG",
+                // Step 2 — DIRECT final-checkpoint tracking event uses the
+                // checkpoint name in the customer-facing wording requested
+                // by the user: "Driver tiba di 'Checkpoint final name'".
+                description: `Driver tiba di '${checkpoint.name}'`,
+                actorId: user.id,
+              },
+            });
+            continue;
+          }
           if (s.master.status === "IN_TRANSPORT") {
             // The driver checked in at the LAST checkpoint (Gudang Tujuan) —
             // the packages are physically at the destination branch, but

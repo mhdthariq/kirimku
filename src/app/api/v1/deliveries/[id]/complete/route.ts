@@ -41,16 +41,57 @@ export async function POST(req: NextRequest, { params }: Params) {
     const body = await req.json().catch(() => ({}));
     const proof = requireStr(body.proofOfDelivery, "proofOfDelivery");
     const notes = str(body.notes) ?? delivery.notes;
+    // Step 5 — proof photo (REQUIRED). Same validation as the pickup confirm
+    // route: non-empty JPEG / PNG data URL under 2.5MB. Stored verbatim on
+    // `Delivery.photoUrl` and surfaced in the deliveries list / detail
+    // dialog gated by `proof_photo.view` (Admin Gudang + Owner).
+    const MAX_PHOTO_BYTES = 2_500_000;
+    const photoUrl = typeof body.photoUrl === "string" ? body.photoUrl : "";
+    if (!photoUrl) {
+      return fail(422, "Foto bukti serah terima wajib disertakan sebelum konfirmasi.");
+    }
+    if (!photoUrl.startsWith("data:image/jpeg;base64,") && !photoUrl.startsWith("data:image/png;base64,")) {
+      return fail(422, "Format foto tidak didukung — gunakan JPEG atau PNG.");
+    }
+    if (photoUrl.length > MAX_PHOTO_BYTES) {
+      return fail(422, "Foto terlalu besar (maks ±2.5 MB setelah kompresi).");
+    }
 
     const kurirName = delivery.kurirId
       ? (await db.employee.findUnique({ where: { id: delivery.kurirId } }))?.name ?? user.name
       : user.name;
     const customerName = delivery.master.customer.name;
 
+    // Step 4 — DIRECT shipments: the driver is at the final checkpoint of
+    // the transport carrying this master (they just scanned the MasterResi /
+    // packages there before handover). Look up the most-recent checkpoint
+    // record for that transport to get the checkpoint name, then build the
+    // customer-facing tracking description "Delivery Success on '{checkpoint
+    // name}'" the user requested. STANDARD deliveries keep the existing
+    // "Delivered to {customer} by [kurir] — received by: [proof]" wording
+    // (those handovers happen at the customer's door, not at a transport
+    // checkpoint).
+    const isDirect = (delivery.master.fulfillmentMode ?? "STANDARD") === "DIRECT";
+    let trackingDescription = `Delivered to ${customerName} by ${kurirName} — received by: ${proof}`;
+    if (isDirect) {
+      const transport = await db.transport.findFirst({
+        where: { shipments: { some: { shipmentId: delivery.masterId } } },
+        include: {
+          route: { include: { checkpoints: { orderBy: { sequence: "asc" } } } },
+          checkpointRecords: { orderBy: { recordedAt: "desc" }, take: 1, include: { checkpoint: true } },
+        },
+      });
+      const latestCheckpointName = transport?.checkpointRecords[0]?.checkpoint?.name ?? null;
+      if (latestCheckpointName) {
+        trackingDescription = `Delivery Success on '${latestCheckpointName}'`;
+      }
+    }
+
     const { updated } = await db.$transaction(async (tx) => {
       const result = await tx.delivery.update({
         where: { id: delivery.id },
-        data: { status: "COMPLETED", completedAt: new Date(), proofOfDelivery: proof, notes },
+        // Step 5 — persist the proof photo URL on the delivery row.
+        data: { status: "COMPLETED", completedAt: new Date(), proofOfDelivery: proof, notes, photoUrl },
       });
       if (delivery.master.status !== "DELIVERED") {
         await tx.masterShipment.update({ where: { id: delivery.masterId }, data: { status: "DELIVERED" } });
@@ -59,7 +100,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         data: {
           masterId: delivery.masterId,
           event: "DELIVERED",
-          description: `Delivered to ${customerName} by ${kurirName} — received by: ${proof}`,
+          description: trackingDescription,
           actorId: user.id,
         },
       });
@@ -71,8 +112,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       entityId: delivery.id,
       entityLabel: `${delivery.deliveryCode} → COMPLETED`,
       actor: user,
-      after: { packagesScanned: `${progress.scanned}/${progress.total}`, proof, kurir: kurirName },
+      after: { packagesScanned: `${progress.scanned}/${progress.total}`, proof, kurir: kurirName, hasPhoto: true },
     });
-    return ok({ ...updated, tracking: `Delivered to ${customerName} by ${kurirName}` });
+    return ok({ ...updated, tracking: trackingDescription });
   });
 }

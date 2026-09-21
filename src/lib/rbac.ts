@@ -241,17 +241,36 @@ export const ROLE_TEMPLATES: { slug: string; name: string; description: string; 
   {
     slug: "driver",
     name: "Driver",
-    description: "Linehaul driver: depart transport + checkpoint selfie check-in",
+    description: "Linehaul driver: depart transport + checkpoint selfie check-in + DIRECT pickup & delivery (scan MasterResi + upload proof photo)",
     permissions: [
       "transport.view", "transport.depart", "transport.arrive", "transport.checkin",
       "shipment.view",
+      // Step 4 — DIRECT shipment pickup & delivery workflow: a DIRECT
+      // shipment is one where the driver picks up at the origin (checkpoint
+      // 1) and delivers straight to the receiver, with no gudang in
+      // between. The driver must be able to view their assigned pickup &
+      // delivery tasks, scan the MasterResi / package QR at handover, and
+      // confirm completion with a proof photo. The pickups / deliveries
+      // list is server-filtered to only DIRECT tasks they're assigned to
+      // (Step 6) — they will not see STANDARD kurir pickups / deliveries.
+      "pickup.view", "pickup.scan", "pickup.confirm",
+      "delivery.view", "delivery.scan", "delivery.confirm",
     ],
   },
   {
     slug: "kenek",
     name: "Kenek",
-    description: "Linehaul assistant: view assigned transports + checkpoint selfie check-in",
-    permissions: ["transport.view", "transport.checkin", "shipment.view"],
+    description: "Linehaul assistant: view assigned transports + checkpoint selfie check-in + DIRECT delivery handover",
+    permissions: [
+      "transport.view", "transport.checkin", "shipment.view",
+      // Step 4 — kenek can assist the driver with DIRECT delivery handover
+      // (scan packages + upload proof photo). Pickup view is granted so
+      // they can also see DIRECT pickup tasks on the same transport when
+      // riding with the driver. The view is server-scoped to the kenek's
+      // own assignments (Step 6).
+      "pickup.view", "pickup.scan",
+      "delivery.view", "delivery.scan", "delivery.confirm",
+    ],
   },
 ];
 

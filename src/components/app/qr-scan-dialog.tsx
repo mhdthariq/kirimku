@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, MapPin, PackageCheck, Phone, QrCode, ScanLine, TriangleAlert, User } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Camera, CheckCircle2, MapPin, PackageCheck, Phone, QrCode, ScanLine, TriangleAlert, User, X } from "lucide-react";
 import { toast } from "sonner";
 import { apiGet, apiPost, type PaymentSummary, type ScanProgress, type ScanResponse } from "@/lib/client-api";
 import { ScanConsole, type ScanMethod } from "@/components/app/scan-console";
@@ -75,8 +75,22 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [notes, setNotes] = useState("");
   const [proof, setProof] = useState("");
+  // Step 5 — proof photo (bukti pickup / bukti serah terima). REQUIRED
+  // before the kurir / driver can confirm. Captured via the device camera
+  // ONLY (file upload is intentionally NOT supported — the photo must be
+  // taken live with the camera so it's proof of the actual handover, not
+  // a pre-existing image). Stored as a JPEG data URL (~720px, ~0.72
+  // quality — same compression the checkpoint selfie check-in uses) and
+  // POSTed to the confirm / complete endpoint as `photoUrl`. The backend
+  // writes it to `Pickup.photoUrl` / `Delivery.photoUrl`.
+  const [photo, setPhoto] = useState<string | null>(null);
+  const [cameraOn, setCameraOn] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
+
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   const basePath = mode === "pickup" ? `/pickups/${task?.id}` : `/deliveries/${task?.id}`;
   const isPickup = mode === "pickup";
@@ -90,6 +104,7 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
     setFeedback(null);
     setNotes("");
     setProof("");
+    setPhoto(null);
     apiGet<{ progress: ScanProgress; paymentSummary?: PaymentSummary }>(basePath)
       .then((d) => {
         setProgress(d.progress);
@@ -97,6 +112,76 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
       })
       .catch(() => setFeedback({ kind: "warn", text: "Gagal memuat daftar paket." }));
   }, [open, task, basePath]);
+
+  // Step 5 — stop the camera when the dialog closes (frees the stream so
+  // the camera light turns off and the next open can re-acquire cleanly).
+  const stopCamera = useCallback(() => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    setCameraOn(false);
+  }, []);
+  useEffect(() => {
+    if (!open) stopCamera();
+    return () => stopCamera();
+  }, [open, stopCamera]);
+
+  // Step 5 — open the device camera (rear-facing preferred for shooting
+  // package labels / receiver handover). Mirrors the checkpoint-checkin
+  // dialog's getUserMedia pattern. Errors are surfaced inline so the user
+  // knows to grant camera permission. NOTE: file upload is intentionally
+  // NOT supported — the photo MUST be taken live with the camera so it's
+  // proof of the actual handover, not a pre-existing image.
+  const startCamera = useCallback(async () => {
+    setCameraError(null);
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      setCameraError("Browser ini tidak mendukung akses kamera — gunakan perangkat dengan kamera.");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      streamRef.current = stream;
+      setCameraOn(true);
+      requestAnimationFrame(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          void videoRef.current.play();
+        }
+      });
+    } catch (err) {
+      const name = err instanceof DOMException ? err.name : "";
+      setCameraError(
+        name === "NotAllowedError"
+          ? "Akses kamera ditolak — izinkan kamera di browser, lalu coba lagi."
+          : name === "NotFoundError"
+            ? "Kamera tidak ditemukan di perangkat ini."
+            : "Kamera gagal dijalankan — coba lagi.",
+      );
+      setCameraOn(false);
+    }
+  }, []);
+
+  // Step 5 — capture the current video frame, downscale to ~720px and
+  // re-encode as JPEG ~0.72 quality so the data URL stays under 2.5MB
+  // (the same cap the checkpoint check-in enforces server-side). Falls
+  // back silently to the original dimensions when the canvas API is
+  // unavailable.
+  const captureFrame = useCallback(() => {
+    const v = videoRef.current;
+    if (!v || !v.videoWidth) return;
+    const maxSide = 720;
+    const scale = Math.min(1, maxSide / Math.max(v.videoWidth, v.videoHeight) || 1);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(v.videoWidth * scale));
+    canvas.height = Math.max(1, Math.round(v.videoHeight * scale));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+    setPhoto(canvas.toDataURL("image/jpeg", 0.72));
+    stopCamera();
+  }, [stopCamera]);
 
   const onScan = useCallback(
     async (code: string, method: ScanMethod) => {
@@ -125,11 +210,20 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
       setFeedback({ kind: "warn", text: "Isi nama penerima sebagai bukti serah terima (proof of delivery)." });
       return;
     }
+    // Step 5 — proof photo is REQUIRED for both pickup and delivery (the
+    // whole point of the photo: admin / owner can later verify the package
+    // was really picked up / handed over). Surface the missing-photo case
+    // as a friendly inline warning instead of letting the backend reject.
+    if (!photo) {
+      setFeedback({ kind: "warn", text: isPickup ? "Foto bukti pickup wajib diambil sebelum konfirmasi." : "Foto bukti serah terima wajib diambil sebelum konfirmasi." });
+      return;
+    }
     setConfirming(true);
     try {
-      // Pickup: kurir tidak menarik pembayaran — body kosong, hanya konfirmasi.
-      // Delivery: tetap kirim POD (bukti serah terima) + catatan opsional.
-      const body = isPickup ? {} : { proofOfDelivery: proof.trim(), notes: notes || null };
+      // Pickup: kurir tidak menarik pembayaran — body kosong kecuali photo.
+      // Delivery: tetap kirim POD (bukti serah terima) + catatan opsional +
+      // foto bukti serah terima.
+      const body = isPickup ? { photoUrl: photo } : { proofOfDelivery: proof.trim(), notes: notes || null, photoUrl: photo };
       const res = await apiPost<{ tracking: string }>(`${basePath}/${isPickup ? "confirm" : "complete"}`, body);
       toast.success(
         isPickup
@@ -143,7 +237,7 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
     } finally {
       setConfirming(false);
     }
-  }, [task, confirming, isPickup, proof, notes, basePath, onOpenChange, onDone]);
+  }, [task, confirming, isPickup, proof, notes, photo, basePath, onOpenChange, onDone]);
 
   const pct = progress
     ? progress.isB2B
@@ -310,6 +404,47 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
                 </div>
               </>
             )}
+            {/* Step 5 — Proof photo capture (REQUIRED before confirm).
+                Same pattern as the checkpoint check-in dialog: phone
+                camera (getUserMedia) only. File upload is intentionally
+                NOT supported — the photo MUST be taken live with the
+                camera so it's proof of the actual handover, not a
+                pre-existing image. The preview thumbnail + "Ganti Foto"
+                button let the user retake if the shot is blurry. */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground">
+                {isPickup ? "Foto Bukti Pickup" : "Foto Bukti Serah Terima"} <span className="text-destructive">*</span>
+              </label>
+              {photo ? (
+                <div className="space-y-2">
+                  <img src={photo} alt="Foto bukti" className="h-40 w-full rounded-lg border object-cover" />
+                  <Button type="button" variant="outline" size="sm" onClick={() => setPhoto(null)} disabled={confirming}>
+                    <X className="h-3.5 w-3.5" /> Ganti Foto
+                  </Button>
+                </div>
+              ) : cameraOn ? (
+                <div className="space-y-2">
+                  <video ref={videoRef} playsInline muted autoPlay className="h-40 w-full rounded-lg border bg-black object-cover" />
+                  <div className="flex gap-2">
+                    <Button type="button" size="sm" onClick={captureFrame} disabled={confirming}>
+                      <Camera className="h-3.5 w-3.5" /> Ambil Foto
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={stopCamera} disabled={confirming}>
+                      Batal
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Button type="button" variant="outline" className="w-full" onClick={() => void startCamera()} disabled={confirming}>
+                    <Camera className="h-4 w-4" /> Buka Kamera
+                  </Button>
+                  {cameraError && (
+                    <p className="text-[11px] text-amber-600 dark:text-amber-400">{cameraError}</p>
+                  )}
+                </div>
+              )}
+            </div>
             <Button className="w-full" onClick={onConfirm} disabled={confirming}>
               <CheckCircle2 className="h-4 w-4" />
               {confirming ? "Memproses…" : isPickup ? "Konfirmasi Paket Diambil (Picked Up)" : "Konfirmasi Delivered (Di Tangan Customer)"}

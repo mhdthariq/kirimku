@@ -235,6 +235,40 @@ export async function POST(req: NextRequest) {
         });
         await tx.masterShipment.updateMany({ where: { id: { in: shipments.map((s) => s.id) } }, data: { status: "IN_TRANSPORT" } });
       }
+      // Step 3 — DIRECT shipments skip the kurir pickup-from-customer flow,
+      // but the driver still needs a Pickup task so they can scan each
+      // MasterResi / package at the origin (checkpoint 1) and upload a
+      // photo of the picked-up packages. Auto-create one Pickup row per
+      // DIRECT shipment on this transport, assigned to the driver.
+      // We only auto-create when no Pickup row already exists for this
+      // master (idempotent — re-loading shouldn't create duplicates).
+      if (driverId != null) {
+        const driverEmployee = await tx.employee.findUnique({ where: { id: driverId }, select: { name: true } });
+        const driverNameLabel = driverEmployee?.name ?? "Driver";
+        const directShipments = shipments.filter((s) => (s.fulfillmentMode ?? "STANDARD") === "DIRECT");
+        for (const s of directShipments) {
+          const existing = await tx.pickup.findFirst({ where: { masterId: s.id }, select: { id: true } });
+          if (existing) continue;
+          const pickupCode = await nextCode("pickup", "PICK-2026-", "pickupCode");
+          await tx.pickup.create({
+            data: {
+              pickupCode,
+              masterId: s.id,
+              kurirId: driverId, // DIRECT driver = the kurir of the pickup
+              status: "ASSIGNED",
+              notes: `Auto-assigned dari transport ${transportCode} (DIRECT — driver pickup di checkpoint 1)`,
+            },
+          });
+          await tx.trackingEvent.create({
+            data: {
+              masterId: s.id,
+              event: "PICKUP_ASSIGNED",
+              description: `${driverNameLabel} auto-assigned untuk pickup DIRECT (transport ${transportCode}) — scan paket di checkpoint 1.`,
+              actorId: user.id,
+            },
+          });
+        }
+      }
       return created;
     });
 

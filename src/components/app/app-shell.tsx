@@ -221,6 +221,14 @@ export function AppShell({
               items: [
                 { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, mobile: true },
                 { href: "/transports", label: "Transport", icon: Route, mobile: true },
+                // Step 4 — DIRECT shipments need a pickup + delivery workflow
+                // for the driver: pickup at checkpoint 1 (scan MasterResi +
+                // photo), delivery to the receiver (scan + photo). The
+                // backend (Step 6) filters these lists to only DIRECT tasks
+                // the driver is assigned to, so they will not see STANDARD
+                // kurir pickups / deliveries.
+                { href: "/pickups", label: "Pickup", icon: Truck, mobile: true },
+                { href: "/deliveries", label: "Delivery", icon: ClipboardList, mobile: true },
                 { href: "/transport-history", label: "Transport History", icon: History, mobile: true },
               ],
             },

@@ -343,12 +343,27 @@ export interface PickupTask {
   notes: string | null;
   createdAt: string;
   completedAt: string | null;
+  /** Step 3 — masterId exposed so the client can look up the transport
+   *  carrying this shipment (for the "picked up from checkpoint 1" badge
+   *  in DIRECT mode). */
+  masterId?: number;
   masterCode: string;
   masterStatus: string;
   origin: string;
   destination: string;
   customerName: string;
   customerType: string;
+  /** Step 1 — Fulfillment Mode. "STANDARD" = via gudang, "DIRECT" = driver
+   *  direct pickup at origin. The UI uses this to render a DIRECT badge
+   *  on the row and driver clients use it to filter to only DIRECT
+   *  shipments they're working on. Defaults to "STANDARD" when absent
+   *  (older server responses). */
+  fulfillmentMode?: "STANDARD" | "DIRECT";
+  /** Step 2 — DIRECT-only: true when the driver of the transport carrying
+   *  this shipment has already checked in at checkpoint 1 (= "picked up
+   *  from the origin point"). Always false for STANDARD pickups (they
+   *  happen at the customer address, not at a transport checkpoint). */
+  pickedUpFromCheckpoint1?: boolean;
   /** Revise round 7 — Pickup address shown to the kurir so they know where
    *  to pick up the package. Sourced from MasterShipment.pengirimAddress
    *  (the per-shipment sender address the staff typed, which may differ
@@ -382,6 +397,10 @@ export interface DeliveryTask {
   photoUrl?: string | null;
   createdAt: string;
   completedAt: string | null;
+  /** Step 3 — masterId exposed so the client can look up the transport
+   *  carrying this shipment (for the "picked up from checkpoint 1" badge
+   *  in DIRECT mode). */
+  masterId?: number;
   masterCode: string;
   masterStatus: string;
   destination: string;
@@ -393,6 +412,16 @@ export interface DeliveryTask {
   customerPhone: string | null;
   customerType?: string;
   priceAmount: number | null;
+  /** Step 1 — Fulfillment Mode. "STANDARD" = via gudang, "DIRECT" = driver
+   *  direct delivery to the receiver. The UI uses this to render a DIRECT
+   *  badge on the row and driver clients use it to filter to only DIRECT
+   *  shipments they're working on. Defaults to "STANDARD" when absent
+   *  (older server responses). */
+  fulfillmentMode?: "STANDARD" | "DIRECT";
+  /** Step 2 — DIRECT-only: true when the driver of the transport carrying
+   *  this shipment has already checked in at checkpoint 1 (= "picked up
+   *  from the origin point"). Always false for STANDARD. */
+  pickedUpFromCheckpoint1?: boolean;
   detailsCount: number;
   scannedCount: number;
   allScanned: boolean;
