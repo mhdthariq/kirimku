@@ -23,11 +23,24 @@ export interface GudangScope {
 /**
  * Resolve the gudang scope of a user:
  * - owner (or `*` permissions) → unscoped, sees every gudang
+ * - driver / kenek → unscoped. They drive transports on any route (Medan →
+ *   Banda Aceh, Lhokseumawe → Medan, …) and binding them to one gudang would
+ *   incorrectly hide transports assigned to them but routed through other
+ *   gudangs. Their actual visibility is enforced by the `?mine=true`
+ *   (driverId/kenekId === user.employeeId) filter at the API layer, not by
+ *   gudang scope.
  * - everyone else → their employee's gudang; employees without a gudang see
  *   no operational data (an account must be bound to a gudang to work)
  */
 export async function scopeForUser(user: AuthUser): Promise<GudangScope> {
   if (user.isOwner || user.permissions.includes("*")) return { unscoped: true, warehouseId: null };
+  // Step 2 — drivers & keneks are unscoped (see every transport they're
+  // assigned to, regardless of which gudang the route endpoints belong to).
+  // The `?mine=true` filter at the API layer restricts their list to their
+  // own assignments; the gudang scope check would otherwise hide transports
+  // assigned to them but routed through other gudangs.
+  const isDriverCrew = user.roles.some((r) => r.slug === "driver" || r.slug === "kenek");
+  if (isDriverCrew) return { unscoped: true, warehouseId: null };
   if (user.employeeId == null) return { unscoped: false, warehouseId: null };
   const employee = await db.employee.findUnique({
     where: { id: user.employeeId },

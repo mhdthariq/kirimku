@@ -469,12 +469,22 @@ function EmployeesTab({ can }: { can: { employeeCreate: boolean; employeeUpdate:
             <Field label="Nama" htmlFor="e-name">
               <Input id="e-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required disabled={busy} />
             </Field>
-            <Field label="Gudang Penempatan" htmlFor="e-warehouse" hint="Semua data operasional karyawan dibatasi ke gudang ini">
+            <Field
+              label="Gudang Penempatan"
+              htmlFor="e-warehouse"
+              hint="Semua data operasional karyawan dibatasi ke gudang ini. Pilih 'Umum' untuk driver / kenek (mereka tidak terikat ke satu gudang — bisa di-assign ke transport rute mana saja)."
+            >
               <FormSelect
-                value={form.warehouseId}
-                onValueChange={(v) => setForm({ ...form, warehouseId: v })}
+                value={form.warehouseId || "none"}
+                onValueChange={(v) => setForm({ ...form, warehouseId: v === "none" ? "" : v })}
                 placeholder="Pilih gudang…"
-                options={(options?.warehouses ?? []).map((w) => ({ value: String(w.id), label: w.name }))}
+                options={[
+                  // Driver / Kenek (and any other role that doesn't need a
+                  // gudang binding) can be left unaffiliated. The 'none'
+                  // sentinel maps to warehouseId = null server-side.
+                  { value: "none", label: "— Umum (tidak terikat gudang) —" },
+                  ...(options?.warehouses ?? []).map((w) => ({ value: String(w.id), label: w.name + (w.city ? ` · ${w.city}` : "") })),
+                ]}
                 disabled={busy}
               />
             </Field>
@@ -536,7 +546,49 @@ function UsersTab({ can }: { can: { userCreate: boolean; userUpdate: boolean } }
   }, [data, search]);
 
   const employeeRoleOptions = (roles ?? []).filter((r) => r.slug !== "marketing" && r.slug !== "vehicle-owner");
+  // Step 3 — Only employees that don't already have a user account linked
+  // are eligible to be picked when creating a new user. Once linked the
+  // employee disappears from this list (so the same employee can't get a
+  // second account). Inactive employees are also hidden.
   const unlinkedEmployees = (employees ?? []).filter((e) => !e.user && e.isActive);
+
+  /** Step 3 — Suggest a username from a full name: take the first word,
+   *  strip diacritics, lowercase, keep only [a-z0-9._-]. "Joko Widodo" →
+   *  "joko"; "Siti Rahma" → "siti"; "Adit Nugroho" → "adit". Returns an
+   *  empty string when the input has no usable ASCII characters. */
+  function suggestUsername(fullName: string): string {
+    const firstWord = fullName.trim().split(/\s+/)[0] ?? "";
+    if (!firstWord) return "";
+    // NFKD normalize then drop combining marks (so "Siti" stays "Siti",
+    // but "José" becomes "Jose")
+    const ascii = firstWord
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+    const cleaned = ascii.replace(/[^a-z0-9._-]/g, "");
+    return cleaned;
+  }
+
+  /** Step 3 — When the user picks an employee in the create dialog, auto-
+   *  fill the Name and Username fields from the employee record. The user
+   *  can still retype either field if the suggestion isn't good (e.g.
+   *  name has typos, username collides with an existing user). The
+   *  employeeId stays pinned — the new user MUST be linked to an employee
+   *  record (the user's request: "users absolutely have relation to
+   *  employee table"). */
+  function onPickEmployee(employeeId: string) {
+    if (editing) {
+      // Editing an existing user — don't allow changing the link.
+      return;
+    }
+    const emp = unlinkedEmployees.find((e) => String(e.id) === employeeId);
+    if (!emp) {
+      setForm((f) => ({ ...f, employeeId, username: "", name: "" }));
+      return;
+    }
+    const suggestedUsername = suggestUsername(emp.name);
+    setForm((f) => ({ ...f, employeeId, name: emp.name, username: suggestedUsername }));
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -658,28 +710,46 @@ function UsersTab({ can }: { can: { userCreate: boolean; userUpdate: boolean } }
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{editing ? `Edit User — @${editing.username}` : "Tambah User"}</DialogTitle>
-            <DialogDescription>{editing ? "Kosongkan password jika tidak ingin mengganti." : "User baru aktif langsung dengan role terpilih."}</DialogDescription>
+            <DialogDescription>{editing ? "Kosongkan password jika tidak ingin mengganti." : "Pilih employee yang belum punya akun — nama & username terisi otomatis, masih bisa diubah."}</DialogDescription>
           </DialogHeader>
           <form onSubmit={onSubmit} className="space-y-4">
+            {/* Step 3 — Employee select moved to the TOP and made REQUIRED
+                for new users. The user's request: "users absolutely have
+                relation to employee table". When the user picks an employee,
+                the Name + Username fields below auto-fill from the employee
+                record (still editable in case the name has a typo or the
+                suggested username collides with an existing user). When
+                editing an existing user, the select is disabled (you
+                can't re-link a user to a different employee). */}
+            <Field
+              label="Employee"
+              htmlFor="u-employee"
+              hint={editing
+                ? "Tautan employee tidak bisa diganti."
+                : "Wajib — pilih employee yang belum punya akun. Nama & username akan terisi otomatis dari data employee."}
+            >
+              <FormSelect
+                value={form.employeeId}
+                onValueChange={(v) => onPickEmployee(v)}
+                placeholder={editing ? (form.employeeId ? "—" : "Tanpa employee") : "Pilih employee…"}
+                options={unlinkedEmployees.map((e) => ({
+                  value: String(e.id),
+                  label: `${e.name}${e.position ? ` — ${e.position}` : ""}${e.warehouse ? ` (${e.warehouse.name})` : ""}`,
+                }))}
+                disabled={busy || !!editing}
+                required={!editing}
+              />
+            </Field>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field label="Username" htmlFor="u-username">
+              <Field label="Username" htmlFor="u-username" hint={!editing ? "Auto dari nama depan employee — edit jika perlu" : undefined}>
                 <Input id="u-username" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} required disabled={busy || !!editing} autoComplete="off" />
               </Field>
-              <Field label="Nama" htmlFor="u-name">
+              <Field label="Nama" htmlFor="u-name" hint={!editing ? "Auto dari employee — edit jika perlu" : undefined}>
                 <Input id="u-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required disabled={busy} />
               </Field>
             </div>
             <Field label={editing ? "Password baru (opsional)" : "Password (min. 8 karakter)"} htmlFor="u-password">
               <Input id="u-password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required={!editing} disabled={busy} minLength={8} autoComplete="new-password" />
-            </Field>
-            <Field label="Employee (opsional)" htmlFor="u-employee" hint={editing ? "Tautan employee tidak bisa diganti." : undefined}>
-              <FormSelect
-                value={form.employeeId}
-                onValueChange={(v) => setForm({ ...form, employeeId: v })}
-                placeholder="Tanpa employee"
-                options={unlinkedEmployees.map((e) => ({ value: String(e.id), label: `${e.name}${e.position ? ` — ${e.position}` : ""}` }))}
-                disabled={busy || !!editing}
-              />
             </Field>
             <div className="space-y-2">
               <p className="text-sm font-medium text-foreground">Roles</p>

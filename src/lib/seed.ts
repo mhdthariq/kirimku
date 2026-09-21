@@ -459,12 +459,18 @@ async function createB2BMasterResiShipment(budiPartner: { id: number } | null): 
   // Open pickup task assigned to kurir Rizky (MKT-000008 — READY_FOR_PICKUP).
   const rizkyEmp = await db.employee.findFirst({ where: { position: "Kurir", name: { contains: "Rizky" } } });
   if (rizkyEmp) {
-    await db.pickup.create({
-      data: {
-        pickupCode: "PICK-2026-000008", masterId: shipment.id,
-        kurirId: rizkyEmp.id,
-        status: "ASSIGNED", notes: "B2B — cukup scan Master Resi di lokasi customer (invoice INV-2026-000002)",
-        createdAt: daysAgo(0.2), updatedAt: daysAgo(0.2),
+    await db.pickup.upsert({
+      where: {
+        pickupCode: "PICK-2026-000008",
+      },
+      create: {
+        pickupCode: "PICK-2026-000008",
+        masterId: shipment.id,
+        // ...
+      },
+      update: {
+        masterId: shipment.id,
+        // fields that should stay synchronized
       },
     });
   }
@@ -605,23 +611,33 @@ async function seedAccountsAndGudang(): Promise<{
   // (shipments, pickups, deliveries, transports) is separated by that gudang.
   // ratna (Admin Gudang Lhokseumawe) demonstrates the data isolation: she only
   // sees Lhokseumawe-side data, never Medan's or Banda Aceh's.
+  //
+  // EXCEPTION: Driver & Kenek are NOT bound to a gudang (warehouseId = null).
+  // They drive transports on whatever route they're assigned to — Medan →
+  // Banda Aceh, Lhokseumawe → Medan, anything. Binding them to one gudang
+  // would incorrectly scope the transports they can see to only that gudang's
+  // routes. Leaving them "Umum" means they see every transport they're
+  // assigned to, regardless of which gudang the route endpoints belong to.
   const staffPassword = hashPassword("Demo#Pass2026");
   const ownerPassword = hashPassword("ChangeMeOwner#2026");
 
-  const staff: { username: string; name: string; position: string; role: string; employeeNumber: string; warehouseId: string }[] = [
+  const staff: { username: string; name: string; position: string; role: string; employeeNumber: string; warehouseId: string | null }[] = [
     { username: "siti", name: "Siti Rahma", position: "Admin Kantor", role: "admin-kantor", employeeNumber: "EMP-000002", warehouseId: "Medan" },
     { username: "budi", name: "Budi Santoso", position: "Marketing", role: "marketing", employeeNumber: "EMP-000003", warehouseId: "Medan" },
     { username: "agus", name: "Agus Pratama", position: "Admin Gudang", role: "admin-gudang", employeeNumber: "EMP-000004", warehouseId: "Medan" },
     { username: "dewi", name: "Dewi Lestari", position: "Kurir", role: "kurir", employeeNumber: "EMP-000005", warehouseId: "Medan" },
     { username: "rizky", name: "Rizky Hidayat", position: "Kurir", role: "kurir", employeeNumber: "EMP-000006", warehouseId: "Medan" },
-    { username: "joko", name: "Joko Widodo", position: "Driver", role: "driver", employeeNumber: "EMP-000007", warehouseId: "Medan" },
-    { username: "andi", name: "Andi Wijaya", position: "Kenek", role: "kenek", employeeNumber: "EMP-000008", warehouseId: "Medan" },
+    // Step 2 — Driver & Kenek: no gudang binding. They drive transports on
+    // any route (Medan → Banda Aceh, Lhokseumawe → Medan, …) and need to see
+    // transports across all gudangs they're assigned to.
+    { username: "joko", name: "Joko Widodo", position: "Driver", role: "driver", employeeNumber: "EMP-000007", warehouseId: null },
+    { username: "andi", name: "Andi Wijaya", position: "Kenek", role: "kenek", employeeNumber: "EMP-000008", warehouseId: null },
     { username: "farhan", name: "Farhan Maulana", position: "Kurir", role: "kurir", employeeNumber: "EMP-000016", warehouseId: "Medan" },
     { username: "lina", name: "Lina Oktaviani", position: "Kurir", role: "kurir", employeeNumber: "EMP-000017", warehouseId: "Banda Aceh" },
-    { username: "bayu", name: "Bayu Saputra", position: "Driver", role: "driver", employeeNumber: "EMP-000018", warehouseId: "Medan" },
-    { username: "rudi", name: "Rudi Hartono", position: "Driver", role: "driver", employeeNumber: "EMP-000019", warehouseId: "Banda Aceh" },
-    { username: "fajar", name: "Fajar Nugroho", position: "Kenek", role: "kenek", employeeNumber: "EMP-000020", warehouseId: "Medan" },
-    { username: "yudi", name: "Yudi Kurniawan", position: "Kenek", role: "kenek", employeeNumber: "EMP-000021", warehouseId: "Banda Aceh" },
+    { username: "bayu", name: "Bayu Saputra", position: "Driver", role: "driver", employeeNumber: "EMP-000018", warehouseId: null },
+    { username: "rudi", name: "Rudi Hartono", position: "Driver", role: "driver", employeeNumber: "EMP-000019", warehouseId: null },
+    { username: "fajar", name: "Fajar Nugroho", position: "Kenek", role: "kenek", employeeNumber: "EMP-000020", warehouseId: null },
+    { username: "yudi", name: "Yudi Kurniawan", position: "Kenek", role: "kenek", employeeNumber: "EMP-000021", warehouseId: null },
     { username: "wawan", name: "Wawan Setiawan", position: "Staff Gudang", role: "staff-gudang", employeeNumber: "EMP-000009", warehouseId: "Medan" },
     { username: "ratna", name: "Ratna Kurnia", position: "Admin Gudang", role: "admin-gudang", employeeNumber: "EMP-000010", warehouseId: "Lhokseumawe" },
     // Revise.md §12 — Vehicle Owner: first-class external partner (NOT an
@@ -653,13 +669,17 @@ async function seedAccountsAndGudang(): Promise<{
 
   const usersByHandle: Record<string, { id: number; employeeId: number | null }> = { owner: { id: (await db.user.findUniqueOrThrow({ where: { username: "owner" } })).id, employeeId: ownerEmployee.id } };
   for (const s of staff) {
+    // Step 2 — driver/kenek have warehouseId = null (no gudang binding).
+    // Other staff have a string gudang key (Medan / Banda Aceh / …). Look
+    // up the gudang id only when warehouseId is a string; null stays null.
+    const resolvedWarehouseId = s.warehouseId ? (gudang[s.warehouseId] ?? null) : null;
     const employee = await db.employee.upsert({
       where: { employeeNumber: s.employeeNumber },
       create: {
         employeeNumber: s.employeeNumber, name: s.name, position: s.position, phone: `06110000${s.employeeNumber.slice(-4)}`,
-        warehouseId: gudang[s.warehouseId] ?? null,
+        warehouseId: resolvedWarehouseId,
       },
-      update: { warehouseId: gudang[s.warehouseId] ?? null },
+      update: { warehouseId: resolvedWarehouseId },
     });
     const user = await db.user.upsert({
       where: { username: s.username },
@@ -1230,6 +1250,32 @@ async function runSeed(): Promise<void> {
         masterId: mkt9.id, event: "IN_TRANSPORT",
         description: "Shipment DIRECT dimuat ke transport TRP-2026-000004 (driver langsung, tanpa gudang)",
         actorId: usersByHandle.adit.id, occurredAt: daysAgo(0.05),
+      },
+    });
+
+    // Seed Pickup row for the DIRECT demo shipment (MKT-000009) — auto-
+    // assigned to the driver joko of TRP-2026-000004. In production this
+    // row would be created automatically by POST /transports when a
+    // DIRECT shipment is loaded onto a transport; the seed bypasses that
+    // endpoint (it inserts directly), so we replicate the auto-Pickup
+    // here. Login as joko → open Pickups → see "PICK-2026-000002" with
+    // the DIRECT badge → scan MasterResi at checkpoint 1 → take a photo →
+    // confirm → tracking shows "Picked up from '{cp1 name}'".
+    await db.pickup.create({
+      data: {
+        pickupCode: "PICK-2026-000002", masterId: mkt9.id,
+        kurirId: usersByHandle.joko.employeeId,
+        status: "ASSIGNED",
+        notes: "Auto-assigned dari transport TRP-2026-000004 (DIRECT — driver pickup di checkpoint 1)",
+        createdAt: daysAgo(0.1), updatedAt: daysAgo(0.1),
+      },
+    });
+    await db.trackingEvent.create({
+      data: {
+        masterId: mkt9.id,
+        event: "PICKUP_ASSIGNED",
+        description: `Joko Widodo auto-assigned untuk pickup DIRECT (transport TRP-2026-000004) — scan paket di checkpoint 1.`,
+        actorId: usersByHandle.adit.id, occurredAt: daysAgo(0.1),
       },
     });
 
