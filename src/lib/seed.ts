@@ -459,18 +459,12 @@ async function createB2BMasterResiShipment(budiPartner: { id: number } | null): 
   // Open pickup task assigned to kurir Rizky (MKT-000008 — READY_FOR_PICKUP).
   const rizkyEmp = await db.employee.findFirst({ where: { position: "Kurir", name: { contains: "Rizky" } } });
   if (rizkyEmp) {
-    await db.pickup.upsert({
-      where: {
-        pickupCode: "PICK-2026-000008",
-      },
-      create: {
-        pickupCode: "PICK-2026-000008",
-        masterId: shipment.id,
-        // ...
-      },
-      update: {
-        masterId: shipment.id,
-        // fields that should stay synchronized
+    await db.pickup.create({
+      data: {
+        pickupCode: "PICK-2026-000008", masterId: shipment.id,
+        kurirId: rizkyEmp.id,
+        status: "ASSIGNED", notes: "B2B — cukup scan Master Resi di lokasi customer (invoice INV-2026-000002)",
+        createdAt: daysAgo(0.2), updatedAt: daysAgo(0.2),
       },
     });
   }
