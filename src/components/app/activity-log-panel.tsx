@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Clock, History, Loader2, Package, RefreshCw } from "lucide-react";
 import { apiGetWithMeta, hasPermission, type AuditEntry, type AuditResponse } from "@/lib/client-api";
 import { useAuth } from "@/hooks/use-auth";
@@ -50,12 +50,28 @@ export function ActivityLogPanel({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Stabilize the entityTypes dependency. Callers always pass an inline
+  // array literal (e.g. <ActivityLogPanel entityTypes={["user"]} />), which
+  // creates a NEW array reference on every parent render. If we put the raw
+  // array in the useCallback deps below, `load` would be regenerated on
+  // every parent render → useEffect would re-fire → the panel would refetch
+  // → the loading skeleton/spinner would blink on every keystroke in any
+  // search input above the panel. By joining into a stable string key, we
+  // ensure `load` only changes when the CONTENT of entityTypes actually
+  // changes — not when the array reference changes.
+  const entityTypesKey = entityTypes.join(",");
+  // Keep a ref to the latest entityTypes so the async callback always reads
+  // the current value without re-triggering on identity changes.
+  const entityTypesRef = useRef(entityTypes);
+  entityTypesRef.current = entityTypes;
+
   const load = useCallback(async () => {
     if (!canViewLog) return;
     setLoading(true);
     setError(null);
     try {
-      const query = entityTypes.map((t) => `entityType=${encodeURIComponent(t)}`).join("&");
+      const types = entityTypesRef.current;
+      const query = types.map((t) => `entityType=${encodeURIComponent(t)}`).join("&");
       const entityQuery = entityId == null ? "" : `&entityId=${entityId}`;
       const res = await apiGetWithMeta<AuditResponse["data"]>(
         `/audit-logs?${query}${entityQuery}&limit=${limit}`,
@@ -67,7 +83,8 @@ export function ActivityLogPanel({
     } finally {
       setLoading(false);
     }
-  }, [canViewLog, entityTypes, entityId, limit]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canViewLog, entityTypesKey, entityId, limit]);
 
   useEffect(() => {
     load();

@@ -24,6 +24,15 @@ export interface TransportCheckinPoint {
  * - the transport's current (last known) position marker
  * - zoom controls bottom-left, overlays inside an isolated stacking context
  *   (never covers the navbar — Revision Part F)
+ *
+ * NOTE on dependency stability: callers typically pass `currentPosition` and
+ * `checkins` as inline object/array literals. That means a NEW reference is
+ * produced on every parent render. If we used the raw props in the redraw
+ * effect's deps array, the map would wipe and re-draw all layers (markers,
+ * circles, polyline, fit-bounds) on every parent re-render — causing visible
+ * flicker when the user types in a search box, opens a sibling dialog, etc.
+ * We therefore derive stable primitive keys (joined strings) for the deps
+ * and read the latest raw values via refs.
  */
 export function TransportMap({
   checkpoints,
@@ -41,6 +50,26 @@ export function TransportMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const layerRef = useRef<L.LayerGroup | null>(null);
+
+  // Stable primitive keys derived from the (possibly unstable) props.
+  const checkpointsKey = checkpoints
+    .map((c) => `${c.id}:${c.latitude},${c.longitude}:${c.checkedIn ? 1 : 0}:${c.latestRecordAt ?? ""}`)
+    .join("|");
+  const positionKey = currentPosition
+    ? `${currentPosition.latitude},${currentPosition.longitude},${currentPosition.recordedAt ?? ""}`
+    : "";
+  const checkinsKey = checkins
+    .map((p) => `${p.latitude},${p.longitude},${p.recordedAt}`)
+    .join("|");
+
+  // Keep refs to the latest raw values so the effect body reads the most
+  // up-to-date data without forcing re-runs on identity changes.
+  const checkpointsRef = useRef(checkpoints);
+  checkpointsRef.current = checkpoints;
+  const currentPositionRef = useRef(currentPosition);
+  currentPositionRef.current = currentPosition;
+  const checkinsRef = useRef(checkins);
+  checkinsRef.current = checkins;
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -66,9 +95,14 @@ export function TransportMap({
     if (!map || !layer) return;
     layer.clearLayers();
 
+    // Read latest values from refs (avoid stale closures).
+    const cps = checkpointsRef.current;
+    const pos = currentPositionRef.current;
+    const ins = checkinsRef.current;
+
     const latlngs: [number, number][] = [];
 
-    checkpoints.forEach((c) => {
+    cps.forEach((c) => {
       latlngs.push([c.latitude, c.longitude]);
       // radius circle (Revision Part G — visualized on the map)
       L.circle([c.latitude, c.longitude], {
@@ -95,23 +129,23 @@ export function TransportMap({
     }
 
     // current position marker (last known)
-    if (currentPosition) {
+    if (pos) {
       const icon = L.divIcon({
         className: "kirimku-truck",
         html: `<div style="width:34px;height:34px;border-radius:9999px;display:flex;align-items:center;justify-content:center;background:#2563eb;color:#fff;border:3px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,.4);font-size:16px;">🚚</div>`,
         iconSize: [34, 34],
         iconAnchor: [17, 17],
       });
-      L.marker([currentPosition.latitude, currentPosition.longitude], { icon })
+      L.marker([pos.latitude, pos.longitude], { icon })
         .addTo(layer)
         .bindTooltip(
-          `Posisi terakhir transport${currentPosition.recordedAt ? ` — ${new Date(currentPosition.recordedAt).toLocaleString("id-ID")}` : ""}`,
+          `Posisi terakhir transport${pos.recordedAt ? ` — ${new Date(pos.recordedAt).toLocaleString("id-ID")}` : ""}`,
           { direction: "top", offset: [0, -12] },
         );
     }
 
     // all check-in points (trace)
-    checkins.forEach((p) => {
+    ins.forEach((p) => {
       L.circleMarker([p.latitude, p.longitude], {
         radius: 4,
         color: "#2563eb",
@@ -125,11 +159,12 @@ export function TransportMap({
 
     // fit bounds
     const all: [number, number][] = [...latlngs];
-    if (currentPosition && fitTo === "position") all.push([currentPosition.latitude, currentPosition.longitude]);
+    if (pos && fitTo === "position") all.push([pos.latitude, pos.longitude]);
     if (all.length > 0) {
       map.fitBounds(L.latLngBounds(all).pad(0.25), { animate: false });
     }
-  }, [checkpoints, currentPosition, checkins, fitTo]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkpointsKey, positionKey, checkinsKey, fitTo]);
 
   return (
     <div className="relative isolate">

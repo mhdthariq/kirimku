@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   apiGet,
@@ -68,19 +68,32 @@ export function TransportFormDialog({
   const [busy, setBusy] = useState(false);
   const [readyShipments, setReadyShipments] = useState<Shipment[]>([]);
 
+  // The parent (e.g. transport-detail-page.tsx) constructs `editing` as an
+  // inline object literal — a NEW object reference on every parent render.
+  // If we used `editing` directly in the effect deps below, the form would
+  // be reset to the initial values on every parent re-render (e.g. when a
+  // sibling dialog opens, or when the auth context changes), wiping out
+  // whatever the user had typed mid-edit. We use a stable primitive key
+  // (editing?.id) as the dep and read the full `editing` via a ref so the
+  // body always sees the latest value.
+  const editingRef = useRef(editing);
+  editingRef.current = editing;
+  const editingId = editing?.id;
+
   // (Re)initialize the form every time the dialog opens.
   useEffect(() => {
     if (!open) return;
-    if (editing) {
+    const editingNow = editingRef.current;
+    if (editingNow) {
       setForm({
-        routeId: editing.routeId ? String(editing.routeId) : "",
-        vehicleId: String(editing.vehicleId),
+        routeId: editingNow.routeId ? String(editingNow.routeId) : "",
+        vehicleId: String(editingNow.vehicleId),
         driverId: "",
         kenekId: "",
-        origin: editing.origin ?? "",
-        destination: editing.destination ?? "",
-        plannedDepartureAt: toLocalInput(editing.plannedDepartureAt ? new Date(editing.plannedDepartureAt) : null),
-        plannedArrivalAt: toLocalInput(editing.plannedArrivalAt ? new Date(editing.plannedArrivalAt) : null),
+        origin: editingNow.origin ?? "",
+        destination: editingNow.destination ?? "",
+        plannedDepartureAt: toLocalInput(editingNow.plannedDepartureAt ? new Date(editingNow.plannedDepartureAt) : null),
+        plannedArrivalAt: toLocalInput(editingNow.plannedArrivalAt ? new Date(editingNow.plannedArrivalAt) : null),
         shipmentIds: [],
       });
     } else {
@@ -116,7 +129,8 @@ export function TransportFormDialog({
         setReadyShipments(merged);
       });
     }
-  }, [open, editing]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editingId]);
 
   // Position-filtered crew dropdowns: Driver select lists ONLY drivers and the
   // Kenek select ONLY keneks. Falls back to the full list only when no
