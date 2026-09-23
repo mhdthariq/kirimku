@@ -324,7 +324,7 @@ export default function TrackingPaketPage() {
                   <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                     <User className="h-3 w-3" /> Penerima
                   </p>
-                  <p className="mt-1 text-sm font-semibold">{data.recipient.name ?? "—"}</p>
+                  <p className="mt-1 text-sm font-semibold">{data.recipient.name ?? "-"}</p>
                   {data.recipient.address && (
                     <p className="text-xs text-muted-foreground">{data.recipient.address}</p>
                   )}
@@ -348,7 +348,7 @@ export default function TrackingPaketPage() {
             </CardContent>
           </Card>
 
-          {/* Packages list — what's tied to this Master Resi */}
+          {/* Packages list - what's tied to this Master Resi */}
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
@@ -441,7 +441,7 @@ export default function TrackingPaketPage() {
 
       {/* Footer */}
       <footer className="border-t bg-background/80 py-6 text-center text-xs text-muted-foreground">
-        <p>© {new Date().getFullYear()} KirimKu — Layanan Lacak Paket Publik</p>
+        <p>© {new Date().getFullYear()} KirimKu - Layanan Lacak Paket Publik</p>
       </footer>
     </main>
   );

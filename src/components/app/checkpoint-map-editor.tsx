@@ -364,7 +364,7 @@ export function CheckpointMapEditor({
 
   return (
     <div className="space-y-3">
-      {/* Revision Part F — `isolate` creates a stacking context so the overlay
+      {/* Revision Part F - `isolate` creates a stacking context so the overlay
           chips below can NEVER float above the app navbar (z-30) on scroll. */}
       <div className="relative isolate">
         <div
@@ -372,7 +372,7 @@ export function CheckpointMapEditor({
           style={{ height }}
           className="w-full overflow-hidden rounded-xl border bg-muted/40"
           role="application"
-          aria-label="Editor peta checkpoint — klik peta untuk menambah checkpoint"
+          aria-label="Editor peta checkpoint - klik peta untuk menambah checkpoint"
         />
         {canEdit && (
           <div className="pointer-events-none absolute left-3 top-3 z-10 flex items-center gap-1.5 rounded-full bg-background/90 px-3 py-1.5 text-[11px] font-medium text-muted-foreground shadow-sm backdrop-blur">
@@ -388,7 +388,7 @@ export function CheckpointMapEditor({
         </Badge>
       </div>
 
-      {/* Add Checkpoint — same editor form opens for the new item (Part C) */}
+      {/* Add Checkpoint - same editor form opens for the new item (Part C) */}
       {canEdit && (
         <Button type="button" variant="outline" onClick={addCheckpointAtCenter} className="w-full sm:w-auto">
           <Plus className="h-4 w-4" /> Tambah Checkpoint
@@ -404,7 +404,7 @@ export function CheckpointMapEditor({
         </div>
       )}
 
-      {/* Selected checkpoint editor — SHARED by existing AND new checkpoints
+      {/* Selected checkpoint editor - SHARED by existing AND new checkpoints
           (Revision Part C: one editor, not two). No nested save button: all
           changes are committed by the parent's main save action (Part D). */}
       {selected && canEdit && (
@@ -416,7 +416,7 @@ export function CheckpointMapEditor({
               {selected.cp.id ? (
                 <Badge variant="outline" className="font-mono text-[10px]">tersimpan</Badge>
               ) : (
-                <Badge className="font-mono text-[10px]">baru — tersimpan saat Simpan Semua</Badge>
+                <Badge className="font-mono text-[10px]">baru - tersimpan saat Simpan Semua</Badge>
               )}
             </p>
             <Button
@@ -475,7 +475,7 @@ export function CheckpointMapEditor({
               </div>
             </div>
 
-            {/* Editable Latitude — type or paste a precise value directly
+            {/* Editable Latitude - type or paste a precise value directly
                 instead of dragging the marker on the Leaflet map. The
                 marker auto-syncs to whatever you type here. */}
             <CoordinateInput
@@ -487,7 +487,7 @@ export function CheckpointMapEditor({
               max={90}
               placeholder="mis. 3.5952"
             />
-            {/* Editable Longitude — same as Latitude above. */}
+            {/* Editable Longitude - same as Latitude above. */}
             <CoordinateInput
               id="cp-lng"
               label="Longitude"
@@ -498,7 +498,7 @@ export function CheckpointMapEditor({
               placeholder="mis. 98.6722"
             />
 
-            {/* Paste-coordinates helper — accept "lat, lng" (or "lat lng",
+            {/* Paste-coordinates helper - accept "lat, lng" (or "lat lng",
                 "lat;lng", "(lat, lng)", etc.) and split into the two
                 coordinate inputs above. Handy when copying coordinates from
                 Google Maps, OpenStreetMap, or a spreadsheet. */}
@@ -511,7 +511,7 @@ export function CheckpointMapEditor({
                   id="cp-coords-paste"
                   type="text"
                   inputMode="decimal"
-                  placeholder="mis. 3.5952, 98.6722 — tekan Enter untuk terapkan"
+                  placeholder="mis. 3.5952, 98.6722 - tekan Enter untuk terapkan"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
@@ -562,7 +562,7 @@ export function CheckpointMapEditor({
                 Radius: <span className="font-mono">{formatNumber(metersToKm(selected.cp.radiusMeters), 2)} KM</span>
                 <span className="ml-1 opacity-70">({formatNumber(selected.cp.radiusMeters, 0)} m)</span>
               </span>
-              {/* Revise round 11 — Google Maps redirect button.
+              {/* Revise round 11 - Google Maps redirect button.
                   Opens Google Maps at this checkpoint's coordinate in a new tab.
                   URL: https://www.google.com/maps/search/?api=1&query=LAT,LNG */}
               <a
@@ -579,7 +579,7 @@ export function CheckpointMapEditor({
         </div>
       )}
 
-      {/* Compact list for all checkpoints (saved + new) — one collection */}
+      {/* Compact list for all checkpoints (saved + new) - one collection */}
       {points.length > 0 && (
         <ol className="grid gap-1.5 sm:grid-cols-2">
           {points.map(({ cp, key }, index) => (

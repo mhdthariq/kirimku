@@ -44,7 +44,7 @@ export async function POST(req: NextRequest, { params }: Params) {
           data: {
             masterId: s.shipmentId,
             event: "AT_DEST_GUDANG",
-            description: `Transport ${transport.transportCode} tiba di gudang tujuan${fromTo} — paket menunggu scan penerimaan Admin Gudang sebelum berstatus Arrived`,
+            description: `Transport ${transport.transportCode} tiba di gudang tujuan${fromTo} - paket menunggu scan penerimaan Admin Gudang sebelum berstatus Arrived`,
             actorId: user.id,
           },
         });

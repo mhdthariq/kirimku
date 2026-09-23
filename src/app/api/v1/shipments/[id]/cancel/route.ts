@@ -71,7 +71,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         referenceType: "shipment",
         referenceId: master.id,
         businessRef: `ESCROW-REFUND-${master.id}`,
-        description: `Refund escrow — shipment ${master.masterCode} dibatalkan`,
+        description: `Refund escrow - shipment ${master.masterCode} dibatalkan`,
         createdById: user.id,
       });
       refundTxId = refund.transactionId;

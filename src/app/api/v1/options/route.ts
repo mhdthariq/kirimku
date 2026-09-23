@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
       ? {}
       : {
           OR: [
-            { warehouseId: null }, // general customers — visible to all
+            { warehouseId: null }, // general customers - visible to all
             ...(scope.warehouseId != null ? [{ warehouseId: scope.warehouseId }] : []),
           ],
         };

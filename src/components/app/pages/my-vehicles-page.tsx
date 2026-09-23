@@ -52,7 +52,7 @@ export function MyVehiclesPage() {
             render: (r) => (
               <div>
                 <p className="font-mono text-sm font-semibold">{r.vehicleNumber}</p>
-                <p className="text-xs text-muted-foreground">{r.name ?? "—"}</p>
+                <p className="text-xs text-muted-foreground">{r.name ?? "-"}</p>
               </div>
             ),
           },
@@ -64,7 +64,7 @@ export function MyVehiclesPage() {
             render: (r) => (
               <div>
                 <p className="text-sm">{r.maxWeightKg.toLocaleString("id-ID")} kg</p>
-                {/* Revise round 11 — volume shows 2 decimal places. */}
+                {/* Revise round 11 - volume shows 2 decimal places. */}
                 <p className="text-xs text-muted-foreground">{formatNumber(r.maxVolumeM3, 2)} m³</p>
               </div>
             ),
@@ -84,7 +84,7 @@ export function MyVehiclesPage() {
             key: "notes",
             header: "Catatan",
             hideOnMobile: true,
-            render: (r) => <span className="text-xs text-muted-foreground">{r.notes ?? "—"}</span>,
+            render: (r) => <span className="text-xs text-muted-foreground">{r.notes ?? "-"}</span>,
           },
         ]}
       />

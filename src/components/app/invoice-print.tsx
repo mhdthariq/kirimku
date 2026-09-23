@@ -33,7 +33,7 @@ export function InvoicePrint({ invoice, onClose }: { invoice: PrintableInvoice; 
     } else if (user.roles.length > 0) {
       roleLabel = user.roles.map((r) => r.name).join(" / ");
     } else {
-      roleLabel = "—";
+      roleLabel = "-";
     }
     return `${accountName} (${roleLabel})`;
   })();
@@ -90,7 +90,7 @@ export function InvoicePrint({ invoice, onClose }: { invoice: PrintableInvoice; 
         <section className="overflow-x-auto py-7"><table className="w-full min-w-[520px] text-sm"><thead><tr className="border-b-2 border-neutral-900 text-left text-[10px] uppercase tracking-wider text-neutral-500"><th className="pb-3">Deskripsi</th><th className="w-16 pb-3 text-right">Qty</th><th className="w-32 pb-3 text-right">Harga satuan</th><th className="w-32 pb-3 text-right">Jumlah</th></tr></thead><tbody>{invoice.lines.map((line) => <tr key={line.id} className="border-b border-neutral-200"><td className="py-3 pr-3"><p className="font-medium">{line.description}</p>{line.shipment?.masterCode && <p className="mt-0.5 font-mono text-[10px] text-neutral-500">Shipment {line.shipment.masterCode}</p>}</td><td className="py-3 text-right">{formatNumber(line.quantity)}</td><td className="py-3 text-right">{formatRupiah(line.unitPrice)}</td><td className="py-3 text-right font-semibold">{formatRupiah(line.quantity * line.unitPrice)}</td></tr>)}</tbody></table></section>
         <section className="ml-auto max-w-sm border-t-2 border-neutral-900 pt-4 text-sm"><div className="flex justify-between"><span className="text-neutral-500">Subtotal</span><span className="font-semibold">{formatRupiah(subtotal)}</span></div><div className="mt-2 flex justify-between"><span className="text-neutral-500">Sudah dibayar</span><span className="font-semibold text-emerald-700">- {formatRupiah(invoice.settledAmount)}</span></div><div className="mt-4 flex justify-between border-t border-neutral-200 pt-3 text-base"><span className="font-bold">Sisa pembayaran</span><span className="font-black text-emerald-700">{formatRupiah(invoice.remainingAmount)}</span></div></section>
         {(invoice.notes || invoice.settlements?.length) && <footer className="mt-12 grid gap-8 border-t pt-6 text-xs sm:grid-cols-2"><div>{invoice.notes && <><p className="font-bold uppercase tracking-wider text-neutral-500">Catatan</p><p className="mt-2 leading-relaxed text-neutral-600">{invoice.notes}</p></>}{invoice.settlements?.length ? <p className="mt-4 text-neutral-500">{invoice.settlements.length} pembayaran tercatat · terakhir {formatDate(invoice.settlements[0].settledAt, true)}</p> : null}</div><p className="self-end text-right text-neutral-500">Terima kasih atas kepercayaan Anda.</p></footer>}
-        {/* Print audit footer — always rendered so every printed / saved
+        {/* Print audit footer - always rendered so every printed / saved
             PDF copy carries the account name + role of the staff who
             triggered the print. Mirrors the "Dicetak oleh" line on the
             resi print. Visible on both the on-screen preview and the

@@ -19,7 +19,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const withdrawal = await db.withdrawalRequest.findUnique({ where: { id: Number(id) } });
     if (!withdrawal) return fail(404, "Permintaan withdrawal tidak ditemukan.");
     if (withdrawal.status === "COMPLETED") {
-      return fail(422, "Withdrawal ini sudah selesai — tidak bisa diselesaikan dua kali.");
+      return fail(422, "Withdrawal ini sudah selesai - tidak bisa diselesaikan dua kali.");
     }
     if (withdrawal.status !== "PROCESSING" && withdrawal.status !== "APPROVED") {
       return fail(422, `Withdrawal berstatus ${withdrawal.status} tidak bisa diselesaikan.`);

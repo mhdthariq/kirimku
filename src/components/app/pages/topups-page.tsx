@@ -97,7 +97,7 @@ export function TopUpManagementPage() {
             key: "info",
             header: "Keterangan",
             hideOnMobile: true,
-            render: (r) => <span className="text-xs text-muted-foreground">{r.partnerNote ?? "—"}</span>,
+            render: (r) => <span className="text-xs text-muted-foreground">{r.partnerNote ?? "-"}</span>,
           },
           { key: "date", header: "Tanggal", hideOnMobile: true, render: (r) => formatDate(r.createdAt, true) },
           {
@@ -139,21 +139,21 @@ export function TopUpManagementPage() {
 
   async function verifyTopUp(id: number) {
     const ok = await runAction(() => apiPost(`/topups/${id}/verify`), {
-      success: "Top up VERIFIED — wallet dikredit atomik (ledger TOPUP dibuat).",
+      success: "Top up VERIFIED - wallet dikredit atomik (ledger TOPUP dibuat).",
     });
     if (ok) reload();
   }
 
   async function rejectTopUp(id: number) {
     const ok = await runAction(() => apiPost(`/topups/${id}/reject`, { reason: "Bukti transfer tidak valid" }), {
-      success: "Top up ditolak — wallet tidak berubah.",
+      success: "Top up ditolak - wallet tidak berubah.",
     });
     if (ok) reload();
   }
 
   async function cancelTopUp(id: number) {
     const ok = await runAction(() => apiPost(`/topups/${id}/cancel`, { reason: "Dibatalkan oleh Admin Kantor" }), {
-      success: "Top up dibatalkan — wallet tidak berubah.",
+      success: "Top up dibatalkan - wallet tidak berubah.",
     });
     if (ok) reload();
   }
@@ -200,7 +200,7 @@ function CreateTopUpDialog({ partners, open, onOpenChange, onDone }: { partners:
           note: note || null,
           proofUrl: proof.dataUrl,
         }),
-      { success: "Top up dibuat dengan bukti transfer — status PENDING_VERIFICATION, menunggu verifikasi Owner." },
+      { success: "Top up dibuat dengan bukti transfer - status PENDING_VERIFICATION, menunggu verifikasi Owner." },
     );
     setBusy(false);
     if (ok) {
@@ -269,7 +269,7 @@ function TopUpDetailDialog({ topUp, onOpenChange }: { topUp: TopUpRequest | null
         <DialogHeader>
           <DialogTitle>{topUp.requestCode} · {topUp.partner?.user.name ?? `#${topUp.partnerId}`}</DialogTitle>
           <DialogDescription>
-            Top up saldo Marketing — {formatRupiah(topUp.amount)}
+            Top up saldo Marketing - {formatRupiah(topUp.amount)}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3 text-sm">
@@ -290,7 +290,7 @@ function TopUpDetailDialog({ topUp, onOpenChange }: { topUp: TopUpRequest | null
             <div className="space-y-2 rounded-lg border border-primary/25 bg-primary/5 p-3">
               <p className="flex items-center gap-1.5 text-xs font-semibold text-primary"><FileImage className="h-3.5 w-3.5" /> Bukti Pembayaran</p>
               {isImage && <img src={topUp.proofUrl} alt={`Bukti ${topUp.requestCode}`} className="max-h-64 w-full rounded-md border bg-white object-contain" />}
-              {!isImage && <p className="text-xs text-muted-foreground">Bukti berbentuk PDF — unduh atau buka di tab baru untuk melihat dokumen.</p>}
+              {!isImage && <p className="text-xs text-muted-foreground">Bukti berbentuk PDF - unduh atau buka di tab baru untuk melihat dokumen.</p>}
               <div className="flex flex-wrap items-center gap-2">
                 <a href={topUp.proofUrl} download={fileName} className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline">
                   <Download className="h-3.5 w-3.5" /> Unduh bukti

@@ -49,7 +49,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     const { id } = await params;
     const existing = await db.invoice.findUnique({ where: { id: Number(id) }, include: { settlements: true } });
     if (!existing) return fail(404, "Invoice tidak ditemukan.");
-    if (existing.settlements.length > 0) return fail(422, "Invoice sudah memiliki settlement — batalkan (cancel), jangan hapus.");
+    if (existing.settlements.length > 0) return fail(422, "Invoice sudah memiliki settlement - batalkan (cancel), jangan hapus.");
     await db.invoice.delete({ where: { id: existing.id } });
     await audit({ action: "deleted", entityType: "invoice", entityId: existing.id, entityLabel: existing.invoiceNumber, actor: user, before: existing });
     return ok({ deleted: true });

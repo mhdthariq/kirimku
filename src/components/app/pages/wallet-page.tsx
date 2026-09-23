@@ -88,8 +88,8 @@ export function WalletPage() {
         title="Wallet Partner"
         subtitle={
           isMarketing
-            ? "Saldo, top up, transaksi, komisi B2B, dan withdrawal — data milik Anda sendiri."
-            : "Saldo, transaksi, dan withdrawal — data milik Anda sendiri."
+            ? "Saldo, top up, transaksi, komisi B2B, dan withdrawal - data milik Anda sendiri."
+            : "Saldo, transaksi, dan withdrawal - data milik Anda sendiri."
         }
         icon={<WalletIcon className="h-5 w-5" />}
         actions={
@@ -128,7 +128,7 @@ export function WalletPage() {
       </div>
 
       <Tabs defaultValue="balance">
-        {/* justify-start at every breakpoint — this list stays w-full and can
+        {/* justify-start at every breakpoint - this list stays w-full and can
             overflow on desktop too; centered overflow would clip the left tab. */}
         <TabsList className="w-full justify-start overflow-x-auto sm:justify-start">
           <TabsTrigger value="balance">Ringkasan</TabsTrigger>
@@ -166,7 +166,7 @@ export function WalletPage() {
                 </>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  Belum ada rekening — lengkapi di halaman <a className="text-primary underline" href="#/profile">Profil</a> sebelum withdrawal.
+                  Belum ada rekening - lengkapi di halaman <a className="text-primary underline" href="#/profile">Profil</a> sebelum withdrawal.
                 </p>
               )}
             </div>
@@ -180,7 +180,7 @@ export function WalletPage() {
         {isMarketing && (
           <TabsContent value="topup" className="mt-3">
             <p className="mb-3 rounded-lg border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-              Top up diajukan oleh Admin Kantor / Owner beserta bukti transfer — saldo bertambah otomatis setelah Owner memverifikasi (§10/§11).
+              Top up diajukan oleh Admin Kantor / Owner beserta bukti transfer - saldo bertambah otomatis setelah Owner memverifikasi (§10/§11).
             </p>
             {topUpsData && (
               <div className="mb-3 rounded-xl border bg-primary/5 p-4">
@@ -207,7 +207,7 @@ export function WalletPage() {
                   key: "info",
                   header: "Keterangan",
                   hideOnMobile: true,
-                  render: (r) => <span className="text-xs text-muted-foreground">{r.partnerNote ?? "—"}</span>,
+                  render: (r) => <span className="text-xs text-muted-foreground">{r.partnerNote ?? "-"}</span>,
                 },
                 { key: "date", header: "Tanggal", hideOnMobile: true, render: (r) => formatDate(r.createdAt, true) },
                 {
@@ -217,7 +217,7 @@ export function WalletPage() {
                     r.verifiedAt ? (
                       <span className="text-xs text-muted-foreground">✓ {formatDate(r.verifiedAt, true)}</span>
                     ) : (
-                      "—"
+                      "-"
                     ),
                 },
               ]}
@@ -268,7 +268,7 @@ export function WalletPage() {
         {isMarketing && (
           <TabsContent value="commissions" className="mt-3">
             <p className="mb-2 text-xs text-muted-foreground">
-              Komisi B2B hanya dirilis ke wallet setelah invoice terkait <b>LUNAS penuh</b> (§8/§9) — pembayaran parsial tetap PENDING.
+              Komisi B2B hanya dirilis ke wallet setelah invoice terkait <b>LUNAS penuh</b> (§8/§9) - pembayaran parsial tetap PENDING.
             </p>
             <DataTable
               rows={commissions ?? []}
@@ -344,7 +344,7 @@ export function WalletPage() {
                   ) : r.completedAt ? (
                     <span className="text-xs text-muted-foreground">✓ {formatDate(r.completedAt, true)}</span>
                   ) : (
-                    "—"
+                    "-"
                   ),
               },
             ]}
@@ -396,7 +396,7 @@ function CancelButton({ requestId, onDone }: { requestId: number; onDone: () => 
       disabled={busy}
       onClick={async () => {
         setBusy(true);
-        const ok = await runAction(() => apiPost(`/withdrawals/${requestId}/cancel`), { success: "Permintaan withdrawal dibatalkan — reserved dilepas." });
+        const ok = await runAction(() => apiPost(`/withdrawals/${requestId}/cancel`), { success: "Permintaan withdrawal dibatalkan - reserved dilepas." });
         if (ok) onDone();
         setBusy(false);
       }}
@@ -429,7 +429,7 @@ function WithdrawDialog({
     if (!amt || amt <= 0) return;
     setBusy(true);
     const ok = await runAction(() => apiPost("/withdrawals", { amount: amt, note: note || null }), {
-      success: "Permintaan withdrawal dibuat — jumlah langsung di-reserve sampai selesai/ditolak.",
+      success: "Permintaan withdrawal dibuat - jumlah langsung di-reserve sampai selesai/ditolak.",
     });
     if (ok) {
       setAmount("");

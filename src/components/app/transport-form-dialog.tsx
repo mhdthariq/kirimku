@@ -202,7 +202,7 @@ export function TransportFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>{editing ? `Edit Transport — ${editing.transportCode}` : "Rencanakan Transport"}</DialogTitle>
+          <DialogTitle>{editing ? `Edit Transport - ${editing.transportCode}` : "Rencanakan Transport"}</DialogTitle>
           <DialogDescription>
             {editing
               ? "Hanya transport PLANNED yang bisa diubah. Rute, Rencana Berangkat & Rencana Tiba wajib terisi."
@@ -225,7 +225,7 @@ export function TransportFormDialog({
                 value={form.vehicleId}
                 onValueChange={(v) => setForm({ ...form, vehicleId: v })}
                 placeholder="Pilih kendaraan aktif"
-                options={(options?.vehicles ?? []).map((v) => ({ value: String(v.id), label: `${v.vehicleNumber}${v.name ? ` — ${v.name}` : ""}` }))}
+                options={(options?.vehicles ?? []).map((v) => ({ value: String(v.id), label: `${v.vehicleNumber}${v.name ? ` - ${v.name}` : ""}` }))}
                 disabled={busy}
               />
             </Field>
@@ -235,7 +235,7 @@ export function TransportFormDialog({
             <Field label="Kenek (opsional)" htmlFor="t-kenek">
               <FormSelect value={form.kenekId} onValueChange={(v) => setForm({ ...form, kenekId: v })} placeholder="Pilih kenek" options={kenekOptions} disabled={busy} />
             </Field>
-            <Field label="Asal (Origin)" htmlFor="t-origin" hint="Otomatis dari rute — dapat diubah">
+            <Field label="Asal (Origin)" htmlFor="t-origin" hint="Otomatis dari rute - dapat diubah">
               <input
                 id="t-origin"
                 className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
@@ -245,7 +245,7 @@ export function TransportFormDialog({
                 disabled={busy}
               />
             </Field>
-            <Field label="Tujuan (Destination)" htmlFor="t-destination" hint="Otomatis dari rute — dapat diubah">
+            <Field label="Tujuan (Destination)" htmlFor="t-destination" hint="Otomatis dari rute - dapat diubah">
               <input
                 id="t-destination"
                 className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
@@ -281,7 +281,7 @@ export function TransportFormDialog({
 
           {!editing && (
             <div className="space-y-2">
-              {/* Revise round 9 — removed the over-explained "(status RECEIVED_AT_GUDANG)"
+              {/* Revise round 9 - removed the over-explained "(status RECEIVED_AT_GUDANG)"
                   text. Each shipment row now shows a compact DIRECT / STANDARD
                   badge so the user can tell at a glance which flow the shipment
                   belongs to. */}
@@ -315,7 +315,7 @@ export function TransportFormDialog({
                               ? "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300"
                               : "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300")
                           }
-                          title={isDirect ? "DIRECT — driver langsung, tanpa gudang" : "STANDARD — lewat gudang"}
+                          title={isDirect ? "DIRECT - driver langsung, tanpa gudang" : "STANDARD - lewat gudang"}
                         >
                           {isDirect ? "DIRECT" : "STANDARD"}
                         </span>

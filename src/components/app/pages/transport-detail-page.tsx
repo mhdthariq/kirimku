@@ -60,7 +60,7 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string;
       <span className="mt-0.5 text-muted-foreground">{icon}</span>
       <div className="min-w-0 flex-1">
         <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-        <p className="truncate text-sm font-medium text-foreground">{value ?? "—"}</p>
+        <p className="truncate text-sm font-medium text-foreground">{value ?? "-"}</p>
       </div>
     </div>
   );
@@ -247,15 +247,15 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
             </CardTitle>
           </CardHeader>
           <CardContent className="divide-y divide-border/60">
-            <InfoRow icon={<Route className="h-4 w-4" />} label="Rute" value={transport.routeName ?? "—"} />
+            <InfoRow icon={<Route className="h-4 w-4" />} label="Rute" value={transport.routeName ?? "-"} />
             <InfoRow icon={<MapPin className="h-4 w-4" />} label="Koridor" value={`${transport.origin ?? "?"} → ${transport.destination ?? "?"}`} />
             <InfoRow icon={<Calendar className="h-4 w-4" />} label="Rencana berangkat" value={formatDate(transport.plannedDepartureAt, true)} />
             <InfoRow icon={<Clock className="h-4 w-4" />} label="Rencana tiba" value={formatDate(transport.plannedArrivalAt, true)} />
             <InfoRow icon={<Truck className="h-4 w-4" />} label="Berangkat aktual" value={formatDate(transport.departedAt, true)} />
             <InfoRow icon={<CheckCircle2 className="h-4 w-4" />} label="Tiba aktual" value={formatDate(transport.arrivedAt, true)} />
-            <InfoRow icon={<CarFront className="h-4 w-4" />} label="Kendaraan" value={`${transport.vehicle.vehicleNumber}${transport.vehicle.name ? ` — ${transport.vehicle.name}` : ""}`} />
-            <InfoRow icon={<User className="h-4 w-4" />} label="Driver" value={transport.driver?.name ?? "—"} />
-            <InfoRow icon={<Users className="h-4 w-4" />} label="Kenek" value={transport.kenek?.name ?? "—"} />
+            <InfoRow icon={<CarFront className="h-4 w-4" />} label="Kendaraan" value={`${transport.vehicle.vehicleNumber}${transport.vehicle.name ? ` - ${transport.vehicle.name}` : ""}`} />
+            <InfoRow icon={<User className="h-4 w-4" />} label="Driver" value={transport.driver?.name ?? "-"} />
+            <InfoRow icon={<Users className="h-4 w-4" />} label="Kenek" value={transport.kenek?.name ?? "-"} />
           </CardContent>
         </Card>
 
@@ -321,7 +321,7 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
                         <p className="mt-1 text-[11px] text-muted-foreground">
                           Radius {formatNumber(c.radiusMeters / 1000, 2)} KM · <span className="font-mono">{c.latitude.toFixed(5)}, {c.longitude.toFixed(5)}</span>
                         </p>
-                        {/* Revise round 11 — Google Maps redirect button.
+                        {/* Revise round 11 - Google Maps redirect button.
                             Opens Google Maps at this checkpoint's coordinate in a new tab. */}
                         <a
                           href={`https://www.google.com/maps/search/?api=1&query=${c.latitude},${c.longitude}`}
@@ -345,7 +345,7 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
                       <div className="mt-2.5 flex flex-wrap gap-2">
                         {records.slice(0, 4).map((r) => (
                           <div key={r.id} className="w-[104px] space-y-1">
-                            {/* Revise round 9 — checkpoint record photo. Click opens
+                            {/* Revise round 9 - checkpoint record photo. Click opens
                                 the PhotoDetailDialog (full-size view). Display is
                                 gated by proof_photo.view (Admin Gudang + Owner). */}
                             <button
@@ -382,7 +382,7 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
                             <p className="text-[10px] leading-tight text-muted-foreground">
                               {new Date(r.recordedAt).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                               <br />
-                              {r.recordedBy?.name ?? "—"}
+                              {r.recordedBy?.name ?? "-"}
                             </p>
                           </div>
                         ))}
@@ -429,7 +429,7 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
                 <Coins className="h-3.5 w-3.5" /> Total Price
               </p>
               <p className="mt-1 text-xl font-bold text-foreground">
-                {transport.totalPrice != null ? formatRupiah(transport.totalPrice) : "—"}
+                {transport.totalPrice != null ? formatRupiah(transport.totalPrice) : "-"}
               </p>
             </div>
           </div>
@@ -464,14 +464,14 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
                         {s.resi && s.resi !== s.masterCode && <p className="text-[10px] text-muted-foreground">{s.resi}</p>}
                       </td>
                       <td className="px-3 py-2.5">
-                        <p className="truncate text-xs font-medium text-foreground">{s.customerName ?? "—"}</p>
+                        <p className="truncate text-xs font-medium text-foreground">{s.customerName ?? "-"}</p>
                         {s.penerimaName && <p className="text-[10px] text-muted-foreground">→ {s.penerimaName}</p>}
                       </td>
                       <td className="px-3 py-2.5 text-xs text-muted-foreground">{s.destination}</td>
                       <td className="px-3 py-2.5 text-right font-mono text-xs">{formatNumber(s.packages, 0)}</td>
                       <td className="px-3 py-2.5 text-right font-mono text-xs">{formatNumber(s.weightKg, 1)}</td>
                       <td className="px-3 py-2.5 text-right font-mono text-xs">{formatNumber(s.volumeM3, 3)}</td>
-                      <td className="px-3 py-2.5 text-right font-mono text-xs">{s.priceAmount != null ? formatRupiah(s.priceAmount) : "—"}</td>
+                      <td className="px-3 py-2.5 text-right font-mono text-xs">{s.priceAmount != null ? formatRupiah(s.priceAmount) : "-"}</td>
                       <td className="px-3 py-2.5">
                         <StatusBadge
                           status={s.status}
@@ -491,7 +491,7 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
                     <td className="px-3 py-2.5 text-right font-mono">{formatNumber(transport.shipments.reduce((s, x) => s + x.packages, 0), 0)}</td>
                     <td className="px-3 py-2.5 text-right font-mono">{formatNumber(transport.totalWeightKg, 1)}</td>
                     <td className="px-3 py-2.5 text-right font-mono">{formatNumber(transport.totalVolumeM3, 3)}</td>
-                    <td className="px-3 py-2.5 text-right font-mono">{transport.totalPrice != null ? formatRupiah(transport.totalPrice) : "—"}</td>
+                    <td className="px-3 py-2.5 text-right font-mono">{transport.totalPrice != null ? formatRupiah(transport.totalPrice) : "-"}</td>
                     <td className="px-3 py-2.5" />
                   </tr>
                 </tfoot>
@@ -503,7 +503,7 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
 
       {transport.status === "ARRIVED" && allCheckedIn && (
         <p className="rounded-lg border border-emerald-200 bg-emerald-50/60 px-3.5 py-2.5 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
-          Transport ditandai <strong>ARRIVED</strong> otomatis melalui check-in checkpoint akhir (deteksi lokasi) — tanpa tombol manual.
+          Transport ditandai <strong>ARRIVED</strong> otomatis melalui check-in checkpoint akhir (deteksi lokasi) - tanpa tombol manual.
         </p>
       )}
 
@@ -516,7 +516,7 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
         onDone={reload}
       />
 
-      {/* Edit — shared create/edit dialog (PLANNED transports only) */}
+      {/* Edit - shared create/edit dialog (PLANNED transports only) */}
       <TransportFormDialog
         open={editOpen}
         onOpenChange={setEditOpen}
@@ -524,7 +524,7 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
         onSaved={reload}
       />
 
-      {/* Remove — confirmation dialog (PLANNED transports only) */}
+      {/* Remove - confirmation dialog (PLANNED transports only) */}
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -542,13 +542,13 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Revise round 9 — Photo Detail Dialog for checkpoint records.
+      {/* Revise round 9 - Photo Detail Dialog for checkpoint records.
           Opens when the user clicks a checkpoint photo thumbnail. Shows
           all photos for that checkpoint at full size, gated by proof_photo.view. */}
       <PhotoDetailDialog
         open={!!photoRecords}
         onOpenChange={(open) => !open && setPhotoRecords(null)}
-        title={`Foto Bukti Checkpoint — ${transport?.transportCode ?? ""}`}
+        title={`Foto Bukti Checkpoint - ${transport?.transportCode ?? ""}`}
         description="Foto bukti check-in driver/kenek di setiap checkpoint sepanjang rute transport."
         photos={photoRecords ?? []}
       />

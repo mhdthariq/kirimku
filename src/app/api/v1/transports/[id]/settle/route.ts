@@ -30,10 +30,10 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (existing) return fail(422, `Transport ini sudah disettle (${existing.settlementCode}).`);
 
     if (transport.status !== "ARRIVED") {
-      return fail(422, `Transport berstatus ${transport.status} belum bisa disettle — harus ARRIVED.`);
+      return fail(422, `Transport berstatus ${transport.status} belum bisa disettle - harus ARRIVED.`);
     }
     if (!transport.vehicle.owner) {
-      return fail(422, "Kendaraan ini milik perusahaan (bukan Vehicle Owner) — tidak ada profit share yang perlu dibayarkan.");
+      return fail(422, "Kendaraan ini milik perusahaan (bukan Vehicle Owner) - tidak ada profit share yang perlu dibayarkan.");
     }
 
     // Transport value: company input, defaulting to the aggregate price of the
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     );
     const transportValue = num(body.transportValue) ?? shipmentsPrice;
     if (transportValue <= 0) {
-      return fail(422, "Nilai transport harus lebih besar dari nol — shipment yang dimuat belum diharga dan tidak ada nilai yang diinput.", {
+      return fail(422, "Nilai transport harus lebih besar dari nol - shipment yang dimuat belum diharga dan tidak ada nilai yang diinput.", {
         transportValue: ["Nilai transport wajib diisi."],
       });
     }

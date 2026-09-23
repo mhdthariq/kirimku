@@ -17,7 +17,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const withdrawal = await db.withdrawalRequest.findUnique({ where: { id: Number(id) } });
     if (!withdrawal) return fail(404, "Permintaan withdrawal tidak ditemukan.");
     if (withdrawal.status !== "APPROVED") {
-      return fail(422, `Withdrawal berstatus ${withdrawal.status} tidak bisa diproses — harus APPROVED.`);
+      return fail(422, `Withdrawal berstatus ${withdrawal.status} tidak bisa diproses - harus APPROVED.`);
     }
 
     const body = await req.json().catch(() => ({}));

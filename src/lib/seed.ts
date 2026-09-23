@@ -8,7 +8,7 @@ import { tenantKey } from "@/lib/tenant-context";
 const DEMO_PROOF_DATA_URL =
   "data:image/svg+xml;base64," +
   Buffer.from(
-    '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="160"><rect width="320" height="160" fill="#f8f9fa"/><text x="20" y="70" font-family="sans-serif" font-size="14" fill="#334155">Bukti Transfer — BCA</text><text x="20" y="100" font-family="sans-serif" font-size="12" fill="#64748b">Demo: bukti top up marketing partner</text></svg>',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="160"><rect width="320" height="160" fill="#f8f9fa"/><text x="20" y="70" font-family="sans-serif" font-size="14" fill="#334155">Bukti Transfer - BCA</text><text x="20" y="100" font-family="sans-serif" font-size="12" fill="#64748b">Demo: bukti top up marketing partner</text></svg>',
   ).toString("base64");
 
 // Keyed per tenant so demo seeding is tracked separately for each database
@@ -148,7 +148,7 @@ async function backfillExtraFleet(): Promise<void> {
   ];
 
   const ownerRole = await db.role.findUnique({ where: { slug: "vehicle-owner" } });
-  if (!ownerRole) return; // RBAC not yet bootstrapped — will run again on next boot
+  if (!ownerRole) return; // RBAC not yet bootstrapped - will run again on next boot
 
   const partnersByUsername: Record<string, number> = {};
   for (const o of newOwners) {
@@ -182,8 +182,8 @@ async function backfillExtraFleet(): Promise<void> {
     { vehicleNumber: "BK 3344 KTE", name: "Engkel Box Besar", status: "ACTIVE", maxWeightKg: 1500, maxVolumeM3: 8, ownerUsername: "maya" },
     { vehicleNumber: "BK 5566 KTF", name: "CDD Box", status: "ACTIVE", maxWeightKg: 4000, maxVolumeM3: 16, ownerUsername: "maya" },
     { vehicleNumber: "BK 7788 KTG", name: "Tronton Box", status: "ACTIVE", maxWeightKg: 12000, maxVolumeM3: 35, ownerUsername: "yusuf" },
-    { vehicleNumber: "BK 8800 KTH", name: "Engkel Box (Company)", status: "ACTIVE", maxWeightKg: 1200, maxVolumeM3: 6, ownerUsername: null, notes: "Kendaraan milik perusahaan — tidak ada profit share." },
-    { vehicleNumber: "BK 9011 KTJ", name: "CDD 6 Ban (Company)", status: "ACTIVE", maxWeightKg: 3500, maxVolumeM3: 14, ownerUsername: null, notes: "Kendaraan milik perusahaan — tidak ada profit share." },
+    { vehicleNumber: "BK 8800 KTH", name: "Engkel Box (Company)", status: "ACTIVE", maxWeightKg: 1200, maxVolumeM3: 6, ownerUsername: null, notes: "Kendaraan milik perusahaan - tidak ada profit share." },
+    { vehicleNumber: "BK 9011 KTJ", name: "CDD 6 Ban (Company)", status: "ACTIVE", maxWeightKg: 3500, maxVolumeM3: 14, ownerUsername: null, notes: "Kendaraan milik perusahaan - tidak ada profit share." },
     { vehicleNumber: "BK 1223 KTK", name: "Fuso Besar (Company)", status: "MAINTENANCE", maxWeightKg: 8000, maxVolumeM3: 28, ownerUsername: null, notes: "Perawatan mesin, kembali aktif minggu depan." },
   ];
   for (const { ownerUsername, ...v } of newVehicles) {
@@ -279,7 +279,7 @@ async function createDemoArrivalShipment(budiPartner: { id: number } | null): Pr
     { event: "PICKED_UP", description: "Picked-up by Dewi Lestari", daysAgo: 1.45, actorId: dewiId },
     { event: "RECEIVED_AT_GUDANG", description: "Diterima di Gudang Medan", daysAgo: 1.4, actorId: agusId },
     { event: "IN_TRANSPORT", description: "Berangkat via transport TRP-2026-000003", daysAgo: 1.3, actorId: jokoId },
-    { event: "AT_DEST_GUDANG", description: `Driver transport TRP-2026-000003 check-in di checkpoint akhir (dari ${medan.name}) — paket ada di gudang tujuan, menunggu scan penerimaan Admin Gudang`, daysAgo: 0.8, actorId: jokoId },
+    { event: "AT_DEST_GUDANG", description: `Driver transport TRP-2026-000003 check-in di checkpoint akhir (dari ${medan.name}) - paket ada di gudang tujuan, menunggu scan penerimaan Admin Gudang`, daysAgo: 0.8, actorId: jokoId },
   ];
   for (const ev of events) {
     await db.trackingEvent.create({
@@ -416,7 +416,7 @@ async function createB2BMasterResiShipment(budiPartner: { id: number } | null): 
         status: "SENT",
         issueDate: daysAgo(0.4),
         dueDate: new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000),
-        notes: "Tagihan pengiriman B2B Master Resi demo (MKT-000008) — Medan → Banda Aceh",
+        notes: "Tagihan pengiriman B2B Master Resi demo (MKT-000008) - Medan → Banda Aceh",
         createdAt: daysAgo(0.4),
       },
       update: {},
@@ -428,7 +428,7 @@ async function createB2BMasterResiShipment(budiPartner: { id: number } | null): 
       await db.invoiceLine.create({
         data: {
           invoiceId: invoice.id,
-          description: "MKT-000008 — pengiriman B2B Master Resi (8 karton @ 3,5 kg)",
+          description: "MKT-000008 - pengiriman B2B Master Resi (8 karton @ 3,5 kg)",
           quantity: 1,
           unitPrice: invoicePrice,
           shipmentId: shipment.id,
@@ -450,7 +450,7 @@ async function createB2BMasterResiShipment(budiPartner: { id: number } | null): 
     data: {
       masterId: shipment.id,
       event: "READY_FOR_PICKUP",
-      description: "Menunggu penjemputan kurir — B2B: cukup scan Master Resi sekali (sudah masuk ke INV-2026-000002)",
+      description: "Menunggu penjemputan kurir - B2B: cukup scan Master Resi sekali (sudah masuk ke INV-2026-000002)",
       actorId: budiId,
       occurredAt: daysAgo(0.38),
     },
@@ -463,7 +463,7 @@ async function createB2BMasterResiShipment(budiPartner: { id: number } | null): 
       data: {
         pickupCode: "PICK-2026-000008", masterId: shipment.id,
         kurirId: rizkyEmp.id,
-        status: "ASSIGNED", notes: "B2B — cukup scan Master Resi di lokasi customer (invoice INV-2026-000002)",
+        status: "ASSIGNED", notes: "B2B - cukup scan Master Resi di lokasi customer (invoice INV-2026-000002)",
         createdAt: daysAgo(0.2), updatedAt: daysAgo(0.2),
       },
     });
@@ -796,8 +796,8 @@ async function runSeed(): Promise<void> {
     { vehicleNumber: "BK 7788 KTG", name: "Tronton Box", status: "ACTIVE", maxWeightKg: 12000, maxVolumeM3: 35, ownerUsername: "yusuf" },
     // COMPANY-OWNED vehicles (ownerUsername = null → ownerId = null) —
     // operated by the company's own drivers, no profit-share settlement.
-    { vehicleNumber: "BK 8800 KTH", name: "Engkel Box (Company)", status: "ACTIVE", maxWeightKg: 1200, maxVolumeM3: 6, ownerUsername: null, notes: "Kendaraan milik perusahaan — tidak ada profit share." },
-    { vehicleNumber: "BK 9011 KTJ", name: "CDD 6 Ban (Company)", status: "ACTIVE", maxWeightKg: 3500, maxVolumeM3: 14, ownerUsername: null, notes: "Kendaraan milik perusahaan — tidak ada profit share." },
+    { vehicleNumber: "BK 8800 KTH", name: "Engkel Box (Company)", status: "ACTIVE", maxWeightKg: 1200, maxVolumeM3: 6, ownerUsername: null, notes: "Kendaraan milik perusahaan - tidak ada profit share." },
+    { vehicleNumber: "BK 9011 KTJ", name: "CDD 6 Ban (Company)", status: "ACTIVE", maxWeightKg: 3500, maxVolumeM3: 14, ownerUsername: null, notes: "Kendaraan milik perusahaan - tidak ada profit share." },
     { vehicleNumber: "BK 1223 KTK", name: "Fuso Besar (Company)", status: "MAINTENANCE", maxWeightKg: 8000, maxVolumeM3: 28, ownerUsername: null, notes: "Perawatan mesin, kembali aktif minggu depan." },
   ];
   const vehicles: Record<string, number> = {};
@@ -1260,7 +1260,7 @@ async function runSeed(): Promise<void> {
         pickupCode: "PICK-2026-000002", masterId: mkt9.id,
         kurirId: usersByHandle.joko.employeeId,
         status: "ASSIGNED",
-        notes: "Auto-assigned dari transport TRP-2026-000004 (DIRECT — driver pickup di checkpoint 1)",
+        notes: "Auto-assigned dari transport TRP-2026-000004 (DIRECT - driver pickup di checkpoint 1)",
         createdAt: daysAgo(0.1), updatedAt: daysAgo(0.1),
       },
     });
@@ -1268,7 +1268,7 @@ async function runSeed(): Promise<void> {
       data: {
         masterId: mkt9.id,
         event: "PICKUP_ASSIGNED",
-        description: `Joko Widodo auto-assigned untuk pickup DIRECT (transport TRP-2026-000004) — scan paket di checkpoint 1.`,
+        description: `Joko Widodo auto-assigned untuk pickup DIRECT (transport TRP-2026-000004) - scan paket di checkpoint 1.`,
         actorId: usersByHandle.adit.id, occurredAt: daysAgo(0.1),
       },
     });
@@ -1324,15 +1324,15 @@ async function runSeed(): Promise<void> {
       data: {
         invoiceNumber: "INV-2026-000001", customerId: maju.id, status: "SENT",
         issueDate: daysAgo(3), dueDate: new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000),
-        notes: "Tagihan pengiriman periode ini — Medan → Banda Aceh", createdAt: daysAgo(3),
+        notes: "Tagihan pengiriman periode ini - Medan → Banda Aceh", createdAt: daysAgo(3),
       },
     });
     const mkt2 = await db.masterShipment.findUniqueOrThrow({ where: { masterCode: "MKT-000002" } });
     const mkt5Row = await db.masterShipment.findUniqueOrThrow({ where: { masterCode: "MKT-000005" } });
     await db.invoiceLine.createMany({
       data: [
-        { invoiceId: invoice.id, description: "MKT-000002 — pengiriman Medan → Banda Aceh (B2B, 25 kg × Rp8.000)", quantity: 1, unitPrice: priceByCode["MKT-000002"] ?? 200000, shipmentId: mkt2.id },
-        { invoiceId: invoice.id, description: "MKT-000005 — pengiriman Medan → Banda Aceh (B2B, 40 kg × Rp8.000)", quantity: 1, unitPrice: priceByCode["MKT-000005"] ?? 320000, shipmentId: mkt5Row.id },
+        { invoiceId: invoice.id, description: "MKT-000002 - pengiriman Medan → Banda Aceh (B2B, 25 kg × Rp8.000)", quantity: 1, unitPrice: priceByCode["MKT-000002"] ?? 200000, shipmentId: mkt2.id },
+        { invoiceId: invoice.id, description: "MKT-000005 - pengiriman Medan → Banda Aceh (B2B, 40 kg × Rp8.000)", quantity: 1, unitPrice: priceByCode["MKT-000005"] ?? 320000, shipmentId: mkt5Row.id },
       ],
     });
     // Partial settlement — invoice PARTIALLY_SETTLED, commission stays
@@ -1371,7 +1371,7 @@ async function runSeed(): Promise<void> {
     await db.invoiceLine.create({
       data: {
         invoiceId: invoice3.id,
-        description: "MKT-000003 — pengiriman Medan → Lhokseumawe (B2B, mesin + spare part)",
+        description: "MKT-000003 - pengiriman Medan → Lhokseumawe (B2B, mesin + spare part)",
         quantity: 1,
         unitPrice: priceByCode["MKT-000003"] ?? 330000,
         shipmentId: mkt3Row.id,
@@ -1446,7 +1446,7 @@ async function runSeed(): Promise<void> {
         walletId: hendraWallet.id, type: "REPAIR_DEDUCTION", amount: 20000, direction: "DEBIT",
         balanceBefore: 100000, balanceAfter: 80000,
         referenceType: "repair", referenceId: rep1.id, businessRef: `REP-${rep1.id}`, status: "COMPLETED",
-        description: `Deduction repair REP-000001 — Ganti oli + servis rem depan`,
+        description: `Deduction repair REP-000001 - Ganti oli + servis rem depan`,
         createdById: usersByHandle.siti.id, createdAt: daysAgo(2),
       },
     });
@@ -1463,7 +1463,7 @@ async function runSeed(): Promise<void> {
       data: {
         repairId: rep1.id, repairCode: "REP-000001", ownerId: hendraPartnerId, vehicleNumber: "BK 9102 KTA",
         action: "CREATED",
-        detail: "Repair REP-000001 dibuat dan langsung terverifikasi — deduction Rp20.000 dari wallet Vehicle Owner.",
+        detail: "Repair REP-000001 dibuat dan langsung terverifikasi - deduction Rp20.000 dari wallet Vehicle Owner.",
         amount: 20000, actorId: usersByHandle.siti.id, actorName: "Siti Rahma", createdAt: daysAgo(2),
       },
     });
@@ -1471,7 +1471,7 @@ async function runSeed(): Promise<void> {
       data: {
         repairId: rep1.id, repairCode: "REP-000001", ownerId: hendraPartnerId, vehicleNumber: "BK 9102 KTA",
         action: "UPDATED",
-        detail: "Repair REP-000001 diubah oleh Siti Rahma — field: amount · wallet disesuaikan +Rp5.000.",
+        detail: "Repair REP-000001 diubah oleh Siti Rahma - field: amount · wallet disesuaikan +Rp5.000.",
         changes: JSON.stringify({ amount: { before: 20000, after: 25000 } }),
         amount: 25000, actorId: usersByHandle.siti.id, actorName: "Siti Rahma", createdAt: daysAgo(1.5),
       },
@@ -1484,7 +1484,7 @@ async function runSeed(): Promise<void> {
         description: "Servis kopling", amount: 40000, repairDate: daysAgo(1.2),
         workshopVendor: "Bengkel Jaya Motor Medan",
         proofUrl: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNDAiIGhlaWdodD0iMTIwIj48cmVjdCB3aWR0aD0iMjQwIiBoZWlnaHQ9IjEyMCIgZmlsbD0iI2Y4ZjlmYSIvPjx0ZXh0IHg9IjEyIiB5PSI3MCIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTMiIGZpbGw9IiM2NDc0OGIiPk5vdGEgUmVwYWlyIC0gS29wbGluZzwvdGV4dD48L3N2Zz4=",
-        notes: "Entry salah kendaraan — record ini sengaja dihapus sebagai demo log.",
+        notes: "Entry salah kendaraan - record ini sengaja dihapus sebagai demo log.",
         status: "VERIFIED", createdById: usersByHandle.owner.id,
         deductedAmount: 0, verifiedAt: daysAgo(1),
         createdAt: daysAgo(1),
@@ -1495,7 +1495,7 @@ async function runSeed(): Promise<void> {
         walletId: hendraWallet.id, type: "REPAIR_DEDUCTION", amount: 40000, direction: "DEBIT",
         balanceBefore: 75000, balanceAfter: 35000,
         referenceType: "repair", referenceId: rep2.id, businessRef: `REP-${rep2.id}`, status: "COMPLETED",
-        description: `Deduction repair REP-000002 — Servis kopling`,
+        description: `Deduction repair REP-000002 - Servis kopling`,
         createdById: usersByHandle.owner.id, createdAt: daysAgo(1),
       },
     });
@@ -1504,7 +1504,7 @@ async function runSeed(): Promise<void> {
         walletId: hendraWallet.id, type: "REPAIR_DEDUCTION", amount: 40000, direction: "CREDIT",
         balanceBefore: 35000, balanceAfter: 75000,
         referenceType: "repair", referenceId: rep2.id, businessRef: `REP-DEL-${rep2.id}-seed`, status: "COMPLETED",
-        description: `Pengembalian penuh deduction repair REP-000002 (Rp40.000) — record dihapus.`,
+        description: `Pengembalian penuh deduction repair REP-000002 (Rp40.000) - record dihapus.`,
         createdById: usersByHandle.owner.id, createdAt: daysAgo(0.8),
       },
     });
@@ -1512,7 +1512,7 @@ async function runSeed(): Promise<void> {
       data: {
         repairId: rep2.id, repairCode: "REP-000002", ownerId: hendraPartnerId, vehicleNumber: "BK 9455 KTB",
         action: "CREATED",
-        detail: "Repair REP-000002 dibuat dan langsung terverifikasi — deduction Rp40.000 dari wallet Vehicle Owner.",
+        detail: "Repair REP-000002 dibuat dan langsung terverifikasi - deduction Rp40.000 dari wallet Vehicle Owner.",
         amount: 40000, actorId: usersByHandle.owner.id, actorName: "Owner Utama", createdAt: daysAgo(1),
       },
     });
@@ -1520,7 +1520,7 @@ async function runSeed(): Promise<void> {
       data: {
         repairId: rep2.id, repairCode: "REP-000002", ownerId: hendraPartnerId, vehicleNumber: "BK 9455 KTB",
         action: "DELETED",
-        detail: "Repair REP-000002 (Servis kopling — Rp40.000) dihapus oleh Owner Utama · deduction Rp40.000 dikembalikan ke wallet.",
+        detail: "Repair REP-000002 (Servis kopling - Rp40.000) dihapus oleh Owner Utama · deduction Rp40.000 dikembalikan ke wallet.",
         amount: 40000, actorId: usersByHandle.owner.id, actorName: "Owner Utama", createdAt: daysAgo(0.8),
       },
     });
@@ -1570,7 +1570,7 @@ async function runSeed(): Promise<void> {
     await db.topUpRequest.create({
       data: {
         requestCode: "TOP-000002", partnerId: budiPartnerId, amount: 150000, status: "PENDING_VERIFICATION",
-        partnerNote: "Transfer Rp150.000 via BCA — jam 07:15 pagi.",
+        partnerNote: "Transfer Rp150.000 via BCA - jam 07:15 pagi.",
         proofUrl: DEMO_PROOF_DATA_URL,
         requestedById: usersByHandle.siti.id,
         submittedForVerificationAt: daysAgo(0.3),
@@ -1591,7 +1591,7 @@ async function runSeed(): Promise<void> {
       { action: "created", entityType: "transport", entityLabel: "TRP-2026-000001", actor: "agus" },
       { action: "status_change", entityType: "transport", entityLabel: "TRP-2026-000001 → DEPARTED", actor: "joko" },
       { action: "created", entityType: "invoice", entityLabel: "INV-2026-000001", actor: "siti" },
-      { action: "created", entityType: "invoice", entityLabel: "INV-2026-000003 (CV Sinar Jaya — MKT-000003)", actor: "siti" },
+      { action: "created", entityType: "invoice", entityLabel: "INV-2026-000003 (CV Sinar Jaya - MKT-000003)", actor: "siti" },
       { action: "created", entityType: "warehouse", entityLabel: "Gudang Banda Aceh", actor: "agus" },
       { action: "updated", entityType: "tariff", entityLabel: "Medan → Banda Aceh (b2c)", actor: "siti" },
       { action: "login", entityType: "auth", entityLabel: "siti", actor: "siti" },

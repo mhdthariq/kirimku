@@ -17,11 +17,13 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const body = await req.json().catch(() => ({}));
 
     const data: Record<string, unknown> = {};
+    let passwordChanged = false;
     if (body.name !== undefined) data.name = str(body.name) ?? existing.name;
     if (body.password !== undefined && str(body.password)) {
       const password = String(body.password);
       if (password.length < 8) return fail(422, "Password minimal 8 karakter.", { password: ["Password minimal 8 karakter."] });
       data.passwordHash = hashPassword(password);
+      passwordChanged = true;
     }
     if (body.isActive !== undefined) data.isActive = Boolean(body.isActive);
 
@@ -100,6 +102,25 @@ export async function PUT(req: NextRequest, { params }: Params) {
     }
 
     await audit({ action: "updated", entityType: "user", entityId: updated.id, entityLabel: updated.username, actor: user, after: { name: updated.name, roles: body.roleIds, warehouseId: body.warehouseId } });
+
+    // Dedicated password-change audit entry — a clear, human-readable
+    // "change_password" action so the audit timeline immediately shows
+    // WHO changed WHOSE password, without needing to expand the generic
+    // "updated" entry to find the passwordChanged flag.
+    if (passwordChanged) {
+      await audit({
+        action: "change_password",
+        entityType: "user",
+        entityId: updated.id,
+        entityLabel: `${user.name} change password ${updated.username}`,
+        actor: user,
+        after: {
+          changedBy: user.name,
+          changedByUsername: user.username,
+          targetUser: updated.username,
+        },
+      });
+    }
     const full = await db.user.findUnique({
       where: { id: updated.id },
       include: { employee: true, roles: { include: { role: true } }, partner: { include: { warehouse: { select: { id: true, name: true } } } } },

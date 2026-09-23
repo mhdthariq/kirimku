@@ -18,7 +18,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const topUp = await db.topUpRequest.findUnique({ where: { id: Number(id) } });
     if (!topUp) return fail(404, "Top up tidak ditemukan.");
     if (topUp.status === "VERIFIED") {
-      return fail(422, "Top up ini sudah terverifikasi — wallet sudah dikredit.");
+      return fail(422, "Top up ini sudah terverifikasi - wallet sudah dikredit.");
     }
     if (topUp.status !== "PENDING_VERIFICATION") {
       return fail(422, `Top up berstatus ${topUp.status} tidak bisa diverifikasi.`);
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     // The requesting partner can never verify their own top-up (§10.1) — an
     // Owner Company account has no partner profile, so this is defensive.
     if (user.partnerId && user.partnerId === topUp.partnerId) {
-      return fail(403, "Akses ditolak — tidak boleh memverifikasi top up milik sendiri.");
+      return fail(403, "Akses ditolak - tidak boleh memverifikasi top up milik sendiri.");
     }
 
     const result = await db.$transaction(async (tx) => {

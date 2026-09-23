@@ -117,7 +117,7 @@ export function InvoicesPage() {
           shipmentId: l.shipmentId ? Number(l.shipmentId) : null,
         })),
     };
-    const ok = await runAction(() => apiPost("/invoices", payload), { success: "Invoice draft dibuat — komisi Marketing (bila ada) otomatis terlacak PENDING." });
+    const ok = await runAction(() => apiPost("/invoices", payload), { success: "Invoice draft dibuat - komisi Marketing (bila ada) otomatis terlacak PENDING." });
     setBusy(false);
     if (ok) {
       setCreateOpen(false);
@@ -127,7 +127,7 @@ export function InvoicesPage() {
 
   async function onSend(inv: Invoice) {
     const ok = await runAction(() => apiPost(`/invoices/${inv.id}/send`, {}), {
-      success: `Invoice ${inv.invoiceNumber} dikirim — baris item terkunci.`,
+      success: `Invoice ${inv.invoiceNumber} dikirim - baris item terkunci.`,
     });
     if (ok) reload();
   }
@@ -170,8 +170,8 @@ export function InvoicesPage() {
       {
         success:
           amount >= (target.remainingAmount ?? 0) - 0.01 && target.commission
-            ? "Pelunasan dicatat — komisi Marketing dirilis ke wallet (atomic, §9)."
-            : "Settlement dicatat — pembayaran parsial, komisi tetap PENDING (§8.1).",
+            ? "Pelunasan dicatat - komisi Marketing dirilis ke wallet (atomic, §9)."
+            : "Settlement dicatat - pembayaran parsial, komisi tetap PENDING (§8.1).",
       },
     );
     setBusy(false);
@@ -220,7 +220,7 @@ export function InvoicesPage() {
     <div className="space-y-4">
       <PageHeader
         title="Invoice"
-        subtitle="Tagihan B2B per customer — draft, kirim, dan settlement bertahap."
+        subtitle="Tagihan B2B per customer - draft, kirim, dan settlement bertahap."
         icon={<Receipt className="h-5 w-5" />}
         actions={
           can.create && (
@@ -389,7 +389,7 @@ export function InvoicesPage() {
                   <Plus className="h-3.5 w-3.5" /> Baris
                 </Button>
               </div>
-              {/* Revise.md §7.1 — pick the customer's B2B shipments to bill;
+              {/* Revise.md §7.1 - pick the customer's B2B shipments to bill;
                   linked Marketing shipments attach the commission (§8). */}
               {(() => {
                 const allCustomerShipments = (options?.b2bShipments ?? []).filter(
@@ -418,7 +418,7 @@ export function InvoicesPage() {
                                           shipmentId,
                                           ...(picked && !l.description
                                             ? {
-                                                description: `${picked.masterCode} — pengiriman ${picked.origin} → ${picked.destination}`,
+                                                description: `${picked.masterCode} - pengiriman ${picked.origin} → ${picked.destination}`,
                                                 unitPrice: String(picked.priceAmount ?? ""),
                                               }
                                             : {}),
@@ -427,7 +427,7 @@ export function InvoicesPage() {
                                   ),
                                 }));
                               }}
-                              placeholder="— tanpa link shipment —"
+                              placeholder="- tanpa link shipment -"
                               options={customerShipments.map((s) => ({
                                 value: String(s.id),
                                 label: `${s.masterCode} · ${formatRupiah(s.priceAmount)}${s.createdByPartnerId ? " · marketing" : ""}`,
@@ -479,7 +479,7 @@ export function InvoicesPage() {
                     )}
                     {linkedPartner != null && (
                       <p className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-[11px] text-primary">
-                        Invoice ini membawa shipment buatan Marketing — komisi partner akan tercatat <b>PENDING</b> dan hanya dirilis saat invoice <b>LUNAS penuh</b> (§8/§9).
+                        Invoice ini membawa shipment buatan Marketing - komisi partner akan tercatat <b>PENDING</b> dan hanya dirilis saat invoice <b>LUNAS penuh</b> (§8/§9).
                       </p>
                     )}
                   </>
@@ -575,7 +575,7 @@ export function InvoicesPage() {
 
               {detailWithLines.notes && <div className="rounded-lg border-l-2 border-primary bg-primary/5 px-3 py-2 text-xs"><p className="font-semibold text-primary">Catatan</p><p className="mt-0.5 text-muted-foreground">{detailWithLines.notes}</p></div>}
 
-              {/* Revise.md §8 — commission panel attached to this invoice */}
+              {/* Revise.md §8 - commission panel attached to this invoice */}
               {detailWithLines.commission && (
                 <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5 text-xs">
                   <div className="flex items-center justify-between">
@@ -585,7 +585,7 @@ export function InvoicesPage() {
                     <StatusBadge status={detailWithLines.commission.status} />
                   </div>
                   <p className="mt-1 text-muted-foreground">
-                    {formatRupiah(detailWithLines.commission.commissionAmount)} —{" "}
+                    {formatRupiah(detailWithLines.commission.commissionAmount)} -{" "}
                     {detailWithLines.commission.status === "RELEASED"
                       ? "sudah dikredit ke wallet Marketing"
                       : "dirilis ke wallet hanya setelah invoice LUNAS penuh (§9)"}

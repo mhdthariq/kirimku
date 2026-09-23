@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "KirimKu — Shipment Management",
+  title: "KirimKu - Shipment Management",
   description:
     "Platform manajemen pengiriman end-to-end: customers, shipments, pickup, gudang, transport, delivery, tarif, invoice, dan audit trail.",
   applicationName: "KirimKu",

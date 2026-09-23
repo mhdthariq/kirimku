@@ -137,7 +137,7 @@ export function LoginScreen() {
           </h1>
           <p className="mt-4 text-[15px] leading-relaxed text-white/85">
             Dari pickup kurir, penyimpanan gudang, transport antar kota dengan checkpoint GPS,
-            hingga delivery dan settlement — semuanya terlacak dan teraudit.
+            hingga delivery dan settlement - semuanya terlacak dan teraudit.
           </p>
 
           <div className="mt-8 grid grid-cols-3 gap-3">
@@ -211,13 +211,13 @@ export function LoginScreen() {
                 </div>
               )}
 
-              {/* Corporate ID — visible in Preview AND Production.
+              {/* Corporate ID - visible in Preview AND Production.
                   In Preview the field is pre-filled with PREVIEW_CORP_ID
                   (default "TRIAL") so testers don't have to type it every
                   time. In Production the field starts empty and the user
                   must type their own Corporate ID (which routes the request
                   to the right tenant's database via the license server).
-                  In Development the field is hidden — license check is
+                  In Development the field is hidden - license check is
                   bypassed server-side and the regular DATABASE_URL is used. */}
               {SHOW_CORP_ID && (
                 <div className="space-y-2">
@@ -238,7 +238,7 @@ export function LoginScreen() {
                   <p className="text-[11px] text-foreground/60">
                     {NEXT_PUBLIC_IS_PREVIEW ? (
                       <>
-                        ID Perusahaan untuk Preview. Default <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">TRIAL</code> —
+                        ID Perusahaan untuk Preview. Default <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">TRIAL</code> -
                         dapat diganti bila ingin login ke tenant lain.
                       </>
                     ) : (
@@ -248,7 +248,7 @@ export function LoginScreen() {
                 </div>
               )}
 
-              {/* Runtime-mode banner — DEV / PREVIEW / Production so the
+              {/* Runtime-mode banner - DEV / PREVIEW / Production so the
                   tester always knows which build they're looking at. The
                   Production variant is hidden so end users don't see it. */}
               {(NEXT_PUBLIC_IS_DEV || NEXT_PUBLIC_IS_PREVIEW) && (
@@ -264,10 +264,10 @@ export function LoginScreen() {
                   <span>
                     <span className="font-semibold">{MODE_LABEL}</span>
                     {NEXT_PUBLIC_IS_PREVIEW && (
-                      <> — build staging/UAT. Akun demo aktif, license server tetap dihubungi.</>
+                      <> - build staging/UAT. Akun demo aktif, license server tetap dihubungi.</>
                     )}
                     {NEXT_PUBLIC_IS_DEV && (
-                      <> — tanpa Corporate ID, license server dilewati (pakai DATABASE_URL lokal).</>
+                      <> - tanpa Corporate ID, license server dilewati (pakai DATABASE_URL lokal).</>
                     )}
                   </span>
                 </div>
@@ -316,7 +316,7 @@ export function LoginScreen() {
 
             {/* Demo accounts are visible in Dev + Preview. In production every
                 login must come from a real user row in the tenant's own
-                database — the demo users (owner/budi/hendra/…) only exist in
+                database - the demo users (owner/budi/hendra/…) only exist in
                 the seeded local DB, so showing them in prod would just lead
                 to "username atau password salah" errors. */}
             {SHOW_DEMO_ACCOUNTS && (
@@ -354,7 +354,7 @@ export function LoginScreen() {
               </div>
             )}
 
-            {/* "Lacak Paket" / Track a Package link — Dev + Preview only.
+            {/* "Lacak Paket" / Track a Package link - Dev + Preview only.
                 In production the public tracking page is reachable only via
                 the standalone /tracking-paket URL (no link inside the app),
                 so end customers don't see this button when the app is in
@@ -366,7 +366,7 @@ export function LoginScreen() {
                   className="flex items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3.5 py-2.5 text-xs font-semibold text-primary transition hover:border-primary/60 hover:bg-primary/10"
                 >
                   <Search className="h-3.5 w-3.5" />
-                  Lacak Paket — pelacakan kiriman untuk customer
+                  Lacak Paket - pelacakan kiriman untuk customer
                 </a>
                 <p className="mt-1.5 text-center text-[10px] text-foreground/55">
                   Tautan ini hanya tampil di {MODE_LABEL}. Di production, customer membuka

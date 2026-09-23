@@ -119,7 +119,7 @@ export function TransportMap({
         iconSize: c.checkedIn ? [38, 38] : [30, 30],
         iconAnchor: c.checkedIn ? [19, 19] : [15, 15],
       });
-      const label = `${c.sequence}. ${c.name}${c.checkedIn ? ` — check-in ${c.latestRecordAt ? new Date(c.latestRecordAt).toLocaleString("id-ID") : ""}${c.latestBy ? ` oleh ${c.latestBy}` : ""}` : ` · radius ${(c.radiusMeters / 1000).toFixed(2)} KM`}`;
+      const label = `${c.sequence}. ${c.name}${c.checkedIn ? ` - check-in ${c.latestRecordAt ? new Date(c.latestRecordAt).toLocaleString("id-ID") : ""}${c.latestBy ? ` oleh ${c.latestBy}` : ""}` : ` · radius ${(c.radiusMeters / 1000).toFixed(2)} KM`}`;
       const marker = L.marker([c.latitude, c.longitude], { icon }).addTo(layer).bindTooltip(label, { direction: "top", offset: [0, c.checkedIn ? -19 : -12] });
       if (c.checkedIn) marker.openTooltip();
     });
@@ -139,7 +139,7 @@ export function TransportMap({
       L.marker([pos.latitude, pos.longitude], { icon })
         .addTo(layer)
         .bindTooltip(
-          `Posisi terakhir transport${pos.recordedAt ? ` — ${new Date(pos.recordedAt).toLocaleString("id-ID")}` : ""}`,
+          `Posisi terakhir transport${pos.recordedAt ? ` - ${new Date(pos.recordedAt).toLocaleString("id-ID")}` : ""}`,
           { direction: "top", offset: [0, -12] },
         );
     }

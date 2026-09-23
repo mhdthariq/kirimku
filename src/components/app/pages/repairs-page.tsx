@@ -103,7 +103,7 @@ export function RepairsPage() {
 
   async function onDelete(repair: VehicleRepairRow) {
     const ok = await runAction(() => apiDelete(`/repairs/${repair.id}`), {
-      success: `Repair ${repair.repairCode} dihapus — deduction ${formatRupiah(repair.deductedAmount)} dikembalikan ke wallet Vehicle Owner. Tercatat di log aksi.`,
+      success: `Repair ${repair.repairCode} dihapus - deduction ${formatRupiah(repair.deductedAmount)} dikembalikan ke wallet Vehicle Owner. Tercatat di log aksi.`,
     });
     if (ok) {
       setDeleteTarget(null);
@@ -121,7 +121,7 @@ export function RepairsPage() {
         title="Repair Verification"
         subtitle={
           isVehicleOwner
-            ? "Biaya repair untuk kendaraan Anda — setiap pembuatan, perubahan, dan penghapusan record tercatat di log aksi."
+            ? "Biaya repair untuk kendaraan Anda - setiap pembuatan, perubahan, dan penghapusan record tercatat di log aksi."
             : "Record repair langsung TERVERIFIKASI dan wallet Vehicle Owner langsung didebit saat dibuat. Semua aksi tercatat di log."
         }
         icon={<Wrench className="h-5 w-5" />}
@@ -135,7 +135,7 @@ export function RepairsPage() {
       />
 
       {/* List + activity log share the page via tabs (same pattern as
-          Shipments/Pickups "Daftar | Log Aktivitas") — the log is no longer
+          Shipments/Pickups "Daftar | Log Aktivitas") - the log is no longer
           stacked below the list. */}
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
@@ -165,7 +165,7 @@ export function RepairsPage() {
                 render: (r) => (
                   <div>
                     <p className="text-sm font-medium">{r.description}</p>
-                    <p className="text-xs text-muted-foreground">{r.workshopVendor ?? "—"} · {formatDate(r.repairDate)}</p>
+                    <p className="text-xs text-muted-foreground">{r.workshopVendor ?? "-"} · {formatDate(r.repairDate)}</p>
                   </div>
                 ),
               },
@@ -183,7 +183,7 @@ export function RepairsPage() {
                       key: "owner",
                       header: "Vehicle Owner",
                       hideOnMobile: true,
-                      render: (r: VehicleRepairRow) => <span className="text-sm">{r.owner?.user?.name ?? "—"}</span>,
+                      render: (r: VehicleRepairRow) => <span className="text-sm">{r.owner?.user?.name ?? "-"}</span>,
                     } as const,
                   ]),
               {
@@ -211,7 +211,7 @@ export function RepairsPage() {
           />
         </TabsContent>
         <TabsContent value="log" className="mt-3">
-          {/* LOG #2 — global activity log (created / changed / deleted), now a
+          {/* LOG #2 - global activity log (created / changed / deleted), now a
               tab instead of a panel below the list. */}
           <RepairActivityLogPanel version={logVersion} />
         </TabsContent>
@@ -238,7 +238,7 @@ export function RepairsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Hapus repair {deleteTarget?.repairCode}?</AlertDialogTitle>
             <AlertDialogDescription>
-              Record {deleteTarget?.repairCode} ({deleteTarget?.description} — {formatRupiah(deleteTarget?.amount ?? 0)}) akan dihapus dan
+              Record {deleteTarget?.repairCode} ({deleteTarget?.description} - {formatRupiah(deleteTarget?.amount ?? 0)}) akan dihapus dan
               deduction {formatRupiah(deleteTarget?.deductedAmount ?? 0)} dikembalikan ke wallet Vehicle Owner.
               Vehicle Owner tetap bisa melihat bekas record ini di log aksi (dibuat → dihapus).
             </AlertDialogDescription>
@@ -279,7 +279,7 @@ const FIELD_LABELS: Record<string, string> = {
 };
 
 function formatChangeValue(field: string, value: unknown): string {
-  if (value == null || value === "") return "—";
+  if (value == null || value === "") return "-";
   if (field === "amount") return formatRupiah(Number(value));
   return String(value);
 }
@@ -395,7 +395,7 @@ export function RepairActivityLogPanel({ version }: { version: number }) {
         )}
       </div>
       <p className="border-t px-4 py-2 text-[11px] text-muted-foreground">
-        Log permanen (append-only): setiap record yang dibuat, diubah, atau dihapus tetap terlihat di sini — termasuk record yang sudah dihapus.
+        Log permanen (append-only): setiap record yang dibuat, diubah, atau dihapus tetap terlihat di sini - termasuk record yang sudah dihapus.
       </p>
     </div>
   );
@@ -500,7 +500,7 @@ function CreateRepairDialog({
           notes: form.notes || null,
           proofUrl: proof?.dataUrl,
         }),
-      { success: "Repair tercatat & langsung TERVERIFIKASI — wallet Vehicle Owner didebit. Tercatat di log aksi." },
+      { success: "Repair tercatat & langsung TERVERIFIKASI - wallet Vehicle Owner didebit. Tercatat di log aksi." },
     );
     if (ok) {
       setForm(EMPTY_FORM);
@@ -518,7 +518,7 @@ function CreateRepairDialog({
         <DialogHeader>
           <DialogTitle>Catat Repair / Maintenance</DialogTitle>
           <DialogDescription>
-            Record langsung TERVERIFIKASI dan wallet Vehicle Owner langsung didebit saat disimpan — tanpa alur approval.
+            Record langsung TERVERIFIKASI dan wallet Vehicle Owner langsung didebit saat disimpan - tanpa alur approval.
             Bukti (nota/invoice) wajib dilampirkan. Vehicle Owner melihat semua ini lewat log aksi.
           </DialogDescription>
         </DialogHeader>
@@ -608,7 +608,7 @@ function EditRepairDialog({
           notes: form.notes || null,
           proofUrl: proof?.dataUrl ?? null,
         }),
-      { success: `Repair ${repair.repairCode} diperbarui — perubahan & penyesuaian wallet tercatat di log aksi.` },
+      { success: `Repair ${repair.repairCode} diperbarui - perubahan & penyesuaian wallet tercatat di log aksi.` },
     );
     if (ok) {
       setInitialized(null);
@@ -626,7 +626,7 @@ function EditRepairDialog({
           <DialogTitle>Edit Repair {repair.repairCode}</DialogTitle>
           <DialogDescription>
             Perubahan tercatat di log aksi (field apa yang berubah, siapa, kapan). Jika biaya berubah, wallet Vehicle
-            Owner otomatis disesuaikan: selisih ditambahkan atau dikembalikan. Kendaraan tidak bisa diganti — hapus
+            Owner otomatis disesuaikan: selisih ditambahkan atau dikembalikan. Kendaraan tidak bisa diganti - hapus
             record dan buat ulang jika salah kendaraan.
           </DialogDescription>
         </DialogHeader>
@@ -685,7 +685,7 @@ function RepairDetailDialog({ repair, onOpenChange }: { repair: VehicleRepairRow
         <DialogHeader>
           <DialogTitle>{repair.repairCode} · {repair.vehicle.vehicleNumber}</DialogTitle>
           <DialogDescription>
-            {repair.description} — {formatRupiah(repair.amount)} (terdeduct dari wallet Vehicle Owner)
+            {repair.description} - {formatRupiah(repair.amount)} (terdeduct dari wallet Vehicle Owner)
           </DialogDescription>
         </DialogHeader>
         {/* Tabs keep the dialog clean: data repair di tab pertama, riwayat
@@ -700,7 +700,7 @@ function RepairDetailDialog({ repair, onOpenChange }: { repair: VehicleRepairRow
           </TabsList>
           <TabsContent value="detail" className="mt-3 space-y-3 text-sm">
             <div className="grid grid-cols-2 gap-2">
-              <DetailItem label="Bengkel" value={repair.workshopVendor ?? "—"} />
+              <DetailItem label="Bengkel" value={repair.workshopVendor ?? "-"} />
               <DetailItem label="Tanggal Repair" value={formatDate(repair.repairDate)} />
               <DetailItem label="Dibuat" value={formatDate(repair.createdAt, true)} />
               <DetailItem label="Status" value="Terverifikasi & Terdeduct" />
@@ -717,10 +717,10 @@ function RepairDetailDialog({ repair, onOpenChange }: { repair: VehicleRepairRow
             )}
           </TabsContent>
           <TabsContent value="log" className="mt-3">
-            {/* LOG #1 — per-item action log */}
+            {/* LOG #1 - per-item action log */}
             <div className="rounded-lg border bg-muted/40 p-3">
               <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                <History className="h-3.5 w-3.5" /> Log Item Ini — kapan dibuat & siapa mengubah apa
+                <History className="h-3.5 w-3.5" /> Log Item Ini - kapan dibuat & siapa mengubah apa
               </p>
               {logsLoading ? (
                 <div className="flex items-center justify-center gap-2 py-4 text-xs text-muted-foreground">

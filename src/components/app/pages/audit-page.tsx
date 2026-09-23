@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { hasPermission } from "@/lib/client-api";
 import { PageHeader } from "@/components/app/data-table";
 import { FormSelect, formatDate } from "@/components/app/form-parts";
+import { AuditDataViewer } from "@/components/app/audit-data-viewer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -31,11 +32,14 @@ const ENTITY_LABELS: Record<string, string> = {
   user: "User",
   role: "Role",
   employee: "Employee",
+  partner: "Partner",
 };
 
 const ACTION_STYLES: Record<string, string> = {
   created: "bg-primary/10 text-primary",
   updated: "bg-chart-4/15 text-chart-4",
+  updated_self: "bg-chart-4/15 text-chart-4",
+  updated_profile: "bg-chart-4/15 text-chart-4",
   deleted: "bg-destructive/10 text-destructive",
   deactivated: "bg-destructive/10 text-destructive",
   disabled: "bg-destructive/10 text-destructive",
@@ -45,6 +49,10 @@ const ACTION_STYLES: Record<string, string> = {
   settled: "bg-primary/10 text-primary",
   status_change: "bg-chart-3/15 text-chart-3",
   cancelled: "bg-destructive/10 text-destructive",
+  notified_marketing: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+  change_password: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+  printed_resi: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
+  printed_invoice: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
 };
 
 const PAGE_SIZE = 30;
@@ -112,7 +120,7 @@ export function AuditPage() {
     <div className="space-y-4">
       <PageHeader
         title="Audit Timeline"
-        subtitle="Jejak audit seluruh sistem — setiap menu juga punya log aktivitasnya sendiri."
+        subtitle="Jejak audit seluruh sistem - setiap menu juga punya log aktivitasnya sendiri."
         icon={<History className="h-5 w-5" />}
         actions={
           <Button variant="outline" size="sm" onClick={exportCsv} disabled={entries.length === 0}>
@@ -179,14 +187,16 @@ export function AuditPage() {
                       <summary className="cursor-pointer text-[11px] font-medium text-primary/80 hover:text-primary">Detail perubahan</summary>
                       <div className="mt-1.5 grid gap-2 sm:grid-cols-2">
                         {entry.beforeData && (
-                          <pre className="max-h-36 overflow-auto rounded-lg bg-muted/60 p-2 text-[10px] leading-relaxed text-muted-foreground">
-                            {JSON.stringify(entry.beforeData, null, 2)}
-                          </pre>
+                          <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-2">
+                            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-destructive/70">Sebelum</p>
+                            <AuditDataViewer data={entry.beforeData} variant="before" />
+                          </div>
                         )}
                         {entry.afterData && (
-                          <pre className="max-h-36 overflow-auto rounded-lg bg-primary/5 p-2 text-[10px] leading-relaxed text-primary/90">
-                            {JSON.stringify(entry.afterData, null, 2)}
-                          </pre>
+                          <div className="rounded-lg border border-primary/20 bg-primary/5 p-2">
+                            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-primary/70">Sesudah</p>
+                            <AuditDataViewer data={entry.afterData} variant="after" />
+                          </div>
                         )}
                       </div>
                     </details>

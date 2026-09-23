@@ -23,10 +23,10 @@ export async function POST(req: NextRequest, { params }: Params) {
     // Complete plan required before departure: Rute + Rencana Berangkat +
     // Rencana Tiba must all be filled ("before we can confirm").
     if (transport.routeId == null) {
-      return fail(422, "Rute wajib dipilih sebelum transport berangkat — lengkapi data transport terlebih dahulu.");
+      return fail(422, "Rute wajib dipilih sebelum transport berangkat - lengkapi data transport terlebih dahulu.");
     }
     if (transport.plannedDepartureAt == null || transport.plannedArrivalAt == null) {
-      return fail(422, "Rencana Berangkat & Rencana Tiba wajib diisi sebelum transport berangkat — lengkapi jadwal transport terlebih dahulu.");
+      return fail(422, "Rencana Berangkat & Rencana Tiba wajib diisi sebelum transport berangkat - lengkapi jadwal transport terlebih dahulu.");
     }
     const firstCheckpoint = transport.route?.checkpoints[0];
     const checkedInAtFirst = firstCheckpoint && transport.checkpointRecords.some((record) => record.checkpointId === firstCheckpoint.id);

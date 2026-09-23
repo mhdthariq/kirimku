@@ -70,7 +70,7 @@ export async function assertShipmentScope(
   }
   const scope = await scopeForUser(user);
   if (!inScope(shipmentGudangIds(shipment, await cityIndex()), scope)) {
-    throw new HttpError(403, "Shipment ini berada di gudang lain — data terpisah antar gudang.");
+    throw new HttpError(403, "Shipment ini berada di gudang lain - data terpisah antar gudang.");
   }
 }
 
@@ -82,7 +82,7 @@ export async function assertTransportScope(
   if (user.isOwner || user.permissions.includes("*")) return;
   const scope = await scopeForUser(user);
   if (!inScope(transportGudangIds(route, shipments, await cityIndex()), scope)) {
-    throw new HttpError(403, "Transport ini berada di gudang lain — data terpisah antar gudang.");
+    throw new HttpError(403, "Transport ini berada di gudang lain - data terpisah antar gudang.");
   }
 }
 
@@ -322,14 +322,14 @@ export async function filterAuditEntriesForScope(entries: AuditEntryRef[], scope
         if (masterId == null) return "unresolvable";
         return gudangByMaster.get(masterId) ?? "unresolvable";
       }
-      default: return null; // company-wide entity (customer, invoice, auth, …) — not gudang data
+      default: return null; // company-wide entity (customer, invoice, auth, …) - not gudang data
     }
   };
 
   return entries.map((e) => {
     const ids = gudangIdsOf(e);
     if (ids === "unresolvable") return false; // gudang entity outside/beyond verification
-    if (ids == null) return true; // company-wide entity — visible
+    if (ids == null) return true; // company-wide entity - visible
     return inScope(ids, scope);
   });
 }

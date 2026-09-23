@@ -131,7 +131,7 @@ export async function POST(req: NextRequest) {
       resolvedLines.push({ description: l.description ?? "", quantity: l.quantity, unitPrice: l.unitPrice, shipmentId: shipment.id });
     }
     if (linkedPartnerIds.size > 1) {
-      return fail(422, "Shipment terpilih dibuat oleh lebih dari satu Marketing partner — pisahkan menjadi invoice terpisah per partner.", {
+      return fail(422, "Shipment terpilih dibuat oleh lebih dari satu Marketing partner - pisahkan menjadi invoice terpisah per partner.", {
         lines: ["Shipment dari beberapa Marketing partner tidak bisa digabung."],
       });
     }

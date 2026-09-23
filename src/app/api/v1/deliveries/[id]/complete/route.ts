@@ -24,7 +24,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (!delivery) return fail(404, "Delivery tidak ditemukan.");
     await assertShipmentScope(user, delivery.master);
     if (delivery.status === "COMPLETED") return fail(422, "Delivery sudah selesai.");
-    if (delivery.status === "FAILED") return fail(422, "Delivery ditandai gagal — buat task baru bila perlu.");
+    if (delivery.status === "FAILED") return fail(422, "Delivery ditandai gagal - buat task baru bila perlu.");
 
     const denied = assertKurirAssignment(delivery, user, "delivery.assign_kurir", delivery.deliveryCode);
     if (denied) return fail(403, denied);
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       return fail(422, "Foto bukti serah terima wajib disertakan sebelum konfirmasi.");
     }
     if (!photoUrl.startsWith("data:image/jpeg;base64,") && !photoUrl.startsWith("data:image/png;base64,")) {
-      return fail(422, "Format foto tidak didukung — gunakan JPEG atau PNG.");
+      return fail(422, "Format foto tidak didukung - gunakan JPEG atau PNG.");
     }
     if (photoUrl.length > MAX_PHOTO_BYTES) {
       return fail(422, "Foto terlalu besar (maks ±2.5 MB setelah kompresi).");
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     // (those handovers happen at the customer's door, not at a transport
     // checkpoint).
     const isDirect = (delivery.master.fulfillmentMode ?? "STANDARD") === "DIRECT";
-    let trackingDescription = `Delivered to ${customerName} by ${kurirName} — received by: ${proof}`;
+    let trackingDescription = `Delivered to ${customerName} by ${kurirName} - received by: ${proof}`;
     if (isDirect) {
       const transport = await db.transport.findFirst({
         where: { shipments: { some: { shipmentId: delivery.masterId } } },

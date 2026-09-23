@@ -20,7 +20,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     const summary = await paymentSummary(master.id);
     if (summary.remainingAmount <= 0) {
-      return fail(422, "Shipment ini sudah lunas — tidak perlu notifikasi.");
+      return fail(422, "Shipment ini sudah lunas - tidak perlu notifikasi.");
     }
 
     const body = await req.json().catch(() => ({}));
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       data: {
         masterId: master.id,
         event: "GUDANG_NOTIFY_MARKETING",
-        description: `Gudang memberi tahu marketing: sisa pembayaran Rp${Math.round(summary.remainingAmount).toLocaleString("id-ID")} — ${note}`,
+        description: `Gudang memberi tahu marketing: sisa pembayaran Rp${Math.round(summary.remainingAmount).toLocaleString("id-ID")} - ${note}`,
         actorId: user.id,
       },
     });

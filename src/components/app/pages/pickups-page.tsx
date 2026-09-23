@@ -202,28 +202,28 @@ export function PickupsPage() {
               <p className="flex items-center gap-1.5 text-sm font-medium text-foreground">
                 {p.customerName}
                 {p.customerType === "b2b" && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-950 dark:text-sky-300" title="B2B — cukup scan Master Resi sekali">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-950 dark:text-sky-300" title="B2B - cukup scan Master Resi sekali">
                     B2B · Master Resi
                   </span>
                 )}
-                {/* Step 2 — DIRECT fulfillment badge (mirrors the shipments-page
+                {/* Step 2 - DIRECT fulfillment badge (mirrors the shipments-page
                     row badge). Violet color matches the shipments page so users
                     can recognize DIRECT shipments at a glance across pages. */}
                 {(p.fulfillmentMode ?? "STANDARD") === "DIRECT" && (
                   <span
                     className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 dark:bg-violet-950 dark:text-violet-300"
-                    title="DIRECT — driver ambil langsung di lokasi customer, kirim langsung ke penerima"
+                    title="DIRECT - driver ambil langsung di lokasi customer, kirim langsung ke penerima"
                   >
                     DIRECT
                   </span>
                 )}
-                {/* Step 2 — "Already picked up from checkpoint 1" badge for
+                {/* Step 2 - "Already picked up from checkpoint 1" badge for
                     DIRECT shipments. Only shown for DIRECT (STANDARD pickups
                     happen at the customer address, never at a checkpoint). */}
                 {(p.fulfillmentMode ?? "STANDARD") === "DIRECT" && p.pickedUpFromCheckpoint1 && (
                   <span
                     className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-                    title="Driver sudah check-in di checkpoint 1 — paket sudah diambil dari titik penjemputan"
+                    title="Driver sudah check-in di checkpoint 1 - paket sudah diambil dari titik penjemputan"
                   >
                     <CheckCircle2 className="h-3 w-3" /> Sudah Diambil CP1
                   </span>
@@ -232,7 +232,7 @@ export function PickupsPage() {
               <p className="text-xs text-muted-foreground">
                 {p.origin} → {p.destination}
               </p>
-              {/* Revise round 7 — Pickup address so the kurir knows where to go.
+              {/* Revise round 7 - Pickup address so the kurir knows where to go.
                   Source: MasterShipment.pengirimAddress (the per-shipment
                   sender address the staff typed). Shows the contact phone
                   and sender name too so the kurir can ask for the right
@@ -264,7 +264,7 @@ export function PickupsPage() {
                 </div>
               ) : (
                 <p className="mt-1 text-[10px] text-amber-600 dark:text-amber-400">
-                  Alamat pickup belum diisi pada shipment — isi di halaman Shipments (Pengirim → Alamat Pengirim).
+                  Alamat pickup belum diisi pada shipment - isi di halaman Shipments (Pengirim → Alamat Pengirim).
                 </p>
               )}
             </div>
@@ -275,7 +275,7 @@ export function PickupsPage() {
           header: "Kurir",
           render: (p) => {
             const kurir = options?.employees?.find((e) => e.id === p.kurirId);
-            return <span className="text-sm text-muted-foreground">{kurir?.name ?? "—"}</span>;
+            return <span className="text-sm text-muted-foreground">{kurir?.name ?? "-"}</span>;
           },
         },
         {
@@ -303,7 +303,7 @@ export function PickupsPage() {
                 </div>
               )
             ) : (
-              <span className="text-[10px] text-muted-foreground">—</span>
+              <span className="text-[10px] text-muted-foreground">-</span>
             ),
         },
         { key: "createdAt", header: "Dibuat", hideOnMobile: true, render: (p) => formatDate(p.createdAt, true) },
@@ -323,7 +323,7 @@ export function PickupsPage() {
           render: (p) => (
             <div className="space-y-1">
               <StatusBadge status={p.status} />
-              {/* Revision Part A — distinguish pickup task state vs package location */}
+              {/* Revision Part A - distinguish pickup task state vs package location */}
               {p.status === "PICKED_UP" && (
                 <p className="text-[10px] leading-tight text-muted-foreground">
                   {p.masterStatus === "RECEIVED_AT_GUDANG" || p.masterStatus === "ARRIVED_AT_GUDANG"
@@ -340,7 +340,7 @@ export function PickupsPage() {
           render: (p) => (
             <div className="flex flex-wrap gap-1.5">
               <ItemAuditDialog entityType="pickup" entityId={p.id} itemLabel={p.pickupCode} />
-              {/* Revise round 9 — Detail Foto button. Opens a dialog showing the
+              {/* Revise round 9 - Detail Foto button. Opens a dialog showing the
                   pickup photo (proof of pickup) at full size. Display is gated
                   by proof_photo.view (Admin Gudang + Owner). The button is
                   always visible to admins/owner; if no photo is set, the dialog
@@ -425,7 +425,7 @@ export function PickupsPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editing ? `Edit Pickup — ${editing.pickupCode}` : "Buat Pickup"}</DialogTitle>
+            <DialogTitle>{editing ? `Edit Pickup - ${editing.pickupCode}` : "Buat Pickup"}</DialogTitle>
             <DialogDescription>
               {editing ? "Ganti kurir atau catatan." : "Pilih shipment READY_FOR_PICKUP dan kurir pelaksana."}
             </DialogDescription>
@@ -451,7 +451,7 @@ export function PickupsPage() {
               <FormSelect value={form.kurirId} onValueChange={(v) => setForm({ ...form, kurirId: v })} placeholder="Pilih kurir" options={kurirOptions} disabled={busy} />
             </Field>
             <Field label="Catatan" htmlFor="p-notes">
-              <Textarea id="p-notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} placeholder="Opsional — instruksi khusus untuk kurir" disabled={busy} />
+              <Textarea id="p-notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} placeholder="Opsional - instruksi khusus untuk kurir" disabled={busy} />
             </Field>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} disabled={busy}>
@@ -488,12 +488,12 @@ export function PickupsPage() {
         onDone={reload}
       />
 
-      {/* Revise round 9 — Photo Detail Dialog for pickups. Shows the pickup
+      {/* Revise round 9 - Photo Detail Dialog for pickups. Shows the pickup
           photo (proof of pickup) at full size, gated by proof_photo.view. */}
       <PhotoDetailDialog
         open={!!photoPickup}
         onOpenChange={(open) => !open && setPhotoPickup(null)}
-        title={`Foto Bukti Pickup — ${photoPickup?.pickupCode ?? ""}`}
+        title={`Foto Bukti Pickup - ${photoPickup?.pickupCode ?? ""}`}
         description="Foto bukti penjemputan paket oleh kurir di lokasi customer."
         photos={
           photoPickup?.photoUrl

@@ -256,14 +256,14 @@ export async function POST(req: NextRequest) {
               masterId: s.id,
               kurirId: driverId, // DIRECT driver = the kurir of the pickup
               status: "ASSIGNED",
-              notes: `Auto-assigned dari transport ${transportCode} (DIRECT — driver pickup di checkpoint 1)`,
+              notes: `Auto-assigned dari transport ${transportCode} (DIRECT - driver pickup di checkpoint 1)`,
             },
           });
           await tx.trackingEvent.create({
             data: {
               masterId: s.id,
               event: "PICKUP_ASSIGNED",
-              description: `${driverNameLabel} auto-assigned untuk pickup DIRECT (transport ${transportCode}) — scan paket di checkpoint 1.`,
+              description: `${driverNameLabel} auto-assigned untuk pickup DIRECT (transport ${transportCode}) - scan paket di checkpoint 1.`,
               actorId: user.id,
             },
           });

@@ -60,10 +60,10 @@ export function FinancePage() {
   const ip = data.invoicePayments;
   const profitStats = ip
     ? [
-        { label: "Pembayaran Invoice (Total)", value: formatRupiah(ip.realized), sub: "lunas + parsial — diterima perusahaan", icon: <Wallet className="h-4 w-4" /> },
+        { label: "Pembayaran Invoice (Total)", value: formatRupiah(ip.realized), sub: "lunas + parsial - diterima perusahaan", icon: <Wallet className="h-4 w-4" /> },
         { label: "Invoice LUNAS", value: formatRupiah(ip.settledTotal), sub: "pembayaran penuh diterima", icon: <Receipt className="h-4 w-4" /> },
         { label: "Invoice PARTIAL", value: formatRupiah(ip.partialTotal), sub: "pembayaran parsial = profit perusahaan", icon: <Coins className="h-4 w-4" /> },
-        { label: "Komisi Belum Dirilis", value: formatRupiah(t.releasedCommissions), sub: "utang ke Marketing — hanya setelah lunas penuh", icon: <Briefcase className="h-4 w-4" /> },
+        { label: "Komisi Belum Dirilis", value: formatRupiah(t.releasedCommissions), sub: "utang ke Marketing - hanya setelah lunas penuh", icon: <Briefcase className="h-4 w-4" /> },
       ]
     : [];
 
@@ -94,7 +94,7 @@ export function FinancePage() {
         ))}
       </div>
 
-      {/* Revision 6 — Invoice payment profit (incl. partial) */}
+      {/* Revision 6 - Invoice payment profit (incl. partial) */}
       {ip && (
         <section className="rounded-xl border bg-card p-4">
           <div className="mb-3 flex items-start justify-between gap-3">
@@ -103,7 +103,7 @@ export function FinancePage() {
                 <Wallet className="h-4 w-4" /> Profit dari Pembayaran Invoice
               </p>
               <p className="mt-0.5 text-[11px] text-muted-foreground">
-                Setiap Rupiah yang dibayar customer (lunas <b>atau parsial</b>) langsung menjadi <b>profit perusahaan</b> —
+                Setiap Rupiah yang dibayar customer (lunas <b>atau parsial</b>) langsung menjadi <b>profit perusahaan</b> -
                 komisi Marketing baru dirilis saat invoice <b>lunas penuh</b> (§9), sehingga pembayaran parsial tetap
                 milik perusahaan dan bukan utang ke partner.
               </p>
@@ -154,7 +154,7 @@ export function FinancePage() {
                               <Paperclip className="h-3 w-3" /> ada
                             </span>
                           ) : (
-                            <span className="text-[10px] text-muted-foreground">—</span>
+                            <span className="text-[10px] text-muted-foreground">-</span>
                           )}
                         </td>
                       </tr>
@@ -163,7 +163,7 @@ export function FinancePage() {
                 </table>
               </div>
               <p className="mt-1.5 text-[10px] text-muted-foreground">
-                Catatan: baris <b>PARTIAL</b> di atas tetap dihitung sebagai profit yang sudah diterima perusahaan —
+                Catatan: baris <b>PARTIAL</b> di atas tetap dihitung sebagai profit yang sudah diterima perusahaan -
                 bukan piutang yang ditunda. Sisa tagihan pada invoice PARTIAL tetap ditagihkan ke customer, tetapi
                 TIDAK menjadi kewajiban perusahaan ke partner Marketing sampai invoice <b>lunas penuh</b>.
               </p>
@@ -289,7 +289,7 @@ export function FinancePage() {
 }
 
 function fmtSigned(v: number | undefined): string {
-  if (v == null || v === 0) return "—";
+  if (v == null || v === 0) return "-";
   return formatRupiah(Math.abs(v));
 }
 

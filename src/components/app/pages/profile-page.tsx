@@ -154,7 +154,7 @@ export function ProfilePage() {
             )}
           </section>
 
-          {/* Edit name + password — every user, including Owner */}
+          {/* Edit name + password - every user, including Owner */}
           <section className="rounded-xl border bg-card p-5">
             <p className="mb-3 flex items-center gap-2 text-sm font-semibold">
               <KeyRound className="h-4 w-4" /> Identitas & Keamanan

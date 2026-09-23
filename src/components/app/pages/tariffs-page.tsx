@@ -129,7 +129,7 @@ export function TariffsPage() {
     <div className="space-y-4">
       <PageHeader
         title="Tarif"
-        subtitle="Harga per kg per koridor — dasar perhitungan chargeable weight shipment."
+        subtitle="Harga per kg per koridor - dasar perhitungan chargeable weight shipment."
         icon={<Tag className="h-5 w-5" />}
         actions={
           can.create && (

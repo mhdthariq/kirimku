@@ -18,7 +18,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const { id } = await params;
     const delivery = await db.delivery.findUnique({ where: { id: Number(id) }, include: { master: { include: { customer: { select: { type: true } }, details: true } } } });
     if (!delivery) return fail(404, "Delivery tidak ditemukan.");
-    if (delivery.status === "COMPLETED") return fail(422, "Delivery sudah selesai — tidak perlu scan lagi.");
+    if (delivery.status === "COMPLETED") return fail(422, "Delivery sudah selesai - tidak perlu scan lagi.");
     if (delivery.status === "FAILED") return fail(422, "Delivery ditandai gagal.");
 
     const denied = assertKurirAssignment(delivery, user, "delivery.assign_kurir", delivery.deliveryCode);
@@ -42,8 +42,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       return ok({
         scan,
         message: isB2B
-          ? "Master Resi B2B terbaca — semua paket pada konsinyasi ini otomatis ter-scan. Silakan konfirmasi serah terima."
-          : "QR master terbaca — lanjut scan semua paket untuk customer ini.",
+          ? "Master Resi B2B terbaca - semua paket pada konsinyasi ini otomatis ter-scan. Silakan konfirmasi serah terima."
+          : "QR master terbaca - lanjut scan semua paket untuk customer ini.",
         progress,
       });
     }
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       });
       return ok({
         scan,
-        message: "Kode tidak dikenali — bukan paket untuk shipment ini.",
+        message: "Kode tidak dikenali - bukan paket untuk shipment ini.",
         progress: await scanProgress({ deliveryId: delivery.id }),
       });
     }
@@ -87,7 +87,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       message: alreadyScanned
         ? "Paket ini sudah pernah discan."
         : progress.allScanned
-          ? "Semua paket sudah discan — silakan konfirmasi serah terima ke customer."
+          ? "Semua paket sudah discan - silakan konfirmasi serah terima ke customer."
           : `Paket OK (${progress.scanned}/${progress.total}) · ${method === "SCANNED" ? "scan" : "diketik"}.`,
       progress,
     });

@@ -20,7 +20,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const { id } = await params;
     const pickup = await db.pickup.findUnique({ where: { id: Number(id) }, include: { master: { include: { customer: { select: { type: true } }, details: true } } } });
     if (!pickup) return fail(404, "Pickup tidak ditemukan.");
-    if (pickup.status === "COMPLETED") return fail(422, "Pickup sudah selesai — tidak perlu scan lagi.");
+    if (pickup.status === "COMPLETED") return fail(422, "Pickup sudah selesai - tidak perlu scan lagi.");
     if (pickup.status === "CANCELLED") return fail(422, "Pickup sudah dibatalkan.");
 
     const denied = assertKurirAssignment(pickup, user, "pickup.assign_kurir", pickup.pickupCode);
@@ -44,8 +44,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       return ok({
         scan,
         message: isB2B
-          ? "Master Resi B2B terbaca — semua paket pada konsinyasi ini otomatis ter-scan. Silakan konfirmasi pickup."
-          : "QR master terbaca — lanjut scan semua paket (detail barang).",
+          ? "Master Resi B2B terbaca - semua paket pada konsinyasi ini otomatis ter-scan. Silakan konfirmasi pickup."
+          : "QR master terbaca - lanjut scan semua paket (detail barang).",
         progress,
       });
     }
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       });
       return ok({
         scan,
-        message: "Kode tidak dikenali — tidak cocok dengan detail barang manapun pada shipment ini.",
+        message: "Kode tidak dikenali - tidak cocok dengan detail barang manapun pada shipment ini.",
         progress: await scanProgress({ pickupId: pickup.id }),
       });
     }
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       message: alreadyScanned
         ? "Paket ini sudah pernah discan."
         : progress.allScanned
-          ? "Semua paket sudah discan — silakan konfirmasi pickup."
+          ? "Semua paket sudah discan - silakan konfirmasi pickup."
           : `Paket OK (${progress.scanned}/${progress.total}) · ${method === "SCANNED" ? "scan" : "diketik"}.`,
       progress,
     });

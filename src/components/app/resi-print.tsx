@@ -77,7 +77,7 @@ function buildPrintByLabel(user: ReturnType<typeof useAuth>["user"]): string | n
   } else if (user.roles.length > 0) {
     roleLabel = user.roles.map((r) => r.name).join(" / ");
   } else {
-    roleLabel = "—";
+    roleLabel = "-";
   }
   return `${accountName} (${roleLabel})`;
 }
@@ -231,17 +231,17 @@ export function ResiPrint({
     shipment.chargeableWeightKg ?? actualWeight;
 
   const penerima = {
-    name: shipment.penerimaName ?? "—",
-    address: shipment.penerimaAddress ?? "—",
-    contact: shipment.penerimaContact ?? "—",
+    name: shipment.penerimaName ?? "-",
+    address: shipment.penerimaAddress ?? "-",
+    contact: shipment.penerimaContact ?? "-",
   };
 
   // Pengirim (sender) — auto-filled from the Customer record at shipment
   // creation but editable per-shipment; fall back to the customer master
   // data when the per-shipment field is empty.
   const pengirim = {
-    name: shipment.pengirimName ?? shipment.customer?.name ?? "—",
-    phone: shipment.pengirimPhone ?? shipment.customer?.phone ?? "—",
+    name: shipment.pengirimName ?? shipment.customer?.name ?? "-",
+    phone: shipment.pengirimPhone ?? shipment.customer?.phone ?? "-",
     email: shipment.pengirimEmail ?? shipment.customer?.email ?? null,
     address: shipment.pengirimAddress ?? shipment.customer?.address ?? null,
   };
@@ -253,10 +253,10 @@ export function ResiPrint({
     shipment.destination;
 
   const originSupport =
-    originGudang?.customerSupportContact ?? "—";
+    originGudang?.customerSupportContact ?? "-";
 
   const destinationSupport =
-    destGudang?.customerSupportContact ?? "—";
+    destGudang?.customerSupportContact ?? "-";
 
   // Resi hanya menampilkan Nilai Pengiriman (+ No. Invoice untuk B2B).
   // Status pembayaran (UNPAID / DP / PAID) tidak lagi ditampilkan di resi
@@ -273,7 +273,7 @@ export function ResiPrint({
   const sheets = (
     <>
       {/* ============================================================
-          MASTER RESI — 100mm × 100mm
+          MASTER RESI - 100mm × 100mm
           Every section is flex-col with explicit fixed heights so the
           sheet always totals exactly 100mm regardless of how long the
           underlying data is. Long fields truncate (truncate class) to
@@ -282,7 +282,7 @@ export function ResiPrint({
           ============================================================ */}
 
       <section className="resi-sheet mx-auto flex h-[100mm] w-[100mm] flex-col overflow-hidden bg-white text-black">
-        {/* Header — fixed 36px. 2px bottom border so the header line
+        {/* Header - fixed 36px. 2px bottom border so the header line
             survives 203 DPI thermal printing. */}
         <header className="flex h-9 flex-none items-center justify-between gap-2 border-b-2 border-black px-3">
           <div className="min-w-0">
@@ -304,7 +304,7 @@ export function ResiPrint({
           </div>
         </header>
 
-        {/* Resi Number + QR — fixed 86px. QR is 70×70 so the thermal
+        {/* Resi Number + QR - fixed 86px. QR is 70×70 so the thermal
             printer renders enough modules for reliable scanning. */}
         <div className="h-21.5 flex-none border-b border-black">
           <div className="grid h-full grid-cols-[1fr_78px]">
@@ -342,7 +342,7 @@ export function ResiPrint({
           </div>
         </div>
 
-        {/* Route — fixed 32px. Bigger font for the city names so
+        {/* Route - fixed 32px. Bigger font for the city names so
             handlers can read them at arm's length on the warehouse
             floor. */}
         <div className="h-8 flex-none border-b border-black px-3">
@@ -371,7 +371,7 @@ export function ResiPrint({
           </div>
         </div>
 
-        {/* Sender / Receiver — fixed 78px. Two equal columns with name,
+        {/* Sender / Receiver - fixed 78px. Two equal columns with name,
             contact, and address. Address truncates to 2 lines. */}
         <div className="h-19.5 flex-none grid grid-cols-2 border-b border-black">
           <div className="flex min-w-0 flex-col justify-center gap-0.5 overflow-hidden border-r border-black px-3">
@@ -409,7 +409,7 @@ export function ResiPrint({
           </div>
         </div>
 
-        {/* Shipment Stats — fixed 44px. 4 cells with stat header + value.
+        {/* Shipment Stats - fixed 44px. 4 cells with stat header + value.
             Each cell has a vertical divider so handlers can scan a
             single column at a time. */}
         <div className="h-11 flex-none grid grid-cols-4 border-b border-black">
@@ -454,7 +454,7 @@ export function ResiPrint({
           </div>
         </div>
 
-        {/* Nilai Pengiriman — fixed 24px. Untuk B2B, No. Invoice ditampilkan
+        {/* Nilai Pengiriman - fixed 24px. Untuk B2B, No. Invoice ditampilkan
             di samping harga karena penagihan ke perusahaan dilakukan via invoice,
             bukan via pembayaran per resi. Pembayaran B2C ditanggung Marketing. */}
         {shipment.priceAmount != null && (
@@ -482,7 +482,7 @@ export function ResiPrint({
           </div>
         )}
 
-        {/* Warehouse — fixed 34px. Origin + destination warehouse with
+        {/* Warehouse - fixed 34px. Origin + destination warehouse with
             customer-support contact. */}
         <div className="h-8.5 flex-none grid grid-cols-2 border-b border-black">
           <div className="flex min-w-0 flex-col justify-center overflow-hidden border-r border-black px-3 leading-none">
@@ -500,7 +500,7 @@ export function ResiPrint({
           </div>
         </div>
 
-        {/* Footer — flex-1, absorbs whatever height is left so the
+        {/* Footer - flex-1, absorbs whatever height is left so the
             sheet always totals exactly 100mm. Includes handling
             instructions, signature lines, print timestamp, and the
             account name + role of the staff who triggered the print. */}
@@ -520,9 +520,9 @@ export function ResiPrint({
       </section>
 
       {/* ============================================================
-          PACKAGE LABELS — 100mm × 100mm
+          PACKAGE LABELS - 100mm × 100mm
           Same fixed-height-per-section approach as the master resi.
-          QR is bumped to 70×70 too — package labels get scanned more
+          QR is bumped to 70×70 too - package labels get scanned more
           often (at every checkpoint) so the larger module size pays
           off in scan reliability.
           ============================================================ */}
@@ -541,7 +541,7 @@ export function ResiPrint({
             key={d.id}
             className="resi-sheet mx-auto flex h-[100mm] w-[100mm] flex-col overflow-hidden bg-white text-black"
           >
-            {/* Header — fixed 36px. Same 2px bottom border as the master
+            {/* Header - fixed 36px. Same 2px bottom border as the master
                 resi so the visual style is consistent across all
                 sheets in the print run. */}
             <header className="flex h-9 flex-none items-center justify-between gap-2 border-b-2 border-black px-3">
@@ -564,7 +564,7 @@ export function ResiPrint({
               </div>
             </header>
 
-            {/* Package Code + QR — fixed 86px. Larger QR (70px) for
+            {/* Package Code + QR - fixed 86px. Larger QR (70px) for
                 checkpoint scanning. */}
             <div className="h-21.5 flex-none border-b border-black">
               <div className="grid h-full grid-cols-[1fr_78px]">
@@ -598,7 +598,7 @@ export function ResiPrint({
               </div>
             </div>
 
-            {/* Route band — fixed 24px. Compact route strip so the
+            {/* Route band - fixed 24px. Compact route strip so the
                 handler knows where this colly needs to go without
                 flipping back to the master resi. */}
             <div className="h-6 flex-none border-b border-black px-3">
@@ -627,7 +627,7 @@ export function ResiPrint({
               </div>
             </div>
 
-            {/* Pengirim — fixed 50px. Sender gets its own block (not
+            {/* Pengirim - fixed 50px. Sender gets its own block (not
                 squeezed into a 2-column row) so the destination
                 handler can verify the shipper without ambiguity. */}
             <div className="h-12.5 flex-none border-b border-black px-3">
@@ -647,7 +647,7 @@ export function ResiPrint({
               </div>
             </div>
 
-            {/* Penerima — fixed 50px. Same treatment as pengirim. */}
+            {/* Penerima - fixed 50px. Same treatment as pengirim. */}
             <div className="h-12.5 flex-none border-b border-black px-3">
               <div className="flex h-full flex-col justify-center gap-0.5 overflow-hidden leading-none">
                 <SmallCaps>Penerima</SmallCaps>
@@ -663,7 +663,7 @@ export function ResiPrint({
               </div>
             </div>
 
-            {/* Package Stats — fixed 40px. 4 cells: weight, volume,
+            {/* Package Stats - fixed 40px. 4 cells: weight, volume,
                 dimension, colly counter. */}
             <div className="h-10 flex-none grid grid-cols-4 border-b border-black">
               <div className="flex flex-col items-center justify-center border-r border-black text-center leading-none">
@@ -700,7 +700,7 @@ export function ResiPrint({
                         d.heightCm ?? 0,
                         0,
                       )}`
-                    : "—"}
+                    : "-"}
                 </p>
                 <p className="mt-0.5 text-[6px] font-normal uppercase text-black">
                   cm
@@ -718,7 +718,7 @@ export function ResiPrint({
               </div>
             </div>
 
-            {/* Description — flex-1, fills the remaining space so the
+            {/* Description - flex-1, fills the remaining space so the
                 sheet always totals exactly 100mm. Dashed rule on top
                 is solid black (not gray) so it reproduces on thermal
                 paper. Includes a "scan at operation point" reminder. */}
@@ -726,7 +726,7 @@ export function ResiPrint({
               <div className="flex-1 min-h-0">
                 <SmallCaps>Isi / Keterangan</SmallCaps>
                 <p className="mt-1 line-clamp-2 text-[8px] font-semibold leading-tight">
-                  {d.description || "—"}
+                  {d.description || "-"}
                 </p>
               </div>
 
@@ -779,12 +779,12 @@ export function ResiPrint({
           PRINT STYLES
           @page is set to exactly 100mm x 100mm with zero margin. The
           sheet itself carries its own w-[100mm]/h-[100mm] sizing via
-          Tailwind so screen preview and print always agree — there is
+          Tailwind so screen preview and print always agree - there is
           no separate "print-only" size rule left to drift out of sync.
 
           Thermal-printer compatibility:
           - All colors forced to pure black/white via filter:
-            grayscale(1) contrast(100) — eliminates any anti-aliased
+            grayscale(1) contrast(100) - eliminates any anti-aliased
             gray edges the browser might produce.
           - print-color-adjust: exact on every element so Chrome's
             "save as PDF" and the OS print dialog both keep the
@@ -907,7 +907,7 @@ export function ResiPrint({
         <div className="print-toolbar sticky top-0 z-10 flex flex-col gap-3 border-b bg-white px-4 py-3 shadow-sm dark:bg-neutral-800 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <p className="text-sm font-bold text-foreground">
-              Pratinjau Cetak Resi — {resiNumber}
+              Pratinjau Cetak Resi - {resiNumber}
             </p>
 
             <p className="text-xs text-muted-foreground">

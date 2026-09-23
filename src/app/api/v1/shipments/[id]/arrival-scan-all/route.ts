@@ -67,8 +67,8 @@ export async function POST(req: NextRequest, { params }: Params) {
         progress,
         message:
           context === "transport_arrival"
-            ? "Master Resi B2B ter-scan (mode reader) — semua paket lengkap. Siap konfirmasi penerimaan dari transport."
-            : "Master Resi B2B ter-scan (mode reader) — semua paket lengkap. Siap konfirmasi tiba di gudang.",
+            ? "Master Resi B2B ter-scan (mode reader) - semua paket lengkap. Siap konfirmasi penerimaan dari transport."
+            : "Master Resi B2B ter-scan (mode reader) - semua paket lengkap. Siap konfirmasi tiba di gudang.",
       });
     }
 
@@ -102,8 +102,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       progress,
       message:
         context === "transport_arrival"
-          ? `${pending.length} paket ditandai ter-scan (mode reader). Semua paket lengkap — siap konfirmasi penerimaan dari transport.`
-          : `${pending.length} paket ditandai ter-scan (mode reader). Semua paket lengkap — siap konfirmasi tiba di gudang.`,
+          ? `${pending.length} paket ditandai ter-scan (mode reader). Semua paket lengkap - siap konfirmasi penerimaan dari transport.`
+          : `${pending.length} paket ditandai ter-scan (mode reader). Semua paket lengkap - siap konfirmasi tiba di gudang.`,
     });
   });
 }

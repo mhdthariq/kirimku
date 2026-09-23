@@ -69,7 +69,7 @@ export function SettlementsPage() {
 
         <TabsContent value="transport" className="mt-3 space-y-3">
           <p className="text-xs text-muted-foreground">
-            Transport ARRIVED dengan kendaraan partner bisa difinalisasi — nilai transport & persentase di-snapshot permanen (§37), profit share dikredit ke wallet Vehicle Owner secara atomik.
+            Transport ARRIVED dengan kendaraan partner bisa difinalisasi - nilai transport & persentase di-snapshot permanen (§37), profit share dikredit ke wallet Vehicle Owner secara atomik.
           </p>
           <DataTable
             rows={partnerArrived}
@@ -100,7 +100,7 @@ export function SettlementsPage() {
               {
                 key: "value",
                 header: "Nilai Shipment",
-                render: (r) => <span className="text-sm">{r.totalPrice != null ? formatRupiah(r.totalPrice) : "—"}</span>,
+                render: (r) => <span className="text-sm">{r.totalPrice != null ? formatRupiah(r.totalPrice) : "-"}</span>,
               },
               {
                 key: "settlement",
@@ -127,7 +127,7 @@ export function SettlementsPage() {
                       <CheckCircle2 className="h-3.5 w-3.5" /> Settle
                     </Button>
                   ) : (
-                    "—"
+                    "-"
                   ),
               },
             ]}
@@ -168,7 +168,7 @@ export function SettlementsPage() {
           ) : (
             <>
               <p className="text-xs text-muted-foreground">
-                Komisi Marketing berstatus <b>PENDING</b> sampai invoice <b>LUNAS penuh</b> — pembayaran parsial tidak merilis komisi (§8.1). Pelunasan invoice otomatis mengkredit wallet Marketing (atomic).
+                Komisi Marketing berstatus <b>PENDING</b> sampai invoice <b>LUNAS penuh</b> - pembayaran parsial tidak merilis komisi (§8.1). Pelunasan invoice otomatis mengkredit wallet Marketing (atomic).
               </p>
               <DataTable
                 rows={commissionInvoices}
@@ -222,7 +222,7 @@ export function SettlementsPage() {
                           Catat Pembayaran
                         </Button>
                       ) : (
-                        "—"
+                        "-"
                       ),
                   },
                 ]}
@@ -258,7 +258,7 @@ function SettleTransportDialog({
     if (!transportValue || transportValue <= 0) return;
     setBusy(true);
     const ok = await runAction(() => apiPost(`/transports/${transport.id}/settle`, { transportValue }), {
-      success: "Settlement difinalisasi — profit share dikredit ke wallet Vehicle Owner (atomic).",
+      success: "Settlement difinalisasi - profit share dikredit ke wallet Vehicle Owner (atomic).",
     });
     if (ok) {
       setValue("");
@@ -280,7 +280,7 @@ function SettleTransportDialog({
         <form onSubmit={onSubmit} className="space-y-3">
           <Field
             label="Nilai Transport (Rupiah)"
-            hint={suggested > 0 ? `Disarankan dari total harga shipment termuat: ${formatRupiah(suggested)}` : "Shipment belum diharga — masukkan nilai manual."}
+            hint={suggested > 0 ? `Disarankan dari total harga shipment termuat: ${formatRupiah(suggested)}` : "Shipment belum diharga - masukkan nilai manual."}
           >
             <NumberInput
               value={value || (suggested > 0 ? String(suggested) : "")}

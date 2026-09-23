@@ -103,7 +103,7 @@ export function CustomersPage() {
       // PIC assignment is admin/owner-only — Marketing users create customers
       // that are automatically connected to themselves (handled server-side).
       ...(isMarketing
-        ? // Revise round 10 — Marketing users send warehouseId ONLY when they
+        ? // Revise round 10 - Marketing users send warehouseId ONLY when they
           // picked one manually (i.e. they're "umum" and the form requires a
           // manual gudang pick). When the marketing partner is aligned to a
           // gudang, we OMIT warehouseId so the server auto-inherits the
@@ -149,7 +149,7 @@ export function CustomersPage() {
 
   const marketingPartnerOptions = [
     // "none" sentinel — Radix Select forbids empty-string item values
-    { value: "none", label: "— Belum terhubung (umum) —" },
+    { value: "none", label: "- Belum terhubung (umum) -" },
     ...(options?.marketingPartners ?? []).map((p) => ({
       value: String(p.id),
       label: p.warehouseName ? `${p.name} · ${p.warehouseName}` : `${p.name} · Umum`,
@@ -157,7 +157,7 @@ export function CustomersPage() {
   ];
   // Revise round 7 — Gudang dropdown for Customer attachment.
   const gudangOptions = [
-    { value: "none", label: "— Umum (terlihat oleh semua gudang) —" },
+    { value: "none", label: "- Umum (terlihat oleh semua gudang) -" },
     ...(options?.warehouses ?? []).map((w) => ({ value: String(w.id), label: w.name + (w.city ? ` · ${w.city}` : "") })),
   ];
 
@@ -167,7 +167,7 @@ export function CustomersPage() {
         title="Customers"
         subtitle={
           isMarketing
-            ? "Customer Anda sendiri — setiap marketing hanya melihat customer yang terhubung dengannya."
+            ? "Customer Anda sendiri - setiap marketing hanya melihat customer yang terhubung dengannya."
             : "Master data pelanggan B2B dan B2C beserta Marketing pengelolanya (PIC) dan Gudang-nya."
         }
         icon={<Users className="h-5 w-5" />}
@@ -221,7 +221,7 @@ export function CustomersPage() {
                       <UserRoundCheck className="h-3.5 w-3.5" /> {c.marketingPartnerName}
                     </span>
                   ) : (
-                    <span className="text-xs text-muted-foreground">— umum —</span>
+                    <span className="text-xs text-muted-foreground">- umum -</span>
                   ),
               },
               {
@@ -233,11 +233,11 @@ export function CustomersPage() {
                       <MapPin className="h-3.5 w-3.5" /> {c.warehouseName}
                     </span>
                   ) : (
-                    <span className="text-xs text-muted-foreground">— umum —</span>
+                    <span className="text-xs text-muted-foreground">- umum -</span>
                   ),
               },
-              { key: "phone", header: "Telepon", hideOnMobile: true, render: (c) => c.phone ?? "—" },
-              { key: "email", header: "Email", hideOnMobile: true, render: (c) => c.email ?? "—" },
+              { key: "phone", header: "Telepon", hideOnMobile: true, render: (c) => c.phone ?? "-" },
+              { key: "email", header: "Email", hideOnMobile: true, render: (c) => c.email ?? "-" },
               { key: "status", header: "Status", render: (c) => <ActiveBadge active={c.isActive} /> },
               ...(can.update || can.delete
                 ? [
@@ -279,7 +279,7 @@ export function CustomersPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editing ? `Edit Customer — ${editing.code}` : "Tambah Customer"}</DialogTitle>
+            <DialogTitle>{editing ? `Edit Customer - ${editing.code}` : "Tambah Customer"}</DialogTitle>
             <DialogDescription>
               {editing ? "Perbarui data customer." : "Customer baru akan mendapat kode otomatis (CUS-xxxxxx)."}
             </DialogDescription>
@@ -293,7 +293,7 @@ export function CustomersPage() {
                 <FormSelect
                   value={form.type}
                   onValueChange={(value) => setForm({ ...form, type: value as "b2b" | "b2c" })}
-                  options={[{ value: "b2c", label: "B2C — individu" }, { value: "b2b", label: "B2B — perusahaan" }]}
+                  options={[{ value: "b2c", label: "B2C - individu" }, { value: "b2b", label: "B2B - perusahaan" }]}
                   disabled={busy}
                 />
               </Field>
@@ -302,14 +302,14 @@ export function CustomersPage() {
                   <Input id="c-company" value={form.companyName} onChange={(e) => setForm({ ...form, companyName: e.target.value })} placeholder="PT / CV" disabled={busy} />
                 </Field>
               )}
-              {/* Marketing (PIC) — "customer connected to who". Admin/owner only:
+              {/* Marketing (PIC) - "customer connected to who". Admin/owner only:
                   a Marketing user's customers are always connected to themselves. */}
               {!isMarketing && (
                 <Field
                   label="Marketing (PIC)"
                   htmlFor="c-marketing"
                   className="sm:col-span-2"
-                  hint="Customer hanya terlihat oleh marketing ini — khususnya penting untuk B2B."
+                  hint="Customer hanya terlihat oleh marketing ini - khususnya penting untuk B2B."
                 >
                   <FormSelect
                     value={form.marketingPartnerId}
@@ -320,11 +320,11 @@ export function CustomersPage() {
                   />
                 </Field>
               )}
-              {/* Revise round 7 — Gudang attachment.
+              {/* Revise round 7 - Gudang attachment.
                   Admin/owner only: when set, only that gudang's admins see
                   this customer. "Umum" = visible to every gudang.
 
-                  Revise round 10 — Marketing users with an aligned gudang
+                  Revise round 10 - Marketing users with an aligned gudang
                   auto-inherit it (no selector shown, just an info banner).
                   Marketing users who are "umum" must pick a gudang manually
                   so their customer doesn't default to umum (otherwise the
@@ -430,17 +430,17 @@ function CustomerMarketingGudangHint({
     // Aligned marketing — server will auto-assign this gudang. Show banner.
     return (
       <div className="sm:col-span-2 rounded-lg border border-emerald-300 bg-emerald-50/60 px-3 py-2 text-xs text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
-        Gudang otomatis: <b>{alignedWarehouseName}</b> — customer akan terikat ke gudang afiliasi marketing Anda.
+        Gudang otomatis: <b>{alignedWarehouseName}</b> - customer akan terikat ke gudang afiliasi marketing Anda.
       </div>
     );
   }
   // Umum marketing — must pick a gudang manually.
   return (
     <Field
-      label="Gudang (wajib — marketing umum)"
+      label="Gudang (wajib - marketing umum)"
       htmlFor="c-warehouse-marketing"
       className="sm:col-span-2"
-      hint="Marketing Anda berstatus 'Umum'. Pilih gudang untuk customer ini — bila tidak dipilih, customer akan terlihat oleh semua gudang."
+      hint="Marketing Anda berstatus 'Umum'. Pilih gudang untuk customer ini - bila tidak dipilih, customer akan terlihat oleh semua gudang."
     >
       <FormSelect
         value={form.warehouseId}

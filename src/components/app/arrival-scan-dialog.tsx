@@ -115,8 +115,8 @@ export function ArrivalScanDialog({
         setFeedback({
           kind: "ok",
           text: isTransport
-            ? "Semua paket ter-scan (mode reader) — siap konfirmasi penerimaan dari transport."
-            : "Semua paket ter-scan (mode reader) — siap konfirmasi tiba di gudang.",
+            ? "Semua paket ter-scan (mode reader) - siap konfirmasi penerimaan dari transport."
+            : "Semua paket ter-scan (mode reader) - siap konfirmasi tiba di gudang.",
         });
       } catch {
         /* ignore */
@@ -169,17 +169,17 @@ export function ArrivalScanDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <QrCode className="h-5 w-5 text-primary" />
-            {isTransport ? "Terima Paket dari Transport" : "Terima Paket"} — {t?.masterCode ?? ""}
+            {isTransport ? "Terima Paket dari Transport" : "Terima Paket"} - {t?.masterCode ?? ""}
           </DialogTitle>
           <DialogDescription>
             {isTransport ? (
               <>
                 Scan setiap paket yang dibawa <b>{whoLabel}</b> dari <b>{t?.originWarehouseName ?? t?.origin ?? "gudang asal"}</b> (
-                {t?.detailsCount ?? 0} paket). Kode tidak ditampilkan — baca dari label fisik paket.
+                {t?.detailsCount ?? 0} paket). Kode tidak ditampilkan - baca dari label fisik paket.
               </>
             ) : (
               <>
-                Scan setiap paket yang dibawa kurir {t?.kurirName ?? ""} ({t?.detailsCount ?? 0} paket). Kode tidak ditampilkan — baca dari
+                Scan setiap paket yang dibawa kurir {t?.kurirName ?? ""} ({t?.detailsCount ?? 0} paket). Kode tidak ditampilkan - baca dari
                 label fisik paket.
               </>
             )}
@@ -198,7 +198,7 @@ export function ArrivalScanDialog({
                     via transport <span className="font-mono font-semibold">{t.transportCode}</span>
                   </>
                 ) : null}
-                . Scan semua paket untuk menerimanya di gudang Anda — setelah diterima, shipment bisa ditugaskan ke kurir untuk
+                . Scan semua paket untuk menerimanya di gudang Anda - setelah diterima, shipment bisa ditugaskan ke kurir untuk
                 dikirim ke penerima.
               </p>
             </div>
@@ -210,7 +210,7 @@ export function ArrivalScanDialog({
             <span className="font-medium text-foreground">
               {progress?.isB2B
                 ? progress.masterScanned
-                  ? "Master Resi ter-scan — semua paket lengkap"
+                  ? "Master Resi ter-scan - semua paket lengkap"
                   : "Menunggu scan Master Resi"
                 : `Paket ter-scan: ${progress?.scanned ?? 0}/${progress?.total ?? "…"}`}
             </span>
@@ -223,7 +223,7 @@ export function ArrivalScanDialog({
 
         {progress?.isB2B && !progress?.masterScanned && (
           <div className="rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-2 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300">
-            <strong>Shipment B2B — cukup scan Master Resi sekali.</strong> Tidak perlu scan tiap paket. Gunakan kamera / reader untuk membaca Master Resi, atau klik <strong>Scan Master Resi</strong> di bawah.
+            <strong>Shipment B2B - cukup scan Master Resi sekali.</strong> Tidak perlu scan tiap paket. Gunakan kamera / reader untuk membaca Master Resi, atau klik <strong>Scan Master Resi</strong> di bawah.
           </div>
         )}
 
@@ -243,7 +243,7 @@ export function ArrivalScanDialog({
           </div>
         )}
 
-        {/* Package checklist — codes hidden, methods visible */}
+        {/* Package checklist - codes hidden, methods visible */}
         <div className="max-h-44 space-y-1.5 overflow-y-auto rounded-lg border p-2">
           {progress?.details.map((d, i) => (
             <div
@@ -257,7 +257,7 @@ export function ArrivalScanDialog({
               )}
               <div className="min-w-0 flex-1">
                 <p className={cn("truncate text-xs font-semibold", d.scanned ? "text-emerald-700 dark:text-emerald-400" : "text-foreground")}>
-                  Paket {i + 1} — {d.description}
+                  Paket {i + 1} - {d.description}
                 </p>
                 {d.scanned && d.scannedByName && <p className="truncate text-[11px] text-muted-foreground">oleh {d.scannedByName}</p>}
               </div>
@@ -293,7 +293,7 @@ export function ArrivalScanDialog({
           {progress?.allScanned && (
             <div className="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 dark:border-emerald-900 dark:bg-emerald-950/40">
               <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
-                {isTransport ? "Semua paket ter-scan — konfirmasi penerimaan dari transport." : "Semua paket ter-scan — konfirmasi tiba di gudang."}
+                {isTransport ? "Semua paket ter-scan - konfirmasi penerimaan dari transport." : "Semua paket ter-scan - konfirmasi tiba di gudang."}
               </p>
               {!isTransport && scopedWarehouseId == null && (
                 <Field label="Gudang Penerima" htmlFor="arr-warehouse">

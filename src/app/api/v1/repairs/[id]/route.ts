@@ -70,7 +70,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       }
     }
     if (Object.keys(changes).length === 0) {
-      return fail(422, "Tidak ada perubahan yang terdeteksi — tidak ada yang perlu disimpan.");
+      return fail(422, "Tidak ada perubahan yang terdeteksi - tidak ada yang perlu disimpan.");
     }
 
     const amountDelta = Math.round((amount - repair.amount) * 100) / 100;
@@ -127,7 +127,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
         ownerId: repair.ownerId,
         vehicleNumber: repair.vehicle.vehicleNumber,
         action: "UPDATED",
-        detail: `Repair ${repair.repairCode} diubah oleh ${user.name}${changedSummary ? ` — field: ${changedSummary}` : ""}${amountDelta !== 0 ? ` · wallet disesuaikan ${amountDelta > 0 ? "+" : ""}${formatIDR(amountDelta)}` : ""}.`,
+        detail: `Repair ${repair.repairCode} diubah oleh ${user.name}${changedSummary ? ` - field: ${changedSummary}` : ""}${amountDelta !== 0 ? ` · wallet disesuaikan ${amountDelta > 0 ? "+" : ""}${formatIDR(amountDelta)}` : ""}.`,
         changes,
         amount,
         actor: user,
@@ -171,7 +171,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
           direction: "CREDIT",
           amount: repair.deductedAmount,
           businessRef: `REP-DEL-${repair.id}-${Date.now()}`,
-          description: `Pengembalian penuh deduction repair ${repair.repairCode} (${formatIDR(repair.deductedAmount)}) — record dihapus.`,
+          description: `Pengembalian penuh deduction repair ${repair.repairCode} (${formatIDR(repair.deductedAmount)}) - record dihapus.`,
           repairId: repair.id,
           createdById: user.id,
         });
@@ -184,7 +184,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
         ownerId: repair.ownerId,
         vehicleNumber: repair.vehicle.vehicleNumber,
         action: "DELETED",
-        detail: `Repair ${repair.repairCode} (${repair.description} — ${formatIDR(repair.amount)}) dihapus oleh ${user.name}${repair.deductedAmount > 0 ? ` · deduction ${formatIDR(repair.deductedAmount)} dikembalikan ke wallet` : ""}.`,
+        detail: `Repair ${repair.repairCode} (${repair.description} - ${formatIDR(repair.amount)}) dihapus oleh ${user.name}${repair.deductedAmount > 0 ? ` · deduction ${formatIDR(repair.deductedAmount)} dikembalikan ke wallet` : ""}.`,
         amount: repair.amount,
         actor: user,
       });

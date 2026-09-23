@@ -103,7 +103,7 @@ export function RoutesPage({ routeId }: { routeId: number | null }) {
   }, [dirty]);
   useEffect(() => {
     const onHashChange = () => {
-      if (dirtyRef.current) toast.info("Ada perubahan checkpoint yang belum disimpan — kembali ke rute untuk menyimpan.");
+      if (dirtyRef.current) toast.info("Ada perubahan checkpoint yang belum disimpan - kembali ke rute untuk menyimpan.");
     };
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
@@ -238,7 +238,7 @@ export function RoutesPage({ routeId }: { routeId: number | null }) {
           }
         />
 
-        {/* Status strip — one source of truth for the collection state */}
+        {/* Status strip - one source of truth for the collection state */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border bg-muted/40 px-3.5 py-2.5 text-xs text-muted-foreground">
           <span className="flex items-center gap-1.5 font-semibold text-foreground">
             <MapPin className="h-3.5 w-3.5 text-primary" /> Koleksi Checkpoint
@@ -307,7 +307,7 @@ export function RoutesPage({ routeId }: { routeId: number | null }) {
                 header: "Koridor",
                 render: (r) => (
                   <span className="text-sm text-muted-foreground">
-                    {r.origin ?? "—"} → {r.destination ?? "—"}
+                    {r.origin ?? "-"} → {r.destination ?? "-"}
                   </span>
                 ),
               },

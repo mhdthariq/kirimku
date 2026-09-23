@@ -108,7 +108,7 @@ export function CheckpointCheckinDialog({ open, onOpenChange, transportId, trans
         }
       });
     } catch {
-      setError("Kamera tidak dapat diakses — izin kamera wajib untuk check-in.");
+      setError("Kamera tidak dapat diakses - izin kamera wajib untuk check-in.");
     }
   }, []);
 
@@ -119,7 +119,7 @@ export function CheckpointCheckinDialog({ open, onOpenChange, transportId, trans
       setPhoto(dataUrl);
       stopCamera();
     } catch {
-      setError("Gagal memproses foto — coba lagi.");
+      setError("Gagal memproses foto - coba lagi.");
     }
   }, [stopCamera]);
 
@@ -141,7 +141,7 @@ export function CheckpointCheckinDialog({ open, onOpenChange, transportId, trans
       },
       () => {
         setLocating(false);
-        setError("Lokasi tidak dapat diambil — pastikan izin lokasi aktif, lalu coba lagi.");
+        setError("Lokasi tidak dapat diambil - pastikan izin lokasi aktif, lalu coba lagi.");
       },
       { enableHighAccuracy: true, timeout: 12000, maximumAge: 5000 },
     );
@@ -160,7 +160,7 @@ export function CheckpointCheckinDialog({ open, onOpenChange, transportId, trans
   async function submit() {
     if (!selected || submitting) return;
     if (!coords) {
-      setError("Lokasi GPS belum didapat — tekan tombol lokasi.");
+      setError("Lokasi GPS belum didapat - tekan tombol lokasi.");
       return;
     }
     if (!photo) {
@@ -193,7 +193,7 @@ export function CheckpointCheckinDialog({ open, onOpenChange, transportId, trans
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <MapPin className="h-5 w-5 text-primary" /> Check-in Checkpoint — {transportCode}
+            <MapPin className="h-5 w-5 text-primary" /> Check-in Checkpoint - {transportCode}
           </DialogTitle>
           <DialogDescription>
             Ambil foto selfie di lokasi checkpoint. Sistem memvalidasi jarak Anda terhadap radius checkpoint.
@@ -239,7 +239,7 @@ export function CheckpointCheckinDialog({ open, onOpenChange, transportId, trans
                       <p className="mt-0.5">
                         Jarak ke {selected.name}: <strong>{formatNumber((liveDistance ?? 0) / 1000, 2)} KM</strong> · radius{" "}
                         <strong>{formatNumber(radiusM / 1000, 2)} KM</strong>{" "}
-                        {inRadius ? "— dalam radius ✓" : "— DI LUAR RADIUS, mendekatlah ke checkpoint"}
+                        {inRadius ? "- dalam radius ✓" : "- DI LUAR RADIUS, mendekatlah ke checkpoint"}
                       </p>
                     )}
                   </div>

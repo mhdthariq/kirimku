@@ -134,7 +134,7 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
   const startCamera = useCallback(async () => {
     setCameraError(null);
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
-      setCameraError("Browser ini tidak mendukung akses kamera — gunakan perangkat dengan kamera.");
+      setCameraError("Browser ini tidak mendukung akses kamera - gunakan perangkat dengan kamera.");
       return;
     }
     try {
@@ -154,10 +154,10 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
       const name = err instanceof DOMException ? err.name : "";
       setCameraError(
         name === "NotAllowedError"
-          ? "Akses kamera ditolak — izinkan kamera di browser, lalu coba lagi."
+          ? "Akses kamera ditolak - izinkan kamera di browser, lalu coba lagi."
           : name === "NotFoundError"
             ? "Kamera tidak ditemukan di perangkat ini."
-            : "Kamera gagal dijalankan — coba lagi.",
+            : "Kamera gagal dijalankan - coba lagi.",
       );
       setCameraOn(false);
     }
@@ -227,8 +227,8 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
       const res = await apiPost<{ tracking: string }>(`${basePath}/${isPickup ? "confirm" : "complete"}`, body);
       toast.success(
         isPickup
-          ? `Paket ${task.code} telah diambil (Picked Up) — tracking: ${res.tracking ?? "Picked-up"}. Pickup selesai otomatis saat paket tiba di gudang.`
-          : `Delivery ${task.code} selesai — ${res.tracking ?? "Delivered"}`,
+          ? `Paket ${task.code} telah diambil (Picked Up) - tracking: ${res.tracking ?? "Picked-up"}. Pickup selesai otomatis saat paket tiba di gudang.`
+          : `Delivery ${task.code} selesai - ${res.tracking ?? "Delivered"}`,
       );
       onOpenChange(false);
       onDone();
@@ -259,15 +259,15 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
           </DialogTitle>
           {progress?.isB2B && (
             <DialogDescription className="rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-2 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300">
-              <strong>Shipment B2B — cukup scan Master Resi sekali.</strong> Semua paket pada konsinyasi ini akan otomatis ter-scan setelah Master Resi terbaca.
+              <strong>Shipment B2B - cukup scan Master Resi sekali.</strong> Semua paket pada konsinyasi ini akan otomatis ter-scan setelah Master Resi terbaca.
             </DialogDescription>
           )}
         </DialogHeader>
 
-        {/* Revise round 7 — Pickup address panel.
+        {/* Revise round 7 - Pickup address panel.
             For pickups, show the address where the kurir needs to go to pick
             up the package. Sourced from MasterShipment.pengirimAddress (the
-            per-shipment sender address the staff typed — NOT the customer's
+            per-shipment sender address the staff typed - NOT the customer's
             master DB record, which may differ). Helps the kurir know where
             to go and who to ask for on arrival. Hidden for deliveries. */}
         {isPickup && task?.pickupAddress && (
@@ -307,7 +307,7 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
             <span className="font-medium text-foreground">
               {progress?.isB2B
                 ? progress.masterScanned
-                  ? "Master Resi ter-scan — semua paket lengkap"
+                  ? "Master Resi ter-scan - semua paket lengkap"
                   : "Menunggu scan Master Resi"
                 : `Paket ter-scan: ${progress?.scanned ?? 0}/${progress?.total ?? "…"}`}
             </span>
@@ -336,7 +336,7 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
           </div>
         )}
 
-        {/* Package checklist — codes hidden, method badges visible (Riwayat Scan) */}
+        {/* Package checklist - codes hidden, method badges visible (Riwayat Scan) */}
         <div className="max-h-[28dvh] space-y-1.5 overflow-y-auto rounded-lg border p-2 sm:max-h-56">
           {progress?.details.map((d, i) => (
             <div
@@ -355,7 +355,7 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
               )}
               <div className="min-w-0 flex-1">
                 <p className={cn("truncate text-xs font-semibold", d.scanned ? "text-emerald-700 dark:text-emerald-400" : "text-foreground")}>
-                  Paket {i + 1} — {d.description}
+                  Paket {i + 1} - {d.description}
                 </p>
                 <p className="truncate text-[11px] text-muted-foreground">
                   {d.scanned && d.scannedByName ? `oleh ${d.scannedByName}` : "belum discan"}
@@ -372,7 +372,7 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
           {!progress && <p className="px-2 py-4 text-center text-sm text-muted-foreground">Memuat daftar paket…</p>}
         </div>
 
-        {/* Pickup info — kurir tidak menarik pembayaran, info box singkat. */}
+        {/* Pickup info - kurir tidak menarik pembayaran, info box singkat. */}
         {isPickup && (
           <div className="rounded-lg border border-sky-200 bg-sky-50/60 px-3 py-2 text-xs dark:border-sky-900 dark:bg-sky-950/40">
             <p className="text-sky-800 dark:text-sky-300">
@@ -381,12 +381,12 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
           </div>
         )}
 
-        {/* Confirm section — unlocked when all packages scanned.
+        {/* Confirm section - unlocked when all packages scanned.
             Pickup: hanya tombol Konfirmasi (tanpa field sisa/metode/catatan). */}
         {!completed && progress?.allScanned && (
           <div className="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 dark:border-emerald-900 dark:bg-emerald-950/40">
             <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
-              Semua paket sudah ter-scan — siap konfirmasi {isPickup ? "pickup" : "serah terima"}.
+              Semua paket sudah ter-scan - siap konfirmasi {isPickup ? "pickup" : "serah terima"}.
             </p>
             {!isPickup && (
               <>
@@ -404,10 +404,10 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
                 </div>
               </>
             )}
-            {/* Step 5 — Proof photo capture (REQUIRED before confirm).
+            {/* Step 5 - Proof photo capture (REQUIRED before confirm).
                 Same pattern as the checkpoint check-in dialog: phone
                 camera (getUserMedia) only. File upload is intentionally
-                NOT supported — the photo MUST be taken live with the
+                NOT supported - the photo MUST be taken live with the
                 camera so it's proof of the actual handover, not a
                 pre-existing image. The preview thumbnail + "Ganti Foto"
                 button let the user retake if the shot is blurry. */}
@@ -451,7 +451,7 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
             </Button>
             {isPickup && (
               <p className="text-[11px] leading-relaxed text-muted-foreground">
-                Pickup berstatus <strong>Picked Up</strong> setelah paket diambil — pickup baru menjadi <strong>Completed</strong> saat paket tiba dan diterima di gudang (dikonfirmasi Admin Gudang).
+                Pickup berstatus <strong>Picked Up</strong> setelah paket diambil - pickup baru menjadi <strong>Completed</strong> saat paket tiba dan diterima di gudang (dikonfirmasi Admin Gudang).
               </p>
             )}
           </div>
@@ -459,7 +459,7 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
 
         {completed && (
           <div className="rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
-            Task ini sudah selesai {task?.completedAt ? `pada ${new Date(task.completedAt).toLocaleString("id-ID")}` : ""} — daftar di atas adalah Riwayat Scan (badge Scanned / Typed).
+            Task ini sudah selesai {task?.completedAt ? `pada ${new Date(task.completedAt).toLocaleString("id-ID")}` : ""} - daftar di atas adalah Riwayat Scan (badge Scanned / Typed).
           </div>
         )}
       </DialogContent>

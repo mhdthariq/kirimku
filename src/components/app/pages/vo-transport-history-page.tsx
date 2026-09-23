@@ -52,7 +52,7 @@ export function VOTransportHistoryPage({ initialTab = "history" }: { initialTab?
     <div className="space-y-4">
       <PageHeader
         title="Transport & Earnings"
-        subtitle="Riwayat transport dengan kendaraan Anda — nilai transport, persentase, dan penghasilan Anda."
+        subtitle="Riwayat transport dengan kendaraan Anda - nilai transport, persentase, dan penghasilan Anda."
         icon={<History className="h-5 w-5" />}
         actions={
           <div className="rounded-xl border bg-primary/10 px-4 py-2">
@@ -103,7 +103,7 @@ export function VOTransportHistoryPage({ initialTab = "history" }: { initialTab?
                 key: "value",
                 header: "Nilai Transport",
                 hideOnMobile: true,
-                render: (r) => <span className="text-sm">{r.transportValue > 0 ? formatRupiah(r.transportValue) : "—"}</span>,
+                render: (r) => <span className="text-sm">{r.transportValue > 0 ? formatRupiah(r.transportValue) : "-"}</span>,
               },
               {
                 key: "percent",
@@ -125,7 +125,7 @@ export function VOTransportHistoryPage({ initialTab = "history" }: { initialTab?
                     // not settled yet → YELLOW with the potential amount
                     <div>
                       <span className="font-semibold text-amber-500 dark:text-yellow-400">~{formatRupiah(estimateFor(r))}</span>
-                      <p className="text-[10px] font-medium text-amber-500/80 dark:text-yellow-400/80">potensi — belum disettle</p>
+                      <p className="text-[10px] font-medium text-amber-500/80 dark:text-yellow-400/80">potensi - belum disettle</p>
                     </div>
                   ) : (
                     <span className="text-xs text-muted-foreground">belum disettle</span>
@@ -141,7 +141,7 @@ export function VOTransportHistoryPage({ initialTab = "history" }: { initialTab?
                     size="sm"
                     className="h-7"
                     onClick={() => (window.location.hash = `#/transports/${r.id}`)}
-                    title="Lihat detail transport — muatan kendaraan Anda & posisinya"
+                    title="Lihat detail transport - muatan kendaraan Anda & posisinya"
                   >
                     <Eye className="h-3.5 w-3.5" /> Detail
                   </Button>
@@ -156,7 +156,7 @@ export function VOTransportHistoryPage({ initialTab = "history" }: { initialTab?
             <SummaryTile label="Total Nilai Transport Disettle" value={formatRupiah(totalValue)} icon={<History className="h-4 w-4" />} />
             <SummaryTile label="Total Earnings Anda" value={formatRupiah(totalEarnings)} icon={<TrendingUp className="h-4 w-4" />} accent="text-emerald-600 dark:text-emerald-400" />
             <SummaryTile label="Jumlah Settlement" value={`${settled.length}×`} icon={<TrendingUp className="h-4 w-4" />} />
-            {/* Potential (unsettled) earnings — YELLOW so the owner knows what
+            {/* Potential (unsettled) earnings - YELLOW so the owner knows what
                 they could still earn from transports awaiting settlement. */}
             <SummaryTile
               label="Potensi Belum Disettle"
@@ -167,11 +167,11 @@ export function VOTransportHistoryPage({ initialTab = "history" }: { initialTab?
           </div>
           {potentialEarnings > 0 && (
             <p className="rounded-lg border border-amber-300/60 bg-amber-50/70 px-3 py-2 text-xs text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
-              Anda punya <b>{unsettled.length} transport selesai</b> yang belum di-settle — potensi penghasilan <b className="text-amber-600 dark:text-yellow-400">~{formatRupiah(potentialEarnings)}</b> (dihitung dari konfigurasi profit sharing saat ini, berupa warna kuning sampai disettle).
+              Anda punya <b>{unsettled.length} transport selesai</b> yang belum di-settle - potensi penghasilan <b className="text-amber-600 dark:text-yellow-400">~{formatRupiah(potentialEarnings)}</b> (dihitung dari konfigurasi profit sharing saat ini, berupa warna kuning sampai disettle).
             </p>
           )}
           <p className="text-xs text-muted-foreground">
-            Setiap settlement menyimpan persentase saat settlement dibuat — perubahan konfigurasi profit sharing di kemudian hari tidak mengubah settlement lama (§37).
+            Setiap settlement menyimpan persentase saat settlement dibuat - perubahan konfigurasi profit sharing di kemudian hari tidak mengubah settlement lama (§37).
           </p>
           <DataTable
             rows={settled}

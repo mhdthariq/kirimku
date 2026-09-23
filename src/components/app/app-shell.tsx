@@ -320,7 +320,7 @@ export function AppShell({
         {/* Top bar */}
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-2 border-b bg-background/80 px-3 backdrop-blur-md sm:px-5">
           <div className="flex items-center gap-2">
-            {/* Mobile: sheet menu — hidden for simplified operational roles
+            {/* Mobile: sheet menu - hidden for simplified operational roles
                 (Revision Part X: they use the bottom navigation only) */}
             {!simplifiedOperational && (
               <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
@@ -396,7 +396,7 @@ export function AppShell({
                   <p className="text-sm font-semibold">{user.name}</p>
                   <p className="text-xs font-normal text-muted-foreground">@{user.username}</p>
                 </DropdownMenuLabel>
-                {/* "Lacak Paket" customer-facing tracking link — only shown in
+                {/* "Lacak Paket" customer-facing tracking link - only shown in
                     Dev + Preview. In production the public /tracking-paket page
                     is reachable directly via URL but never advertised from the
                     authenticated UI. */}
@@ -426,7 +426,7 @@ export function AppShell({
         </main>
       </div>
 
-      {/* Mobile bottom navigation — for operational roles this is THE
+      {/* Mobile bottom navigation - for operational roles this is THE
           navigation (no hamburger); persistent, safe-area aware, content
           padded via main's pb-24 (Revision Part X). */}
       {mobileItems.length > 0 && (

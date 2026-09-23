@@ -277,7 +277,7 @@ export interface ShipmentTotals {
 
 export interface PaymentSummary {
   priceAmount: number | null;
-  discountAmount: number; // Revise.md §6 — Marketing-funded discount
+  discountAmount: number; // Revise.md §6 - Marketing-funded discount
   finalPriceAmount: number | null; // what the customer actually owes
   paidAmount: number;
   remainingAmount: number;

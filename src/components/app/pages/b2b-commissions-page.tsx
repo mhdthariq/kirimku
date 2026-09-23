@@ -41,7 +41,7 @@ export function B2BCommissionsPage() {
     return (
       <PageHeader
         title="B2B"
-        subtitle="Halaman ini khusus untuk partner Marketing — komisi B2B milik Anda."
+        subtitle="Halaman ini khusus untuk partner Marketing - komisi B2B milik Anda."
         icon={<Briefcase className="h-5 w-5" />}
       />
     );
@@ -51,7 +51,7 @@ export function B2BCommissionsPage() {
     <div className="space-y-4">
       <PageHeader
         title="B2B & Komisi"
-        subtitle="Invoice B2B milik perusahaan — komisi Anda dirilis ke wallet hanya setelah invoice LUNAS penuh (§9)."
+        subtitle="Invoice B2B milik perusahaan - komisi Anda dirilis ke wallet hanya setelah invoice LUNAS penuh (§9)."
         icon={<Briefcase className="h-5 w-5" />}
         actions={
           <div className="flex flex-wrap gap-2">
@@ -98,7 +98,7 @@ export function B2BCommissionsPage() {
                   <div>
                     <p className="text-sm">{formatRupiah(r.paidAmount)} <span className="text-xs text-muted-foreground">/ {formatRupiah(r.invoiceAmount)}</span></p>
                     {r.remainingAmount > 0 ? (
-                      <p className="text-xs text-chart-4">sisa {formatRupiah(r.remainingAmount)} — komisi belum rilis</p>
+                      <p className="text-xs text-chart-4">sisa {formatRupiah(r.remainingAmount)} - komisi belum rilis</p>
                     ) : (
                       <p className="text-xs text-primary">lunas</p>
                     )}
@@ -119,7 +119,7 @@ export function B2BCommissionsPage() {
         <TabsContent value="shipments" className="mt-3">
           <p className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
             <TrendingUp className="h-3.5 w-3.5" />
-            Pembayaran B2C customer untuk shipment Anda tidak dikelola sistem wallet — Anda yang menagih customer (§5.1).
+            Pembayaran B2C customer untuk shipment Anda tidak dikelola sistem wallet - Anda yang menagih customer (§5.1).
           </p>
           <DataTable
             rows={shipments ?? []}

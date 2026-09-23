@@ -178,7 +178,7 @@ export function VehiclesPage() {
                       <p>T {formatNumber(v.heightM, 3)}m</p>
                     </div>
                   ) : (
-                    <span className="text-xs text-muted-foreground">—</span>
+                    <span className="text-xs text-muted-foreground">-</span>
                   ),
               },
               {
@@ -186,7 +186,7 @@ export function VehiclesPage() {
                 header: "Kapasitas",
                 render: (v) => (
                   <span className="text-sm text-muted-foreground">
-                    {/* Revise round 11 — volume now shows 2 decimal places (e.g., 12.89 m³). */}
+                    {/* Revise round 11 - volume now shows 2 decimal places (e.g., 12.89 m³). */}
                     {formatNumber(v.maxWeightKg, 0)} kg · {formatNumber(v.maxVolumeM3, 2)} m³
                   </span>
                 ),
@@ -210,10 +210,10 @@ export function VehiclesPage() {
                 hideOnMobile: true,
                 render: (v) => {
                   const assignment = v.assignments?.[0];
-                  if (!assignment) return "—";
+                  if (!assignment) return "-";
                   return (
                     <span className="text-sm text-muted-foreground">
-                      {assignment.driver?.name ?? "—"} (driver){assignment.kenek ? `, ${assignment.kenek.name} (kenek)` : ""}
+                      {assignment.driver?.name ?? "-"} (driver){assignment.kenek ? `, ${assignment.kenek.name} (kenek)` : ""}
                     </span>
                   );
                 },
@@ -255,7 +255,7 @@ export function VehiclesPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editing ? `Edit Kendaraan — ${editing.vehicleNumber}` : "Tambah Kendaraan"}</DialogTitle>
+            <DialogTitle>{editing ? `Edit Kendaraan - ${editing.vehicleNumber}` : "Tambah Kendaraan"}</DialogTitle>
             <DialogDescription>Armada baru bisa langsung dipakai membuat transport.</DialogDescription>
           </DialogHeader>
           <form onSubmit={onSubmit} className="space-y-4">
@@ -277,11 +277,11 @@ export function VehiclesPage() {
               <Field label="Max Berat (kg)" htmlFor="v-weight">
                 <NumberInput id="v-weight" value={form.maxWeightKg} onChange={(e) => setForm({ ...form, maxWeightKg: e.target.value })} placeholder="3500" required disabled={busy} />
               </Field>
-              {/* Revise round 9 — physical cargo box dimensions in meters.
+              {/* Revise round 9 - physical cargo box dimensions in meters.
                   When all three are set, maxVolumeM3 is auto-computed as L × W × H
                   and the volume field below becomes read-only. */}
               <Field
-                label="Ukuran — Panjang (m)"
+                label="Ukuran - Panjang (m)"
                 htmlFor="v-length"
                 className="sm:col-span-2"
                 hint="Isi Panjang × Lebar × Tinggi (m) untuk menghitung volume otomatis."
@@ -333,7 +333,7 @@ export function VehiclesPage() {
                 htmlFor="v-volume"
                 hint={
                   form.lengthM !== "" && form.widthM !== "" && form.heightM !== "" && Number(form.lengthM) > 0 && Number(form.widthM) > 0 && Number(form.heightM) > 0
-                    ? "Auto-computed dari ukuran — clear ukuran untuk override manual."
+                    ? "Auto-computed dari ukuran - clear ukuran untuk override manual."
                     : "Boleh diisi manual jika ukuran tidak diisi."
                 }
               >
@@ -356,12 +356,12 @@ export function VehiclesPage() {
               <Field label="Catatan" htmlFor="v-notes" className="sm:col-span-2">
                 <Textarea id="v-notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} placeholder="Opsional" disabled={busy} />
               </Field>
-              {/* Revise.md §13 — link the vehicle to its Vehicle Owner */}
+              {/* Revise.md §13 - link the vehicle to its Vehicle Owner */}
               <Field
                 label="Vehicle Owner"
                 htmlFor="v-owner"
                 className="sm:col-span-2"
-                hint="Kendaraan partner dihubungkan ke pemiliknya — profit share transport dibayarkan ke wallet owner."
+                hint="Kendaraan partner dihubungkan ke pemiliknya - profit share transport dibayarkan ke wallet owner."
               >
                 <FormSelect
                   value={form.ownerId}

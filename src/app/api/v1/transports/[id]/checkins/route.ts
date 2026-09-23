@@ -75,7 +75,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const photo = typeof body.photo === "string" ? body.photo : "";
     if (!photo) return fail(422, "Foto selfie di checkpoint wajib disertakan sebagai bukti check-in.");
     if (!photo.startsWith("data:image/jpeg;base64,") && !photo.startsWith("data:image/png;base64,")) {
-      return fail(422, "Format foto tidak didukung — gunakan JPEG atau PNG.");
+      return fail(422, "Format foto tidak didukung - gunakan JPEG atau PNG.");
     }
     if (photo.length > MAX_PHOTO_BYTES) {
       return fail(422, "Foto terlalu besar (maks ±2.5 MB setelah kompresi).");
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     // ---- server-side geographic validation (never trust the client) -------
     const distance = haversineMeters(latitude, longitude, checkpoint.latitude, checkpoint.longitude);
     if (distance > checkpoint.radiusMeters) {
-      return fail(422, `Jarak Anda ${metersToKmDisplay(distance)} KM dari checkpoint — radius validasi hanya ${metersToKmDisplay(checkpoint.radiusMeters)} KM. Mendekatlah ke checkpoint lalu ulangi check-in.`, {
+      return fail(422, `Jarak Anda ${metersToKmDisplay(distance)} KM dari checkpoint - radius validasi hanya ${metersToKmDisplay(checkpoint.radiusMeters)} KM. Mendekatlah ke checkpoint lalu ulangi check-in.`, {
         distance: [`distance ${distance} m > radius ${checkpoint.radiusMeters} m`],
       });
     }
@@ -99,7 +99,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       },
     });
     if (recent) {
-      return fail(422, "Anda baru saja check-in di checkpoint ini — tunggu sebentar sebelum check-in ulang.");
+      return fail(422, "Anda baru saja check-in di checkpoint ini - tunggu sebentar sebelum check-in ulang.");
     }
 
     const isFinalCheckpoint =
@@ -208,7 +208,7 @@ export async function POST(req: NextRequest, { params }: Params) {
                   masterId: s.shipmentId,
                   kurirId: transport.driverId,
                   status: "ASSIGNED",
-                  notes: `Auto-assigned dari transport ${transport.transportCode} (DIRECT — driver antar langsung ke penerima)`,
+                  notes: `Auto-assigned dari transport ${transport.transportCode} (DIRECT - driver antar langsung ke penerima)`,
                 },
               });
             }
@@ -240,7 +240,7 @@ export async function POST(req: NextRequest, { params }: Params) {
             data: {
               masterId: s.shipmentId,
               event: "AT_DEST_GUDANG",
-              description: `Driver transport ${transport.transportCode} check-in di checkpoint akhir ${checkpoint.name}${originGudangName ? ` (dari ${originGudangName})` : ""} oleh ${user.name} — paket ada di gudang tujuan, menunggu scan penerimaan Admin Gudang`,
+              description: `Driver transport ${transport.transportCode} check-in di checkpoint akhir ${checkpoint.name}${originGudangName ? ` (dari ${originGudangName})` : ""} oleh ${user.name} - paket ada di gudang tujuan, menunggu scan penerimaan Admin Gudang`,
               actorId: user.id,
             },
           });
@@ -281,7 +281,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       radiusKm: metersToKmDisplay(checkpoint.radiusMeters),
       autoArrived,
       message: autoArrived
-        ? `Check-in berhasil di ${checkpoint.name} — transport ${transport.transportCode} OTOMATIS ditandai ARRIVED (checkpoint akhir tercapai).`
+        ? `Check-in berhasil di ${checkpoint.name} - transport ${transport.transportCode} OTOMATIS ditandai ARRIVED (checkpoint akhir tercapai).`
         : `Check-in berhasil di ${checkpoint.name} (jarak ${metersToKmDisplay(distance)} KM, radius ${metersToKmDisplay(checkpoint.radiusMeters)} KM).`,
     });
   });

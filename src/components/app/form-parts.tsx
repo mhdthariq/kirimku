@@ -110,14 +110,14 @@ export { Input, Textarea };
 
 /** Format helpers */
 export function formatRupiah(value: number | null | undefined): string {
-  if (value == null) return "—";
+  if (value == null) return "-";
   return `Rp${value.toLocaleString("id-ID")}`;
 }
 
 export function formatDate(value: string | Date | null | undefined, withTime = false): string {
-  if (value == null) return "—";
+  if (value == null) return "-";
   const d = typeof value === "string" ? new Date(value) : value;
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return "-";
   return d.toLocaleDateString("id-ID", {
     day: "2-digit",
     month: "short",
@@ -127,6 +127,6 @@ export function formatDate(value: string | Date | null | undefined, withTime = f
 }
 
 export function formatNumber(value: number | null | undefined, digits = 1): string {
-  if (value == null) return "—";
+  if (value == null) return "-";
   return value.toLocaleString("id-ID", { maximumFractionDigits: digits });
 }

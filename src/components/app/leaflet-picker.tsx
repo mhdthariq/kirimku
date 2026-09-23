@@ -104,7 +104,7 @@ export function LeafletPicker({
       style={{ height }}
       className="w-full overflow-hidden rounded-lg border bg-muted/40"
       role="application"
-      aria-label="Peta pemilih lokasi — klik untuk menentukan koordinat"
+      aria-label="Peta pemilih lokasi - klik untuk menentukan koordinat"
     />
   );
 }

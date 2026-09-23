@@ -94,7 +94,7 @@ export function VehicleOwnerDashboard() {
     <div className="space-y-4">
       <PageHeader
         title="Dashboard Vehicle Owner"
-        subtitle="Armada, earnings, repair, dan wallet Anda — hanya milik Anda (§39)."
+        subtitle="Armada, earnings, repair, dan wallet Anda - hanya milik Anda (§39)."
         icon={<CarFront className="h-5 w-5" />}
         actions={
           data.recentRepairLogs.length > 0 ? (
@@ -167,7 +167,7 @@ export function VehicleOwnerDashboard() {
                   </CardHeader>
                   <CardContent className="flex-1 space-y-2">
                     <p className="text-xs text-muted-foreground">
-                      {v.name ?? "—"} · kapasitas {formatNumber(v.maxWeightKg, 0)} kg / {formatNumber(v.maxVolumeM3, 2)} m³
+                      {v.name ?? "-"} · kapasitas {formatNumber(v.maxWeightKg, 0)} kg / {formatNumber(v.maxVolumeM3, 2)} m³
                     </p>
                     <div className="grid grid-cols-2 gap-2 text-center">
                       <div className="rounded-lg bg-muted/60 px-2 py-1.5">
@@ -195,7 +195,7 @@ export function VehicleOwnerDashboard() {
 
       {/* 3. Recent settlements + Recent repair activity */}
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Recent settlements — commission money */}
+        {/* Recent settlements - commission money */}
         <section className="rounded-xl border bg-card">
           <div className="flex items-center justify-between border-b px-4 py-3">
             <p className="flex items-center gap-2 text-sm font-semibold">
@@ -227,7 +227,7 @@ export function VehicleOwnerDashboard() {
           </div>
         </section>
 
-        {/* Recent repair activity (action log) — the VO no longer approves
+        {/* Recent repair activity (action log) - the VO no longer approves
             anything; this feed keeps them informed of create/update/delete. */}
         <section className="rounded-xl border bg-card">
           <div className="flex items-center justify-between border-b px-4 py-3">
@@ -265,7 +265,7 @@ export function VehicleOwnerDashboard() {
         </section>
       </div>
 
-      {/* 4. Full list of repairs — every deduction that hit the wallet */}
+      {/* 4. Full list of repairs - every deduction that hit the wallet */}
       <section className="rounded-xl border bg-card">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
           <p className="flex items-center gap-2 text-sm font-semibold">

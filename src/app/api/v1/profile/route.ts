@@ -151,6 +151,26 @@ export async function PUT(req: NextRequest) {
       });
     }
 
+    // Dedicated password-change audit entry — makes the timeline show a
+    // clear "change_password" action instead of requiring the user to
+    // expand the generic "updated_self" entry. Self-service path: the
+    // actor and target are the same person.
+    if (auditNotes.passwordChanged) {
+      await audit({
+        action: "change_password",
+        entityType: "user",
+        entityId: user.id,
+        entityLabel: `${user.name} change password (self)`,
+        actor: user,
+        after: {
+          changedBy: user.name,
+          changedByUsername: user.username,
+          targetUser: user.username,
+          selfService: true,
+        },
+      });
+    }
+
     const refreshed = await db.user.findUniqueOrThrow({
       where: { id: user.id },
       select: { id: true, username: true, name: true, isOwner: true },

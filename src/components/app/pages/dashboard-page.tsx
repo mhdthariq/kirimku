@@ -286,7 +286,7 @@ export function DashboardPage() {
         <DatePeriodFilter from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t); }} />
       </div>
 
-      {/* 1. APPROVAL QUEUE — top priority (only if user has any approval permission) */}
+      {/* 1. APPROVAL QUEUE - top priority (only if user has any approval permission) */}
       {approvalCards.length > 0 && (
         <>
           {totalApprovals > 0 && (
@@ -304,7 +304,7 @@ export function DashboardPage() {
                   Perlu Approval Anda
                 </CardTitle>
                 <p className="text-xs text-muted-foreground">
-                  Aktivitas yang perlu Anda tinjau &amp; setujui — Top Up, Withdrawal, Payment, dan Komisi Marketing yang siap dirilis.
+                  Aktivitas yang perlu Anda tinjau &amp; setujui - Top Up, Withdrawal, Payment, dan Komisi Marketing yang siap dirilis.
                 </p>
               </CardHeader>
             </Card>
@@ -316,7 +316,7 @@ export function DashboardPage() {
         </>
       )}
 
-      {/* 2. Marketing partner snapshot — own wallet & commission pipeline */}
+      {/* 2. Marketing partner snapshot - own wallet & commission pipeline */}
       {data.role === "marketing" && data.marketing && (
         <MarketingOverview snapshot={data.marketing} />
       )}
@@ -348,12 +348,12 @@ export function DashboardPage() {
         </div>
       )}
 
-      {/* 4. Gudang workspace — Admin Gudang / Staff Gudang scan queue */}
+      {/* 4. Gudang workspace - Admin Gudang / Staff Gudang scan queue */}
       {data.gudang && (data.role === "admin-gudang" || data.role === "staff-gudang") && (
         <GudangScanQueue workspace={data.gudang} />
       )}
 
-      {/* 5. Operational details (filtered by period) — owner / admin-kantor only */}
+      {/* 5. Operational details (filtered by period) - owner / admin-kantor only */}
       {(data.role === "owner" || data.role === "admin-kantor") && (
         <div className="grid gap-4 lg:grid-cols-3">
           {/* Shipment lifecycle funnel */}
@@ -655,13 +655,13 @@ function GudangScanQueue({ workspace }: { workspace: GudangDashboardWorkspace })
             </div>
           </CardTitle>
           <p className="text-xs text-muted-foreground">
-            Daftar shipment yang perlu Anda scan & verifikasi — paket dari kurir (pickup selesai), paket dari gudang lain (transport tiba), serta walk-in dari customer.
+            Daftar shipment yang perlu Anda scan & verifikasi - paket dari kurir (pickup selesai), paket dari gudang lain (transport tiba), serta walk-in dari customer.
           </p>
         </CardHeader>
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Pickup arrivals — kurir brought back packages */}
+        {/* Pickup arrivals - kurir brought back packages */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center justify-between text-base">
@@ -672,7 +672,7 @@ function GudangScanQueue({ workspace }: { workspace: GudangDashboardWorkspace })
                 Buka Shipments <ArrowRight className="h-3 w-3" />
               </a>
             </CardTitle>
-            <p className="text-xs text-muted-foreground">Paket dibawa kurir — scan setiap detail sebelum konfirmasi terima.</p>
+            <p className="text-xs text-muted-foreground">Paket dibawa kurir - scan setiap detail sebelum konfirmasi terima.</p>
           </CardHeader>
           <CardContent>
             {workspace.arrivals.length === 0 ? (
@@ -707,7 +707,7 @@ function GudangScanQueue({ workspace }: { workspace: GudangDashboardWorkspace })
           </CardContent>
         </Card>
 
-        {/* Transport arrivals — from another gudang */}
+        {/* Transport arrivals - from another gudang */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center justify-between text-base">
@@ -718,7 +718,7 @@ function GudangScanQueue({ workspace }: { workspace: GudangDashboardWorkspace })
                 Buka Shipments <ArrowRight className="h-3 w-3" />
               </a>
             </CardTitle>
-            <p className="text-xs text-muted-foreground">Paket dari transport antar-gudang — scan dulu sebelum bisa delivery.</p>
+            <p className="text-xs text-muted-foreground">Paket dari transport antar-gudang - scan dulu sebelum bisa delivery.</p>
           </CardHeader>
           <CardContent>
             {workspace.transportArrivals.length === 0 ? (
@@ -740,7 +740,7 @@ function GudangScanQueue({ workspace }: { workspace: GudangDashboardWorkspace })
                         </p>
                         <p className="text-[11px] text-muted-foreground">
                           {s.originWarehouseName ? `dari ${s.originWarehouseName} · ` : ""}
-                          {s.transportCode ?? "—"}
+                          {s.transportCode ?? "-"}
                           {s.driverName ? ` · driver ${s.driverName}` : ""}
                           {` · ${s.scannedCount}/${s.detailsCount} paket`}
                         </p>
@@ -762,7 +762,7 @@ function GudangScanQueue({ workspace }: { workspace: GudangDashboardWorkspace })
             <CardTitle className="flex items-center gap-2 text-base">
               <MapPin className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> Walk-In (Customer ke Gudang)
             </CardTitle>
-            <p className="text-xs text-muted-foreground">Customer menyerahkan langsung — konfirmasi terima tanpa scan.</p>
+            <p className="text-xs text-muted-foreground">Customer menyerahkan langsung - konfirmasi terima tanpa scan.</p>
           </CardHeader>
           <CardContent>
             {workspace.walkIns.length === 0 ? (
@@ -814,7 +814,7 @@ function GudangScanQueue({ workspace }: { workspace: GudangDashboardWorkspace })
                   >
                     <p className="flex items-center justify-between gap-2">
                       <span className="truncate text-sm font-semibold text-foreground">{w.warehouseName}</span>
-                      <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{w.city ?? "—"}</span>
+                      <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{w.city ?? "-"}</span>
                     </p>
                     <div className="mt-2 grid grid-cols-3 gap-1 text-center">
                       <div className="rounded-md bg-muted/60 px-1 py-1.5">
@@ -831,7 +831,7 @@ function GudangScanQueue({ workspace }: { workspace: GudangDashboardWorkspace })
                       </div>
                     </div>
                     {w.unpaidCount > 0 && null}
-                    {/* "belum lunas" badge dihapus — B2C ditanggung Marketing,
+                    {/* "belum lunas" badge dihapus - B2C ditanggung Marketing,
                         B2B via invoice. Dashboard tidak menampilkan status
                         pembayaran per shipment lagi. */}
                   </a>

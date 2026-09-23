@@ -193,11 +193,11 @@ export function assertKurirAssignment(
   overridePermission: string,
   label: string,
 ): string | null {
-  if (task.kurirId == null) return null; // unassigned — supervisors handle it
+  if (task.kurirId == null) return null; // unassigned - supervisors handle it
   if (user.employeeId != null && task.kurirId === user.employeeId) return null;
   if (user.isOwner || user.permissions.includes("*")) return null;
   if (user.permissions.includes(overridePermission)) return null;
-  return `Task ${label} ditugaskan ke kurir lain — hanya kurir bersangkutan atau supervisor yang boleh memproses.`;
+  return `Task ${label} ditugaskan ke kurir lain - hanya kurir bersangkutan atau supervisor yang boleh memproses.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -215,12 +215,12 @@ export function assertKurirAssignment(
 
 export interface PaymentSummary {
   priceAmount: number | null;
-  discountAmount: number; // Revise.md §6 — Marketing-funded discount
+  discountAmount: number; // Revise.md §6 - Marketing-funded discount
   finalPriceAmount: number | null; // what the customer actually owes
   paidAmount: number; // sum of RECORDED + VERIFIED payments
   remainingAmount: number; // final price - paid (>= 0)
-  dpRequirement: number; // deprecated — always 0 (DP rule dihapus)
-  dpOk: boolean; // deprecated — always true (DP rule dihapus)
+  dpRequirement: number; // deprecated - always 0 (DP rule dihapus)
+  dpOk: boolean; // deprecated - always true (DP rule dihapus)
   status: "UNPAID" | "DP" | "PAID" | "UNPRICED";
 }
 
@@ -255,8 +255,8 @@ export async function paymentSummary(masterId: number): Promise<PaymentSummary> 
     finalPriceAmount,
     paidAmount,
     remainingAmount,
-    dpRequirement: 0, // deprecated — DP rule dihapus
-    dpOk: true, // deprecated — DP rule dihapus, selalu diizinkan
+    dpRequirement: 0, // deprecated - DP rule dihapus
+    dpOk: true, // deprecated - DP rule dihapus, selalu diizinkan
     status: paidAmount >= finalPriceAmount - 0.01 ? "PAID" : paidAmount > 0 ? "DP" : "UNPAID",
   };
 }

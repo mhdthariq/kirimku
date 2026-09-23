@@ -6,6 +6,7 @@ import { apiGetWithMeta, hasPermission, type AuditEntry, type AuditResponse } fr
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/components/app/form-parts";
+import { AuditDataViewer } from "@/components/app/audit-data-viewer";
 import { cn } from "@/lib/utils";
 
 const ACTION_STYLES: Record<string, string> = {
@@ -20,6 +21,9 @@ const ACTION_STYLES: Record<string, string> = {
   settled: "bg-primary/10 text-primary",
   status_change: "bg-chart-3/15 text-chart-3",
   cancelled: "bg-destructive/10 text-destructive",
+  change_password: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+  printed_resi: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
+  printed_invoice: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
 };
 
 /**
@@ -153,9 +157,9 @@ export function ActivityLogPanel({
                     <summary className="cursor-pointer text-[11px] font-medium text-primary/80 hover:text-primary">
                       Detail perubahan
                     </summary>
-                    <pre className="mt-1 max-h-40 overflow-auto rounded-lg bg-muted/60 p-2 text-[10px] leading-relaxed text-muted-foreground">
-                      {JSON.stringify(entry.afterData, null, 2)}
-                    </pre>
+                    <div className="mt-1 rounded-lg bg-muted/40 p-2">
+                      <AuditDataViewer data={entry.afterData} variant="after" />
+                    </div>
                   </details>
                 )}
               </li>

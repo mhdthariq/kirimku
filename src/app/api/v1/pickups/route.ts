@@ -171,7 +171,7 @@ export async function POST(req: NextRequest) {
     }
     // Defensive gate: a pickup request requires a counted price (Revision rule)
     if (master.priceAmount == null || master.priceAmount <= 0) {
-      return fail(422, "Harga shipment belum dihitung — hitung harga sebelum membuat task pickup.");
+      return fail(422, "Harga shipment belum dihitung - hitung harga sebelum membuat task pickup.");
     }
     // B2B invoice gate: shipment B2B wajib sudah masuk ke invoice perusahaan
     // customernya sebelum bisa dibuatkan task pickup. Untuk B2C biaya
@@ -179,7 +179,7 @@ export async function POST(req: NextRequest) {
     if (master.customer?.type === "b2b" && master.invoiceLines.length === 0) {
       return fail(
         422,
-        "Shipment B2B belum ditagirkan ke invoice manapun — tambahkan shipment ini ke invoice perusahaan customer sebelum membuat task pickup.",
+        "Shipment B2B belum ditagirkan ke invoice manapun - tambahkan shipment ini ke invoice perusahaan customer sebelum membuat task pickup.",
       );
     }
     const kurirId = num(body.kurirId);

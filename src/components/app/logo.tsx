@@ -10,7 +10,7 @@ export function LogoMark({ className = "h-9 w-9" }: { className?: string }) {
 
 export function Logo({ href = "#/dashboard", compact = false }: { href?: string; compact?: boolean }) {
   return (
-    <a href={href} className="flex items-center gap-2.5 group" aria-label="KirimKu — beranda">
+    <a href={href} className="flex items-center gap-2.5 group" aria-label="KirimKu - beranda">
       <div className="relative">
         <LogoMark className={compact ? "h-8 w-8" : "h-9 w-9 transition-transform group-hover:scale-105"} />
       </div>

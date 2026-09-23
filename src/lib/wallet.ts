@@ -186,7 +186,7 @@ export async function assertAvailableBalance(partnerId: number, amount: number):
   if (round2(summary.available - amount) < -0.001) {
     throw new HttpError(
       422,
-      `Jumlah melebihi saldo tersedia (Rp${summary.available.toLocaleString("id-ID")} dari Rp${summary.balance.toLocaleString("id-ID")} — Rp${summary.reserved.toLocaleString("id-ID")} terreserve).`,
+      `Jumlah melebihi saldo tersedia (Rp${summary.available.toLocaleString("id-ID")} dari Rp${summary.balance.toLocaleString("id-ID")} - Rp${summary.reserved.toLocaleString("id-ID")} terreserve).`,
     );
   }
   return summary;
@@ -211,10 +211,10 @@ export function requirePartner(
   type?: "MARKETING" | "VEHICLE_OWNER",
 ): { id: number; type: string } {
   if (!user.partnerId || !user.partnerType) {
-    throw new HttpError(403, "Akses ditolak — akun ini bukan partner.");
+    throw new HttpError(403, "Akses ditolak - akun ini bukan partner.");
   }
   if (type && user.partnerType !== type) {
-    throw new HttpError(403, `Akses ditolak — endpoint ini hanya untuk partner ${type === "MARKETING" ? "Marketing" : "Vehicle Owner"}.`);
+    throw new HttpError(403, `Akses ditolak - endpoint ini hanya untuk partner ${type === "MARKETING" ? "Marketing" : "Vehicle Owner"}.`);
   }
   return { id: user.partnerId, type: user.partnerType };
 }

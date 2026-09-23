@@ -155,7 +155,7 @@ export function DeliveriesPage() {
     <div className="space-y-4">
       <PageHeader
         title="Deliveries"
-        subtitle="Pengiriman akhir ke penerima — kurir scan QR semua paket customer sebelum konfirmasi."
+        subtitle="Pengiriman akhir ke penerima - kurir scan QR semua paket customer sebelum konfirmasi."
         icon={<ClipboardList className="h-5 w-5" />}
         actions={
           <>
@@ -176,11 +176,11 @@ export function DeliveriesPage() {
       />
 
       {/* Shipments whose driver already checked in at the destination gudang
-          but whose packages were not scan-received by Admin Gudang yet —
+          but whose packages were not scan-received by Admin Gudang yet -
           they cannot be assigned for delivery until scanned. */}
       {pendingScanCount > 0 && (
         <p className="rounded-lg border border-amber-300 bg-amber-50/70 px-3 py-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
-          {pendingScanCount} shipment sudah tiba di gudang tujuan (driver check-in checkpoint akhir) tetapi menunggu scan penerimaan Admin Gudang — buka menu <b>Shipments</b> (status Tiba di Gudang Tujuan) untuk scan paketnya sebelum menugaskan kurir delivery.
+          {pendingScanCount} shipment sudah tiba di gudang tujuan (driver check-in checkpoint akhir) tetapi menunggu scan penerimaan Admin Gudang - buka menu <b>Shipments</b> (status Tiba di Gudang Tujuan) untuk scan paketnya sebelum menugaskan kurir delivery.
         </p>
       )}
 
@@ -231,35 +231,35 @@ export function DeliveriesPage() {
                     <p className="flex items-center gap-1.5 text-sm font-medium text-foreground">
                       {d.customerName}
                       {d.customerType === "b2b" && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-950 dark:text-sky-300" title="B2B — cukup scan Master Resi sekali">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-950 dark:text-sky-300" title="B2B - cukup scan Master Resi sekali">
                           B2B · Master Resi
                         </span>
                       )}
-                      {/* Step 2 — DIRECT fulfillment badge (mirrors the
+                      {/* Step 2 - DIRECT fulfillment badge (mirrors the
                           shipments-page row badge). */}
                       {(d.fulfillmentMode ?? "STANDARD") === "DIRECT" && (
                         <span
                           className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 dark:bg-violet-950 dark:text-violet-300"
-                          title="DIRECT — driver ambil langsung di gudang asal, kirim langsung ke gudang tujuan"
+                          title="DIRECT - driver ambil langsung di gudang asal, kirim langsung ke gudang tujuan"
                         >
                           DIRECT
                         </span>
                       )}
-                      {/* Step 2 — "Already picked up from checkpoint 1" badge
+                      {/* Step 2 - "Already picked up from checkpoint 1" badge
                           for DIRECT shipments. Means the driver is on the way
-                          (or has arrived) — the package is no longer sitting
+                          (or has arrived) - the package is no longer sitting
                           at the origin. */}
                       {(d.fulfillmentMode ?? "STANDARD") === "DIRECT" && d.pickedUpFromCheckpoint1 && (
                         <span
                           className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-                          title="Driver sudah check-in di checkpoint 1 — paket dalam perjalanan"
+                          title="Driver sudah check-in di checkpoint 1 - paket dalam perjalanan"
                         >
                           <CheckCircle2 className="h-3 w-3" /> Diambil CP1
                         </span>
                       )}
                     </p>
                     <p className="text-xs text-muted-foreground">{d.address ?? d.destination}</p>
-                    {/* "This shipment is from Gudang X" — the destination-side
+                    {/* "This shipment is from Gudang X" - the destination-side
                         crew sees at a glance where the package started */}
                     {d.originWarehouseName && (
                       <p className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-sky-100/70 px-1.5 py-0.5 text-[10px] font-semibold text-sky-800 dark:bg-sky-950/60 dark:text-sky-300">
@@ -274,7 +274,7 @@ export function DeliveriesPage() {
                 header: "Kurir",
                 render: (d) => {
                   const kurir = options?.employees?.find((emp) => emp.id === d.kurirId);
-                  return <span className="text-sm text-muted-foreground">{kurir?.name ?? "—"}</span>;
+                  return <span className="text-sm text-muted-foreground">{kurir?.name ?? "-"}</span>;
                 },
               },
               {
@@ -303,7 +303,7 @@ export function DeliveriesPage() {
                 render: (d) => (
                   <div className="flex flex-wrap gap-1.5">
                     <ItemAuditDialog entityType="delivery" entityId={d.id} itemLabel={d.deliveryCode} />
-                    {/* Revise round 9 — Detail Foto button. Opens a dialog showing
+                    {/* Revise round 9 - Detail Foto button. Opens a dialog showing
                         the delivery photo (proof of delivery) at full size.
                         Display is gated by proof_photo.view (Admin Gudang + Owner). */}
                     {(can.viewProofPhoto || !isExecutor) && (
@@ -364,7 +364,7 @@ export function DeliveriesPage() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editTarget ? `Edit Delivery — ${editTarget.deliveryCode}` : "Buat Delivery"}</DialogTitle>
+            <DialogTitle>{editTarget ? `Edit Delivery - ${editTarget.deliveryCode}` : "Buat Delivery"}</DialogTitle>
             <DialogDescription>
               {editTarget ? "Ganti kurir atau catatan." : "Pilih shipment yang sudah tiba di gudang tujuan dan kurir pengantar."}
             </DialogDescription>
@@ -397,13 +397,13 @@ export function DeliveriesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Detail barang dialog — packages of this delivery + handover state */}
+      {/* Detail barang dialog - packages of this delivery + handover state */}
       <Dialog open={!!detailTarget} onOpenChange={(open) => !open && setDetailTarget(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <PackageCheck className="h-5 w-5 text-primary" />
-              Detail Barang — {detailTarget?.deliveryCode}
+              Detail Barang - {detailTarget?.deliveryCode}
             </DialogTitle>
             <DialogDescription>
               Shipment {detailTarget?.masterCode} · {detailTarget?.customerName}. Paket bertanda hijau sudah ter-scan saat serah terima.
@@ -432,9 +432,9 @@ export function DeliveriesPage() {
           {detailTarget?.status === "COMPLETED" && (
             <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
               <p>
-                Delivery selesai {detailTarget.completedAt ? formatDate(detailTarget.completedAt) : ""} — PoD (nama penerima): <b className="text-foreground">{detailTarget.proofOfDelivery ?? "—"}</b>
+                Delivery selesai {detailTarget.completedAt ? formatDate(detailTarget.completedAt) : ""} - PoD (nama penerima): <b className="text-foreground">{detailTarget.proofOfDelivery ?? "-"}</b>
               </p>
-              {/* Revise round 8 — optional delivery photo (proof of delivery image).
+              {/* Revise round 8 - optional delivery photo (proof of delivery image).
                   Display gated by proof_photo.view (Admin Gudang + Owner). */}
               {detailTarget.photoUrl && (
                 <div className="mt-2">
@@ -452,7 +452,7 @@ export function DeliveriesPage() {
                       title="Foto bukti hanya dapat dilihat oleh Admin Gudang / Owner (proof_photo.view)"
                     >
                       <Camera className="h-4 w-4" />
-                      Foto bukti tersedia — terkunci. Hubungi Admin Gudang / Owner untuk melihat.
+                      Foto bukti tersedia - terkunci. Hubungi Admin Gudang / Owner untuk melihat.
                     </div>
                   )}
                 </div>
@@ -485,13 +485,13 @@ export function DeliveriesPage() {
         onDone={reload}
       />
 
-      {/* Revise round 9 — Photo Detail Dialog for deliveries. Shows the
+      {/* Revise round 9 - Photo Detail Dialog for deliveries. Shows the
           delivery photo (proof of delivery image) at full size, gated by
           proof_photo.view (Admin Gudang + Owner). */}
       <PhotoDetailDialog
         open={!!photoDelivery}
         onOpenChange={(open) => !open && setPhotoDelivery(null)}
-        title={`Foto Bukti Delivery — ${photoDelivery?.deliveryCode ?? ""}`}
+        title={`Foto Bukti Delivery - ${photoDelivery?.deliveryCode ?? ""}`}
         description="Foto bukti serah terima paket kepada penerima di lokasi tujuan."
         photos={
           photoDelivery?.photoUrl

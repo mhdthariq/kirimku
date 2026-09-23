@@ -145,8 +145,8 @@ export function GudangPage() {
         title="Gudang"
         subtitle={
           workspace?.scope?.scoped
-            ? `Master gudang & isinya — akses terbatas ke ${workspace.scope.warehouseName ?? "gudang Anda"}.`
-            : "Titik fisik jaringan pengiriman — asal, transit, dan tujuan kiriman beserta isinya."
+            ? `Master gudang & isinya - akses terbatas ke ${workspace.scope.warehouseName ?? "gudang Anda"}.`
+            : "Titik fisik jaringan pengiriman - asal, transit, dan tujuan kiriman beserta isinya."
         }
         icon={<WarehouseIcon className="h-5 w-5" />}
         actions={
@@ -184,12 +184,12 @@ export function GudangPage() {
                   </div>
                 ),
               },
-              { key: "city", header: "Kota", render: (w) => w.city ?? "—" },
+              { key: "city", header: "Kota", render: (w) => w.city ?? "-" },
               {
                 key: "cs",
                 header: "CS Contact",
                 hideOnMobile: true,
-                render: (w) => w.customerSupportContact ?? "—",
+                render: (w) => w.customerSupportContact ?? "-",
               },
               {
                 key: "coords",
@@ -201,7 +201,7 @@ export function GudangPage() {
                       {w.latitude.toFixed(4)}, {w.longitude.toFixed(4)}
                     </span>
                   ) : (
-                    "—"
+                    "-"
                   ),
               },
               { key: "status", header: "Status", render: (w) => <ActiveBadge active={w.isActive} /> },
@@ -241,7 +241,7 @@ export function GudangPage() {
         {can.contents && (
           <TabsContent value="contents" className="mt-3 space-y-4">
             <p className="rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-2 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300">
-              Kiriman yang <b>sedang tersimpan</b> di tiap gudang — paket RECEIVED_AT_GUDANG (gudang asal) serta TIBA DI GUDANG TUJUAN / ARRIVED_AT_GUDANG (gudang
+              Kiriman yang <b>sedang tersimpan</b> di tiap gudang - paket RECEIVED_AT_GUDANG (gudang asal) serta TIBA DI GUDANG TUJUAN / ARRIVED_AT_GUDANG (gudang
               tujuan). {workspace?.scope?.scoped ? "Akses Anda dibatasi ke gudang Anda sendiri." : "Admin Gudang melihat semua gudang."}
             </p>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -255,7 +255,7 @@ export function GudangPage() {
                         <WarehouseIcon className="h-4 w-4 shrink-0 text-primary" />
                         <span className="truncate">{w.name}</span>
                       </span>
-                      <span className="self-start rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground sm:self-auto sm:shrink-0">{w.city ?? "—"}</span>
+                      <span className="self-start rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground sm:self-auto sm:shrink-0">{w.city ?? "-"}</span>
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
@@ -303,7 +303,7 @@ export function GudangPage() {
                             </p>
                             <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
                               <div className="flex flex-wrap items-center gap-1.5">
-                                {/* "This shipment is from Gudang X" — destination-stage rows */}
+                                {/* "This shipment is from Gudang X" - destination-stage rows */}
                                 {s.stage === "destination" && s.originWarehouseName && (
                                   <span className="inline-flex items-center gap-1 rounded-full bg-sky-100/70 px-1.5 py-0.5 text-[10px] font-semibold text-sky-800 dark:bg-sky-950/60 dark:text-sky-300">
                                     dari {s.originWarehouseName}
@@ -315,7 +315,7 @@ export function GudangPage() {
                                   </span>
                                 )}
                               </div>
-                              {/* "sisa dibayar customer" badge dihapus — B2C ditanggung
+                              {/* "sisa dibayar customer" badge dihapus - B2C ditanggung
                                   Marketing, B2B via invoice. Gudang tidak perlu melihat
                                   status pembayaran per shipment. */}
                             </div>
@@ -329,7 +329,7 @@ export function GudangPage() {
             </div>
             {!contentsLoading && contents.length === 0 && (
               <p className="rounded-xl border border-dashed bg-card px-6 py-10 text-center text-sm text-muted-foreground">
-                Tidak ada gudang aktif — buat gudang di tab Daftar.
+                Tidak ada gudang aktif - buat gudang di tab Daftar.
               </p>
             )}
           </TabsContent>
@@ -344,7 +344,7 @@ export function GudangPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{editing ? `Edit Gudang — ${editing.code}` : "Tambah Gudang"}</DialogTitle>
+            <DialogTitle>{editing ? `Edit Gudang - ${editing.code}` : "Tambah Gudang"}</DialogTitle>
             <DialogDescription>
               {editing ? "Perbarui informasi gudang." : "Gudang baru akan mendapat kode otomatis (WH-xxxxxx). Klik peta untuk mengisi koordinat."}
             </DialogDescription>

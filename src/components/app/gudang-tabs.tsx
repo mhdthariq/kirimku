@@ -63,7 +63,7 @@ export function GudangTabBanner({ gudangName, count }: { gudangName: string; cou
     <p className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-foreground/80">
       <WarehouseIcon className="h-3.5 w-3.5 shrink-0 text-primary" />
       <span>
-        Menampilkan data <b>{gudangName}</b> saja — {count} entri. Pindah ke tab <b>Daftar</b> untuk melihat semua gudang.
+        Menampilkan data <b>{gudangName}</b> saja - {count} entri. Pindah ke tab <b>Daftar</b> untuk melihat semua gudang.
       </span>
     </p>
   );

@@ -102,27 +102,27 @@ export function WithdrawalManagementPage() {
             render: (r) => (
               <div className="flex flex-wrap items-center gap-1.5">
                 {canApprove && r.status === "PENDING" && (
-                  <Button size="sm" className="h-7" onClick={() => act(`/withdrawals/${r.id}/approve`, {}, "Withdrawal disetujui — dana tetap di-reserve.")}>
+                  <Button size="sm" className="h-7" onClick={() => act(`/withdrawals/${r.id}/approve`, {}, "Withdrawal disetujui - dana tetap di-reserve.")}>
                     <CheckCircle2 className="h-3.5 w-3.5" /> Setujui
                   </Button>
                 )}
                 {canReject && ["PENDING", "APPROVED"].includes(r.status) && (
-                  <Button size="sm" variant="outline" className="h-7 text-destructive" onClick={() => act(`/withdrawals/${r.id}/reject`, { reason: "Tidak dapat diproses saat ini" }, "Withdrawal ditolak — reserved dilepas.")}>
+                  <Button size="sm" variant="outline" className="h-7 text-destructive" onClick={() => act(`/withdrawals/${r.id}/reject`, { reason: "Tidak dapat diproses saat ini" }, "Withdrawal ditolak - reserved dilepas.")}>
                     <XCircle className="h-3.5 w-3.5" /> Tolak
                   </Button>
                 )}
                 {canProcess && r.status === "APPROVED" && (
-                  <Button size="sm" variant="secondary" className="h-7" onClick={() => act(`/withdrawals/${r.id}/process`, {}, "Withdrawal diproses — lakukan transfer bank lalu selesaikan dengan bukti.")}>
+                  <Button size="sm" variant="secondary" className="h-7" onClick={() => act(`/withdrawals/${r.id}/process`, {}, "Withdrawal diproses - lakukan transfer bank lalu selesaikan dengan bukti.")}>
                     Proses Transfer
                   </Button>
                 )}
                 {canProcess && r.status === "PROCESSING" && (
-                  <Button size="sm" className="h-7" onClick={() => act(`/withdrawals/${r.id}/complete`, { proofUrl: "attachment://bank-transfer-receipt" }, "Withdrawal COMPLETED — wallet didebit atomik + ledger WITHDRAWAL.")}>
+                  <Button size="sm" className="h-7" onClick={() => act(`/withdrawals/${r.id}/complete`, { proofUrl: "attachment://bank-transfer-receipt" }, "Withdrawal COMPLETED - wallet didebit atomik + ledger WITHDRAWAL.")}>
                     <Upload className="h-3.5 w-3.5" /> Selesaikan + Bukti
                   </Button>
                 )}
                 {canProcess && ["PENDING", "APPROVED", "PROCESSING"].includes(r.status) && (
-                  <Button size="sm" variant="ghost" className="h-7 text-destructive" onClick={() => act(`/withdrawals/${r.id}/fail`, { reason: "Transfer bank gagal" }, "Withdrawal ditandai gagal — reserved dilepas.")}>
+                  <Button size="sm" variant="ghost" className="h-7 text-destructive" onClick={() => act(`/withdrawals/${r.id}/fail`, { reason: "Transfer bank gagal" }, "Withdrawal ditandai gagal - reserved dilepas.")}>
                     Gagal
                   </Button>
                 )}

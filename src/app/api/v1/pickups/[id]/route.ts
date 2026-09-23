@@ -56,7 +56,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     // the task cannot be cancelled: it will complete when the package reaches
     // the gudang.
     if (existing.status === "PICKED_UP") {
-      return fail(422, "Paket sudah diambil kurir (PICKED_UP) — pickup tidak bisa dibatalkan; tunggu paket tiba di gudang.");
+      return fail(422, "Paket sudah diambil kurir (PICKED_UP) - pickup tidak bisa dibatalkan; tunggu paket tiba di gudang.");
     }
 
     await db.pickup.update({ where: { id: existing.id }, data: { status: "CANCELLED" } }).catch(() => undefined);

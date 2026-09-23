@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
     // Marketing data separation: a Marketing partner may only create shipments
     // for customers connected to them ("marketing only knew their customer").
     if (user.partnerType === "MARKETING" && user.partnerId != null && customer.marketingPartnerId !== user.partnerId) {
-      return fail(403, "Customer ini bukan milik Anda — Marketing hanya bisa membuat shipment untuk customer sendiri.", {
+      return fail(403, "Customer ini bukan milik Anda - Marketing hanya bisa membuat shipment untuk customer sendiri.", {
         customerId: ["Customer ini bukan milik Anda."],
       });
     }
@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
       });
       if (!tariff) return fail(422, "Tarif tidak ditemukan / tidak aktif.", { tariffId: ["Tarif tidak ditemukan / tidak aktif."] });
       if (tariff.customerType && tariff.customerType !== customer.type) {
-        return fail(422, `Tarif ini hanya untuk customer ${tariff.customerType.toUpperCase()} — customer terpilih bertipe ${customer.type.toUpperCase()}.`, {
+        return fail(422, `Tarif ini hanya untuk customer ${tariff.customerType.toUpperCase()} - customer terpilih bertipe ${customer.type.toUpperCase()}.`, {
           tariffId: [`Tarif ${tariff.customerType.toUpperCase()} tidak cocok untuk customer ${customer.type.toUpperCase()}.`],
         });
       }

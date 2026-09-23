@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
         future: [],
         completedCount: 0,
         history: [],
-        note: "Akun tidak terhubung ke data karyawan — hubungi admin.",
+        note: "Akun tidak terhubung ke data karyawan - hubungi admin.",
       });
     }
     const me = user.employeeId;

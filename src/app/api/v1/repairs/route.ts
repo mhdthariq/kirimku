@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
     const vehicle = await db.vehicle.findUnique({ where: { id: vehicleId }, include: { owner: true } });
     if (!vehicle) return fail(404, "Kendaraan tidak ditemukan.");
     if (!vehicle.owner) {
-      return fail(422, "Kendaraan ini milik perusahaan — tidak ada Vehicle Owner yang bisa dibebani repair.");
+      return fail(422, "Kendaraan ini milik perusahaan - tidak ada Vehicle Owner yang bisa dibebani repair.");
     }
     if (relatedTransportId) {
       const transport = await db.transport.findUnique({ where: { id: relatedTransportId } });
@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
         direction: "DEBIT",
         amount,
         businessRef: `REP-${created.id}`,
-        description: `Deduction repair ${repairCode} — ${description}`,
+        description: `Deduction repair ${repairCode} - ${description}`,
         repairId: created.id,
         createdById: user.id,
       });
@@ -131,7 +131,7 @@ export async function POST(req: NextRequest) {
         ownerId: created.ownerId,
         vehicleNumber: vehicle.vehicleNumber,
         action: "CREATED",
-        detail: `Repair ${repairCode} dibuat dan langsung terverifikasi — deduction ${formatIDR(amount)} dari wallet Vehicle Owner.`,
+        detail: `Repair ${repairCode} dibuat dan langsung terverifikasi - deduction ${formatIDR(amount)} dari wallet Vehicle Owner.`,
         amount,
         actor: user,
       });

@@ -70,7 +70,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         if (discountAmount > partnerShare + 0.001) {
           return fail(
             422,
-            `Discount Rp${discountAmount.toLocaleString("id-ID")} melebihi bagian Marketing (Rp${Math.round(partnerShare).toLocaleString("id-ID")} = ${partner.partnerPercent}% dari harga) — discount akan membuat bagian Marketing negatif (§6.2).`,
+            `Discount Rp${discountAmount.toLocaleString("id-ID")} melebihi bagian Marketing (Rp${Math.round(partnerShare).toLocaleString("id-ID")} = ${partner.partnerPercent}% dari harga) - discount akan membuat bagian Marketing negatif (§6.2).`,
             { discountAmount: ["Discount melebihi bagian Marketing."] },
           );
         }

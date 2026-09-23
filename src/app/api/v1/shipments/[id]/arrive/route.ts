@@ -64,21 +64,21 @@ export async function POST(req: NextRequest, { params }: Params) {
       const warehouseId = master.arrivedWarehouseId ?? master.destinationWarehouseId;
       const warehouse = warehouseId ? await db.warehouse.findUnique({ where: { id: warehouseId } }) : null;
       if (!warehouse || !warehouse.isActive) {
-        return fail(422, "Gudang tujuan shipment belum jelas — hubungi admin untuk memperbaiki data.");
+        return fail(422, "Gudang tujuan shipment belum jelas - hubungi admin untuk memperbaiki data.");
       }
       if (!user.isOwner && user.warehouseId !== warehouse.id) {
         return fail(403, "Anda hanya bisa menerima paket transport di gudang Anda sendiri.");
       }
       const progress = await scanProgress({ masterId: master.id, context: "transport_arrival" });
       if (!progress.allScanned) {
-        return fail(422, `Belum semua paket discan (${progress.scanned}/${progress.total}) — scan semua paket atau gunakan tombol "Scan Semua Paket".`);
+        return fail(422, `Belum semua paket discan (${progress.scanned}/${progress.total}) - scan semua paket atau gunakan tombol "Scan Semua Paket".`);
       }
 
       // which gudang did this shipment come from? (the origin branch)
       const originWarehouse = master.originWarehouseId
         ? await db.warehouse.findUnique({ where: { id: master.originWarehouseId }, select: { name: true } })
         : null;
-      const description = `Paket diterima di ${warehouse.name} dari transport${originWarehouse ? ` (asal ${originWarehouse.name})` : ""} — ${master.details.length} paket terverifikasi scan`;
+      const description = `Paket diterima di ${warehouse.name} dari transport${originWarehouse ? ` (asal ${originWarehouse.name})` : ""} - ${master.details.length} paket terverifikasi scan`;
       const updated = await db.$transaction(async (tx) => {
         const result = await tx.masterShipment.update({
           where: { id: master.id },
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest, { params }: Params) {
           data: {
             masterId: master.id,
             event: "RECEIVED_FROM_TRANSPORT",
-            description: notes ? `${description} — ${notes}` : description,
+            description: notes ? `${description} - ${notes}` : description,
             actorId: user.id,
           },
         });
@@ -127,7 +127,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       }
       const progress = await scanProgress({ masterId: master.id, context: "gudang_arrival" });
       if (!progress.allScanned) {
-        return fail(422, `Belum semua paket discan (${progress.scanned}/${progress.total}) — scan semua paket atau gunakan tombol "Scan Semua Paket".`);
+        return fail(422, `Belum semua paket discan (${progress.scanned}/${progress.total}) - scan semua paket atau gunakan tombol "Scan Semua Paket".`);
       }
     } else if (!["CREATED", "READY_FOR_PICKUP"].includes(master.status)) {
       return fail(422, `Walk-in hanya untuk shipment CREATED / READY_FOR_PICKUP (saat ini: ${master.status}).`);
@@ -135,7 +135,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     const description =
       mode === "scan"
-        ? `Paket diterima di ${warehouse.name} — ${master.details.length} paket terverifikasi scan${master.customer ? ` (kurir drop-off, shipment ${master.customer.name})` : ""}`
+        ? `Paket diterima di ${warehouse.name} - ${master.details.length} paket terverifikasi scan${master.customer ? ` (kurir drop-off, shipment ${master.customer.name})` : ""}`
         : `Pelanggan ${master.customer?.name ?? ""} menyerahkan langsung di ${warehouse.name} (walk-in, tanpa scan)`;
     const updated = await db.$transaction(async (tx) => {
       const result = await tx.masterShipment.update({
@@ -154,7 +154,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         data: {
           masterId: master.id,
           event: "RECEIVED_AT_GUDANG",
-          description: notes ? `${description} — ${notes}` : description,
+          description: notes ? `${description} - ${notes}` : description,
           actorId: user.id,
         },
       });

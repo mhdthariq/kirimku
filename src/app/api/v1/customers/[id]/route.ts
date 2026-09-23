@@ -13,7 +13,7 @@ function assertCustomerScope(
   if (user.isOwner || user.permissions.includes("*")) return;
   if (user.partnerType === "MARKETING" && user.partnerId != null) {
     if (customer.marketingPartnerId !== user.partnerId) {
-      throw new HttpError(403, "Customer ini bukan milik Anda — data customer terpisah antar marketing.");
+      throw new HttpError(403, "Customer ini bukan milik Anda - data customer terpisah antar marketing.");
     }
   }
 }

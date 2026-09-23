@@ -76,6 +76,24 @@ export async function PUT(req: NextRequest, { params }: Params) {
       after: changes,
     });
 
+    // Dedicated password-change audit entry — same pattern as the admin
+    // /users/{id} path. The entityLabel spells out WHO changed WHOSE
+    // password so the audit timeline is readable at a glance.
+    if (changes.password) {
+      await audit({
+        action: "change_password",
+        entityType: "partner",
+        entityId: partner.id,
+        entityLabel: `${user.name} change password ${partner.user.username}`,
+        actor: user,
+        after: {
+          changedBy: user.name,
+          changedByUsername: user.username,
+          targetUser: partner.user.username,
+        },
+      });
+    }
+
     return ok({
       id: partner.id,
       userId: updated.id,

@@ -38,14 +38,14 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (!pickup) return fail(404, "Pickup tidak ditemukan.");
     if (pickup.status === "COMPLETED") return fail(422, "Pickup sudah selesai.");
     if (pickup.status === "CANCELLED") return fail(422, "Pickup sudah dibatalkan.");
-    if (pickup.status === "PICKED_UP") return fail(422, "Paket sudah diambil kurir (Picked Up) — pickup akan selesai otomatis saat paket tiba di gudang.");
+    if (pickup.status === "PICKED_UP") return fail(422, "Paket sudah diambil kurir (Picked Up) - pickup akan selesai otomatis saat paket tiba di gudang.");
 
     const denied = assertKurirAssignment(pickup, user, "pickup.assign_kurir", pickup.pickupCode);
     if (denied) return fail(403, denied);
 
     const progress = await scanProgress({ pickupId: pickup.id });
     if (pickup.master.details.length === 0) {
-      return fail(422, "Shipment belum punya detail barang — tambahkan detail sebelum pickup.");
+      return fail(422, "Shipment belum punya detail barang - tambahkan detail sebelum pickup.");
     }
     if (!progress.allScanned) {
       const remaining = progress.total - progress.scanned;
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       if (!hasInvoice) {
         return fail(
           422,
-          "Shipment B2B belum ditagirkan ke invoice manapun — tambahkan shipment ini ke invoice perusahaan customer sebelum pickup.",
+          "Shipment B2B belum ditagirkan ke invoice manapun - tambahkan shipment ini ke invoice perusahaan customer sebelum pickup.",
         );
       }
     }
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       return fail(422, "Foto bukti pickup wajib disertakan sebelum konfirmasi.");
     }
     if (!photoUrl.startsWith("data:image/jpeg;base64,") && !photoUrl.startsWith("data:image/png;base64,")) {
-      return fail(422, "Format foto tidak didukung — gunakan JPEG atau PNG.");
+      return fail(422, "Format foto tidak didukung - gunakan JPEG atau PNG.");
     }
     if (photoUrl.length > MAX_PHOTO_BYTES) {
       return fail(422, "Foto terlalu besar (maks ±2.5 MB setelah kompresi).");

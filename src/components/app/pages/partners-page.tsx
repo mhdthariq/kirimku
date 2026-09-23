@@ -45,7 +45,7 @@ export function PartnersPage() {
   // Gudang options for the Partner Alignment dropdown.
   // "none" sentinel = umum / general (no alignment).
   const gudangOptions = [
-    { value: "none", label: "— Umum (tidak terikat gudang) —" },
+    { value: "none", label: "- Umum (tidak terikat gudang) -" },
     ...(options?.warehouses ?? []).map((w) => ({ value: String(w.id), label: w.name + (w.city ? ` · ${w.city}` : "") })),
   ];
 
@@ -106,7 +106,7 @@ export function PartnersPage() {
                   </span>
                 )
               ) : (
-                <span className="text-xs text-muted-foreground">—</span>
+                <span className="text-xs text-muted-foreground">-</span>
               ),
           },
           {
@@ -167,7 +167,7 @@ export function PartnersPage() {
                   <p className="font-mono text-muted-foreground">{r.bank.bankAccountNumber} · {r.bank.bankName}</p>
                 </div>
               ) : (
-                <span className="text-xs text-muted-foreground">—</span>
+                <span className="text-xs text-muted-foreground">-</span>
               ),
           },
           { key: "active", header: "Status", render: (r) => <ActiveBadge active={r.isActive} /> },
@@ -180,7 +180,7 @@ export function PartnersPage() {
                   Atur
                 </Button>
               ) : (
-                "—"
+                "-"
               ),
           },
         ]}
@@ -242,8 +242,8 @@ function EditPartnerDialog({
     const ok = await runAction(() => apiPut(`/partners/${partner.id}`, payload), {
       success:
         isMarketing
-          ? "Profit share + Gudang alignment diperbarui — berlaku untuk settlement berikutnya."
-          : "Konfigurasi profit share diperbarui — berlaku untuk settlement berikutnya (settlement lama tetap).",
+          ? "Profit share + Gudang alignment diperbarui - berlaku untuk settlement berikutnya."
+          : "Konfigurasi profit share diperbarui - berlaku untuk settlement berikutnya (settlement lama tetap).",
     });
     if (ok) {
       onOpenChange(false);
@@ -256,10 +256,10 @@ function EditPartnerDialog({
     <Dialog open={!!partner} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Atur Partner — {partner?.name}</DialogTitle>
+          <DialogTitle>Atur Partner - {partner?.name}</DialogTitle>
           <DialogDescription>
-            Konfigurasi profit sharing (§4) — Company% + Partner% harus tepat 100%. Settlement historis TIDAK berubah (§37).
-            {isMarketing && " Anda juga dapat mengatur Gudang alignment — biarkan kosong jika marketing ini melayani semua gudang."}
+            Konfigurasi profit sharing (§4) - Company% + Partner% harus tepat 100%. Settlement historis TIDAK berubah (§37).
+            {isMarketing && " Anda juga dapat mengatur Gudang alignment - biarkan kosong jika marketing ini melayani semua gudang."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={onSubmit} className="space-y-3">
@@ -274,11 +274,11 @@ function EditPartnerDialog({
           <div className={cn("rounded-lg border p-3 text-xs", valid ? "border-primary/30 bg-primary/5 text-primary" : "border-destructive/40 bg-destructive/10 text-destructive")}>
             <span className="flex items-center gap-2">
               {valid ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}
-              Total: {sum}% {valid ? "✓ valid (100%)" : "— harus tepat 100%" }
+              Total: {sum}% {valid ? "✓ valid (100%)" : "- harus tepat 100%" }
             </span>
           </div>
 
-          {/* Revise round 7 — Partner Alignment.
+          {/* Revise round 7 - Partner Alignment.
               Only Marketing partners can be aligned to a Gudang. */}
           {isMarketing && (
             <Field

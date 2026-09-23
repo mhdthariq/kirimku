@@ -49,7 +49,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (!context) {
       return fail(
         422,
-        `Konfirmasi tiba di gudang hanya untuk shipment PICKED_UP (kurir) atau AT_DEST_GUDANG (transport) — saat ini: ${master.status}.`,
+        `Konfirmasi tiba di gudang hanya untuk shipment PICKED_UP (kurir) atau AT_DEST_GUDANG (transport) - saat ini: ${master.status}.`,
       );
     }
 
@@ -86,11 +86,11 @@ export async function POST(req: NextRequest, { params }: Params) {
       });
       const doneMessage =
         context === "transport_arrival"
-          ? "Master Resi B2B terbaca — semua paket ter-scan. Siap konfirmasi penerimaan dari transport."
-          : "Master Resi B2B terbaca — semua paket ter-scan. Siap konfirmasi tiba di gudang.";
+          ? "Master Resi B2B terbaca - semua paket ter-scan. Siap konfirmasi penerimaan dari transport."
+          : "Master Resi B2B terbaca - semua paket ter-scan. Siap konfirmasi tiba di gudang.";
       return ok({
         scan,
-        message: isB2B ? doneMessage : "QR master terbaca — lanjut scan semua paket (detail barang).",
+        message: isB2B ? doneMessage : "QR master terbaca - lanjut scan semua paket (detail barang).",
         progress,
         context,
       });
@@ -112,7 +112,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       });
       return ok({
         scan,
-        message: "Kode tidak dikenali — tidak cocok dengan paket manapun pada shipment ini.",
+        message: "Kode tidak dikenali - tidak cocok dengan paket manapun pada shipment ini.",
         progress: await scanProgress({ masterId: master.id, context }),
       });
     }
@@ -141,8 +141,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     const progress = await scanProgress({ masterId: master.id, context });
     const doneMessage =
       context === "transport_arrival"
-        ? "Semua paket sudah discan — siap konfirmasi penerimaan dari transport."
-        : "Semua paket sudah discan — siap konfirmasi tiba di gudang.";
+        ? "Semua paket sudah discan - siap konfirmasi penerimaan dari transport."
+        : "Semua paket sudah discan - siap konfirmasi tiba di gudang.";
     return ok({
       scan,
       message: alreadyScanned

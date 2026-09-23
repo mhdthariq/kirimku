@@ -60,7 +60,7 @@ export function PhotoDetailDialog({ open, onOpenChange, title, description, phot
           <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-10 text-center dark:border-amber-700 dark:bg-amber-950/40">
             <Camera className="h-8 w-8 text-amber-600 dark:text-amber-400" />
             <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
-              Foto bukti tersedia — terkunci
+              Foto bukti tersedia - terkunci
             </p>
             <p className="text-xs text-amber-700 dark:text-amber-400">
               Hanya Admin Gudang / Owner yang dapat melihat foto bukti (proof_photo.view). Hubungi admin gudang untuk melihat foto.

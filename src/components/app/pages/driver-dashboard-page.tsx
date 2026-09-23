@@ -102,7 +102,7 @@ function TransportMiniCard({ t, actionLabel = "Buka" }: { t: DriverTransportSumm
           </p>
           <p className="mt-0.5 flex flex-wrap gap-x-3 text-[11px] text-muted-foreground">
             <span className="flex items-center gap-1"><CarFront className="h-3 w-3" /> {t.vehicleNumber}</span>
-            <span className="flex items-center gap-1"><User className="h-3 w-3" /> {t.driverName ?? "—"}</span>
+            <span className="flex items-center gap-1"><User className="h-3 w-3" /> {t.driverName ?? "-"}</span>
             {t.kenekName && <span className="flex items-center gap-1"><Users className="h-3 w-3" /> {t.kenekName}</span>}
             <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {formatDate(t.plannedDepartureAt, true)}</span>
           </p>
@@ -184,7 +184,7 @@ export function DriverDashboard() {
           <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
             {greeting}, {user?.name.split(" ")[0]}
           </h1>
-          <p className="text-sm text-muted-foreground">Dashboard operasional driver — transport yang ditugaskan kepada Anda.</p>
+          <p className="text-sm text-muted-foreground">Dashboard operasional driver - transport yang ditugaskan kepada Anda.</p>
         </div>
         <DatePeriodFilter from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t); }} />
       </div>
@@ -218,7 +218,7 @@ export function DriverDashboard() {
                       {current.transportCode}
                     </a>
                     <p className="text-sm font-medium text-foreground">
-                      {current.origin ?? "?"} → {current.destination ?? "?"} · {current.routeName ?? "—"}
+                      {current.origin ?? "?"} → {current.destination ?? "?"} · {current.routeName ?? "-"}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -324,7 +324,7 @@ export function DriverDashboard() {
                   </div>
                   <div className="rounded-xl border bg-muted/40 p-3">
                     <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Total Harga</p>
-                    <p className="mt-1 text-lg font-bold text-foreground">{current.totalPrice != null ? formatRupiah(current.totalPrice) : "—"}</p>
+                    <p className="mt-1 text-lg font-bold text-foreground">{current.totalPrice != null ? formatRupiah(current.totalPrice) : "-"}</p>
                   </div>
                 </div>
               </div>
@@ -341,7 +341,7 @@ export function DriverDashboard() {
           </CardHeader>
           <CardContent>
             {!current ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">Belum ada kendaraan aktif — muncul saat transport berjalan.</p>
+              <p className="py-6 text-center text-sm text-muted-foreground">Belum ada kendaraan aktif - muncul saat transport berjalan.</p>
             ) : (
               <div className="divide-y divide-border/60 text-sm">
                 <div className="flex items-center justify-between py-2">
@@ -350,7 +350,7 @@ export function DriverDashboard() {
                 </div>
                 <div className="flex items-center justify-between py-2">
                   <span className="flex items-center gap-2 text-muted-foreground"><Package className="h-4 w-4" /> Kendaraan</span>
-                  <span className="font-medium text-foreground">{current.vehicleName ?? "—"}</span>
+                  <span className="font-medium text-foreground">{current.vehicleName ?? "-"}</span>
                 </div>
                 <div className="flex items-center justify-between py-2">
                   <span className="flex items-center gap-2 text-muted-foreground"><Scale className="h-4 w-4" /> Kapasitas</span>
@@ -358,11 +358,11 @@ export function DriverDashboard() {
                 </div>
                 <div className="flex items-center justify-between py-2">
                   <span className="flex items-center gap-2 text-muted-foreground"><User className="h-4 w-4" /> Driver</span>
-                  <span className="font-medium text-foreground">{current.driverName ?? "—"}</span>
+                  <span className="font-medium text-foreground">{current.driverName ?? "-"}</span>
                 </div>
                 <div className="flex items-center justify-between py-2">
                   <span className="flex items-center gap-2 text-muted-foreground"><Users className="h-4 w-4" /> Kenek</span>
-                  <span className="font-medium text-foreground">{current.kenekName ?? "—"}</span>
+                  <span className="font-medium text-foreground">{current.kenekName ?? "-"}</span>
                 </div>
                 <div className="flex items-center justify-between py-2">
                   <span className="flex items-center gap-2 text-muted-foreground"><Clock className="h-4 w-4" /> Berangkat</span>

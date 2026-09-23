@@ -72,7 +72,7 @@ export function ScanConsole({ onScan, disabled, placeholder = "Arahkan QR ke kam
   const startCamera = useCallback(async () => {
     setCameraError(null);
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
-      setCameraError("Browser ini tidak mendukung akses kamera — gunakan reader tool atau ketik kode manual.");
+      setCameraError("Browser ini tidak mendukung akses kamera - gunakan reader tool atau ketik kode manual.");
       return;
     }
     try {
@@ -109,10 +109,10 @@ export function ScanConsole({ onScan, disabled, placeholder = "Arahkan QR ke kam
       const name = err instanceof DOMException ? err.name : "";
       setCameraError(
         name === "NotAllowedError"
-          ? "Akses kamera ditolak — izinkan kamera di browser, atau gunakan reader tool / ketik manual."
+          ? "Akses kamera ditolak - izinkan kamera di browser, atau gunakan reader tool / ketik manual."
           : name === "NotFoundError"
             ? "Kamera tidak ditemukan di perangkat ini."
-            : "Kamera gagal dijalakan — gunakan reader tool atau ketik kode manual.",
+            : "Kamera gagal dijalakan - gunakan reader tool atau ketik kode manual.",
       );
       setCameraOn(false);
     }

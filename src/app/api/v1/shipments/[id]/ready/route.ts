@@ -52,10 +52,10 @@ export async function POST(req: NextRequest, { params }: Params) {
       return fail(422, "Tambahkan minimal satu detail barang sebelum submit untuk pickup.");
     }
     if (master.priceAmount == null || master.priceAmount <= 0) {
-      return fail(422, "Harga belum dihitung — klik “Hitung Harga” dan simpan harga shipment sebelum submit untuk pickup.");
+      return fail(422, "Harga belum dihitung - klik “Hitung Harga” dan simpan harga shipment sebelum submit untuk pickup.");
     }
     if (!master.penerimaName) {
-      return fail(422, "Isi data Penerima (nama penerima) sebelum submit untuk pickup — Penerima dicetak pada resi.", {
+      return fail(422, "Isi data Penerima (nama penerima) sebelum submit untuk pickup - Penerima dicetak pada resi.", {
         penerimaName: ["Penerima wajib diisi (dicetak pada Resi)."],
       });
     }
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest, { params }: Params) {
             referenceType: "shipment",
             referenceId: master.id,
             businessRef: `ESCROW-${master.id}`,
-            description: `Escrow hold — bagian company (${partner.companyPercent}%) untuk shipment B2C ${master.masterCode}`,
+            description: `Escrow hold - bagian company (${partner.companyPercent}%) untuk shipment B2C ${master.masterCode}`,
             createdById: user.id,
           });
           escrowTxId = result.transactionId;
@@ -113,8 +113,8 @@ export async function POST(req: NextRequest, { params }: Params) {
         event: "READY_FOR_PICKUP",
         description:
           escrowTxId != null
-            ? `Shipment siap dijemput (${master.details.length} paket) — harga Rp${Math.round(master.priceAmount).toLocaleString("id-ID")}. Escrow Rp${Math.round(escrowAmount).toLocaleString("id-ID")} di-hold dari wallet Marketing.`
-            : `Shipment siap dijemput (${master.details.length} paket) — harga Rp${Math.round(master.priceAmount).toLocaleString("id-ID")}`,
+            ? `Shipment siap dijemput (${master.details.length} paket) - harga Rp${Math.round(master.priceAmount).toLocaleString("id-ID")}. Escrow Rp${Math.round(escrowAmount).toLocaleString("id-ID")} di-hold dari wallet Marketing.`
+            : `Shipment siap dijemput (${master.details.length} paket) - harga Rp${Math.round(master.priceAmount).toLocaleString("id-ID")}`,
         actorId: user.id,
       },
     });

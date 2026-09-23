@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
         counts: { pickupsAssigned: 0, pickupsPickedUp: 0, pickupsCompleted: 0, deliveriesAssigned: 0, deliveriesDelivered: 0 },
         pickups: [],
         deliveries: [],
-        note: "Akun tidak terhubung ke data karyawan — hubungi admin.",
+        note: "Akun tidak terhubung ke data karyawan - hubungi admin.",
       });
     }
     const me = user.employeeId;

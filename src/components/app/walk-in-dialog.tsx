@@ -61,10 +61,10 @@ export function WalkInDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Store className="h-5 w-5 shrink-0 text-primary" />
-            <span className="min-w-0 truncate">Pelanggan Langsung — {task?.masterCode ?? ""}</span>
+            <span className="min-w-0 truncate">Pelanggan Langsung - {task?.masterCode ?? ""}</span>
           </DialogTitle>
           <DialogDescription>
-            Customer menyerahkan paket langsung di gudang. Tidak perlu scan — konfirmasi langsung status Tiba di Gudang.
+            Customer menyerahkan paket langsung di gudang. Tidak perlu scan - konfirmasi langsung status Tiba di Gudang.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={onSubmit} className="space-y-4">

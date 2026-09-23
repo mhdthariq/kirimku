@@ -92,7 +92,7 @@ function PartnersTab({ can }: { can: { userCreate: boolean; userUpdate: boolean;
   // Revise round 10 — warehouse options for the Gudang selector (shown only
   // when partner type is MARKETING). "none" sentinel = umum / general.
   const warehouseOptions = [
-    { value: 'none', label: '— Umum (tidak terikat gudang) —' },
+    { value: 'none', label: '- Umum (tidak terikat gudang) -' },
     ...(options?.warehouses ?? []).map((w) => ({ value: String(w.id), label: w.name + (w.city ? ` · ${w.city}` : '') })),
   ];
 
@@ -210,7 +210,7 @@ function PartnersTab({ can }: { can: { userCreate: boolean; userUpdate: boolean;
                   <span className="text-xs text-muted-foreground">Umum</span>
                 )
               ) : (
-                <span className="text-xs text-muted-foreground">—</span>
+                <span className="text-xs text-muted-foreground">-</span>
               ),
           },
           { key: 'status', header: 'Status', render: (u) => <ActiveBadge active={u.isActive} /> },
@@ -252,7 +252,7 @@ function PartnersTab({ can }: { can: { userCreate: boolean; userUpdate: boolean;
             <Field label="Tipe Partner" htmlFor="p-type">
               <FormSelect value={createForm.type} onValueChange={(v) => setCreateForm({ ...createForm, type: v as 'MARKETING' | 'VEHICLE_OWNER' })} options={[{ value: 'MARKETING', label: 'Marketing' }, { value: 'VEHICLE_OWNER', label: 'Vehicle Owner' }]} disabled={busy} />
             </Field>
-            {/* Revise round 10 — Gudang selector shown only for MARKETING partners.
+            {/* Revise round 10 - Gudang selector shown only for MARKETING partners.
                 When not selected (Umum), customers they create will need a
                 manual gudang pick. When aligned to a gudang, customers they
                 create auto-inherit that gudang. */}
@@ -283,7 +283,7 @@ function PartnersTab({ can }: { can: { userCreate: boolean; userUpdate: boolean;
       <Dialog open={!!editFor} onOpenChange={(open) => !open && setEditFor(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Edit Partner — @{editFor?.username}</DialogTitle>
+            <DialogTitle>Edit Partner - @{editFor?.username}</DialogTitle>
             <DialogDescription>
               Ubah nama atau password partner. Kosongkan password jika tidak ingin mengganti.
             </DialogDescription>
@@ -295,7 +295,7 @@ function PartnersTab({ can }: { can: { userCreate: boolean; userUpdate: boolean;
             <Field label="Password baru (opsional, min. 8 karakter)" htmlFor="ep-password">
               <Input id="ep-password" type="password" value={editForm.password} onChange={(e) => setEditForm({ ...editForm, password: e.target.value })} disabled={busy} minLength={8} autoComplete="new-password" placeholder="••••••••" />
             </Field>
-            {/* Revise round 10 — Gudang selector for marketing partners (edit). */}
+            {/* Revise round 10 - Gudang selector for marketing partners (edit). */}
             {editFor?.partnerType === 'MARKETING' && (
               <Field
                 label="Gudang (afiliasi marketing)"
@@ -411,7 +411,7 @@ function EmployeesTab({ can }: { can: { employeeCreate: boolean; employeeUpdate:
         columns={[
           { key: "number", header: "Nomor", primary: true, render: (e) => <span className="font-mono text-xs">{e.employeeNumber}</span> },
           { key: "name", header: "Nama", render: (e) => <span className="font-medium">{e.name}</span> },
-          { key: "position", header: "Posisi", render: (e) => e.position ?? "—" },
+          { key: "position", header: "Posisi", render: (e) => e.position ?? "-" },
           {
             key: "gudang",
             header: "Gudang",
@@ -419,10 +419,10 @@ function EmployeesTab({ can }: { can: { employeeCreate: boolean; employeeUpdate:
               e.warehouse ? (
                 <Badge variant="outline" className="max-w-[180px] truncate text-[11px]">{e.warehouse.name}</Badge>
               ) : (
-                <span className="text-xs text-muted-foreground" title="Data operational kosong — hanya Owner melihat semua gudang">belum ditugaskan</span>
+                <span className="text-xs text-muted-foreground" title="Data operational kosong - hanya Owner melihat semua gudang">belum ditugaskan</span>
               ),
           },
-          { key: "phone", header: "Telepon", hideOnMobile: true, render: (e) => e.phone ?? "—" },
+          { key: "phone", header: "Telepon", hideOnMobile: true, render: (e) => e.phone ?? "-" },
           {
             key: "account",
             header: "Akun User",
@@ -462,7 +462,7 @@ function EmployeesTab({ can }: { can: { employeeCreate: boolean; employeeUpdate:
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editing ? `Edit Employee — ${editing.employeeNumber}` : "Tambah Employee"}</DialogTitle>
+            <DialogTitle>{editing ? `Edit Employee - ${editing.employeeNumber}` : "Tambah Employee"}</DialogTitle>
             <DialogDescription>{editing ? "Perbarui data employee." : "Nomor employee (EMP-xxxxxx) dibuat otomatis."}</DialogDescription>
           </DialogHeader>
           <form onSubmit={onSubmit} className="space-y-4">
@@ -472,7 +472,7 @@ function EmployeesTab({ can }: { can: { employeeCreate: boolean; employeeUpdate:
             <Field
               label="Gudang Penempatan"
               htmlFor="e-warehouse"
-              hint="Semua data operasional karyawan dibatasi ke gudang ini. Pilih 'Umum' untuk driver / kenek (mereka tidak terikat ke satu gudang — bisa di-assign ke transport rute mana saja)."
+              hint="Semua data operasional karyawan dibatasi ke gudang ini. Pilih 'Umum' untuk driver / kenek (mereka tidak terikat ke satu gudang - bisa di-assign ke transport rute mana saja)."
             >
               <FormSelect
                 value={form.warehouseId || "none"}
@@ -482,7 +482,7 @@ function EmployeesTab({ can }: { can: { employeeCreate: boolean; employeeUpdate:
                   // Driver / Kenek (and any other role that doesn't need a
                   // gudang binding) can be left unaffiliated. The 'none'
                   // sentinel maps to warehouseId = null server-side.
-                  { value: "none", label: "— Umum (tidak terikat gudang) —" },
+                  { value: "none", label: "- Umum (tidak terikat gudang) -" },
                   ...(options?.warehouses ?? []).map((w) => ({ value: String(w.id), label: w.name + (w.city ? ` · ${w.city}` : "") })),
                 ]}
                 disabled={busy}
@@ -654,9 +654,9 @@ function UsersTab({ can }: { can: { userCreate: boolean; userUpdate: boolean } }
             render: (u) => (
               <div className="flex flex-wrap gap-1">
                 {u.isOwner ? (
-                  <Badge>Owner — semua akses</Badge>
+                  <Badge>Owner - semua akses</Badge>
                 ) : u.roles.length === 0 ? (
-                  <span className="text-xs text-muted-foreground">—</span>
+                  <span className="text-xs text-muted-foreground">-</span>
                 ) : (
                   u.roles.map((r) => (
                     <Badge key={r.role.id} variant="secondary" className="text-[10px]">{r.role.name}</Badge>
@@ -709,11 +709,11 @@ function UsersTab({ can }: { can: { userCreate: boolean; userUpdate: boolean } }
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editing ? `Edit User — @${editing.username}` : "Tambah User"}</DialogTitle>
-            <DialogDescription>{editing ? "Kosongkan password jika tidak ingin mengganti." : "Pilih employee yang belum punya akun — nama & username terisi otomatis, masih bisa diubah."}</DialogDescription>
+            <DialogTitle>{editing ? `Edit User - @${editing.username}` : "Tambah User"}</DialogTitle>
+            <DialogDescription>{editing ? "Kosongkan password jika tidak ingin mengganti." : "Pilih employee yang belum punya akun - nama & username terisi otomatis, masih bisa diubah."}</DialogDescription>
           </DialogHeader>
           <form onSubmit={onSubmit} className="space-y-4">
-            {/* Step 3 — Employee select moved to the TOP and made REQUIRED
+            {/* Step 3 - Employee select moved to the TOP and made REQUIRED
                 for new users. The user's request: "users absolutely have
                 relation to employee table". When the user picks an employee,
                 the Name + Username fields below auto-fill from the employee
@@ -726,25 +726,25 @@ function UsersTab({ can }: { can: { userCreate: boolean; userUpdate: boolean } }
               htmlFor="u-employee"
               hint={editing
                 ? "Tautan employee tidak bisa diganti."
-                : "Wajib — pilih employee yang belum punya akun. Nama & username akan terisi otomatis dari data employee."}
+                : "Wajib - pilih employee yang belum punya akun. Nama & username akan terisi otomatis dari data employee."}
             >
               <FormSelect
                 value={form.employeeId}
                 onValueChange={(v) => onPickEmployee(v)}
-                placeholder={editing ? (form.employeeId ? "—" : "Tanpa employee") : "Pilih employee…"}
+                placeholder={editing ? (form.employeeId ? "-" : "Tanpa employee") : "Pilih employee…"}
                 options={unlinkedEmployees.map((e) => ({
                   value: String(e.id),
-                  label: `${e.name}${e.position ? ` — ${e.position}` : ""}${e.warehouse ? ` (${e.warehouse.name})` : ""}`,
+                  label: `${e.name}${e.position ? ` - ${e.position}` : ""}${e.warehouse ? ` (${e.warehouse.name})` : ""}`,
                 }))}
                 disabled={busy || !!editing}
                 required={!editing}
               />
             </Field>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field label="Username" htmlFor="u-username" hint={!editing ? "Auto dari nama depan employee — edit jika perlu" : undefined}>
+              <Field label="Username" htmlFor="u-username" hint={!editing ? "Auto dari nama depan employee - edit jika perlu" : undefined}>
                 <Input id="u-username" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} required disabled={busy || !!editing} autoComplete="off" />
               </Field>
-              <Field label="Nama" htmlFor="u-name" hint={!editing ? "Auto dari employee — edit jika perlu" : undefined}>
+              <Field label="Nama" htmlFor="u-name" hint={!editing ? "Auto dari employee - edit jika perlu" : undefined}>
                 <Input id="u-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required disabled={busy} />
               </Field>
             </div>
@@ -861,7 +861,7 @@ function RolesTab({ can }: { can: { roleCreate: boolean; roleUpdate: boolean } }
               </div>
             ),
           },
-          { key: "description", header: "Deskripsi", render: (r) => <span className="text-sm text-muted-foreground">{r.description ?? "—"}</span> },
+          { key: "description", header: "Deskripsi", render: (r) => <span className="text-sm text-muted-foreground">{r.description ?? "-"}</span> },
           { key: "permissions", header: "Permissions", render: (r) => <Badge variant="secondary">{r.permissions.length}</Badge> },
           { key: "users", header: "Users", render: (r) => r._count?.users ?? 0 },
           { key: "type", header: "Tipe", render: (r) => (r.isSystem ? <Badge variant="outline">system</Badge> : <Badge>custom</Badge>) },
@@ -914,7 +914,7 @@ function RolesTab({ can }: { can: { roleCreate: boolean; roleUpdate: boolean } }
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editing ? `Edit Role — ${editing.name}` : "Tambah Role Custom"}</DialogTitle>
+            <DialogTitle>{editing ? `Edit Role - ${editing.name}` : "Tambah Role Custom"}</DialogTitle>
             <DialogDescription>
               {editing?.isSystem
                 ? "Role sistem: nama & slug terkunci, tapi owner bisa mengubah permission yang dimiliki role ini."
@@ -980,7 +980,7 @@ function RolesTab({ can }: { can: { roleCreate: boolean; roleUpdate: boolean } }
     return (
       <>
         <div className="border-b px-4 py-3">
-          <p className="text-sm font-semibold">Permissions — {role.name}</p>
+          <p className="text-sm font-semibold">Permissions - {role.name}</p>
         </div>
         <div className="space-y-3 p-4">
           {Array.from(byModule.entries()).map(([moduleName, perms]) => (

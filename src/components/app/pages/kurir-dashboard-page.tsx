@@ -123,7 +123,7 @@ export function KurirDashboard() {
           <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
             {greeting}, {user?.name.split(" ")[0]}
           </h1>
-          <p className="text-sm text-muted-foreground">Dashboard operasional kurir — tugas pickup & delivery Anda.</p>
+          <p className="text-sm text-muted-foreground">Dashboard operasional kurir - tugas pickup & delivery Anda.</p>
         </div>
         <DatePeriodFilter from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t); }} />
       </div>
@@ -211,7 +211,7 @@ export function KurirDashboard() {
                         )}
                       </div>
                     </div>
-                    {/* Revise round 7 — Pickup address so the kurir knows where
+                    {/* Revise round 7 - Pickup address so the kurir knows where
                         to go. Falls back to the customer's phone (master DB)
                         if no per-shipment sender phone was typed. */}
                     {pp.pickupAddress ? (

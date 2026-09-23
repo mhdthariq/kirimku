@@ -18,10 +18,10 @@ export async function POST(req: NextRequest, { params }: Params) {
     const withdrawal = await db.withdrawalRequest.findUnique({ where: { id: Number(id) } });
     if (!withdrawal) return fail(404, "Permintaan withdrawal tidak ditemukan.");
     if (withdrawal.partnerId !== partner.id) {
-      return fail(403, "Akses ditolak — ini bukan permintaan withdrawal milik Anda.");
+      return fail(403, "Akses ditolak - ini bukan permintaan withdrawal milik Anda.");
     }
     if (withdrawal.status === "COMPLETED") return fail(422, "Withdrawal yang sudah selesai tidak bisa diubah/dibatalkan (§24).");
-    if (withdrawal.status === "PROCESSING") return fail(422, "Withdrawal sedang diproses transfer bank — hubungi Admin Kantor.");
+    if (withdrawal.status === "PROCESSING") return fail(422, "Withdrawal sedang diproses transfer bank - hubungi Admin Kantor.");
     if (!["PENDING", "APPROVED"].includes(withdrawal.status)) {
       return fail(422, `Withdrawal berstatus ${withdrawal.status} tidak bisa dibatalkan.`);
     }

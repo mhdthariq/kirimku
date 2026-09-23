@@ -29,7 +29,7 @@ export const PERMISSIONS: { slug: string; module: string; description: string }[
   // do not see photo thumbnails even if they can see the row that owns
   // the photo. They still see the text metadata (timestamp, recorded-by
   // name); only the image is hidden.
-  { slug: "proof_photo.view", module: "Proof Photos", description: "Lihat foto bukti (pickup, checkpoint, delivery PoD) — Admin Gudang & Owner" },
+  { slug: "proof_photo.view", module: "Proof Photos", description: "Lihat foto bukti (pickup, checkpoint, delivery PoD) - Admin Gudang & Owner" },
   { slug: "shipment_detail.view", module: "Shipments", description: "View detail shipments" },
   { slug: "shipment_detail.create", module: "Shipments", description: "Add detail shipments" },
   { slug: "shipment_detail.update", module: "Shipments", description: "Update detail shipments" },
@@ -49,7 +49,7 @@ export const PERMISSIONS: { slug: string; module: string; description: string }[
   { slug: "transport.view", module: "Transports", description: "View transports" },
   { slug: "transport.create", module: "Transports", description: "Create/plan transports" },
   { slug: "transport.depart", module: "Transports", description: "Mark transport departed" },
-  { slug: "transport.arrive", module: "Transports", description: "Mark transport arrived (admin override — arrival is normally auto-detected at the destination checkpoint)" },
+  { slug: "transport.arrive", module: "Transports", description: "Mark transport arrived (admin override - arrival is normally auto-detected at the destination checkpoint)" },
   { slug: "transport.checkin", module: "Transports", description: "Checkpoint selfie check-in with GPS validation (driver/kenek)" },
   // Vehicle
   { slug: "vehicle.view", module: "Vehicles", description: "View vehicles" },
@@ -109,7 +109,7 @@ export const PERMISSIONS: { slug: string; module: string; description: string }[
   { slug: "wallet.withdrawal.review", module: "Wallet", description: "Review withdrawal requests" },
   { slug: "wallet.withdrawal.process", module: "Wallet", description: "Process / complete withdrawals with bank transfer" },
   // Owner Company finance
-  { slug: "wallet.topup.verify", module: "Wallet", description: "Verify top-ups (final approval — credits wallet atomically)" },
+  { slug: "wallet.topup.verify", module: "Wallet", description: "Verify top-ups (final approval - credits wallet atomically)" },
   { slug: "wallet.withdrawal.approve", module: "Wallet", description: "Approve withdrawal requests" },
   { slug: "wallet.withdrawal.reject", module: "Wallet", description: "Reject withdrawal requests" },
   { slug: "wallet.adjustment.create", module: "Wallet", description: "Create wallet ADJUSTMENT corrections" },
@@ -123,7 +123,7 @@ export const PERMISSIONS: { slug: string; module: string; description: string }[
   // immediately final (VERIFIED + wallet deduction). No approval workflow;
   // every create/update/delete is tracked in the repair action log.
   { slug: "repair.view", module: "Repairs", description: "View all repair records (company)" },
-  { slug: "repair.create", module: "Repairs", description: "Create repair records — immediately verified & deducted" },
+  { slug: "repair.create", module: "Repairs", description: "Create repair records - immediately verified & deducted" },
   { slug: "repair.update", module: "Repairs", description: "Edit repair records (wallet auto-adjusted, logged)" },
   { slug: "repair.delete", module: "Repairs", description: "Delete repair records (deduction refunded, logged)" },
   { slug: "repair.view_own", module: "Repairs", description: "View own-vehicle repair records + action logs (Vehicle Owner)" },
@@ -189,7 +189,7 @@ export const ROLE_TEMPLATES: { slug: string; name: string; description: string; 
   {
     slug: "admin-gudang",
     name: "Admin Gudang",
-    description: "Warehouse operations: arrival scanning, fleet, routes, transports, customers — data terbatas ke gudang tempatnya bertugas",
+    description: "Warehouse operations: arrival scanning, fleet, routes, transports, customers - data terbatas ke gudang tempatnya bertugas",
     permissions: [
       "warehouse.view", "warehouse.create", "warehouse.update", "warehouse.delete",
       "vehicle.view", "vehicle.create", "vehicle.update",
@@ -217,7 +217,7 @@ export const ROLE_TEMPLATES: { slug: string; name: string; description: string; 
   {
     slug: "staff-gudang",
     name: "Staff Gudang",
-    description: "Warehouse floor staff: arrival scanning & walk-in confirm — data terbatas ke gudang tempatnya bertugas",
+    description: "Warehouse floor staff: arrival scanning & walk-in confirm - data terbatas ke gudang tempatnya bertugas",
     permissions: [
       "warehouse.view",
       "shipment.view", "shipment.view_tracking", "shipment.confirm_arrival",
@@ -230,7 +230,7 @@ export const ROLE_TEMPLATES: { slug: string; name: string; description: string; 
   {
     slug: "kurir",
     name: "Kurir",
-    description: "First/last mile: pickup & delivery execution with QR scanning — data terbatas ke gudang tempatnya bertugas",
+    description: "First/last mile: pickup & delivery execution with QR scanning - data terbatas ke gudang tempatnya bertugas",
     permissions: [
       "pickup.view", "pickup.create", "pickup.scan", "pickup.confirm",
       "delivery.view", "delivery.scan", "delivery.confirm",

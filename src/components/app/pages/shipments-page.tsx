@@ -254,7 +254,7 @@ function ShipmentList() {
     const addressSame = senderAddress && receiverAddress && senderAddress === receiverAddress;
 
     if (nameSame && contactSame && addressSame) {
-      toast.error("Data Pengirim dan Penerima identik. Pengiriman ke diri sendiri tidak diperbolehkan — ubah minimal nama, kontak, atau alamat penerima.");
+      toast.error("Data Pengirim dan Penerima identik. Pengiriman ke diri sendiri tidak diperbolehkan - ubah minimal nama, kontak, atau alamat penerima.");
       return;
     }
     if (nameSame && contactSame) {
@@ -307,7 +307,7 @@ function ShipmentList() {
       live ?? {
         id: s.id,
         masterCode: s.masterCode,
-        customerName: s.customer?.name ?? "—",
+        customerName: s.customer?.name ?? "-",
         customerPhone: s.customer?.phone ?? null,
         origin: s.origin,
         destination: s.destination,
@@ -338,7 +338,7 @@ function ShipmentList() {
       live ?? {
         id: s.id,
         masterCode: s.masterCode,
-        customerName: s.customer?.name ?? "—",
+        customerName: s.customer?.name ?? "-",
         customerPhone: s.customer?.phone ?? null,
         origin: s.origin,
         destination: s.destination,
@@ -409,17 +409,17 @@ function ShipmentList() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          {/* Revise round 8 — Regular / Direct top-level tabs.
+          {/* Revise round 8 - Regular / Direct top-level tabs.
               "Regular" = STANDARD fulfillment (kurir → gudang → transport → gudang → kurir).
               "Direct"  = DIRECT fulfillment (driver picks up at origin warehouse → delivers to destination).
               These two tabs are visible to every role with shipment.view.
-              The owner additionally gets per-gudang tabs AFTER these two —
+              The owner additionally gets per-gudang tabs AFTER these two -
               per-gudang tabs show only STANDARD shipments (DIRECT stays in the Direct tab
               so the per-gudang view doesn't accidentally mix in DIRECT shipments). */}
           <TabsTrigger value="regular">Regular</TabsTrigger>
           <TabsTrigger value="direct">Direct</TabsTrigger>
           {isOwner && <GudangTabsTriggers warehouses={gudangOptions} />}
-          {/* Log Aktivitas reads the audit trail — hidden for users without
+          {/* Log Aktivitas reads the audit trail - hidden for users without
               audit_log.view (e.g. Marketing) so they never see an empty log. */}
           {can.viewLog && <TabsTrigger value="activity">Log Aktivitas</TabsTrigger>}
         </TabsList>
@@ -427,21 +427,21 @@ function ShipmentList() {
           const activeW = gudangOptions.find((g) => gudangTabValue(g.id) === v) ?? null;
           return (
             <TabsContent key={v} value={v} className="mt-3 space-y-3">
-              {/* Revise round 9 — trimmed the over-explained banners.
+              {/* Revise round 9 - trimmed the over-explained banners.
                   Each banner is now a single short line. */}
               {activeW && (
                 <p className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs text-foreground/80">
-                  Gudang <b>{activeW.name}</b> — Regular only.
+                  Gudang <b>{activeW.name}</b> - Regular only.
                 </p>
               )}
               {statusFilter === "PICKED_UP" && can.confirmArrival && (
                 <p className="rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-1.5 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300">
-                  Shipment <b>PICKED UP</b> — klik <b>Terima / Scan</b> untuk konfirmasi kedatangan paket di gudang.
+                  Shipment <b>PICKED UP</b> - klik <b>Terima / Scan</b> untuk konfirmasi kedatangan paket di gudang.
                 </p>
               )}
               {(statusFilter === "AT_DEST_GUDANG" || statusFilter === "ARRIVED_AT_GUDANG") && can.confirmArrival && (
                 <p className="rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-1.5 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300">
-                  <b>TIBA DI GUDANG TUJUAN</b> — klik <b>Terima / Scan</b> untuk menerima paket.
+                  <b>TIBA DI GUDANG TUJUAN</b> - klik <b>Terima / Scan</b> untuk menerima paket.
                 </p>
               )}
               <DataTable
@@ -497,19 +497,19 @@ function ShipmentList() {
                 render: (s) => (
                   <div>
                     <p className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-                      {s.customer?.name ?? "—"}
+                      {s.customer?.name ?? "-"}
                       {s.customer?.type === "b2b" && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-950 dark:text-sky-300" title="B2B — cukup scan Master Resi sekali">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-950 dark:text-sky-300" title="B2B - cukup scan Master Resi sekali">
                           B2B · Master Resi
                         </span>
                       )}
-                      {/* Revise round 8 — Fulfillment Mode badge so users can
+                      {/* Revise round 8 - Fulfillment Mode badge so users can
                           tell at a glance whether this shipment is Regular
                           (STANDARD) or Direct (DIRECT). */}
                       {(s.fulfillmentMode ?? "STANDARD") === "DIRECT" && (
                         <span
                           className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 dark:bg-violet-950 dark:text-violet-300"
-                          title="DIRECT — driver ambil langsung di gudang asal, kirim langsung ke gudang tujuan"
+                          title="DIRECT - driver ambil langsung di gudang asal, kirim langsung ke gudang tujuan"
                         >
                           DIRECT
                         </span>
@@ -518,7 +518,7 @@ function ShipmentList() {
                     <p className="text-xs text-muted-foreground">
                       {s.origin} → {s.destination}
                     </p>
-                    {/* "This shipment is from Gudang X" — shown once the package
+                    {/* "This shipment is from Gudang X" - shown once the package
                         reached the destination side (another gudang) */}
                     {["AT_DEST_GUDANG", "ARRIVED_AT_GUDANG", "DELIVERED"].includes(s.status) && (s.originWarehouseName ?? s.originWarehouseId) && (
                       <p className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-sky-100/70 px-1.5 py-0.5 text-[10px] font-semibold text-sky-800 dark:bg-sky-950/60 dark:text-sky-300">
@@ -545,12 +545,12 @@ function ShipmentList() {
                 header: "Harga",
                 render: (s) => (
                   <div>
-                    {/* Price is hidden until "Hitung Harga" has been run —
+                    {/* Price is hidden until "Hitung Harga" has been run -
                         unpriced shipments show a hint instead of a number. */}
                     {s.priceAmount != null ? (
                       <p className="text-sm font-semibold">{formatRupiah(s.priceAmount)}</p>
                     ) : (
-                      <p className="text-sm font-medium text-muted-foreground">— belum dihitung</p>
+                      <p className="text-sm font-medium text-muted-foreground">- belum dihitung</p>
                     )}
                     {s.chargeableWeightKg != null && <p className="text-[11px] text-muted-foreground">{formatNumber(s.chargeableWeightKg)} kg cw</p>}
                   </div>
@@ -666,12 +666,12 @@ function ShipmentList() {
                   disabled={busy}
                 />
               </Field>
-              {/* Revise round 7 — Customer marker.
+              {/* Revise round 7 - Customer marker.
                   When a customer is selected we show a small panel listing
                   the customer's DB-record data so the user can quickly see
                   the difference between what's in the database and what
                   they've typed into the Pengirim fields below. This is a
-                  UI-only marker — nothing here is added to the resi or
+                  UI-only marker - nothing here is added to the resi or
                   stored on the shipment. The "per-shipment override" hint
                   shows next to each Pengirim field when it diverges. */}
               {selectedCustomer && (
@@ -684,13 +684,13 @@ function ShipmentList() {
                     <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-0.5 text-foreground/80">
                       <p><span className="font-medium">Kode:</span> <span className="font-mono">{selectedCustomer.code}</span></p>
                       <p><span className="font-medium">Tipe:</span> {selectedCustomer.type.toUpperCase()}</p>
-                      <p><span className="font-medium">Nama DB:</span> {selectedCustomer.name || "—"}</p>
-                      <p><span className="font-medium">Telp DB:</span> {selectedCustomer.phone || "—"}</p>
-                      <p className="col-span-2"><span className="font-medium">Email DB:</span> {selectedCustomer.email || "—"}</p>
-                      <p className="col-span-2"><span className="font-medium">Alamat DB:</span> {selectedCustomer.address || "—"}</p>
+                      <p><span className="font-medium">Nama DB:</span> {selectedCustomer.name || "-"}</p>
+                      <p><span className="font-medium">Telp DB:</span> {selectedCustomer.phone || "-"}</p>
+                      <p className="col-span-2"><span className="font-medium">Email DB:</span> {selectedCustomer.email || "-"}</p>
+                      <p className="col-span-2"><span className="font-medium">Alamat DB:</span> {selectedCustomer.address || "-"}</p>
                     </div>
                     <p className="mt-1.5 text-[10px] text-foreground/55">
-                      Bidang Pengirim di bawah otomatis terisi dari data customer — bidang yang <span className="rounded bg-amber-100 px-1 font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">diubah</span> menandakan override per-shipment. Tidak dicetak pada resi.
+                      Bidang Pengirim di bawah otomatis terisi dari data customer - bidang yang <span className="rounded bg-amber-100 px-1 font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">diubah</span> menandakan override per-shipment. Tidak dicetak pada resi.
                     </p>
                   </div>
                 </div>
@@ -722,9 +722,9 @@ function ShipmentList() {
                   </p>
                 </div>
               )}*/}
-              {/* Revise round 9 — Mode Fulfillment moved BEFORE Gudang Asal/Tujuan.
+              {/* Revise round 9 - Mode Fulfillment moved BEFORE Gudang Asal/Tujuan.
                   Reason: when DIRECT is selected, the Gudang Asal/Tujuan fields
-                  are hidden (DIRECT doesn't use company warehouses — the driver
+                  are hidden (DIRECT doesn't use company warehouses - the driver
                   picks up at the customer's location directly), so the user
                   needs to pick the mode FIRST to know which fields appear. */}
               <Field
@@ -733,21 +733,21 @@ function ShipmentList() {
                 className="sm:col-span-2"
                 hint={
                   form.fulfillmentMode === "DIRECT"
-                    ? "DIRECT — driver ambil langsung di lokasi customer, kirim langsung ke penerima. Tidak lewat gudang."
-                    : "STANDARD — kurir pickup → gudang → transport → gudang tujuan → kurir delivery."
+                    ? "DIRECT - driver ambil langsung di lokasi customer, kirim langsung ke penerima. Tidak lewat gudang."
+                    : "STANDARD - kurir pickup → gudang → transport → gudang tujuan → kurir delivery."
                 }
               >
                 <FormSelect
                   value={form.fulfillmentMode}
                   onValueChange={(v) => setForm({ ...form, fulfillmentMode: v as "STANDARD" | "DIRECT" })}
                   options={[
-                    { value: "STANDARD", label: "STANDARD — Lewat gudang" },
-                    { value: "DIRECT", label: "DIRECT — Driver langsung (tanpa gudang)" },
+                    { value: "STANDARD", label: "STANDARD - Lewat gudang" },
+                    { value: "DIRECT", label: "DIRECT - Driver langsung (tanpa gudang)" },
                   ]}
                   disabled={busy}
                 />
               </Field>
-              {/* Gudang Asal / Gudang Tujuan — only shown for STANDARD fulfillment.
+              {/* Gudang Asal / Gudang Tujuan - only shown for STANDARD fulfillment.
                   DIRECT shipments skip the company warehouse flow entirely, so
                   these fields are irrelevant and hidden to keep the form clean. */}
               {form.fulfillmentMode === "STANDARD" && (
@@ -755,12 +755,12 @@ function ShipmentList() {
                   <Field
                     label="Gudang Asal"
                     htmlFor="s-warehouse-from"
-                    hint={selectedTariff ? "Otomatis dari rute — dapat diubah" : "Otomatis terisi saat rute dipilih"}
+                    hint={selectedTariff ? "Otomatis dari rute - dapat diubah" : "Otomatis terisi saat rute dipilih"}
                   >
                     <FormSelect
                       value={form.originWarehouseId}
                       onValueChange={(v) => setForm({ ...form, originWarehouseId: v })}
-                      placeholder="—"
+                      placeholder="-"
                       options={(options?.warehouses ?? []).map((w) => ({ value: String(w.id), label: w.name }))}
                       disabled={busy}
                     />
@@ -768,12 +768,12 @@ function ShipmentList() {
                   <Field
                     label="Gudang Tujuan"
                     htmlFor="s-warehouse-to"
-                    hint={selectedTariff ? "Otomatis dari rute — dapat diubah" : "Otomatis terisi saat rute dipilih"}
+                    hint={selectedTariff ? "Otomatis dari rute - dapat diubah" : "Otomatis terisi saat rute dipilih"}
                   >
                     <FormSelect
                       value={form.destinationWarehouseId}
                       onValueChange={(v) => setForm({ ...form, destinationWarehouseId: v })}
-                      placeholder="—"
+                      placeholder="-"
                       options={(options?.warehouses ?? []).map((w) => ({ value: String(w.id), label: w.name }))}
                       disabled={busy}
                     />
@@ -782,7 +782,7 @@ function ShipmentList() {
               )}
               {form.fulfillmentMode === "DIRECT" && (
                 <div className="sm:col-span-2 rounded-lg border border-violet-300 bg-violet-50/60 px-3 py-2 text-xs text-violet-800 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-300">
-                  <b>Mode DIRECT</b> — shipment tidak melalui gudang. Driver akan pickup langsung di lokasi pengirim dan mengantar langsung ke penerima. Pastikan alamat Pengirim & Penerima diisi dengan lengkap.
+                  <b>Mode DIRECT</b> - shipment tidak melalui gudang. Driver akan pickup langsung di lokasi pengirim dan mengantar langsung ke penerima. Pastikan alamat Pengirim & Penerima diisi dengan lengkap.
                 </div>
               )}
               {/* Discount is entered in Rupiah; the backend derives its percentage. */}
@@ -811,7 +811,7 @@ function ShipmentList() {
                 label="Asuransi (Rupiah)"
                 htmlFor="s-insurance"
                 className="sm:col-span-2"
-                hint="Opsional — masukkan nominal asuransi secara manual."
+                hint="Opsional - masukkan nominal asuransi secara manual."
               >
                 <NumberInput
                   id="s-insurance"
@@ -822,7 +822,7 @@ function ShipmentList() {
                   disabled={busy}
                 />
               </Field>
-              {/* Pengirim (sender) — auto-filled from Customer when the customer
+              {/* Pengirim (sender) - auto-filled from Customer when the customer
                   is picked, but every field is editable so the user can override
                   the contact person / phone / email / address per-shipment.
                   Revise round 7: each field shows a "diubah" (overridden) badge
@@ -833,7 +833,7 @@ function ShipmentList() {
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pengirim (dicetak pada resi)</p>
                   <span className="text-[10px] text-muted-foreground">
-                    {form.customerId ? "Data customer otomatis terisi — dapat diubah." : "Pilih customer untuk mengisi otomatis."}
+                    {form.customerId ? "Data customer otomatis terisi - dapat diubah." : "Pilih customer untuk mengisi otomatis."}
                   </span>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -843,7 +843,7 @@ function ShipmentList() {
                     className="sm:col-span-2"
                     hint={
                       selectedCustomer && form.pengirimName !== (selectedCustomer.name ?? "")
-                        ? "Diubah dari data customer — override per-shipment."
+                        ? "Diubah dari data customer - override per-shipment."
                         : undefined
                     }
                   >
@@ -865,7 +865,7 @@ function ShipmentList() {
                     htmlFor="s-pengirim-phone"
                     hint={
                       selectedCustomer && form.pengirimPhone !== (selectedCustomer.phone ?? "")
-                        ? "Diubah dari data customer — override per-shipment."
+                        ? "Diubah dari data customer - override per-shipment."
                         : undefined
                     }
                   >
@@ -887,7 +887,7 @@ function ShipmentList() {
                     htmlFor="s-pengirim-email"
                     hint={
                       selectedCustomer && form.pengirimEmail !== (selectedCustomer.email ?? "")
-                        ? "Diubah dari data customer — override per-shipment."
+                        ? "Diubah dari data customer - override per-shipment."
                         : "Kosongkan bila tidak ada."
                     }
                   >
@@ -911,7 +911,7 @@ function ShipmentList() {
                     className="sm:col-span-2"
                     hint={
                       selectedCustomer && form.pengirimAddress !== (selectedCustomer.address ?? "")
-                        ? "Diubah dari data customer — override per-shipment."
+                        ? "Diubah dari data customer - override per-shipment."
                         : undefined
                     }
                   >
@@ -993,7 +993,7 @@ function ShipmentList() {
         <ScanArrivalPickerDialog open={scanPickerOpen} onOpenChange={setScanPickerOpen} onDone={reload} />
       )}
 
-      {/* Per-row arrival scan — opens straight from a PICKED_UP row ("Picked Up" tab) */}
+      {/* Per-row arrival scan - opens straight from a PICKED_UP row ("Picked Up" tab) */}
       {can.confirmArrival && (
         <ArrivalScanDialog
           key={rowScanTask ? `row-arr-${rowScanTask.id}` : "row-arr-none"}
@@ -1009,7 +1009,7 @@ function ShipmentList() {
         />
       )}
 
-      {/* Per-row transport arrival scan — opens straight from a row that
+      {/* Per-row transport arrival scan - opens straight from a row that
           reached the destination gudang (AT_DEST_GUDANG / awaiting scan) */}
       {can.confirmArrival && (
         <ArrivalScanDialog
@@ -1092,7 +1092,7 @@ function ScanArrivalPickerDialog({
             </DialogTitle>
             <DialogDescription>
               Shipment yang menunggu diterima gudang: <b>PICKED UP</b> (dibawa kurir kembali ke gudang) dan <b>TIBA DI GUDANG TUJUAN</b>{" "}
-              (driver transport sudah check-in di checkpoint akhir — paket dari gudang lain menunggu diterima). Pilih satu untuk scan tiap paketnya (kamera HP / reader tool / ketik
+              (driver transport sudah check-in di checkpoint akhir - paket dari gudang lain menunggu diterima). Pilih satu untuk scan tiap paketnya (kamera HP / reader tool / ketik
               manual), lalu konfirmasi penerimaannya setelah semua paket lengkap.
             </DialogDescription>
           </DialogHeader>
@@ -1381,7 +1381,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
           pengirimEmail: pengirimForm.email || null,
           pengirimAddress: pengirimForm.address || null,
         }),
-      { success: "Data Pengirim disimpan — akan dicetak pada resi." },
+      { success: "Data Pengirim disimpan - akan dicetak pada resi." },
     );
     setBusy(false);
     if (ok) {
@@ -1401,7 +1401,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
           penerimaAddress: penerimaForm.address || null,
           penerimaContact: penerimaForm.contact || null,
         }),
-      { success: "Data Penerima disimpan — akan dicetak pada resi." },
+      { success: "Data Penerima disimpan - akan dicetak pada resi." },
     );
     setBusy(false);
     if (ok) {
@@ -1465,7 +1465,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
       {
         success: editingDetail
           ? "Detail diperbarui."
-          : `${Math.round(Number(detailForm.quantity) || 1)} paket dibuat — setiap paket punya kode unik.`,
+          : `${Math.round(Number(detailForm.quantity) || 1)} paket dibuat - setiap paket punya kode unik.`,
       },
     );
     setBusy(false);
@@ -1503,7 +1503,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
         acc[key] = {
           id: key,
           description: d.description,
-          dims: l || w || h ? `${formatNumber(l, 0)}×${formatNumber(w, 0)}×${formatNumber(h, 0)}` : "—",
+          dims: l || w || h ? `${formatNumber(l, 0)}×${formatNumber(w, 0)}×${formatNumber(h, 0)}` : "-",
           volumeM3: 0,
           quantity: 0,
           weightKg: d.actualWeightKg,
@@ -1525,7 +1525,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
 
       <PageHeader
         title={shipment.masterCode}
-        subtitle={`${shipment.customer?.name ?? "—"} · ${shipment.origin} → ${shipment.destination} · dibuat ${formatDate(shipment.createdAt)}`}
+        subtitle={`${shipment.customer?.name ?? "-"} · ${shipment.origin} → ${shipment.destination} · dibuat ${formatDate(shipment.createdAt)}`}
         actions={
           <>
             <StatusBadge
@@ -1547,7 +1547,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
                 <Send className="h-4 w-4" /> Submit for Pickup
               </Button>
             )}
-            {/* Walk-in: customer came straight to the gudang — confirm arrival
+            {/* Walk-in: customer came straight to the gudang - confirm arrival
                 directly instead of requesting a kurir pickup. Permission-gated. */}
             {can.confirmArrival && ["CREATED", "READY_FOR_PICKUP"].includes(shipment.status) && (
               <Button variant="secondary" onClick={() => setWalkInTask(toWalkInItem(shipment))}>
@@ -1573,29 +1573,29 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
         }
       />
 
-      {/* Where is this shipment from? — origin gudang banner for shipments that
+      {/* Where is this shipment from? - origin gudang banner for shipments that
           reached the destination gudang. Admin Gudang of the destination branch
           sees at a glance where the package came from. */}
       {["AT_DEST_GUDANG", "ARRIVED_AT_GUDANG", "DELIVERED"].includes(shipment.status) && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-2 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300">
           <Warehouse className="h-4 w-4 shrink-0" />
           <p>
-            Shipment ini <b>dari {shipment.originWarehouseName ?? options?.warehouses?.find((w) => w.id === shipment.originWarehouseId)?.name ?? shipment.origin}</b> —{" "}
+            Shipment ini <b>dari {shipment.originWarehouseName ?? options?.warehouses?.find((w) => w.id === shipment.originWarehouseId)?.name ?? shipment.origin}</b> -{" "}
             {shipment.status === "AT_DEST_GUDANG"
-              ? <>driver transport sudah check-in di gudang tujuan (<b>{shipment.arrivedWarehouseName ?? options?.warehouses?.find((w) => w.id === shipment.arrivedWarehouseId)?.name ?? shipment.destination}</b>) — menunggu scan penerimaan Admin Gudang sebelum berstatus <b>Arrived at (gudang)</b>.</>
+              ? <>driver transport sudah check-in di gudang tujuan (<b>{shipment.arrivedWarehouseName ?? options?.warehouses?.find((w) => w.id === shipment.arrivedWarehouseId)?.name ?? shipment.destination}</b>) - menunggu scan penerimaan Admin Gudang sebelum berstatus <b>Arrived at (gudang)</b>.</>
               : shipment.status === "ARRIVED_AT_GUDANG"
                 ? shipment.destReceivedAt != null
                   ? <>sudah diterima & diverifikasi scan Admin Gudang di <b>{shipment.arrivedWarehouseName ?? options?.warehouses?.find((w) => w.id === shipment.arrivedWarehouseId)?.name ?? shipment.destination}</b> pada {formatDate(shipment.destReceivedAt, true)}.</>
-                  : <>menunggu scan penerimaan Admin Gudang di <b>{shipment.arrivedWarehouseName ?? options?.warehouses?.find((w) => w.id === shipment.arrivedWarehouseId)?.name ?? shipment.destination}</b> — scan semua paket sebelum menugaskan kurir delivery.</>
+                  : <>menunggu scan penerimaan Admin Gudang di <b>{shipment.arrivedWarehouseName ?? options?.warehouses?.find((w) => w.id === shipment.arrivedWarehouseId)?.name ?? shipment.destination}</b> - scan semua paket sebelum menugaskan kurir delivery.</>
                 : <>sudah selesai dikirim ke penerima.</>}
           </p>
         </div>
       )}
 
-      {/* Pickup submission checklist — price must be counted + penerima filled */}
+      {/* Pickup submission checklist - price must be counted + penerima filled */}
       {shipment.status === "CREATED" && can.submitPickup && (shipment.priceAmount == null || !shipment.penerimaName) && (
         <p className="rounded-lg border border-amber-300 bg-amber-50/70 px-3 py-2 text-xs text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
-          Sebelum submit untuk pickup: {shipment.priceAmount == null ? "hitung harga shipment (wajib — pickup tidak bisa diajukan tanpa harga)" : ""}
+          Sebelum submit untuk pickup: {shipment.priceAmount == null ? "hitung harga shipment (wajib - pickup tidak bisa diajukan tanpa harga)" : ""}
           {shipment.priceAmount == null && !shipment.penerimaName ? " dan " : ""}
           {!shipment.penerimaName ? "isi data Penerima (dicetak pada Resi Shipment & Resi Detail)" : ""}.
         </p>
@@ -1624,7 +1624,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
                   ? `${formatNumber(shipment.chargeableWeightKg)} kg`
                   : pricing
                     ? `${formatNumber(pricing.chargeableKg)} kg (estimasi)`
-                    : "—"
+                    : "-"
               }
             />
             <Row
@@ -1632,11 +1632,11 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
               value={
                 shipment.ratePerKg != null || pricing?.ratePerKg != null
                   ? `${formatRupiah(shipment.ratePerKg ?? pricing?.ratePerKg ?? 0)}/kg`
-                  : "—"
+                  : "-"
               }
             />
             <Row label="Asuransi" value={formatRupiah(shipment.insuranceAmount)} />
-            {/* The price stays hidden until "Hitung Harga" is clicked — the
+            {/* The price stays hidden until "Hitung Harga" is clicked - the
                 estimation is deliberately NOT shown either. */}
             {shipment.priceAmount != null ? (
               <div className="flex items-center justify-between rounded-lg bg-primary/10 px-3 py-2.5">
@@ -1686,7 +1686,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
             )}
             {!pricing && (
               <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
-                Tidak ada tarif aktif untuk rute {shipment.origin} → {shipment.destination} — buat tarif di menu Tariffs agar harga bisa dihitung.
+                Tidak ada tarif aktif untuk rute {shipment.origin} → {shipment.destination} - buat tarif di menu Tariffs agar harga bisa dihitung.
               </p>
             )}
           </CardContent>
@@ -1707,13 +1707,13 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
             </div>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
-            <Row label="Nama" value={shipment.penerimaName ?? "—"} />
-            <Row label="Kontak" value={shipment.penerimaContact ?? "—"} />
+            <Row label="Nama" value={shipment.penerimaName ?? "-"} />
+            <Row label="Kontak" value={shipment.penerimaContact ?? "-"} />
             <p className="text-xs leading-relaxed text-muted-foreground">{shipment.penerimaAddress ?? "Alamat penerima belum diisi"}</p>
             <div className="border-t pt-2">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Customer</p>
-              <Row label="Nama" value={shipment.customer?.name ?? "—"} />
-              <Row label="Telp." value={shipment.customer?.phone ?? "—"} />
+              <Row label="Nama" value={shipment.customer?.name ?? "-"} />
+              <Row label="Telp." value={shipment.customer?.phone ?? "-"} />
             </div>
             <p className="text-[11px] leading-relaxed text-muted-foreground">
               Data Penerima &amp; CS Gudang dicetak pada Resi Shipment (customer) dan setiap Resi Detail (stiker paket).
@@ -1721,7 +1721,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
           </CardContent>
         </Card>
 
-        {/* Pengirim (sender) — was a tiny footer row in the Penerima card;
+        {/* Pengirim (sender) - was a tiny footer row in the Penerima card;
             now its own card so the four editable fields have room to breathe
             and the user can override them per-shipment. */}
         <Card className="lg:col-span-1">
@@ -1738,12 +1738,12 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
             </div>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
-            <Row label="Nama" value={shipment.pengirimName ?? shipment.customer?.name ?? "—"} />
-            <Row label="Telepon" value={shipment.pengirimPhone ?? shipment.customer?.phone ?? "—"} />
-            <Row label="Email" value={shipment.pengirimEmail ?? shipment.customer?.email ?? "—"} />
+            <Row label="Nama" value={shipment.pengirimName ?? shipment.customer?.name ?? "-"} />
+            <Row label="Telepon" value={shipment.pengirimPhone ?? shipment.customer?.phone ?? "-"} />
+            <Row label="Email" value={shipment.pengirimEmail ?? shipment.customer?.email ?? "-"} />
             <p className="text-xs leading-relaxed text-muted-foreground">{shipment.pengirimAddress ?? shipment.customer?.address ?? "Alamat pengirim belum diisi"}</p>
             <p className="text-[11px] leading-relaxed text-muted-foreground">
-              Diisi otomatis dari data customer saat shipment dibuat — dapat diubah per-shipment.
+              Diisi otomatis dari data customer saat shipment dibuat - dapat diubah per-shipment.
             </p>
           </CardContent>
         </Card>
@@ -1777,7 +1777,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
         </Card>
       </div>
 
-      {/* Detail Barang — tabs: Semua (1 baris per paket) / Ringkas (digabung) */}
+      {/* Detail Barang - tabs: Semua (1 baris per paket) / Ringkas (digabung) */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1803,7 +1803,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
               <TabsContent value="all" className="mt-3">
                 <DataTable
                   rows={shipment.details}
-                  emptyMessage="—"
+                  emptyMessage="-"
                   columns={[
                     {
                       key: "code",
@@ -1816,7 +1816,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
                       key: "dims",
                       header: "Dimensi (cm)",
                       hideOnMobile: true,
-                      render: (d) => (d.lengthCm ? `${formatNumber(d.lengthCm, 0)}×${formatNumber(d.widthCm, 0)}×${formatNumber(d.heightCm, 0)}` : "—"),
+                      render: (d) => (d.lengthCm ? `${formatNumber(d.lengthCm, 0)}×${formatNumber(d.widthCm, 0)}×${formatNumber(d.heightCm, 0)}` : "-"),
                     },
                     // Revise round 11 — Volume (m³) column. Uses volumeM3 when
                     // set, otherwise computed from L×W×H/1.000.000. Shows "—"
@@ -1829,7 +1829,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
                         const vol = (d.volumeM3 ?? 0) > 0
                           ? d.volumeM3!
                           : ((d.lengthCm ?? 0) * (d.widthCm ?? 0) * (d.heightCm ?? 0)) / 1_000_000;
-                        return <span className="text-sm tabular-nums">{vol > 0 ? vol.toFixed(3) : "—"}</span>;
+                        return <span className="text-sm tabular-nums">{vol > 0 ? vol.toFixed(3) : "-"}</span>;
                       },
                     },
                     { key: "weight", header: "Berat", render: (d) => `${formatNumber(d.actualWeightKg)} kg` },
@@ -1861,7 +1861,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
               <TabsContent value="grouped" className="mt-3">
                 <DataTable
                   rows={groupedDetails}
-                  emptyMessage="—"
+                  emptyMessage="-"
                   columns={[
                     { key: "desc", header: "Deskripsi", primary: true, render: (g) => <span className="font-medium">{g.description}</span> },
                     { key: "dims", header: "Dimensi (cm)", render: (g) => g.dims },
@@ -1871,7 +1871,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
                       header: "Volume (m³)",
                       render: (g) => (
                         <span className="tabular-nums">
-                          {g.volumeM3 > 0 ? `${(g.volumeM3 * g.quantity).toFixed(3)} m³` : "—"}
+                          {g.volumeM3 > 0 ? `${(g.volumeM3 * g.quantity).toFixed(3)} m³` : "-"}
                           {g.volumeM3 > 0 && <span className="ml-1 text-[10px] text-muted-foreground">({g.volumeM3.toFixed(3)}/paket)</span>}
                         </span>
                       ),
@@ -1895,7 +1895,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
         </CardContent>
       </Card>
 
-      {/* Log Aktivitas — only rendered for audit_log.view holders (hidden for
+      {/* Log Aktivitas - only rendered for audit_log.view holders (hidden for
            Marketing & other roles that cannot read the audit trail). */}
       {can.viewLog && (
         <ActivityLogPanel entityTypes={["shipment", "shipment_detail", "pickup", "delivery", "transport"]} title="Log Aktivitas Shipment Ini" limit={20} />
@@ -1905,11 +1905,11 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingDetail ? `Edit Detail — ${editingDetail.detailCode}` : "Tambah Detail Barang"}</DialogTitle>
+            <DialogTitle>{editingDetail ? `Edit Detail - ${editingDetail.detailCode}` : "Tambah Detail Barang"}</DialogTitle>
             <DialogDescription>
               {editingDetail
                 ? "1 baris = 1 paket. Volumetrik: L×W×H cm / 1.000.000 × multiplier tarif."
-                : "Isi jumlah paket — sistem membuat N baris, masing-masing dengan kode unik (mis. 10 → DTL-…-01 s/d DTL-…-10)."}
+                : "Isi jumlah paket - sistem membuat N baris, masing-masing dengan kode unik (mis. 10 → DTL-…-01 s/d DTL-…-10)."}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={onDetailSubmit} className="space-y-4">
@@ -1936,12 +1936,12 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
                   <NumberInput id="d-h" value={detailForm.heightCm} onChange={(e) => setDetailForm({ ...detailForm, heightCm: e.target.value })} placeholder="15" disabled={busy} />
                 </Field>
               </div>
-              {/* Revise round 11 — optional direct volume entry (m³).
+              {/* Revise round 11 - optional direct volume entry (m³).
                   Use case: irregularly-shaped packages where entering dimensions
                   is impractical. When set, volume is used directly instead of
                   L×W×H/1.000.000. Leave empty to compute from dimensions. */}
               <Field
-                label="Volume langsung (m³) — opsional"
+                label="Volume langsung (m³) - opsional"
                 htmlFor="d-volume"
                 className="sm:col-span-2"
                 hint="Isi jika paket berbentuk tidak beraturan (skip dimensi). Kosongkan untuk hitung otomatis dari P×L×T."
@@ -1982,7 +1982,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Cancel shipment — confirmation dialog (not a direct cancel) */}
+      {/* Cancel shipment - confirmation dialog (not a direct cancel) */}
       <AlertDialog open={confirmCancel} onOpenChange={setConfirmCancel}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -2037,7 +2037,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
               <UserRound className="h-5 w-5 text-primary" /> Edit Pengirim
             </DialogTitle>
             <DialogDescription>
-              Diisi otomatis dari data customer — dapat diubah di sini untuk shipment ini saja (tanpa mengubah data customer).
+              Diisi otomatis dari data customer - dapat diubah di sini untuk shipment ini saja (tanpa mengubah data customer).
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={onPengirimSubmit} className="space-y-4">
@@ -2063,7 +2063,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
         </DialogContent>
       </Dialog>
 
-      {/* Resi print overlay — 1 Resi Shipment + N Resi Detail stickers */}
+      {/* Resi print overlay - 1 Resi Shipment + N Resi Detail stickers */}
       {printOpen && (
         <ResiPrint
           shipment={shipment}
@@ -2071,7 +2071,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
         />
       )}
 
-      {/* Walk-in arrival dialog — customer hands the package over at the gudang counter */}
+      {/* Walk-in arrival dialog - customer hands the package over at the gudang counter */}
       {can.confirmArrival && (
         <WalkInDialog
           key={walkInTask ? `walk-${walkInTask.id}-${walkInTask.status}` : "walk-none"}
@@ -2100,7 +2100,7 @@ function toWalkInItem(s: Shipment & { details: DetailShipment[] }): GudangWalkIn
   return {
     id: s.id,
     masterCode: s.masterCode,
-    customerName: s.customer?.name ?? "—",
+    customerName: s.customer?.name ?? "-",
     origin: s.origin,
     destination: s.destination,
     originWarehouseId: s.originWarehouseId ?? null,
