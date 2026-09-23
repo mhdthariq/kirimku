@@ -343,7 +343,7 @@ export function ResiPrint({
             </p>
 
             {pengirim.address && (
-              <p className="line-clamp-2 text-[7px] font-normal leading-tight text-black">
+              <p className="line-clamp-2 text-[8px] font-normal leading-tight text-black">
                 {pengirim.address}
               </p>
             )}
@@ -360,7 +360,7 @@ export function ResiPrint({
               Telp: {penerima.contact}
             </p>
 
-            <p className="line-clamp-2 text-[7px] font-normal leading-tight text-black">
+            <p className="line-clamp-2 text-[8px] font-normal leading-tight text-black">
               {penerima.address}
             </p>
           </div>
@@ -460,7 +460,7 @@ export function ResiPrint({
         {/* Footer — flex-1, absorbs whatever height is left so the
             sheet always totals exactly 100mm. Includes handling
             instructions, signature lines, and print timestamp. */}
-        <footer className="flex min-h-0 flex-1 flex-col justify-between gap-1 overflow-hidden px-3 py-2 text-[7px] leading-tight text-black">
+        <footer className="flex min-h-0 flex-1 flex-col justify-between gap-1 overflow-hidden px-3 py-2 text-[8px] leading-tight text-black">
           <div className="flex-1 min-h-0">
             <p className="tracking-widest">
               Dicetak: {new Date().toLocaleString("id-ID")}
