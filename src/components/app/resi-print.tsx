@@ -7,12 +7,14 @@ import { Printer, X } from "lucide-react";
 import { COMPANY_NAME } from "@/lib/company";
 import {
   apiGet,
+  apiPost,
   type DetailShipment,
   type Customer,
   type Options,
   type Shipment,
   type ShipmentTotals,
 } from "@/lib/client-api";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { formatNumber, formatRupiah } from "@/components/app/form-parts";
 
@@ -56,6 +58,31 @@ function SmallCaps({ children }: { children: React.ReactNode }) {
 }
 
 /**
+ * Build the "Dicetak oleh" label from the current session.
+ *
+ * Format: "<Account Name> (<Role1> / <Role2>)"
+ * - Uses the user's display `name` (Account Name) — not the username — so
+ *   the printed footer matches what staff see in the header/sidebar.
+ * - Owner gets the literal "Owner" role; non-owner users list every role
+ *   `name` attached to their account, joined by ` / ` for multi-role cases.
+ * - Returns null when there is no session (e.g. deep-link opened before
+ *   login completes) so the print layout never shows an empty "()" pair.
+ */
+function buildPrintByLabel(user: ReturnType<typeof useAuth>["user"]): string | null {
+  if (!user) return null;
+  const accountName = user.name?.trim() || user.username;
+  let roleLabel: string;
+  if (user.isOwner) {
+    roleLabel = "Owner";
+  } else if (user.roles.length > 0) {
+    roleLabel = user.roles.map((r) => r.name).join(" / ");
+  } else {
+    roleLabel = "—";
+  }
+  return `${accountName} (${roleLabel})`;
+}
+
+/**
  * Print format:
  * - Exactly 100mm x 100mm per sheet, no more, no less
  * - QR Code only (no barcode — QR survives smudges better)
@@ -85,8 +112,24 @@ export function ResiPrint({
   shipment,
   onClose,
 }: ResiPrintProps) {
+  const { user } = useAuth();
   const [qrMap, setQrMap] = useState<Record<string, string>>({});
   const [options, setOptions] = useState<Options | null>(null);
+
+  // Print-by label — resolved once per render from the session. Captured at
+  // print time (not at component mount) so the footer reflects whoever is
+  // actually logged in when the user hits "Cetak / Simpan PDF".
+  const printByLabel = buildPrintByLabel(user);
+
+  // Fire-and-forget audit log — called right before window.print() opens
+  // the OS print dialog. The server records who printed which resi at
+  // what time, so there's a permanent trail even if the printed paper
+  // copy is lost or the PDF is deleted. Errors are swallowed on purpose:
+  // a failed audit write must never block the actual print.
+  const logPrint = () => {
+    if (!shipment?.id) return;
+    apiPost(`/shipments/${shipment.id}/print-log`).catch(() => undefined);
+  };
 
   // Lock the page scroll behind the portal — exactly ONE scrollbar (the
   // portal's own) stays visible, matching the invoice detail print view.
@@ -459,12 +502,19 @@ export function ResiPrint({
 
         {/* Footer — flex-1, absorbs whatever height is left so the
             sheet always totals exactly 100mm. Includes handling
-            instructions, signature lines, and print timestamp. */}
+            instructions, signature lines, print timestamp, and the
+            account name + role of the staff who triggered the print. */}
         <footer className="flex min-h-0 flex-1 flex-col justify-between gap-1 overflow-hidden px-3 py-2 text-[8px] leading-tight text-black">
           <div className="flex-1 min-h-0">
             <p className="tracking-widest">
               Dicetak: {new Date().toLocaleString("id-ID")}
             </p>
+            {printByLabel && (
+              <p className="mt-0.5 truncate tracking-wide">
+                <span className="font-bold uppercase tracking-[0.08em]">Dicetak oleh:</span>{" "}
+                {printByLabel}
+              </p>
+            )}
           </div>
         </footer>
       </section>
@@ -710,6 +760,12 @@ export function ResiPrint({
               <p className="mt-1 text-[6px] font-normal text-black">
                 Dicetak: {new Date().toLocaleString("id-ID")}
               </p>
+              {printByLabel && (
+                <p className="mt-0.5 truncate text-[6px] font-normal text-black">
+                  <span className="font-bold uppercase tracking-[0.06em]">Oleh:</span>{" "}
+                  {printByLabel}
+                </p>
+              )}
             </footer>
           </section>
         );
@@ -858,6 +914,13 @@ export function ResiPrint({
               QR Code only • Ukuran 100 × 100 mm • Thermal printer ready • 1 Master Resi +{" "}
               {totalPackages} Package Label
             </p>
+
+            {printByLabel && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                <span className="font-semibold text-foreground">Akan dicetak oleh:</span>{" "}
+                {printByLabel}
+              </p>
+            )}
           </div>
 
           <div className="flex w-full flex-wrap gap-2 sm:w-auto">
@@ -874,7 +937,10 @@ export function ResiPrint({
             <Button
               type="button"
               className="flex-1 sm:flex-none"
-              onClick={() => window.print()}
+              onClick={() => {
+                logPrint();
+                window.print();
+              }}
             >
               <Printer className="h-4 w-4" />
               Cetak / Simpan PDF

@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { Printer, X } from "lucide-react";
 import { COMPANY_NAME, COMPANY_TAGLINE } from "@/lib/company";
 import { useAuth } from "@/hooks/use-auth";
-import { type Invoice, type InvoiceLine } from "@/lib/client-api";
+import { type Invoice, type InvoiceLine, apiPost } from "@/lib/client-api";
 import { formatDate, formatNumber, formatRupiah } from "@/components/app/form-parts";
 import { StatusBadge } from "@/components/app/status-badge";
 import { Button } from "@/components/ui/button";
@@ -16,8 +16,38 @@ type PrintableInvoice = Invoice & {
 };
 
 export function InvoicePrint({ invoice, onClose }: { invoice: PrintableInvoice; onClose: () => void }) {
-  const { companyName: tenantCompanyName } = useAuth();
+  const { companyName: tenantCompanyName, user } = useAuth();
   const displayCompanyName = tenantCompanyName ?? COMPANY_NAME;
+
+  // Build the "Dicetak oleh" label from the current session. Captured at
+  // print time so the footer reflects whoever is actually logged in when
+  // the user hits "Cetak / Simpan PDF" — not whoever opened the preview.
+  // Format: "<Account Name> (<Role>)" using the user's display name and
+  // the human-readable role name(s) attached to their account.
+  const printByLabel = (() => {
+    if (!user) return null;
+    const accountName = user.name?.trim() || user.username;
+    let roleLabel: string;
+    if (user.isOwner) {
+      roleLabel = "Owner";
+    } else if (user.roles.length > 0) {
+      roleLabel = user.roles.map((r) => r.name).join(" / ");
+    } else {
+      roleLabel = "—";
+    }
+    return `${accountName} (${roleLabel})`;
+  })();
+
+  // Fire-and-forget audit log — called right before window.print() opens
+  // the OS print dialog. The server records who printed which invoice at
+  // what time, so there's a permanent trail even if the PDF is deleted or
+  // the printed copy is lost. Errors are swallowed on purpose: a failed
+  // audit write must never block the actual print.
+  const logPrint = () => {
+    if (!invoice?.id) return;
+    apiPost(`/invoices/${invoice.id}/print-log`).catch(() => undefined);
+  };
+
   // Lock the page scroll behind the portal — exactly ONE scrollbar (the
   // portal's own) stays visible, even when opened from a long list page.
   useEffect(() => {
@@ -36,8 +66,16 @@ export function InvoicePrint({ invoice, onClose }: { invoice: PrintableInvoice; 
   return createPortal(
     <div id="invoice-print-portal" className="fixed inset-0 z-[80] overflow-y-auto bg-neutral-200 dark:bg-neutral-900">
       <div className="sticky top-0 z-10 flex flex-col gap-3 border-b bg-white px-4 py-3 shadow-sm dark:bg-neutral-800 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0"><p className="text-sm font-bold text-foreground">Pratinjau Invoice</p><p className="truncate text-xs text-muted-foreground">{invoice.invoiceNumber} · siap dicetak atau disimpan sebagai PDF</p></div>
-        <div className="flex w-full flex-wrap gap-2 sm:w-auto"><Button type="button" variant="outline" className="flex-1 sm:flex-none" onClick={onClose}><X className="h-4 w-4" /> Tutup</Button><Button type="button" className="flex-1 sm:flex-none" onClick={() => window.print()}><Printer className="h-4 w-4" /> Cetak / Simpan PDF</Button></div>
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-foreground">Pratinjau Invoice</p>
+          <p className="truncate text-xs text-muted-foreground">{invoice.invoiceNumber} · siap dicetak atau disimpan sebagai PDF</p>
+          {printByLabel && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              <span className="font-semibold text-foreground">Akan dicetak oleh:</span> {printByLabel}
+            </p>
+          )}
+        </div>
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto"><Button type="button" variant="outline" className="flex-1 sm:flex-none" onClick={onClose}><X className="h-4 w-4" /> Tutup</Button><Button type="button" className="flex-1 sm:flex-none" onClick={() => { logPrint(); window.print(); }}><Printer className="h-4 w-4" /> Cetak / Simpan PDF</Button></div>
       </div>
       <article className="invoice-sheet mx-auto my-6 bg-white px-8 py-10 text-neutral-900 shadow-xl sm:px-12" aria-label={`Invoice ${invoice.invoiceNumber}`}>
         <header className="flex flex-col justify-between gap-8 border-b-2 border-neutral-900 pb-7 sm:flex-row">
@@ -52,6 +90,28 @@ export function InvoicePrint({ invoice, onClose }: { invoice: PrintableInvoice; 
         <section className="overflow-x-auto py-7"><table className="w-full min-w-[520px] text-sm"><thead><tr className="border-b-2 border-neutral-900 text-left text-[10px] uppercase tracking-wider text-neutral-500"><th className="pb-3">Deskripsi</th><th className="w-16 pb-3 text-right">Qty</th><th className="w-32 pb-3 text-right">Harga satuan</th><th className="w-32 pb-3 text-right">Jumlah</th></tr></thead><tbody>{invoice.lines.map((line) => <tr key={line.id} className="border-b border-neutral-200"><td className="py-3 pr-3"><p className="font-medium">{line.description}</p>{line.shipment?.masterCode && <p className="mt-0.5 font-mono text-[10px] text-neutral-500">Shipment {line.shipment.masterCode}</p>}</td><td className="py-3 text-right">{formatNumber(line.quantity)}</td><td className="py-3 text-right">{formatRupiah(line.unitPrice)}</td><td className="py-3 text-right font-semibold">{formatRupiah(line.quantity * line.unitPrice)}</td></tr>)}</tbody></table></section>
         <section className="ml-auto max-w-sm border-t-2 border-neutral-900 pt-4 text-sm"><div className="flex justify-between"><span className="text-neutral-500">Subtotal</span><span className="font-semibold">{formatRupiah(subtotal)}</span></div><div className="mt-2 flex justify-between"><span className="text-neutral-500">Sudah dibayar</span><span className="font-semibold text-emerald-700">- {formatRupiah(invoice.settledAmount)}</span></div><div className="mt-4 flex justify-between border-t border-neutral-200 pt-3 text-base"><span className="font-bold">Sisa pembayaran</span><span className="font-black text-emerald-700">{formatRupiah(invoice.remainingAmount)}</span></div></section>
         {(invoice.notes || invoice.settlements?.length) && <footer className="mt-12 grid gap-8 border-t pt-6 text-xs sm:grid-cols-2"><div>{invoice.notes && <><p className="font-bold uppercase tracking-wider text-neutral-500">Catatan</p><p className="mt-2 leading-relaxed text-neutral-600">{invoice.notes}</p></>}{invoice.settlements?.length ? <p className="mt-4 text-neutral-500">{invoice.settlements.length} pembayaran tercatat · terakhir {formatDate(invoice.settlements[0].settledAt, true)}</p> : null}</div><p className="self-end text-right text-neutral-500">Terima kasih atas kepercayaan Anda.</p></footer>}
+        {/* Print audit footer — always rendered so every printed / saved
+            PDF copy carries the account name + role of the staff who
+            triggered the print. Mirrors the "Dicetak oleh" line on the
+            resi print. Visible on both the on-screen preview and the
+            actual print/PDF output so the preview is WYSIWYG. */}
+        <footer className="mt-8 border-t border-neutral-200 pt-4 text-[10px] leading-relaxed text-neutral-500">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span>
+                <span className="font-bold uppercase tracking-wider text-neutral-600">Dicetak:</span>{" "}
+                {new Date().toLocaleString("id-ID")}
+              </span>
+              {printByLabel && (
+                <span>
+                  <span className="font-bold uppercase tracking-wider text-neutral-600">Oleh:</span>{" "}
+                  {printByLabel}
+                </span>
+              )}
+            </div>
+            <span className="font-mono text-[9px] text-neutral-400">Dokumen ini dicetak dari sistem KirimKu.</span>
+          </div>
+        </footer>
       </article>
     </div>, document.body,
   );
