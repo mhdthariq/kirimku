@@ -125,6 +125,9 @@ export async function GET(req: NextRequest) {
           // Display is gated by proof_photo.view on the client (Admin Gudang +
           // Owner by default). Other roles see the metadata but not the image.
           photoUrl: d.photoUrl ?? null,
+          // Delivery point coordinates — plotted GREEN on the kurir task map.
+          latitude: d.latitude,
+          longitude: d.longitude,
           createdAt: d.createdAt,
           completedAt: d.completedAt,
           masterCode: d.master.masterCode,
@@ -135,7 +138,7 @@ export async function GET(req: NextRequest) {
           originWarehouseId: d.master.originWarehouseId,
           originWarehouseName: whName(d.master.originWarehouseId),
           address: d.master.customer.address,
-          customerName: d.master.customer.name,
+          customerName: d.master.customer.companyName || d.master.customer.name,
           customerPhone: d.master.customer.phone,
           customerType: d.master.customer.type,
           priceAmount: d.master.priceAmount,
@@ -188,6 +191,8 @@ export async function POST(req: NextRequest) {
     const kurir = await db.employee.findUnique({ where: { id: kurirId } });
     if (!kurir) return fail(422, "Kurir tidak ditemukan.", { kurirId: ["Kurir tidak ditemukan."] });
     const notes = str(body.notes);
+    const latitude = num(body.latitude);
+    const longitude = num(body.longitude);
 
     const deliveryCode = await nextCode("delivery", "DLV-2026-", "deliveryCode");
     const delivery = await db.delivery.create({
@@ -197,6 +202,8 @@ export async function POST(req: NextRequest) {
         kurirId,
         status: "ASSIGNED",
         notes,
+        latitude,
+        longitude,
       },
     });
     await db.trackingEvent.create({

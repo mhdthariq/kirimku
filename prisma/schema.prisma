@@ -270,6 +270,14 @@ model MasterShipment {
   pengirimAddress        String?
   chargeableWeightKg     Float?
   ratePerKg              Float?
+  /// Snapshot of the tariff's pricing method at the time price was
+  /// computed ("PER_KG" | "PER_KOLI" | "PER_CUBIC"). Null = legacy rows
+  /// priced before this feature existed — treated as PER_KG.
+  pricingMethod          String?
+  /// Chargeable koli count snapshot — set only when pricingMethod = PER_KOLI.
+  chargeableKoli         Float?
+  /// Chargeable volume (m³) snapshot — set only when pricingMethod = PER_CUBIC.
+  chargeableVolumeM3     Float?
   priceAmount            Float?
   pricedAt               DateTime?
   insuranceAmount        Float               @default(0)
@@ -486,6 +494,10 @@ model Pickup {
   /// Revise round 8 — optional pickup photo (proof of pickup). Display is
   /// gated by proof_photo.view (Admin Gudang + Owner by default).
   photoUrl    String?
+  /// Pickup point coordinates — plotted RED on the kurir's task map so the
+  /// courier can see exactly where to collect the package.
+  latitude    Float?
+  longitude   Float?
   createdAt   DateTime       @default(now())
   completedAt DateTime?
   updatedAt   DateTime       @updatedAt
@@ -541,6 +553,10 @@ model Delivery {
   /// (or in addition to) the text `proofOfDelivery`.
   photoUrl        String?
   notes           String?
+  /// Delivery point coordinates — plotted GREEN on the kurir's task map so
+  /// the courier can see exactly where to drop the package off.
+  latitude        Float?
+  longitude       Float?
   createdAt       DateTime       @default(now())
   completedAt     DateTime?
   updatedAt       DateTime       @updatedAt
@@ -558,6 +574,20 @@ model Tariff {
   volumetricMultiplier Float            @default(250)
   roundingMode         String           @default("UP")
   roundingUnitKg       Float            @default(0.5)
+  /// B2B pricing method — "PER_KG" | "PER_KOLI" | "PER_CUBIC". B2C tariffs
+  /// (customerType = "b2c" or generic/null) are always forced to "PER_KG"
+  /// server-side; only B2B tariffs may pick /koli or /cubic. Choosing a
+  /// tariff at shipment-creation time is how the operator picks the method.
+  pricingMethod        String           @default("PER_KG")
+  /// Rate per koli (package/collie) — used when pricingMethod = "PER_KOLI".
+  ratePerKoli          Float?
+  /// Rate per m³ — used when pricingMethod = "PER_CUBIC".
+  ratePerCubic         Float?
+  /// Minimum chargeable koli count (PER_KOLI method). Default 1 — a
+  /// shipment is always billed at least 1 koli.
+  minChargeableKoli    Float            @default(1)
+  /// Minimum chargeable volume in m³ (PER_CUBIC method). Default 0 = no floor.
+  minChargeableM3      Float            @default(0)
   effectiveFrom        DateTime
   effectiveTo          DateTime?
   isActive             Boolean          @default(true)

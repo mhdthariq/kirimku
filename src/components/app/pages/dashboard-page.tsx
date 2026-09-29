@@ -268,7 +268,7 @@ export function DashboardPage() {
     { label: "Pickup Aktif", value: counts.activePickups, icon: Truck, href: "#/pickups", show: can("pickup.view") },
     { label: "Delivery Tertunda", value: counts.pendingDeliveries, icon: ClipboardList, href: "#/deliveries", show: can("delivery.view") },
     { label: "Transport Berjalan", value: counts.inTransit, icon: Route, href: "#/transports", show: can("transport.view") },
-    { label: "Customer Aktif", value: counts.customers, icon: Users, href: "#/customers", show: can("customer.view") },
+    { label: "Customer Aktif", value: counts.customers, icon: Users, href: "/customers", show: can("customer.view") },
     { label: "Gudang", value: counts.gudang, icon: Warehouse, href: "#/gudang", show: can("warehouse.view") && user?.isOwner },
     { label: "Kendaraan", value: counts.vehicles, icon: CarFront, href: "#/vehicles", show: can("vehicle.view") },
     { label: "Invoice", value: counts.invoices, icon: Receipt, href: "#/invoices", show: can("invoice.view") },
@@ -809,7 +809,7 @@ function GudangScanQueue({ workspace }: { workspace: GudangDashboardWorkspace })
                 {workspace.heldSummary.map((w) => (
                   <a
                     key={w.warehouseId}
-                    href="#/gudang"
+                    href="/gudang"
                     className="rounded-xl border bg-card p-3.5 transition hover:border-primary/40 hover:bg-accent/50"
                   >
                     <p className="flex items-center justify-between gap-2">

@@ -5,8 +5,9 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 /**
- * Simple single-point location picker (used by the Gudang form).
- * Click the map to set coordinates; marker is draggable.
+ * Simple single-point location picker (used by the Gudang, Pickup and
+ * Delivery forms). Click the map to set coordinates; marker is draggable.
+ * Tiles: Google Maps (roadmap) instead of OpenStreetMap.
  */
 export function LeafletPicker({
   latitude,
@@ -14,12 +15,15 @@ export function LeafletPicker({
   onChange,
   height = 280,
   zoom = 11,
+  markerColor = "#0d9d70",
 }: {
   latitude: number | null;
   longitude: number | null;
   onChange: (lat: number, lng: number) => void;
   height?: number;
   zoom?: number;
+  /** Pin color — e.g. red for pickup points, green for delivery points. */
+  markerColor?: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -37,15 +41,17 @@ export function LeafletPicker({
       latitude != null && longitude != null ? [latitude, longitude] : [3.5952, 98.6722];
 
     const map = L.map(containerRef.current, { scrollWheelZoom: true }).setView(center, zoom);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    // Google Maps roadmap tiles (replaces OpenStreetMap).
+    L.tileLayer("https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}", {
+      maxZoom: 20,
+      subdomains: ["mt0", "mt1", "mt2", "mt3"],
+      attribution: "© Google Maps",
     }).addTo(map);
     mapRef.current = map;
 
     const icon = L.divIcon({
       className: "kirimku-pin",
-      html: '<div style="width:22px;height:22px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#0d9d70;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);"></div>',
+      html: `<div style="width:22px;height:22px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${markerColor};border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);"></div>`,
       iconSize: [22, 22],
       iconAnchor: [11, 22],
     });

@@ -2,7 +2,8 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { guard, ok, handle, fail, num } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
-import { resolveTariff, computePricing } from "@/lib/pricing";
+import { computePricing } from "@/lib/pricing";
+import { resolveTariff } from "@/lib/pricing-server";
 import { hasPermission } from "@/lib/auth";
 import { assertShipmentScope } from "@/lib/gudang-scope";
 import { walletSummary } from "@/lib/wallet";
@@ -122,6 +123,9 @@ export async function POST(req: NextRequest, { params }: Params) {
         tariffId: tariff.id,
         chargeableWeightKg: r.chargeableKg,
         ratePerKg: tariff.ratePerKg,
+        pricingMethod: r.method,
+        chargeableKoli: r.method === "PER_KOLI" ? r.chargeableKoli : null,
+        chargeableVolumeM3: r.method === "PER_CUBIC" ? r.chargeableVolumeM3 : null,
         priceAmount: r.price,
         pricedAt: new Date(),
         discountAmount,
@@ -130,11 +134,20 @@ export async function POST(req: NextRequest, { params }: Params) {
       },
     });
 
+    // Method-aware audit description — B2B tariffs may bill /kg, /koli, or
+    // /cubic (m³); B2C tariffs are always /kg.
+    const priceDescription =
+      r.method === "PER_KOLI"
+        ? `Harga dihitung: ${r.chargeableKoli.toFixed(0)} koli × Rp${r.rateApplied.toLocaleString("id-ID")}/koli = Rp${r.price.toLocaleString("id-ID")}`
+        : r.method === "PER_CUBIC"
+          ? `Harga dihitung: ${r.chargeableVolumeM3.toFixed(3)} m³ × Rp${r.rateApplied.toLocaleString("id-ID")}/m³ = Rp${r.price.toLocaleString("id-ID")}`
+          : `Harga dihitung: chargeable ${r.chargeableKg.toFixed(1)} kg (aktual ${r.actualKg.toFixed(1)} kg, volumetrik ${r.volumetricKg.toFixed(2)} kg = L×W×H/1.000.000 × ${r.multiplier}) × Rp${r.rateApplied.toLocaleString("id-ID")} = Rp${r.price.toLocaleString("id-ID")}`;
+
     await db.trackingEvent.create({
       data: {
         masterId: master.id,
         event: "PRICED",
-        description: `Harga dihitung: chargeable ${r.chargeableKg.toFixed(1)} kg (aktual ${r.actualKg.toFixed(1)} kg, volumetrik ${r.volumetricKg.toFixed(2)} kg = L×W×H/1.000.000 × ${r.multiplier}) × Rp${tariff.ratePerKg.toLocaleString("id-ID")} = Rp${r.price.toLocaleString("id-ID")}`,
+        description: priceDescription,
         actorId: user.id,
       },
     });

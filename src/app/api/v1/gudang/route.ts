@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
       where: { status: "PICKED_UP" },
       orderBy: { updatedAt: "asc" },
       include: {
-        customer: { select: { id: true, name: true, type: true, phone: true } },
+        customer: { select: { id: true, name: true, type: true, phone: true, companyName: true } },
         details: { select: { id: true, actualWeightKg: true, lengthCm: true, widthCm: true, heightCm: true } },
         pickups: { orderBy: { completedAt: "desc" }, take: 1, select: { id: true, pickupCode: true, kurirId: true, completedAt: true } },
       },
@@ -84,7 +84,7 @@ export async function GET(req: NextRequest) {
       return {
         id: s.id,
         masterCode: s.masterCode,
-        customerName: s.customer.name,
+        customerName: s.customer.companyName || s.customer.name,
         customerPhone: s.customer.phone,
         origin: s.origin,
         destination: s.destination,
@@ -113,7 +113,7 @@ export async function GET(req: NextRequest) {
       where: { status: { in: ["CREATED", "READY_FOR_PICKUP"] } },
       orderBy: { createdAt: "desc" },
       include: {
-        customer: { select: { name: true } },
+        customer: { select: { name: true, companyName: true } },
         details: { select: { actualWeightKg: true, lengthCm: true, widthCm: true, heightCm: true } },
       },
     });
@@ -125,7 +125,7 @@ export async function GET(req: NextRequest) {
         return {
           id: s.id,
           masterCode: s.masterCode,
-          customerName: s.customer.name,
+          customerName: s.customer.companyName || s.customer.name,
           origin: s.origin,
           destination: s.destination,
           originWarehouseId: s.originWarehouseId,
@@ -154,7 +154,7 @@ export async function GET(req: NextRequest) {
       },
       orderBy: { updatedAt: "asc" },
       include: {
-        customer: { select: { id: true, name: true, type: true, phone: true } },
+        customer: { select: { id: true, name: true, type: true, phone: true, companyName: true } },
         details: { select: { id: true, actualWeightKg: true, lengthCm: true, widthCm: true, heightCm: true } },
         transportItems: {
           select: {
@@ -203,7 +203,7 @@ export async function GET(req: NextRequest) {
       return {
         id: s.id,
         masterCode: s.masterCode,
-        customerName: s.customer.name,
+        customerName: s.customer.companyName || s.customer.name,
         customerPhone: s.customer.phone,
         origin: s.origin,
         destination: s.destination,
@@ -228,7 +228,7 @@ export async function GET(req: NextRequest) {
       where: { status: { in: ["RECEIVED_AT_GUDANG", "AT_DEST_GUDANG", "ARRIVED_AT_GUDANG"] } },
       orderBy: { updatedAt: "desc" },
       include: {
-        customer: { select: { name: true } },
+        customer: { select: { name: true, companyName: true } },
         details: { select: { actualWeightKg: true, lengthCm: true, widthCm: true, heightCm: true } },
       },
     });
@@ -269,7 +269,7 @@ export async function GET(req: NextRequest) {
           return {
             id: s.id,
             masterCode: s.masterCode,
-            customerName: s.customer.name,
+            customerName: s.customer.companyName || s.customer.name,
             status: s.status,
             stage: s.status === "RECEIVED_AT_GUDANG" ? "origin" : "destination",
             originWarehouseName,

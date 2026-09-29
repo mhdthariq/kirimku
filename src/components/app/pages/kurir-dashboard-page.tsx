@@ -21,6 +21,12 @@ import { formatDate, formatRupiah } from "@/components/app/form-parts";
 import { QrScanDialog, type ScanTaskInfo } from "@/components/app/qr-scan-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import dynamic from "next/dynamic";
+
+const TaskPointsMap = dynamic(() => import("@/components/app/task-points-map").then((m) => m.TaskPointsMap), {
+  ssr: false,
+  loading: () => <Skeleton className="h-[320px] w-full rounded-lg" />,
+});
 
 interface KurirDashboardData {
   period: { from: string; to: string; days: number };
@@ -156,6 +162,51 @@ export function KurirDashboard() {
           </motion.a>
         ))}
       </div>
+
+      {/* Peta Tugas — pickup (merah) & delivery (hijau) yang punya koordinat */}
+      {(() => {
+        const points = [
+          ...data.pickups
+            .filter((p) => p.latitude != null && p.longitude != null)
+            .map((p) => ({
+              id: p.id,
+              kind: "pickup" as const,
+              latitude: p.latitude as number,
+              longitude: p.longitude as number,
+              code: p.pickupCode,
+              title: p.pickupSenderName ?? p.customerName,
+              subtitle: p.pickupAddress,
+            })),
+          ...data.deliveries
+            .filter((d) => d.latitude != null && d.longitude != null)
+            .map((d) => ({
+              id: d.id,
+              kind: "delivery" as const,
+              latitude: d.latitude as number,
+              longitude: d.longitude as number,
+              code: d.deliveryCode,
+              title: d.customerName,
+              subtitle: d.address,
+            })),
+        ];
+        if (points.length === 0) return null;
+        return (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <MapPin className="h-4 w-4 text-primary" /> Peta Tugas
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                <span className="font-semibold text-red-600">● Merah</span> = titik jemput ·{" "}
+                <span className="font-semibold text-emerald-600">● Hijau</span> = titik antar
+              </p>
+            </CardHeader>
+            <CardContent>
+              <TaskPointsMap points={points} />
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Pickup list */}

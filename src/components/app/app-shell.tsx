@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ClipboardList,
@@ -53,6 +54,23 @@ export interface NavItem {
   /** visible only to the owner (e.g. the Gudang master-data menu) */
   ownerOnly?: boolean;
   mobile?: boolean;
+}
+
+/**
+ * Routing migration (docs/CLEAN_ARCHITECTURE_PLAN.md §3) — routes in this
+ * set have a real Next.js page under `app/(dashboard)/...` and should
+ * navigate via <Link> (client-side, no hash) instead of the legacy
+ * `#/...` hash router. Everything else still uses the hash router until
+ * it's migrated. Add a route here the same PR you add its `page.tsx`.
+ */
+const MIGRATED_ROUTES = new Set<string>(["/tariffs", "/customers", "/gudang"]);
+
+/** href for a legacy (not-yet-migrated) nav item — always absolute (`/#/x`,
+ *  not `#/x`) so it resolves correctly even when the current page is
+ *  already a real route like `/tariffs` (a bare `#/x` would otherwise
+ *  append to the current path instead of replacing it). */
+function legacyHashHref(href: string): string {
+  return `/#${href}`;
 }
 
 export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
@@ -116,19 +134,26 @@ function NavLink({
   active: boolean;
   onNavigate?: () => void;
 }) {
+  const className = cn(
+    "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+    active
+      ? "bg-primary text-primary-foreground shadow-sm"
+      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+  );
+  const iconClassName = cn("h-[18px] w-[18px] shrink-0", active ? "text-primary-foreground" : "text-muted-foreground group-hover:text-accent-foreground");
+
+  if (MIGRATED_ROUTES.has(item.href)) {
+    return (
+      <Link href={item.href} onClick={onNavigate} aria-current={active ? "page" : undefined} className={className}>
+        <item.icon className={iconClassName} />
+        {item.label}
+      </Link>
+    );
+  }
+
   return (
-    <a
-      href={`#${item.href}`}
-      onClick={onNavigate}
-      aria-current={active ? "page" : undefined}
-      className={cn(
-        "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-        active
-          ? "bg-primary text-primary-foreground shadow-sm"
-          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-      )}
-    >
-      <item.icon className={cn("h-[18px] w-[18px] shrink-0", active ? "text-primary-foreground" : "text-muted-foreground group-hover:text-accent-foreground")} />
+    <a href={legacyHashHref(item.href)} onClick={onNavigate} aria-current={active ? "page" : undefined} className={className}>
+      <item.icon className={iconClassName} />
       {item.label}
     </a>
   );
@@ -436,18 +461,28 @@ export function AppShell({
         >
           {mobileItems.map((item) => {
             const active = path.startsWith(item.href);
-            return (
-              <a
-                key={`${item.href}:${item.label}`}
-                href={`#${item.href}`}
-                className={cn(
-                  "flex min-w-[64px] flex-1 flex-col items-center gap-0.5 px-2 py-2 text-[10px] font-medium transition-colors",
-                  active ? "text-primary" : "text-muted-foreground hover:text-foreground",
-                )}
-                aria-current={active ? "page" : undefined}
-              >
+            const className = cn(
+              "flex min-w-[64px] flex-1 flex-col items-center gap-0.5 px-2 py-2 text-[10px] font-medium transition-colors",
+              active ? "text-primary" : "text-muted-foreground hover:text-foreground",
+            );
+            const inner = (
+              <>
                 <item.icon className="h-5 w-5" />
                 {item.label}
+              </>
+            );
+            return MIGRATED_ROUTES.has(item.href) ? (
+              <Link key={`${item.href}:${item.label}`} href={item.href} className={className} aria-current={active ? "page" : undefined}>
+                {inner}
+              </Link>
+            ) : (
+              <a
+                key={`${item.href}:${item.label}`}
+                href={legacyHashHref(item.href)}
+                className={className}
+                aria-current={active ? "page" : undefined}
+              >
+                {inner}
               </a>
             );
           })}

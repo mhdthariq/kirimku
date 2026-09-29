@@ -36,6 +36,7 @@ import {
   type Shipment,
   type TrackingEvent,
 } from "@/lib/client-api";
+import { customerDisplayParts, customerPrimaryName } from "@/lib/customer-display";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
@@ -200,6 +201,7 @@ function ShipmentList() {
         (!q ||
           s.masterCode.toLowerCase().includes(q) ||
           (s.customer?.name ?? "").toLowerCase().includes(q) ||
+          (s.customer?.companyName ?? "").toLowerCase().includes(q) ||
           s.origin.toLowerCase().includes(q) ||
           s.destination.toLowerCase().includes(q) ||
           (s.penerimaName ?? "").toLowerCase().includes(q)),
@@ -376,10 +378,22 @@ function ShipmentList() {
         (!selectedCustomer || !t.customerType || t.customerType === selectedCustomer.type)
       );
     })
-    .map((t) => ({
-      value: String(t.id),
-      label: `${t.origin} → ${t.destination} · ${t.customerType ? t.customerType.toUpperCase() : "SEMUA"} · Rp${formatNumber(t.ratePerKg, 0)}/kg`,
-    }));
+    .map((t) => {
+      // B2B tariffs may bill /kg, /koli, or /cubic (m³) - show the method +
+      // matching rate right in the label so the operator picks the right
+      // one for this shipment (kg → /kg, koli → /koli, cubic → /cubic).
+      const method = t.customerType === "b2b" ? t.pricingMethod ?? "PER_KG" : "PER_KG";
+      const rateLabel =
+        method === "PER_KOLI"
+          ? `Rp${formatNumber(t.ratePerKoli ?? 0, 0)}/koli`
+          : method === "PER_CUBIC"
+            ? `Rp${formatNumber(t.ratePerCubic ?? 0, 0)}/m³`
+            : `Rp${formatNumber(t.ratePerKg, 0)}/kg`;
+      return {
+        value: String(t.id),
+        label: `${t.origin} → ${t.destination} · ${t.customerType ? t.customerType.toUpperCase() : "SEMUA"} · ${rateLabel}`,
+      };
+    });
   const selectedTariff = (options?.tariffs ?? []).find((t) => String(t.id) === form.tariffId) ?? null;
   const canAddDiscount = user?.partnerType === "MARKETING" || can.confirmArrival;
   const discountIsMarketingFunded = user?.partnerType === "MARKETING";
@@ -494,10 +508,12 @@ function ShipmentList() {
               {
                 key: "customer",
                 header: "Customer & Rute",
-                render: (s) => (
+                render: (s) => {
+                  const cust = s.customer ? customerDisplayParts(s.customer) : { primary: "-", secondary: null };
+                  return (
                   <div>
                     <p className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-                      {s.customer?.name ?? "-"}
+                      {cust.primary}
                       {s.customer?.type === "b2b" && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-950 dark:text-sky-300" title="B2B - cukup scan Master Resi sekali">
                           B2B · Master Resi
@@ -515,6 +531,7 @@ function ShipmentList() {
                         </span>
                       )}
                     </p>
+                    {cust.secondary && <p className="text-[11px] text-muted-foreground">PIC: {cust.secondary}</p>}
                     <p className="text-xs text-muted-foreground">
                       {s.origin} → {s.destination}
                     </p>
@@ -537,7 +554,8 @@ function ShipmentList() {
                     )}
                     {s.penerimaName && <p className="text-[11px] text-muted-foreground">penerima: {s.penerimaName}</p>}
                   </div>
-                ),
+                  );
+                },
               },
               { key: "details", header: "Detail", render: (s) => <span className="text-sm">{s.totals?.totalPackages ?? s._count?.details ?? 0} paket</span> },
               {
@@ -662,7 +680,10 @@ function ShipmentList() {
                     });
                   }}
                   placeholder="Pilih customer…"
-                  options={(options?.customers ?? []).map((c) => ({ value: String(c.id), label: `${c.name} (${c.type.toUpperCase()} · ${c.code})` }))}
+                  options={(options?.customers ?? []).map((c) => ({
+                    value: String(c.id),
+                    label: c.type === "b2b" && c.companyName ? `${c.companyName} (PIC: ${c.name}) · ${c.code}` : `${c.name} (${c.type.toUpperCase()} · ${c.code})`,
+                  }))}
                   disabled={busy}
                 />
               </Field>
@@ -684,7 +705,14 @@ function ShipmentList() {
                     <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-0.5 text-foreground/80">
                       <p><span className="font-medium">Kode:</span> <span className="font-mono">{selectedCustomer.code}</span></p>
                       <p><span className="font-medium">Tipe:</span> {selectedCustomer.type.toUpperCase()}</p>
-                      <p><span className="font-medium">Nama DB:</span> {selectedCustomer.name || "-"}</p>
+                      {selectedCustomer.type === "b2b" && selectedCustomer.companyName ? (
+                        <>
+                          <p><span className="font-medium">Perusahaan:</span> {selectedCustomer.companyName}</p>
+                          <p><span className="font-medium">PIC:</span> {selectedCustomer.name || "-"}</p>
+                        </>
+                      ) : (
+                        <p><span className="font-medium">Nama DB:</span> {selectedCustomer.name || "-"}</p>
+                      )}
                       <p><span className="font-medium">Telp DB:</span> {selectedCustomer.phone || "-"}</p>
                       <p className="col-span-2"><span className="font-medium">Email DB:</span> {selectedCustomer.email || "-"}</p>
                       <p className="col-span-2"><span className="font-medium">Alamat DB:</span> {selectedCustomer.address || "-"}</p>
@@ -1487,6 +1515,17 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
   const pricing = shipment.pricingPreview ?? null;
   const actualWeight = pricing?.actualKg ?? shipment.details.reduce((sum, d) => sum + d.actualWeightKg, 0);
   const volumetric = pricing?.volumetricKg ?? 0;
+  // B2B tariffs may bill /kg, /koli, or /cubic (m³) - use whichever method
+  // was actually applied (snapshot on the shipment once priced, otherwise
+  // the live preview) so this card never assumes /kg.
+  const pricingMethod = shipment.pricingMethod ?? pricing?.method ?? "PER_KG";
+  const rateApplied =
+    pricing?.rateApplied ??
+    (pricingMethod === "PER_KOLI"
+      ? shipment.tariff?.ratePerKoli ?? 0
+      : pricingMethod === "PER_CUBIC"
+        ? shipment.tariff?.ratePerCubic ?? 0
+        : shipment.ratePerKg ?? shipment.tariff?.ratePerKg ?? 0);
 
   // "Ringkas" grouping: packages sharing description + dimensions + weight collapse into one row.
   // Presentation only — the database keeps 1 row per package (exactly like the "Semua" tab).
@@ -1525,7 +1564,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
 
       <PageHeader
         title={shipment.masterCode}
-        subtitle={`${shipment.customer?.name ?? "-"} · ${shipment.origin} → ${shipment.destination} · dibuat ${formatDate(shipment.createdAt)}`}
+        subtitle={`${shipment.customer ? customerPrimaryName(shipment.customer) : "-"} · ${shipment.origin} → ${shipment.destination} · dibuat ${formatDate(shipment.createdAt)}`}
         actions={
           <>
             <StatusBadge
@@ -1612,29 +1651,41 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
           <CardContent className="space-y-2.5">
             <Row label="Total paket" value={`${shipment.details.length} paket`} />
             <Row label="Total volume" value={`${(shipment.totals?.totalVolumeM3 ?? 0).toFixed(3)} m³`} />
-            <Row label="Berat aktual" value={`${formatNumber(actualWeight)} kg`} />
-            <Row
-              label={`Berat volumetrik (${pricing ? formatNumber(pricing.volumetricMultiplier, 0) : "?"})`}
-              value={`${formatNumber(volumetric)} kg`}
-            />
-            <Row
-              label="Chargeable weight"
-              value={
-                shipment.chargeableWeightKg != null
-                  ? `${formatNumber(shipment.chargeableWeightKg)} kg`
-                  : pricing
-                    ? `${formatNumber(pricing.chargeableKg)} kg (estimasi)`
-                    : "-"
-              }
-            />
-            <Row
-              label="Tarif"
-              value={
-                shipment.ratePerKg != null || pricing?.ratePerKg != null
-                  ? `${formatRupiah(shipment.ratePerKg ?? pricing?.ratePerKg ?? 0)}/kg`
-                  : "-"
-              }
-            />
+            {pricingMethod === "PER_KG" && (
+              <>
+                <Row label="Berat aktual" value={`${formatNumber(actualWeight)} kg`} />
+                <Row
+                  label={`Berat volumetrik (${pricing ? formatNumber(pricing.volumetricMultiplier, 0) : "?"})`}
+                  value={`${formatNumber(volumetric)} kg`}
+                />
+                <Row
+                  label="Chargeable weight"
+                  value={
+                    shipment.chargeableWeightKg != null
+                      ? `${formatNumber(shipment.chargeableWeightKg)} kg`
+                      : pricing
+                        ? `${formatNumber(pricing.chargeableKg)} kg (estimasi)`
+                        : "-"
+                  }
+                />
+                <Row label="Tarif" value={rateApplied ? `${formatRupiah(rateApplied)}/kg` : "-"} />
+              </>
+            )}
+            {pricingMethod === "PER_KOLI" && (
+              <>
+                <Row label="Jumlah koli" value={`${shipment.chargeableKoli ?? pricing?.chargeableKoli ?? shipment.details.length} koli`} />
+                <Row label="Tarif" value={rateApplied ? `${formatRupiah(rateApplied)}/koli` : "-"} />
+              </>
+            )}
+            {pricingMethod === "PER_CUBIC" && (
+              <>
+                <Row
+                  label="Volume chargeable"
+                  value={`${formatNumber(shipment.chargeableVolumeM3 ?? pricing?.chargeableVolumeM3 ?? 0, 3)} m³`}
+                />
+                <Row label="Tarif" value={rateApplied ? `${formatRupiah(rateApplied)}/m³` : "-"} />
+              </>
+            )}
             <Row label="Asuransi" value={formatRupiah(shipment.insuranceAmount)} />
             {/* The price stays hidden until "Hitung Harga" is clicked - the
                 estimation is deliberately NOT shown either. */}
@@ -1712,7 +1763,14 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
             <p className="text-xs leading-relaxed text-muted-foreground">{shipment.penerimaAddress ?? "Alamat penerima belum diisi"}</p>
             <div className="border-t pt-2">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Customer</p>
-              <Row label="Nama" value={shipment.customer?.name ?? "-"} />
+              {shipment.customer?.type === "b2b" && shipment.customer?.companyName ? (
+                <>
+                  <Row label="Perusahaan" value={shipment.customer.companyName} />
+                  <Row label="PIC" value={shipment.customer?.name ?? "-"} />
+                </>
+              ) : (
+                <Row label="Nama" value={shipment.customer?.name ?? "-"} />
+              )}
               <Row label="Telp." value={shipment.customer?.phone ?? "-"} />
             </div>
             <p className="text-[11px] leading-relaxed text-muted-foreground">

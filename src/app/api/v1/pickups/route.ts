@@ -126,13 +126,16 @@ export async function GET(req: NextRequest) {
         // Revise round 8 — pickup photo (proof of pickup). Display is gated
         // by proof_photo.view on the client.
         photoUrl: p.photoUrl ?? null,
+        // Pickup point coordinates — plotted RED on the kurir task map.
+        latitude: p.latitude,
+        longitude: p.longitude,
         createdAt: p.createdAt,
         completedAt: p.completedAt,
         masterCode: p.master.masterCode,
         masterStatus: p.master.status,
         origin: p.master.origin,
         destination: p.master.destination,
-        customerName: p.master.customer.name,
+        customerName: p.master.customer.companyName || p.master.customer.name,
         customerType: p.master.customer.type,
         // Step 1 — expose fulfillmentMode on each pickup row so the UI can
         // render the DIRECT badge and so driver clients can filter to only
@@ -187,6 +190,8 @@ export async function POST(req: NextRequest) {
     const kurir = await db.employee.findUnique({ where: { id: kurirId } });
     if (!kurir) return fail(422, "Kurir tidak ditemukan.", { kurirId: ["Kurir tidak ditemukan."] });
     const notes = str(body.notes);
+    const latitude = num(body.latitude);
+    const longitude = num(body.longitude);
 
     const pickupCode = await nextCode("pickup", "PICK-2026-", "pickupCode");
     const pickup = await db.pickup.create({
@@ -196,6 +201,8 @@ export async function POST(req: NextRequest) {
         kurirId,
         status: "ASSIGNED",
         notes,
+        latitude,
+        longitude,
       },
     });
 

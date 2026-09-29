@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { guard, ok, handle, fail, str, num } from "@/lib/api-helpers";
 import { audit, diffFields } from "@/lib/audit";
-import { pricingPreview } from "@/lib/pricing";
+import { pricingPreview } from "@/lib/pricing-server";
 import { computeTotals } from "@/lib/shipment-totals";
 import { paymentSummary } from "@/lib/scan-flow";
 import { assertShipmentScope } from "@/lib/gudang-scope";

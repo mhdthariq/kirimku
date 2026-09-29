@@ -1,8 +1,12 @@
-import { db } from "@/lib/db";
-
 /**
  * Pricing engine — single source of truth for the volumetric formula, shared
  * by the API price calculation, shipment GET preview, and the seeder.
+ *
+ * IMPORTANT: this file is intentionally framework/DB-free (no import of
+ * `@/lib/db`) so it can be unit-tested in isolation — see
+ * `src/lib/pricing.test.ts`. Anything that needs the database (resolving a
+ * tariff, building a server-side preview) lives in `./pricing-server.ts`
+ * instead, which imports the pure functions from here.
  *
  * Formula (per user revision):
  *   volumetric kg = (L × W × H in cm) / 1.000.000 × multiplier
@@ -11,9 +15,24 @@ import { db } from "@/lib/db";
  * Chargeable weight = max(total actual kg, total volumetric kg), floored at
  * the tariff's minChargeableKg, then rounded UP (default) / NEAREST to the
  * tariff's rounding unit. Price = chargeable kg × rate per kg.
+ *
+ * B2B pricing methods — every tariff carries ONE pricing method:
+ *   - PER_KG    (default, and the ONLY method B2C ever uses): the formula
+ *               above, unchanged.
+ *   - PER_KOLI  price = max(package count, minChargeableKoli) × ratePerKoli.
+ *   - PER_CUBIC price = max(total volume m³, minChargeableM3) × ratePerCubic.
+ * Picking a tariff at shipment-creation time IS picking the method — the
+ * operator sees the method on the tariff (Tarif page / shipment tariff
+ * dropdown) and chooses the one that fits (kg / koli / cubic).
  */
 
 export const DEFAULT_VOLUMETRIC_MULTIPLIER = 250;
+
+export type PricingMethod = "PER_KG" | "PER_KOLI" | "PER_CUBIC";
+
+export function normalizePricingMethod(value: unknown): PricingMethod {
+  return value === "PER_KOLI" || value === "PER_CUBIC" ? value : "PER_KG";
+}
 
 export interface PricedDetailInput {
   lengthCm?: number | null;
@@ -31,6 +50,13 @@ export interface TariffLike {
   volumetricMultiplier: number;
   roundingMode: string;
   roundingUnitKg: number;
+  /** B2B pricing method. Defaults to "PER_KG" when absent (legacy tariffs /
+   *  B2C tariffs — B2C never uses anything else). */
+  pricingMethod?: string | null;
+  ratePerKoli?: number | null;
+  ratePerCubic?: number | null;
+  minChargeableKoli?: number | null;
+  minChargeableM3?: number | null;
 }
 
 /** Compute the volume (m³) of a single detail row.
@@ -54,6 +80,19 @@ export interface PricingResult {
   chargeableKg: number;
   price: number;
   multiplier: number;
+  /** Which method actually produced `price` for this shipment. */
+  method: PricingMethod;
+  /** Total physical volume (m³) across all details — always computed,
+   *  regardless of method, so the UI can always show it for reference. */
+  totalVolumeM3: number;
+  /** Package (koli) count — always computed for reference. */
+  koliCount: number;
+  /** Chargeable koli — only meaningful when method === "PER_KOLI". */
+  chargeableKoli: number;
+  /** Chargeable volume (m³) — only meaningful when method === "PER_CUBIC". */
+  chargeableVolumeM3: number;
+  /** The rate actually applied (ratePerKg / ratePerKoli / ratePerCubic). */
+  rateApplied: number;
 }
 
 export function computePricing(details: PricedDetailInput[], tariff: TariffLike): PricingResult {
@@ -62,108 +101,48 @@ export function computePricing(details: PricedDetailInput[], tariff: TariffLike)
   // Revise round 11 — use volumetricKgForDetail so packages with `volumeM3`
   // set use that value directly instead of L×W×H.
   const volumetricKg = details.reduce((sum, d) => sum + volumetricKgForDetail(d, multiplier), 0);
+  const totalVolumeM3 = details.reduce((sum, d) => sum + detailVolumeM3(d), 0);
+  const koliCount = details.length;
 
-  let chargeable = Math.max(actualKg, volumetricKg);
-  chargeable = Math.max(chargeable, tariff.minChargeableKg);
+  let chargeableKg = Math.max(actualKg, volumetricKg);
+  chargeableKg = Math.max(chargeableKg, tariff.minChargeableKg);
   const unit = tariff.roundingUnitKg > 0 ? tariff.roundingUnitKg : 0.5;
-  chargeable =
+  chargeableKg =
     tariff.roundingMode === "NEAREST"
-      ? Math.round(chargeable / unit) * unit
-      : Math.ceil(chargeable / unit) * unit;
+      ? Math.round(chargeableKg / unit) * unit
+      : Math.ceil(chargeableKg / unit) * unit;
 
-  const price = Math.round(chargeable * tariff.ratePerKg);
-  return { actualKg, volumetricKg, chargeableKg: chargeable, price, multiplier };
-}
+  const method = normalizePricingMethod(tariff.pricingMethod);
 
-/**
- * Resolve the tariff that applies to a shipment:
- * 1. the tariff explicitly selected at creation (master.tariffId), or
- * 2. the newest active tariff matching origin → destination and the
- *    customer's type (b2b/b2c), generic tariffs (customerType null) as fallback.
- * Active = isActive and effective window covers today.
- */
-export async function resolveTariff(master: {
-  tariffId: number | null;
-  origin: string;
-  destination: string;
-  customer: { type: string };
-}): Promise<{
-  id: number;
-  ratePerKg: number;
-  minChargeableKg: number;
-  volumetricMultiplier: number;
-  roundingMode: string;
-  roundingUnitKg: number;
-  origin: string;
-  destination: string;
-  customerType: string | null;
-} | null> {
-  const now = new Date();
+  let price: number;
+  let rateApplied: number;
+  let chargeableKoli = 0;
+  let chargeableVolumeM3 = 0;
 
-  if (master.tariffId != null) {
-    const own = await db.tariff.findFirst({
-      where: {
-        id: master.tariffId,
-        isActive: true,
-        effectiveFrom: { lte: now },
-        OR: [{ effectiveTo: null }, { effectiveTo: { gte: now } }],
-      },
-    });
-    if (own) return own;
+  if (method === "PER_KOLI") {
+    chargeableKoli = Math.max(koliCount, tariff.minChargeableKoli ?? 1);
+    rateApplied = tariff.ratePerKoli ?? 0;
+    price = Math.round(chargeableKoli * rateApplied);
+  } else if (method === "PER_CUBIC") {
+    chargeableVolumeM3 = Math.max(totalVolumeM3, tariff.minChargeableM3 ?? 0);
+    rateApplied = tariff.ratePerCubic ?? 0;
+    price = Math.round(chargeableVolumeM3 * rateApplied);
+  } else {
+    rateApplied = tariff.ratePerKg;
+    price = Math.round(chargeableKg * tariff.ratePerKg);
   }
 
-  return db.tariff.findFirst({
-    where: {
-      origin: master.origin,
-      destination: master.destination,
-      isActive: true,
-      effectiveFrom: { lte: now },
-      AND: [
-        { OR: [{ effectiveTo: null }, { effectiveTo: { gte: now } }] },
-        // exact customer-type match first, generic (null) as fallback
-        { OR: [{ customerType: master.customer.type }, { customerType: null }] },
-      ],
-    },
-    orderBy: [{ customerType: "desc" }, { effectiveFrom: "desc" }],
-  });
-}
-
-export interface PricingPreview {
-  tariffId: number | null;
-  ratePerKg: number | null;
-  volumetricMultiplier: number;
-  minChargeableKg: number;
-  roundingMode: string;
-  roundingUnitKg: number;
-  actualKg: number;
-  volumetricKg: number;
-  chargeableKg: number;
-  estimatedPrice: number | null;
-}
-
-/** Server-side preview used by GET /shipments/{id} so the UI never hardcodes the formula. */
-export async function pricingPreview(master: {
-  tariffId: number | null;
-  origin: string;
-  destination: string;
-  customer: { type: string };
-  details: PricedDetailInput[];
-  priceAmount: number | null;
-  chargeableWeightKg: number | null;
-}): Promise<PricingPreview | null> {
-  const tariff = await resolveTariff(master);
-  if (!tariff) return null;
-  const r = computePricing(master.details, tariff);
   return {
-    tariffId: tariff.id,
-    ratePerKg: tariff.ratePerKg,
-    volumetricMultiplier: r.multiplier,
-    minChargeableKg: tariff.minChargeableKg,
-    roundingMode: tariff.roundingMode,
-    roundingUnitKg: tariff.roundingUnitKg,
-    actualKg: r.actualKg,
-    volumetricKg: r.volumetricKg,
-    chargeableKg: r.chargeableKg,
-    estimatedPrice: master.priceAmount ?? r.price,
+    actualKg,
+    volumetricKg,
+    chargeableKg,
+    price,
+    multiplier,
+    method,
+    totalVolumeM3,
+    koliCount,
+    chargeableKoli,
+    chargeableVolumeM3,
+    rateApplied,
   };
 }

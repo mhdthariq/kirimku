@@ -3,3 +3,5 @@ scripts
 .next
 .env
 tsconfig.tsbuildinfo
+# Vitest coverage output
+coverage/

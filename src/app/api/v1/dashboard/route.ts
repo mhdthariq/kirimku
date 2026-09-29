@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
                 createdAt: { gte: from, lte: to },
                 ...(isMarketingPartner && user.partnerId ? { createdByPartnerId: user.partnerId } : {}),
               },
-              select: { id: true, status: true, masterCode: true, origin: true, destination: true, originWarehouseId: true, destinationWarehouseId: true, arrivedWarehouseId: true, createdAt: true, customer: { select: { name: true } } },
+              select: { id: true, status: true, masterCode: true, origin: true, destination: true, originWarehouseId: true, destinationWarehouseId: true, arrivedWarehouseId: true, createdAt: true, customer: { select: { name: true, companyName: true } } },
             })
           : Promise.resolve([]),
         can("pickup.view")
@@ -135,7 +135,7 @@ export async function GET(req: NextRequest) {
               where: { status: "RECORDED", createdAt: { gte: from, lte: to } },
               orderBy: { createdAt: "desc" },
               take: 10,
-              include: { master: { select: { masterCode: true, customer: { select: { name: true } } } }, recordedBy: { select: { name: true } } },
+              include: { master: { select: { masterCode: true, customer: { select: { name: true, companyName: true } } } }, recordedBy: { select: { name: true } } },
             })
           : Promise.resolve([]),
         canReleaseCommission
@@ -183,7 +183,7 @@ export async function GET(req: NextRequest) {
             where: { partnerId: partner.id },
             orderBy: { createdAt: "desc" },
             take: 5,
-            include: { invoice: { select: { invoiceNumber: true, status: true, customer: { select: { name: true } } } } },
+            include: { invoice: { select: { invoiceNumber: true, status: true, customer: { select: { name: true, companyName: true } } } } },
           }),
           db.walletTransaction.findMany({
             where: { wallet: { partnerId: partner.id } },
@@ -214,7 +214,7 @@ export async function GET(req: NextRequest) {
             amount: c.commissionAmount,
             invoiceNumber: c.invoice?.invoiceNumber ?? "-",
             invoiceStatus: c.invoice?.status ?? "-",
-            customerName: c.invoice?.customer?.name ?? "-",
+            customerName: c.invoice?.customer?.companyName || c.invoice?.customer?.name || "-",
             createdAt: c.createdAt,
           })),
           recentTransactions: walletTx.map((t) => ({
@@ -289,7 +289,7 @@ export async function GET(req: NextRequest) {
           method: p.method,
           reference: p.reference,
           masterCode: p.master?.masterCode ?? "-",
-          customerName: p.master?.customer?.name ?? "-",
+          customerName: p.master?.customer?.companyName || p.master?.customer?.name || "-",
           recordedByName: p.recordedBy?.name ?? "-",
           createdAt: p.createdAt,
         })),
@@ -324,7 +324,7 @@ export async function GET(req: NextRequest) {
         status: s.status,
         origin: s.origin,
         destination: s.destination,
-        customerName: s.customer.name,
+        customerName: s.customer.companyName || s.customer.name,
         createdAt: s.createdAt,
       })),
       recentAudit: auditVisible.slice(0, 8).map((a) => ({
@@ -451,7 +451,7 @@ async function buildGudangWorkspace(user: AuthUser, scope: { unscoped: boolean; 
     where: { status: "PICKED_UP" },
     orderBy: { updatedAt: "asc" },
     include: {
-      customer: { select: { name: true } },
+      customer: { select: { name: true, companyName: true } },
       details: { select: { id: true, actualWeightKg: true, lengthCm: true, widthCm: true, heightCm: true } },
       pickups: { orderBy: { completedAt: "desc" }, take: 1, select: { id: true, pickupCode: true, kurirId: true, completedAt: true } },
     },
@@ -482,7 +482,7 @@ async function buildGudangWorkspace(user: AuthUser, scope: { unscoped: boolean; 
     return {
       id: s.id,
       masterCode: s.masterCode,
-      customerName: s.customer.name,
+      customerName: s.customer.companyName || s.customer.name,
       origin: s.origin,
       destination: s.destination,
       detailsCount: totals.totalPackages,
@@ -498,7 +498,7 @@ async function buildGudangWorkspace(user: AuthUser, scope: { unscoped: boolean; 
     where: { status: { in: ["CREATED", "READY_FOR_PICKUP"] } },
     orderBy: { createdAt: "desc" },
     include: {
-      customer: { select: { name: true } },
+      customer: { select: { name: true, companyName: true } },
       details: { select: { actualWeightKg: true, lengthCm: true, widthCm: true, heightCm: true } },
     },
   });
@@ -510,7 +510,7 @@ async function buildGudangWorkspace(user: AuthUser, scope: { unscoped: boolean; 
       return {
         id: s.id,
         masterCode: s.masterCode,
-        customerName: s.customer.name,
+        customerName: s.customer.companyName || s.customer.name,
         origin: s.origin,
         destination: s.destination,
         status: s.status,
@@ -530,7 +530,7 @@ async function buildGudangWorkspace(user: AuthUser, scope: { unscoped: boolean; 
     },
     orderBy: { updatedAt: "asc" },
     include: {
-      customer: { select: { name: true } },
+      customer: { select: { name: true, companyName: true } },
       details: { select: { id: true, actualWeightKg: true, lengthCm: true, widthCm: true, heightCm: true } },
       transportItems: {
         select: {
@@ -575,7 +575,7 @@ async function buildGudangWorkspace(user: AuthUser, scope: { unscoped: boolean; 
     return {
       id: s.id,
       masterCode: s.masterCode,
-      customerName: s.customer.name,
+      customerName: s.customer.companyName || s.customer.name,
       origin: s.origin,
       destination: s.destination,
       originWarehouseName,
@@ -592,7 +592,7 @@ async function buildGudangWorkspace(user: AuthUser, scope: { unscoped: boolean; 
     where: { status: { in: ["RECEIVED_AT_GUDANG", "AT_DEST_GUDANG", "ARRIVED_AT_GUDANG"] } },
     orderBy: { updatedAt: "desc" },
     include: {
-      customer: { select: { name: true } },
+      customer: { select: { name: true, companyName: true } },
       details: { select: { actualWeightKg: true, lengthCm: true, widthCm: true, heightCm: true } },
     },
   });

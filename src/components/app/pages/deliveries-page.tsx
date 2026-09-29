@@ -18,14 +18,17 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { CoordinatePasteField } from "@/components/app/coordinate-paste-field";
 
 interface DeliveryForm {
   masterId: string;
   kurirId: string;
   notes: string;
+  latitude: string;
+  longitude: string;
 }
 
-const EMPTY: DeliveryForm = { masterId: "", kurirId: "", notes: "" };
+const EMPTY: DeliveryForm = { masterId: "", kurirId: "", notes: "", latitude: "", longitude: "" };
 
 export function DeliveriesPage() {
   const { user } = useAuth();
@@ -93,11 +96,13 @@ export function DeliveriesPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
+    const latitude = form.latitude === "" ? null : Number(form.latitude);
+    const longitude = form.longitude === "" ? null : Number(form.longitude);
     const ok = await runAction(
       () =>
         editTarget
-          ? apiPut(`/deliveries/${editTarget.id}`, { kurirId: form.kurirId ? Number(form.kurirId) : undefined, notes: form.notes || null })
-          : apiPost("/deliveries", { masterId: Number(form.masterId), kurirId: Number(form.kurirId), notes: form.notes || null }),
+          ? apiPut(`/deliveries/${editTarget.id}`, { kurirId: form.kurirId ? Number(form.kurirId) : undefined, notes: form.notes || null, latitude, longitude })
+          : apiPost("/deliveries", { masterId: Number(form.masterId), kurirId: Number(form.kurirId), notes: form.notes || null, latitude, longitude }),
       { success: editTarget ? "Delivery diperbarui." : "Delivery dibuat & kurir ditugaskan." },
     );
     setBusy(false);
@@ -335,7 +340,13 @@ export function DeliveriesPage() {
                           className="h-8 w-8"
                           onClick={() => {
                             setEditTarget(d);
-                            setForm({ masterId: "", kurirId: d.kurirId ? String(d.kurirId) : "", notes: d.notes ?? "" });
+                            setForm({
+                              masterId: "",
+                              kurirId: d.kurirId ? String(d.kurirId) : "",
+                              notes: d.notes ?? "",
+                              latitude: d.latitude != null ? String(d.latitude) : "",
+                              longitude: d.longitude != null ? String(d.longitude) : "",
+                            });
                             setCreateOpen(true);
                           }}
                           aria-label={`Edit ${d.deliveryCode}`}
@@ -384,6 +395,14 @@ export function DeliveriesPage() {
             <Field label="Kurir" htmlFor="d-kurir">
               <FormSelect value={form.kurirId} onValueChange={(v) => setForm({ ...form, kurirId: v })} placeholder="Pilih kurir" options={kurirOptions} disabled={busy} />
             </Field>
+            <CoordinatePasteField
+              label="Titik Lokasi Pengantaran (opsional)"
+              id="d-coord"
+              latitude={form.latitude === "" ? null : Number(form.latitude)}
+              longitude={form.longitude === "" ? null : Number(form.longitude)}
+              onChange={(lat, lng) => setForm((f) => ({ ...f, latitude: lat == null ? "" : String(lat), longitude: lng == null ? "" : String(lng) }))}
+              disabled={busy}
+            />
             <Field label="Catatan" htmlFor="d-notes">
               <Textarea id="d-notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} placeholder="Opsional" disabled={busy} />
             </Field>

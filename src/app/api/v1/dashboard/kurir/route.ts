@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
           select: {
             masterCode: true, status: true, origin: true, destination: true,
             pengirimName: true, pengirimPhone: true, pengirimAddress: true,
-            customer: { select: { name: true, phone: true } },
+            customer: { select: { name: true, phone: true, companyName: true } },
             _count: { select: { details: true } },
           },
         },
@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
         master: {
           select: {
             masterCode: true, status: true, destination: true, penerimaName: true, penerimaAddress: true, priceAmount: true,
-            customer: { select: { name: true, phone: true } },
+            customer: { select: { name: true, phone: true, companyName: true } },
             _count: { select: { details: true } },
           },
         },
@@ -106,7 +106,7 @@ export async function GET(req: NextRequest) {
         masterStatus: p.master.status,
         origin: p.master.origin,
         destination: p.master.destination,
-        customerName: p.master.customer.name,
+        customerName: p.master.customer.companyName || p.master.customer.name,
         customerPhone: p.master.customer.phone,
         detailsCount: p.master._count.details,
         scannedCount: scannedCount(p.scans),
@@ -116,6 +116,9 @@ export async function GET(req: NextRequest) {
         pickupAddress: p.master.pengirimAddress ?? null,
         pickupContact: p.master.pengirimPhone ?? null,
         pickupSenderName: p.master.pengirimName ?? null,
+        // Pickup point coordinates — plotted RED on the kurir task map.
+        latitude: p.latitude,
+        longitude: p.longitude,
       })),
       deliveries: deliveries.slice(0, 30).map((d) => ({
         id: d.id,
@@ -126,13 +129,16 @@ export async function GET(req: NextRequest) {
         destination: d.master.destination,
         address: d.master.penerimaAddress,
         penerimaName: d.master.penerimaName,
-        customerName: d.master.customer.name,
+        customerName: d.master.customer.companyName || d.master.customer.name,
         customerPhone: d.master.customer.phone,
         priceAmount: d.master.priceAmount,
         detailsCount: d.master._count.details,
         scannedCount: scannedCount(d.scans),
         createdAt: d.createdAt,
         completedAt: d.completedAt,
+        // Delivery point coordinates — plotted GREEN on the kurir task map.
+        latitude: d.latitude,
+        longitude: d.longitude,
       })),
     });
   });

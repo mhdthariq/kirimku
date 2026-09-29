@@ -17,6 +17,9 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { formatNumber, formatRupiah } from "@/components/app/form-parts";
+import { cn } from "@/lib/utils";
+import { resiPricingMethodLabel, resiStatVisibility } from "@/lib/resi-display";
+import type { PricingMethod } from "@/lib/client-api";
 
 type ResiShipment = Shipment & {
   details: DetailShipment[];
@@ -97,16 +100,25 @@ function buildPrintByLabel(user: ReturnType<typeof useAuth>["user"]): string | n
  *
  *   MASTER RESI:
  *     36 (header) + 86 (resi+QR) + 32 (route) + 78 (sender/receiver)
- *     + 44 (stats) + 24 (price, optional) + 24 (insurance, optional)
- *     + 34 (warehouse) + flex (footer)
- *     = 334px fixed without optionals → 44px+ footer room
- *     = 382px fixed with BOTH optionals → footer shrinks but never clips
- *       because optional rows themselves shrink to 18px each via flex
+ *     + 44 (stats) + 16 (B2B pricing-method mark, B2B only) + 24 (price,
+ *     optional) + 24 (insurance, optional) + 34 (warehouse) + flex (footer)
+ *     = 334px fixed without optionals (B2C, or B2B before pricing) →
+ *       44px+ footer room
+ *     = 350px fixed for B2B without price/insurance optionals →
+ *       28px+ footer room
+ *     = 398px fixed for a B2B shipment with BOTH price AND insurance shown
+ *       → exceeds the 378px sheet height by ~20px in this one combination;
+ *       the footer (flex-1, min-h-0) shrinks to absorb it, down to fully
+ *       hidden in the worst case — the resi number/QR/route/stats/price,
+ *       the parts that matter operationally, are never affected, only the
+ *       "printed at/by" footer trivia in this specific worst case
  *
  *   PACKAGE LABEL:
  *     36 (header) + 86 (code+QR) + 24 (master ref) + 50 (sender)
- *     + 50 (receiver) + 40 (address) + 40 (stats) + flex (description+footer)
- *     = 326px fixed → 52px+ for description/footer
+ *     + 50 (receiver) + 40 (address) + 40 (stats)
+ *     + 14 (B2B pricing-method mark, B2B only) + flex (description+footer)
+ *     = 326px fixed (B2C, or B2B before pricing) → 52px+ for description/footer
+ *     = 340px fixed for B2B → 38px+ for description/footer
  */
 export function ResiPrint({
   shipment,
@@ -270,6 +282,39 @@ export function ResiPrint({
   const invoiceNumber =
     shipment.invoiceLines?.[0]?.invoice.invoiceNumber ?? null;
 
+  // Fix, 2026-09-28 — B2B chooses ONE pricing method (/kg, /koli, /cubic)
+  // per tariff; the Master Resi must mark which one and only show the
+  // stat cells that are actually relevant to it (see resiStatVisibility's
+  // doc comment for the exact rule). Prefer the snapshot taken when the
+  // shipment was priced (`shipment.pricingMethod`); fall back to the
+  // selected tariff's method for a B2B shipment printed before pricing
+  // has run yet, so the mark is correct from the moment the resi exists,
+  // not just after "Hitung Harga". B2C is always /kg and unaffected.
+  const effectivePricingMethod: PricingMethod = isB2B
+    ? shipment.pricingMethod ?? shipment.tariff?.pricingMethod ?? "PER_KG"
+    : "PER_KG";
+  const { showWeight: showWeightStats, showVolume: showVolumeStats } = isB2B
+    ? resiStatVisibility(effectivePricingMethod)
+    : { showWeight: true, showVolume: true };
+
+  const statCells: { key: string; label: string; value: string; unit: string }[] = [
+    { key: "jumlah", label: "Jumlah", value: String(totalPackages), unit: "pcs" },
+  ];
+  if (showWeightStats) {
+    statCells.push(
+      { key: "aktual", label: "Aktual", value: formatNumber(actualWeight), unit: "kg" },
+      { key: "chargeable", label: "Chargeable", value: formatNumber(chargeableWeight), unit: "kg" },
+    );
+  }
+  if (showVolumeStats) {
+    statCells.push({ key: "volume", label: "Volume", value: totalVolume.toFixed(3), unit: "m\u00b3" });
+  }
+
+  // Package label (Resi Detail) stats row — same visibility rule as the
+  // Master Resi, just counted differently: Berat is 1 cell, Volume+Dimensi
+  // are 2 cells together, Colly (+1) always shows.
+  const packageStatCount = (showWeightStats ? 1 : 0) + (showVolumeStats ? 2 : 0) + 1;
+
   const sheets = (
     <>
       {/* ============================================================
@@ -409,50 +454,49 @@ export function ResiPrint({
           </div>
         </div>
 
-        {/* Shipment Stats - fixed 44px. 4 cells with stat header + value.
-            Each cell has a vertical divider so handlers can scan a
-            single column at a time. */}
-        <div className="h-11 flex-none grid grid-cols-4 border-b border-black">
-          <div className="flex flex-col items-center justify-center border-r border-black text-center leading-none">
-            <SmallCaps>Jumlah</SmallCaps>
-            <p className="mt-1 text-[13px] font-extrabold leading-none">
-              {totalPackages}
-            </p>
-            <p className="mt-0.5 text-[6px] font-normal uppercase text-black">
-              pcs
-            </p>
-          </div>
-
-          <div className="flex flex-col items-center justify-center border-r border-black text-center leading-none">
-            <SmallCaps>Aktual</SmallCaps>
-            <p className="mt-1 text-[13px] font-extrabold leading-none">
-              {formatNumber(actualWeight)}
-            </p>
-            <p className="mt-0.5 text-[6px] font-normal uppercase text-black">
-              kg
-            </p>
-          </div>
-
-          <div className="flex flex-col items-center justify-center border-r border-black text-center leading-none">
-            <SmallCaps>Chargeable</SmallCaps>
-            <p className="mt-1 text-[13px] font-extrabold leading-none">
-              {formatNumber(chargeableWeight)}
-            </p>
-            <p className="mt-0.5 text-[6px] font-normal uppercase text-black">
-              kg
-            </p>
-          </div>
-
-          <div className="flex flex-col items-center justify-center text-center leading-none">
-            <SmallCaps>Volume</SmallCaps>
-            <p className="mt-1 text-[13px] font-extrabold leading-none">
-              {totalVolume.toFixed(3)}
-            </p>
-            <p className="mt-0.5 text-[6px] font-normal uppercase text-black">
-              m³
-            </p>
-          </div>
+        {/* Shipment Stats - fixed 44px. Jumlah (colly count) always shows;
+            weight/volume cells are shown only when relevant to how this
+            B2B shipment is actually billed (resiStatVisibility) — B2C
+            always shows all 4 cells, unchanged. Column count adapts to
+            how many cells are visible so they stay evenly spaced. */}
+        <div
+          className={cn(
+            "h-11 flex-none grid border-b border-black",
+            statCells.length === 1 && "grid-cols-1",
+            statCells.length === 2 && "grid-cols-2",
+            statCells.length === 3 && "grid-cols-3",
+            statCells.length === 4 && "grid-cols-4",
+          )}
+        >
+          {statCells.map((cell, i) => (
+            <div
+              key={cell.key}
+              className={cn(
+                "flex flex-col items-center justify-center text-center leading-none",
+                i < statCells.length - 1 && "border-r border-black",
+              )}
+            >
+              <SmallCaps>{cell.label}</SmallCaps>
+              <p className="mt-1 text-[13px] font-extrabold leading-none">{cell.value}</p>
+              <p className="mt-0.5 text-[6px] font-normal uppercase text-black">{cell.unit}</p>
+            </div>
+          ))}
         </div>
+
+        {/* B2B pricing-method mark - fixed 16px, B2B only. Inverted
+            (black-bg/white-text) so it reads as a distinct mark rather
+            than just another stat, telling handling/finance staff at a
+            glance which of the 3 B2B pricing methods this shipment is
+            billed by — directly explains why the stats row above shows
+            (or hides) weight/volume. */}
+        {isB2B && (
+          <div className="flex h-4 flex-none items-center justify-between border-b border-black bg-black px-3">
+            <span className="text-[7px] font-bold uppercase tracking-[0.1em] text-white">Metode Tarif B2B</span>
+            <span className="text-[8px] font-extrabold uppercase tracking-[0.04em] text-white">
+              {resiPricingMethodLabel(effectivePricingMethod)}
+            </span>
+          </div>
+        )}
 
         {/* Nilai Pengiriman - fixed 24px. Untuk B2B, No. Invoice ditampilkan
             di samping harga karena penagihan ke perusahaan dilakukan via invoice,
@@ -663,50 +707,69 @@ export function ResiPrint({
               </div>
             </div>
 
-            {/* Package Stats - fixed 40px. 4 cells: weight, volume,
-                dimension, colly counter. */}
-            <div className="h-10 flex-none grid grid-cols-4 border-b border-black">
-              <div className="flex flex-col items-center justify-center border-r border-black text-center leading-none">
-                <SmallCaps>Berat</SmallCaps>
-                <p className="mt-1 text-[11px] font-extrabold leading-none">
-                  {formatNumber(actual)}
-                </p>
-                <p className="mt-0.5 text-[6px] font-normal uppercase text-black">
-                  kg
-                </p>
-              </div>
+            {/* Package Stats - fixed 40px. Colly always shows (same rule
+                as the Master Resi — see resiStatVisibility); weight/volume
+                +dimension are shown only when relevant to the B2B pricing
+                method, B2C unaffected (all 4 cells, unchanged). Column
+                count adapts to how many cells are visible. */}
+            <div
+              className={cn(
+                "h-10 flex-none grid border-b border-black",
+                packageStatCount === 1 && "grid-cols-1",
+                packageStatCount === 2 && "grid-cols-2",
+                packageStatCount === 3 && "grid-cols-3",
+                packageStatCount === 4 && "grid-cols-4",
+              )}
+            >
+              {showWeightStats && (
+                <div className="flex flex-col items-center justify-center border-r border-black text-center leading-none">
+                  <SmallCaps>Berat</SmallCaps>
+                  <p className="mt-1 text-[11px] font-extrabold leading-none">
+                    {formatNumber(actual)}
+                  </p>
+                  <p className="mt-0.5 text-[6px] font-normal uppercase text-black">
+                    kg
+                  </p>
+                </div>
+              )}
 
-              <div className="flex flex-col items-center justify-center border-r border-black text-center leading-none">
-                <SmallCaps>Volume</SmallCaps>
-                <p className="mt-1 text-[11px] font-extrabold leading-none">
-                  {volume.toFixed(3)}
-                </p>
-                <p className="mt-0.5 text-[6px] font-normal uppercase text-black">
-                  m³
-                </p>
-              </div>
+              {showVolumeStats && (
+                <>
+                  <div className="flex flex-col items-center justify-center border-r border-black text-center leading-none">
+                    <SmallCaps>Volume</SmallCaps>
+                    <p className="mt-1 text-[11px] font-extrabold leading-none">
+                      {volume.toFixed(3)}
+                    </p>
+                    <p className="mt-0.5 text-[6px] font-normal uppercase text-black">
+                      m³
+                    </p>
+                  </div>
 
-              <div className="flex flex-col items-center justify-center border-r border-black text-center leading-none">
-                <SmallCaps>Dimensi</SmallCaps>
-                <p className="mt-1 text-[8px] font-extrabold leading-none">
-                  {d.lengthCm != null
-                    ? `${formatNumber(
-                        d.lengthCm,
-                        0,
-                      )}×${formatNumber(
-                        d.widthCm ?? 0,
-                        0,
-                      )}×${formatNumber(
-                        d.heightCm ?? 0,
-                        0,
-                      )}`
-                    : "-"}
-                </p>
-                <p className="mt-0.5 text-[6px] font-normal uppercase text-black">
-                  cm
-                </p>
-              </div>
+                  <div className="flex flex-col items-center justify-center border-r border-black text-center leading-none">
+                    <SmallCaps>Dimensi</SmallCaps>
+                    <p className="mt-1 text-[8px] font-extrabold leading-none">
+                      {d.lengthCm != null
+                        ? `${formatNumber(
+                            d.lengthCm,
+                            0,
+                          )}×${formatNumber(
+                            d.widthCm ?? 0,
+                            0,
+                          )}×${formatNumber(
+                            d.heightCm ?? 0,
+                            0,
+                          )}`
+                        : "-"}
+                    </p>
+                    <p className="mt-0.5 text-[6px] font-normal uppercase text-black">
+                      cm
+                    </p>
+                  </div>
+                </>
+              )}
 
+              {/* Colly always shows — this IS the billing unit for /koli,
+                  and matters for handling no matter how it's billed. */}
               <div className="flex flex-col items-center justify-center text-center leading-none">
                 <SmallCaps>Colly</SmallCaps>
                 <p className="mt-1 font-mono text-[11px] font-extrabold leading-none">
@@ -717,6 +780,20 @@ export function ResiPrint({
                 </p>
               </div>
             </div>
+
+            {/* B2B pricing-method mark - same treatment as the Master Resi
+                (fixed ~14px, B2B only, inverted black-bg/white-text) so a
+                package label handled on its own (e.g. at a checkpoint scan,
+                away from the master resi) still tells staff which method
+                this shipment is billed by. */}
+            {isB2B && (
+              <div className="flex h-3.5 flex-none items-center justify-between border-b border-black bg-black px-3">
+                <span className="text-[6.5px] font-bold uppercase tracking-[0.08em] text-white">Tarif B2B</span>
+                <span className="text-[7px] font-extrabold uppercase tracking-[0.04em] text-white">
+                  {resiPricingMethodLabel(effectivePricingMethod)}
+                </span>
+              </div>
+            )}
 
             {/* Description - flex-1, fills the remaining space so the
                 sheet always totals exactly 100mm. Dashed rule on top

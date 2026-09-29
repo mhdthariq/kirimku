@@ -17,6 +17,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { CoordinatePasteField } from "@/components/app/coordinate-paste-field";
 
 const LeafletPicker = dynamic(() => import("@/components/app/leaflet-picker").then((m) => m.LeafletPicker), {
   ssr: false,
@@ -291,7 +292,7 @@ export function GudangPage() {
                         {w.shipments.map((s) => (
                           <div key={s.id} className="rounded-lg border bg-card px-2.5 py-2">
                             <div className="flex items-center justify-between gap-2">
-                              <a href={`#/shipments/${s.id}`} className="font-mono text-xs font-semibold text-primary hover:underline">
+                              <a href={`/#/shipments/${s.id}`} className="font-mono text-xs font-semibold text-primary hover:underline">
                                 {s.masterCode}
                               </a>
                               <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -363,12 +364,17 @@ export function GudangPage() {
               <Field label="Customer Support" htmlFor="g-cs" hint="dicetak di resi">
                 <Input id="g-cs" value={form.customerSupportContact} onChange={(e) => setForm({ ...form, customerSupportContact: e.target.value })} placeholder="0811-1000-001" disabled={busy} />
               </Field>
-              <Field label="Latitude" htmlFor="g-lat">
-                <Input id="g-lat" value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} placeholder="-6.9175" disabled={busy} />
-              </Field>
-              <Field label="Longitude" htmlFor="g-lng">
-                <Input id="g-lng" value={form.longitude} onChange={(e) => setForm({ ...form, longitude: e.target.value })} placeholder="107.6191" disabled={busy} />
-              </Field>
+              <CoordinatePasteField
+                latitude={Number.isFinite(lat as number) ? (lat as number) : null}
+                longitude={Number.isFinite(lng as number) ? (lng as number) : null}
+                onChange={(newLat, newLng) =>
+                  setForm((f) => ({
+                    ...f,
+                    latitude: newLat == null ? "" : newLat.toFixed(7),
+                    longitude: newLng == null ? "" : newLng.toFixed(7),
+                  }))
+                }
+              />
               <Field label="Catatan" htmlFor="g-notes" className="sm:col-span-2">
                 <Textarea id="g-notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} placeholder="Opsional" disabled={busy} />
               </Field>

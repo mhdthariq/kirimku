@@ -5,6 +5,7 @@ import { MapPin, Pencil, Plus, Trash2, UserRoundCheck, Users } from "lucide-reac
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type Customer, type Options } from "@/lib/client-api";
+import { customerDisplayParts } from "@/lib/customer-display";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
@@ -204,12 +205,15 @@ export function CustomersPage() {
               {
                 key: "name",
                 header: "Nama",
-                render: (c) => (
-                  <div>
-                    <p className="font-medium text-foreground">{c.name}</p>
-                    {c.companyName && <p className="text-xs text-muted-foreground">{c.companyName}</p>}
-                  </div>
-                ),
+                render: (c) => {
+                  const { primary, secondary } = customerDisplayParts(c);
+                  return (
+                    <div>
+                      <p className="font-medium text-foreground">{primary}</p>
+                      {secondary && <p className="text-xs text-muted-foreground">PIC: {secondary}</p>}
+                    </div>
+                  );
+                },
               },
               { key: "type", header: "Tipe", render: (c) => <TypeBadge type={c.type} /> },
               {

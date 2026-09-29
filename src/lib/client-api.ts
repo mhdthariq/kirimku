@@ -209,6 +209,15 @@ export interface PricingPreview {
   volumetricKg: number;
   chargeableKg: number;
   estimatedPrice: number | null;
+  /** B2B pricing method actually used ("PER_KG" | "PER_KOLI" | "PER_CUBIC"). */
+  method?: "PER_KG" | "PER_KOLI" | "PER_CUBIC";
+  ratePerKoli?: number | null;
+  ratePerCubic?: number | null;
+  totalVolumeM3?: number;
+  koliCount?: number;
+  chargeableKoli?: number;
+  chargeableVolumeM3?: number;
+  rateApplied?: number;
 }
 
 export interface Shipment {
@@ -253,6 +262,10 @@ export interface Shipment {
   paymentSummary?: PaymentSummary;
   chargeableWeightKg: number | null;
   ratePerKg: number | null;
+  /** Snapshot of the pricing method used ("PER_KG" | "PER_KOLI" | "PER_CUBIC"); null on legacy rows = PER_KG. */
+  pricingMethod?: PricingMethod | null;
+  chargeableKoli?: number | null;
+  chargeableVolumeM3?: number | null;
   priceAmount: number | null;
   pricedAt: string | null;
   insuranceAmount: number;
@@ -377,6 +390,9 @@ export interface PickupTask {
   /** Revise round 8 — pickup photo (proof of pickup). Display gated by
    *  proof_photo.view (Admin Gudang + Owner default). */
   photoUrl?: string | null;
+  /** Pickup point coordinates — plotted RED on the kurir task map. */
+  latitude?: number | null;
+  longitude?: number | null;
   detailsCount: number;
   scannedCount: number;
   /** gudang(s) this pickup belongs to (origin side of the master shipment) */
@@ -395,6 +411,9 @@ export interface DeliveryTask {
   /** Revise round 8 — optional delivery photo (proof of delivery image).
    *  Display is gated by proof_photo.view (Admin Gudang + Owner default). */
   photoUrl?: string | null;
+  /** Delivery point coordinates — plotted GREEN on the kurir task map. */
+  latitude?: number | null;
+  longitude?: number | null;
   createdAt: string;
   completedAt: string | null;
   /** Step 3 — masterId exposed so the client can look up the transport
@@ -617,6 +636,11 @@ export interface CheckinResponse {
   message: string;
 }
 
+/** B2B pricing method — every tariff bills by ONE of these. B2C tariffs are
+ *  always "PER_KG" (enforced server-side). Picking a tariff at shipment
+ *  creation is how the operator picks the method. */
+export type PricingMethod = "PER_KG" | "PER_KOLI" | "PER_CUBIC";
+
 export interface Tariff {
   id: number;
   origin: string;
@@ -627,6 +651,11 @@ export interface Tariff {
   volumetricMultiplier: number;
   roundingMode: string;
   roundingUnitKg: number;
+  pricingMethod: PricingMethod;
+  ratePerKoli: number | null;
+  ratePerCubic: number | null;
+  minChargeableKoli: number;
+  minChargeableM3: number;
   effectiveFrom: string;
   effectiveTo: string | null;
   isActive: boolean;
@@ -750,8 +779,23 @@ export interface Options {
   vehicles: { id: number; vehicleNumber: string; name: string | null; maxWeightKg: number; maxVolumeM3?: number; lengthM?: number | null; widthM?: number | null; heightM?: number | null }[];
   routes: { id: number; name: string; origin: string | null; destination: string | null }[];
   warehouses: { id: number; code: string; name: string; city: string | null; customerSupportContact?: string | null }[];
-  customers: { id: number; code: string; name: string; type: string; phone: string | null; email: string | null; address: string | null; marketingPartnerId?: number | null; warehouseId?: number | null; warehouseName?: string | null }[];
-  tariffs: { id: number; origin: string; destination: string; customerType: string | null; ratePerKg: number; minChargeableKg: number; volumetricMultiplier: number; roundingMode: string; roundingUnitKg: number; effectiveFrom: string; effectiveTo: string | null }[];
+  customers: { id: number; code: string; name: string; type: string; companyName?: string | null; phone: string | null; email: string | null; address: string | null; marketingPartnerId?: number | null; warehouseId?: number | null; warehouseName?: string | null }[];
+  tariffs: {
+    id: number;
+    origin: string;
+    destination: string;
+    customerType: string | null;
+    ratePerKg: number;
+    minChargeableKg: number;
+    volumetricMultiplier: number;
+    roundingMode: string;
+    roundingUnitKg: number;
+    pricingMethod: PricingMethod;
+    ratePerKoli: number | null;
+    ratePerCubic: number | null;
+    effectiveFrom: string;
+    effectiveTo: string | null;
+  }[];
   permissions: { id: number; slug: string; module: string; description: string | null }[];
   /** Revise.md §13 — vehicle-owner partners (vehicle ownership dropdown) */
   vehicleOwners?: { id: number; name: string; username: string; profitShare: { company: number; partner: number } }[];

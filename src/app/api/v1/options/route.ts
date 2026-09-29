@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
           ...customerWarehouseClause,
         },
         orderBy: { name: "asc" },
-        select: { id: true, code: true, name: true, type: true, phone: true, email: true, address: true, marketingPartnerId: true, warehouseId: true, warehouse: { select: { name: true } } },
+        select: { id: true, code: true, name: true, type: true, companyName: true, phone: true, email: true, address: true, marketingPartnerId: true, warehouseId: true, warehouse: { select: { name: true } } },
       }),
       db.tariff.findMany({
         where: {

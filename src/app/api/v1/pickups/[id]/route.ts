@@ -38,6 +38,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (body.kurirId !== undefined) data.kurirId = num(body.kurirId);
     if (body.notes !== undefined) data.notes = str(body.notes);
     if (body.status !== undefined && ["ASSIGNED", "IN_PROGRESS"].includes(body.status)) data.status = body.status;
+    if (body.latitude !== undefined) data.latitude = num(body.latitude);
+    if (body.longitude !== undefined) data.longitude = num(body.longitude);
 
     const pickup = await db.pickup.update({ where: { id: existing.id }, data });
     await audit({ action: "updated", entityType: "pickup", entityId: pickup.id, entityLabel: pickup.pickupCode, actor: user, before: diffFields(existing, pickup as unknown as Record<string, unknown>) });

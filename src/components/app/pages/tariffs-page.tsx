@@ -25,6 +25,12 @@ interface TariffForm {
   roundingUnitKg: string;
   effectiveFrom: string;
   effectiveTo: string;
+  /** B2B-only pricing method — B2C is always forced to "PER_KG" (§ below). */
+  pricingMethod: "PER_KG" | "PER_KOLI" | "PER_CUBIC";
+  ratePerKoli: string;
+  ratePerCubic: string;
+  minChargeableKoli: string;
+  minChargeableM3: string;
 }
 
 const EMPTY: TariffForm = {
@@ -38,6 +44,17 @@ const EMPTY: TariffForm = {
   roundingUnitKg: "0.5",
   effectiveFrom: new Date().toISOString().slice(0, 10),
   effectiveTo: "",
+  pricingMethod: "PER_KG",
+  ratePerKoli: "",
+  ratePerCubic: "",
+  minChargeableKoli: "1",
+  minChargeableM3: "0",
+};
+
+const PRICING_METHOD_LABEL: Record<string, string> = {
+  PER_KG: "/ kg",
+  PER_KOLI: "/ koli",
+  PER_CUBIC: "/ m³ (cubic)",
 };
 
 export function TariffsPage() {
@@ -83,6 +100,11 @@ export function TariffsPage() {
       roundingUnitKg: String(t.roundingUnitKg),
       effectiveFrom: t.effectiveFrom.slice(0, 10),
       effectiveTo: t.effectiveTo ? t.effectiveTo.slice(0, 10) : "",
+      pricingMethod: t.customerType === "b2b" ? t.pricingMethod ?? "PER_KG" : "PER_KG",
+      ratePerKoli: t.ratePerKoli != null ? String(t.ratePerKoli) : "",
+      ratePerCubic: t.ratePerCubic != null ? String(t.ratePerCubic) : "",
+      minChargeableKoli: String(t.minChargeableKoli ?? 1),
+      minChargeableM3: String(t.minChargeableM3 ?? 0),
     });
     setDialogOpen(true);
   }
@@ -90,11 +112,19 @@ export function TariffsPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
+    const isB2b = form.customerType === "b2b";
     const payload = {
       origin: form.origin,
       destination: form.destination,
       customerType: form.customerType === "" ? null : form.customerType,
-      ratePerKg: Number(form.ratePerKg),
+      // Only B2B may use /koli or /cubic — B2C / semua tipe is always /kg
+      // (also re-enforced server-side, this just keeps the payload honest).
+      pricingMethod: isB2b ? form.pricingMethod : "PER_KG",
+      ratePerKg: Number(form.ratePerKg) || 0,
+      ratePerKoli: isB2b && form.pricingMethod === "PER_KOLI" ? Number(form.ratePerKoli) : null,
+      ratePerCubic: isB2b && form.pricingMethod === "PER_CUBIC" ? Number(form.ratePerCubic) : null,
+      minChargeableKoli: Number(form.minChargeableKoli) || 1,
+      minChargeableM3: Number(form.minChargeableM3) || 0,
       minChargeableKg: Number(form.minChargeableKg),
       volumetricMultiplier: Number(form.volumetricMultiplier),
       roundingMode: form.roundingMode,
@@ -129,7 +159,7 @@ export function TariffsPage() {
     <div className="space-y-4">
       <PageHeader
         title="Tarif"
-        subtitle="Harga per kg per koridor - dasar perhitungan chargeable weight shipment."
+        subtitle="B2C selalu /kg. B2B bisa /kg, /koli, atau /cubic (m³) - pilih metode saat membuat tarif."
         icon={<Tag className="h-5 w-5" />}
         actions={
           can.create && (
@@ -174,17 +204,38 @@ export function TariffsPage() {
                     <span className="text-xs font-semibold uppercase text-muted-foreground">semua</span>
                   ),
               },
-              { key: "rate", header: "Tarif/kg", render: (t) => <span className="font-semibold">Rp{t.ratePerKg.toLocaleString("id-ID")}</span> },
+              {
+                key: "rate",
+                header: "Tarif",
+                render: (t) => {
+                  const method = t.customerType === "b2b" ? (t.pricingMethod ?? "PER_KG") : "PER_KG";
+                  const rate = method === "PER_KOLI" ? t.ratePerKoli ?? 0 : method === "PER_CUBIC" ? t.ratePerCubic ?? 0 : t.ratePerKg;
+                  return (
+                    <span className="font-semibold">
+                      Rp{rate.toLocaleString("id-ID")} <span className="font-normal text-muted-foreground">{PRICING_METHOD_LABEL[method]}</span>
+                    </span>
+                  );
+                },
+              },
               {
                 key: "rules",
                 header: "Aturan",
                 hideOnMobile: true,
-                render: (t) => (
-                  <span className="text-xs text-muted-foreground">
-                    min {formatNumber(t.minChargeableKg)} kg · multiplier {formatNumber(t.volumetricMultiplier, 0)} kg/m³ ·{" "}
-                    {t.roundingMode === "UP" ? "round up" : "nearest"} {formatNumber(t.roundingUnitKg)} kg
-                  </span>
-                ),
+                render: (t) => {
+                  const method = t.customerType === "b2b" ? (t.pricingMethod ?? "PER_KG") : "PER_KG";
+                  if (method === "PER_KOLI") {
+                    return <span className="text-xs text-muted-foreground">min {formatNumber(t.minChargeableKoli ?? 1, 0)} koli / shipment</span>;
+                  }
+                  if (method === "PER_CUBIC") {
+                    return <span className="text-xs text-muted-foreground">min {formatNumber(t.minChargeableM3 ?? 0, 3)} m³ / shipment</span>;
+                  }
+                  return (
+                    <span className="text-xs text-muted-foreground">
+                      min {formatNumber(t.minChargeableKg)} kg · multiplier {formatNumber(t.volumetricMultiplier, 0)} kg/m³ ·{" "}
+                      {t.roundingMode === "UP" ? "round up" : "nearest"} {formatNumber(t.roundingUnitKg)} kg
+                    </span>
+                  );
+                },
               },
               { key: "effective", header: "Berlaku", hideOnMobile: true, render: (t) => `${formatDate(t.effectiveFrom)}${t.effectiveTo ? ` – ${formatDate(t.effectiveTo)}` : " – ∞"}` },
               { key: "status", header: "Status", render: (t) => <ActiveBadge active={t.isActive} /> },
@@ -231,15 +282,47 @@ export function TariffsPage() {
               <Field label="Tipe Customer" htmlFor="tf-type">
                 <FormSelect
                   value={form.customerType}
-                  onValueChange={(value) => setForm({ ...form, customerType: value })}
+                  onValueChange={(value) => setForm({ ...form, customerType: value, pricingMethod: value === "b2b" ? form.pricingMethod : "PER_KG" })}
                   placeholder="Semua tipe"
                   options={[{ value: "b2b", label: "B2B" }, { value: "b2c", label: "B2C" }]}
                   disabled={busy}
                 />
               </Field>
-              <Field label="Tarif per kg (Rp)" htmlFor="tf-rate">
-                <NumberInput id="tf-rate" value={form.ratePerKg} onChange={(e) => setForm({ ...form, ratePerKg: e.target.value })} placeholder="4500" required disabled={busy} />
-              </Field>
+              {form.customerType === "b2b" ? (
+                <>
+                  <Field label="Metode Harga (B2B)" htmlFor="tf-method" hint="B2C selalu pakai /kg - B2B bisa pilih /kg, /koli, atau /cubic.">
+                    <FormSelect
+                      value={form.pricingMethod}
+                      onValueChange={(value) => setForm({ ...form, pricingMethod: value as TariffForm["pricingMethod"] })}
+                      options={[
+                        { value: "PER_KG", label: "Per kg" },
+                        { value: "PER_KOLI", label: "Per koli" },
+                        { value: "PER_CUBIC", label: "Per cubic (m³)" },
+                      ]}
+                      disabled={busy}
+                    />
+                  </Field>
+                  {form.pricingMethod === "PER_KG" && (
+                    <Field label="Tarif per kg (Rp)" htmlFor="tf-rate">
+                      <NumberInput id="tf-rate" value={form.ratePerKg} onChange={(e) => setForm({ ...form, ratePerKg: e.target.value })} placeholder="4500" required disabled={busy} />
+                    </Field>
+                  )}
+                  {form.pricingMethod === "PER_KOLI" && (
+                    <Field label="Tarif per koli (Rp)" htmlFor="tf-rate-koli">
+                      <NumberInput id="tf-rate-koli" value={form.ratePerKoli} onChange={(e) => setForm({ ...form, ratePerKoli: e.target.value })} placeholder="25000" required disabled={busy} />
+                    </Field>
+                  )}
+                  {form.pricingMethod === "PER_CUBIC" && (
+                    <Field label="Tarif per m³ (Rp)" htmlFor="tf-rate-cubic">
+                      <NumberInput id="tf-rate-cubic" value={form.ratePerCubic} onChange={(e) => setForm({ ...form, ratePerCubic: e.target.value })} placeholder="850000" required disabled={busy} />
+                    </Field>
+                  )}
+                </>
+              ) : (
+                <Field label="Tarif per kg (Rp)" htmlFor="tf-rate">
+                  <NumberInput id="tf-rate" value={form.ratePerKg} onChange={(e) => setForm({ ...form, ratePerKg: e.target.value })} placeholder="4500" required disabled={busy} />
+                </Field>
+              )}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Min. kg" htmlFor="tf-min">
                   <NumberInput id="tf-min" value={form.minChargeableKg} onChange={(e) => setForm({ ...form, minChargeableKg: e.target.value })} disabled={busy} />
@@ -248,6 +331,16 @@ export function TariffsPage() {
                   <NumberInput id="tf-multiplier" value={form.volumetricMultiplier} onChange={(e) => setForm({ ...form, volumetricMultiplier: e.target.value })} placeholder="250" disabled={busy} />
                 </Field>
               </div>
+              {form.customerType === "b2b" && form.pricingMethod === "PER_KOLI" && (
+                <Field label="Min. koli" htmlFor="tf-min-koli" hint="Shipment selalu ditagih minimal sekian koli">
+                  <NumberInput id="tf-min-koli" value={form.minChargeableKoli} onChange={(e) => setForm({ ...form, minChargeableKoli: e.target.value })} disabled={busy} />
+                </Field>
+              )}
+              {form.customerType === "b2b" && form.pricingMethod === "PER_CUBIC" && (
+                <Field label="Min. m³" htmlFor="tf-min-cubic" hint="0 = tanpa batas minimum">
+                  <NumberInput id="tf-min-cubic" value={form.minChargeableM3} onChange={(e) => setForm({ ...form, minChargeableM3: e.target.value })} disabled={busy} />
+                </Field>
+              )}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Pembulatan" htmlFor="tf-rounding">
                   <FormSelect

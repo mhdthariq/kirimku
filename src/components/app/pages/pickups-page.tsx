@@ -17,14 +17,17 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CoordinatePasteField } from "@/components/app/coordinate-paste-field";
 
 interface PickupForm {
   masterId: string;
   kurirId: string;
   notes: string;
+  latitude: string;
+  longitude: string;
 }
 
-const EMPTY: PickupForm = { masterId: "", kurirId: "", notes: "" };
+const EMPTY: PickupForm = { masterId: "", kurirId: "", notes: "", latitude: "", longitude: "" };
 
 export function PickupsPage() {
   const { user } = useAuth();
@@ -95,18 +98,26 @@ export function PickupsPage() {
 
   function openEdit(p: PickupTask) {
     setEditing(p);
-    setForm({ masterId: String(p.id), kurirId: p.kurirId ? String(p.kurirId) : "", notes: p.notes ?? "" });
+    setForm({
+      masterId: String(p.id),
+      kurirId: p.kurirId ? String(p.kurirId) : "",
+      notes: p.notes ?? "",
+      latitude: p.latitude != null ? String(p.latitude) : "",
+      longitude: p.longitude != null ? String(p.longitude) : "",
+    });
     setDialogOpen(true);
   }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
+    const latitude = form.latitude === "" ? null : Number(form.latitude);
+    const longitude = form.longitude === "" ? null : Number(form.longitude);
     const ok = await runAction(
       () =>
         editing
-          ? apiPut(`/pickups/${editing.id}`, { kurirId: form.kurirId ? Number(form.kurirId) : undefined, notes: form.notes || null })
-          : apiPost("/pickups", { masterId: Number(form.masterId), kurirId: Number(form.kurirId), notes: form.notes || null }),
+          ? apiPut(`/pickups/${editing.id}`, { kurirId: form.kurirId ? Number(form.kurirId) : undefined, notes: form.notes || null, latitude, longitude })
+          : apiPost("/pickups", { masterId: Number(form.masterId), kurirId: Number(form.kurirId), notes: form.notes || null, latitude, longitude }),
       { success: editing ? "Pickup diperbarui." : "Pickup dibuat & kurir ditugaskan." },
     );
     setBusy(false);
@@ -450,6 +461,14 @@ export function PickupsPage() {
             <Field label="Kurir" htmlFor="p-kurir">
               <FormSelect value={form.kurirId} onValueChange={(v) => setForm({ ...form, kurirId: v })} placeholder="Pilih kurir" options={kurirOptions} disabled={busy} />
             </Field>
+            <CoordinatePasteField
+              label="Titik Lokasi Penjemputan (opsional)"
+              id="p-coord"
+              latitude={form.latitude === "" ? null : Number(form.latitude)}
+              longitude={form.longitude === "" ? null : Number(form.longitude)}
+              onChange={(lat, lng) => setForm((f) => ({ ...f, latitude: lat == null ? "" : String(lat), longitude: lng == null ? "" : String(lng) }))}
+              disabled={busy}
+            />
             <Field label="Catatan" htmlFor="p-notes">
               <Textarea id="p-notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} placeholder="Opsional - instruksi khusus untuk kurir" disabled={busy} />
             </Field>

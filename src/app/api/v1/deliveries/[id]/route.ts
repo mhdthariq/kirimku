@@ -39,6 +39,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const data: Record<string, unknown> = {};
     if (body.kurirId !== undefined) data.kurirId = num(body.kurirId);
     if (body.notes !== undefined) data.notes = str(body.notes);
+    if (body.latitude !== undefined) data.latitude = num(body.latitude);
+    if (body.longitude !== undefined) data.longitude = num(body.longitude);
     const delivery = await db.delivery.update({ where: { id: existing.id }, data });
     await audit({ action: "updated", entityType: "delivery", entityId: delivery.id, entityLabel: delivery.deliveryCode, actor: user, before: diffFields(existing, delivery as unknown as Record<string, unknown>) });
     return ok(delivery);

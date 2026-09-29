@@ -35,7 +35,7 @@ export async function GET(req: NextRequest, { params }: Params) {
         vehicle: true,
         driver: true,
         kenek: true,
-        shipments: { include: { master: { include: { customer: { select: { name: true } } } } } },
+        shipments: { include: { master: { include: { customer: { select: { name: true, companyName: true } } } } } },
         checkpointRecords: {
           orderBy: { recordedAt: "desc" },
           include: { checkpoint: true, recordedBy: { select: { id: true, name: true } } },
@@ -133,7 +133,7 @@ export async function GET(req: NextRequest, { params }: Params) {
         status: s.master.status,
         origin: s.master.origin,
         destination: s.master.destination,
-        customerName: s.master.customer?.name ?? null,
+        customerName: s.master.customer?.companyName || s.master.customer?.name || null,
         penerimaName: s.master.penerimaName,
         arrivedWarehouseName: whName(s.master.arrivedWarehouseId),
         destinationWarehouseName: whName(s.master.destinationWarehouseId),

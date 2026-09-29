@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { AuthProvider, useAuth } from "@/hooks/use-auth";
+import { useAuth } from "@/hooks/use-auth";
 import { useHashRoute } from "@/hooks/use-hash-route";
-import { LoginScreen } from "@/components/app/login-screen";
+import { AuthGate } from "@/components/app/auth-gate";
 import { AppShell } from "@/components/app/app-shell";
-import { Loader2 } from "lucide-react";
 
 import { DashboardPage } from "@/components/app/pages/dashboard-page";
 import { KurirDashboard } from "@/components/app/pages/kurir-dashboard-page";
@@ -18,10 +18,7 @@ import { DeliveriesPage } from "@/components/app/pages/deliveries-page";
 import { TransportsPage } from "@/components/app/pages/transports-page";
 import { TransportDetailPage } from "@/components/app/pages/transport-detail-page";
 import { VehiclesPage } from "@/components/app/pages/vehicles-page";
-import { GudangPage } from "@/components/app/pages/gudang-page";
 import { RoutesPage } from "@/components/app/pages/routes-page";
-import { CustomersPage } from "@/components/app/pages/customers-page";
-import { TariffsPage } from "@/components/app/pages/tariffs-page";
 import { InvoicesPage } from "@/components/app/pages/invoices-page";
 import { InvoiceDetailPage } from "@/components/app/pages/invoice-detail-page";
 import { AccessPage } from "@/components/app/pages/access-page";
@@ -39,8 +36,18 @@ import { SettlementsPage } from "@/components/app/pages/settlements-page";
 import { PartnersPage } from "@/components/app/pages/partners-page";
 import { ProfilePage } from "@/components/app/pages/profile-page";
 
+/**
+ * Routing migration (docs/CLEAN_ARCHITECTURE_PLAN.md §3) — sections that
+ * now have a real Next.js route under `app/(dashboard)/...`. Anyone who
+ * still lands on the old `#/tariffs` etc. (an old bookmark, a link that
+ * hasn't been updated yet) is bounced to the real route below. Add a
+ * section here the same PR you delete its `case` from the switch and add
+ * its `app/(dashboard)/<section>/page.tsx`.
+ */
+const MIGRATED_SECTIONS = new Set(["tariffs", "customers", "gudang"]);
+
 function Router() {
-  const { user, loading } = useAuth();
+  const router = useRouter();
   const { segments, query } = useHashRoute();
 
   // Legacy redirect: the old "Gudang" operations menu (#/gudang-ops) was merged
@@ -52,18 +59,24 @@ function Router() {
     }
   }, [segments]);
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Memuat sesi…</p>
-        </div>
-      </div>
-    );
-  }
+  // Routing migration redirect — send anyone still on a migrated section's
+  // hash route to its real route instead (see MIGRATED_SECTIONS above).
+  useEffect(() => {
+    if (segments[0] && MIGRATED_SECTIONS.has(segments[0])) {
+      router.replace(`/${segments[0]}`);
+    }
+  }, [segments, router]);
 
-  if (!user) return <LoginScreen />;
+  return (
+    <AuthGate>
+      <RouterInner segments={segments} query={query} />
+    </AuthGate>
+  );
+}
+
+function RouterInner({ segments, query }: { segments: string[]; query: URLSearchParams }) {
+  const { user } = useAuth();
+  if (!user) return null;
 
   const section = segments[0] ?? "dashboard";
 
@@ -101,13 +114,14 @@ function Router() {
         // Revise.md §13/§32 — Vehicle Owner's own vehicles
         return <MyVehiclesPage />;
       case "gudang":
-        return <GudangPage />;
+      case "customers":
+      case "tariffs":
+        // Migrated to real routes (app/(dashboard)/<section>/page.tsx) —
+        // the redirect effect above sends the browser to /<section>; render
+        // nothing here for the one tick before that happens.
+        return null;
       case "routes":
         return <RoutesPage routeId={segments[1] ? Number(segments[1]) : null} />;
-      case "customers":
-        return <CustomersPage />;
-      case "tariffs":
-        return <TariffsPage />;
       case "invoices":
         return segments[1] ? <InvoiceDetailPage invoiceId={Number(segments[1])} /> : <InvoicesPage />;
       case "access":
@@ -159,9 +173,5 @@ function Router() {
 }
 
 export default function Home() {
-  return (
-    <AuthProvider>
-      <Router />
-    </AuthProvider>
-  );
+  return <Router />;
 }
