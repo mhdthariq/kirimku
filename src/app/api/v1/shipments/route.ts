@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
     const tariffId = num(body.tariffId);
     let origin: string | null = null;
     let destination: string | null = null;
-    let tariff: { id: number; origin: string; destination: string; customerType: string | null } | null = null;
+    let tariff: { id: number; origin: string; destination: string; customerType: string | null; customerId: number | null } | null = null;
 
     if (tariffId) {
       const now = new Date();
@@ -117,6 +117,12 @@ export async function POST(req: NextRequest) {
       if (tariff.customerType && tariff.customerType !== customer.type) {
         return fail(422, `Tarif ini hanya untuk customer ${tariff.customerType.toUpperCase()} - customer terpilih bertipe ${customer.type.toUpperCase()}.`, {
           tariffId: [`Tarif ${tariff.customerType.toUpperCase()} tidak cocok untuk customer ${customer.type.toUpperCase()}.`],
+        });
+      }
+      // B2B tariffs are tied to one specific B2B customer — only that customer may use them.
+      if (tariff.customerType === "b2b" && tariff.customerId !== customer.id) {
+        return fail(422, "Tarif B2B ini bukan milik customer terpilih.", {
+          tariffId: ["Pilih tarif yang terdaftar untuk customer ini."],
         });
       }
       origin = tariff.origin;

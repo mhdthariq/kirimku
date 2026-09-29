@@ -265,8 +265,8 @@ export function DashboardPage() {
 
   const stats = [
     { label: "Shipment Total", value: counts.shipments, icon: Package, href: "#/shipments", show: can("shipment.view") },
-    { label: "Pickup Aktif", value: counts.activePickups, icon: Truck, href: "#/pickups", show: can("pickup.view") },
-    { label: "Delivery Tertunda", value: counts.pendingDeliveries, icon: ClipboardList, href: "#/deliveries", show: can("delivery.view") },
+    { label: "Pickup Aktif", value: counts.activePickups, icon: Truck, href: "/pickups", show: can("pickup.view") },
+    { label: "Delivery Tertunda", value: counts.pendingDeliveries, icon: ClipboardList, href: "/deliveries", show: can("delivery.view") },
     { label: "Transport Berjalan", value: counts.inTransit, icon: Route, href: "#/transports", show: can("transport.view") },
     { label: "Customer Aktif", value: counts.customers, icon: Users, href: "/customers", show: can("customer.view") },
     { label: "Gudang", value: counts.gudang, icon: Warehouse, href: "#/gudang", show: can("warehouse.view") && user?.isOwner },

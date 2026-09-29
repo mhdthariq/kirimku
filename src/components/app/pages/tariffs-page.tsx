@@ -1,55 +1,22 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Pencil, Plus, Tag, Trash2 } from "lucide-react";
+import { Building2, Pencil, Plus, Tag, Trash2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type Tariff } from "@/lib/client-api";
+import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type Options, type Tariff } from "@/lib/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
 import { ActiveBadge } from "@/components/app/status-badge";
-import { Field, FormSelect, Input, NumberInput, SubmitButton, formatDate, formatNumber } from "@/components/app/form-parts";
+import { SubmitButton, formatDate, formatNumber } from "@/components/app/form-parts";
+import { TariffFormFields } from "@/components/app/tariff-form-fields";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-interface TariffForm {
-  origin: string;
-  destination: string;
-  customerType: string;
-  ratePerKg: string;
-  minChargeableKg: string;
-  volumetricMultiplier: string;
-  roundingMode: string;
-  roundingUnitKg: string;
-  effectiveFrom: string;
-  effectiveTo: string;
-  /** B2B-only pricing method — B2C is always forced to "PER_KG" (§ below). */
-  pricingMethod: "PER_KG" | "PER_KOLI" | "PER_CUBIC";
-  ratePerKoli: string;
-  ratePerCubic: string;
-  minChargeableKoli: string;
-  minChargeableM3: string;
-}
-
-const EMPTY: TariffForm = {
-  origin: "",
-  destination: "",
-  customerType: "",
-  ratePerKg: "",
-  minChargeableKg: "1",
-  volumetricMultiplier: "250",
-  roundingMode: "UP",
-  roundingUnitKg: "0.5",
-  effectiveFrom: new Date().toISOString().slice(0, 10),
-  effectiveTo: "",
-  pricingMethod: "PER_KG",
-  ratePerKoli: "",
-  ratePerCubic: "",
-  minChargeableKoli: "1",
-  minChargeableM3: "0",
-};
+import { buildTariffPayload, emptyTariffForm, tariffLabel, tariffTabOf, tariffToForm, validateTariffForm, type TariffFormState, type TariffTab } from "@/lib/tariff-form";
+import { customerPrimaryName } from "@/lib/customer-display";
+import { toast } from "sonner";
 
 const PRICING_METHOD_LABEL: Record<string, string> = {
   PER_KG: "/ kg",
@@ -66,72 +33,62 @@ export function TariffsPage() {
   };
 
   const { data, loading, reload } = useApiData<Tariff[]>(() => apiGet<Tariff[]>("/tariffs"), []);
+  const { data: options } = useApiData<Options>(() => apiGet<Options>("/options"), []);
   const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState<TariffTab | "activity">("b2c");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogTab, setDialogTab] = useState<TariffTab>("b2c");
   const [editing, setEditing] = useState<Tariff | null>(null);
-  const [form, setForm] = useState<TariffForm>(EMPTY);
+  const [form, setForm] = useState<TariffFormState>(emptyTariffForm());
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<Tariff | null>(null);
 
-  const rows = useMemo(() => {
-    if (!data) return [];
+  const matches = (t: Tariff, q: string) =>
+    !q ||
+    t.origin.toLowerCase().includes(q) ||
+    t.destination.toLowerCase().includes(q) ||
+    (t.name ?? "").toLowerCase().includes(q) ||
+    (t.customer ? customerPrimaryName({ ...t.customer, type: "b2b" }) : "").toLowerCase().includes(q);
+
+  const rowsByTab = useMemo(() => {
     const q = search.toLowerCase();
-    return data.filter(
-      (t) => !q || t.origin.toLowerCase().includes(q) || t.destination.toLowerCase().includes(q) || (t.customerType ?? "").toLowerCase().includes(q),
-    );
+    const all = (data ?? []).filter((t) => matches(t, q));
+    return { b2c: all.filter((t) => tariffTabOf(t) === "b2c"), b2b: all.filter((t) => tariffTabOf(t) === "b2b") };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, search]);
 
+  const b2bCustomerOptions = useMemo(
+    () =>
+      (options?.customers ?? [])
+        .filter((c) => c.type === "b2b")
+        .map((c) => ({ value: String(c.id), label: c.companyName ? `${c.companyName} (PIC: ${c.name})` : c.name })),
+    [options],
+  );
+
   function openCreate() {
+    const tab: TariffTab = activeTab === "b2b" ? "b2b" : "b2c";
     setEditing(null);
-    setForm(EMPTY);
+    setDialogTab(tab);
+    setForm(emptyTariffForm());
     setDialogOpen(true);
   }
 
   function openEdit(t: Tariff) {
     setEditing(t);
-    setForm({
-      origin: t.origin,
-      destination: t.destination,
-      customerType: t.customerType ?? "",
-      ratePerKg: String(t.ratePerKg),
-      minChargeableKg: String(t.minChargeableKg),
-      volumetricMultiplier: String(t.volumetricMultiplier),
-      roundingMode: t.roundingMode,
-      roundingUnitKg: String(t.roundingUnitKg),
-      effectiveFrom: t.effectiveFrom.slice(0, 10),
-      effectiveTo: t.effectiveTo ? t.effectiveTo.slice(0, 10) : "",
-      pricingMethod: t.customerType === "b2b" ? t.pricingMethod ?? "PER_KG" : "PER_KG",
-      ratePerKoli: t.ratePerKoli != null ? String(t.ratePerKoli) : "",
-      ratePerCubic: t.ratePerCubic != null ? String(t.ratePerCubic) : "",
-      minChargeableKoli: String(t.minChargeableKoli ?? 1),
-      minChargeableM3: String(t.minChargeableM3 ?? 0),
-    });
+    setDialogTab(tariffTabOf(t));
+    setForm(tariffToForm(t));
     setDialogOpen(true);
   }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const problem = validateTariffForm(dialogTab, form);
+    if (problem) {
+      toast.error(problem);
+      return;
+    }
     setBusy(true);
-    const isB2b = form.customerType === "b2b";
-    const payload = {
-      origin: form.origin,
-      destination: form.destination,
-      customerType: form.customerType === "" ? null : form.customerType,
-      // Only B2B may use /koli or /cubic — B2C / semua tipe is always /kg
-      // (also re-enforced server-side, this just keeps the payload honest).
-      pricingMethod: isB2b ? form.pricingMethod : "PER_KG",
-      ratePerKg: Number(form.ratePerKg) || 0,
-      ratePerKoli: isB2b && form.pricingMethod === "PER_KOLI" ? Number(form.ratePerKoli) : null,
-      ratePerCubic: isB2b && form.pricingMethod === "PER_CUBIC" ? Number(form.ratePerCubic) : null,
-      minChargeableKoli: Number(form.minChargeableKoli) || 1,
-      minChargeableM3: Number(form.minChargeableM3) || 0,
-      minChargeableKg: Number(form.minChargeableKg),
-      volumetricMultiplier: Number(form.volumetricMultiplier),
-      roundingMode: form.roundingMode,
-      roundingUnitKg: Number(form.roundingUnitKg),
-      effectiveFrom: form.effectiveFrom,
-      effectiveTo: form.effectiveTo === "" ? null : form.effectiveTo,
-    };
+    const payload = buildTariffPayload(dialogTab, form);
     const ok = await runAction(
       () => (editing ? apiPut(`/tariffs/${editing.id}`, payload) : apiPost("/tariffs", payload)),
       { success: editing ? "Tarif diperbarui." : "Tarif dibuat." },
@@ -155,109 +112,127 @@ export function TariffsPage() {
     return <PageHeader title="Tarif" subtitle="Anda tidak memiliki izin melihat tarif." />;
   }
 
+  const nameCol = {
+    key: "lane",
+    header: "Tarif",
+    primary: true,
+    render: (t: Tariff) => (
+      <div>
+        <p className="font-semibold text-foreground">{t.name || <span className="font-normal text-muted-foreground">(tanpa nama)</span>}</p>
+        <p className="text-xs text-muted-foreground">
+          {t.origin} → {t.destination}
+        </p>
+      </div>
+    ),
+  };
+  // B2B only: which customer this tariff is tied to — same badge style as the
+  // "Marketing (PIC)" column on the Customers page.
+  const customerCol = {
+    key: "customer",
+    header: "Customer",
+    render: (t: Tariff) =>
+      t.customer ? (
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+          <Building2 className="h-3.5 w-3.5" /> {customerPrimaryName({ ...t.customer, type: "b2b" })}
+        </span>
+      ) : (
+        <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:bg-amber-950 dark:text-amber-300" title="Edit tarif ini dan pilih customer, kalau tidak tarif ini tidak muncul di pembuatan shipment.">
+          Belum terikat customer
+        </span>
+      ),
+  };
+  const rateCol = {
+    key: "rate",
+    header: "Tarif",
+    render: (t: Tariff) => {
+      const method = t.customerType === "b2b" ? (t.pricingMethod ?? "PER_KG") : "PER_KG";
+      const rate = method === "PER_KOLI" ? t.ratePerKoli ?? 0 : method === "PER_CUBIC" ? t.ratePerCubic ?? 0 : t.ratePerKg;
+      return (
+        <span className="font-semibold">
+          Rp{rate.toLocaleString("id-ID")} <span className="font-normal text-muted-foreground">{PRICING_METHOD_LABEL[method]}</span>
+        </span>
+      );
+    },
+  };
+  const rulesCol = {
+    key: "rules",
+    header: "Aturan",
+    hideOnMobile: true,
+    render: (t: Tariff) => {
+      const method = t.customerType === "b2b" ? (t.pricingMethod ?? "PER_KG") : "PER_KG";
+      if (method === "PER_KOLI") return <span className="text-xs text-muted-foreground">min {formatNumber(t.minChargeableKoli ?? 1, 0)} koli / shipment</span>;
+      if (method === "PER_CUBIC") return <span className="text-xs text-muted-foreground">min {formatNumber(t.minChargeableM3 ?? 0, 3)} m³ / shipment</span>;
+      return (
+        <span className="text-xs text-muted-foreground">
+          min {formatNumber(t.minChargeableKg)} kg · multiplier {formatNumber(t.volumetricMultiplier, 0)} kg/m³ · {t.roundingMode === "UP" ? "round up" : "nearest"} {formatNumber(t.roundingUnitKg)} kg
+        </span>
+      );
+    },
+  };
+  const commonCols = [
+    { key: "effective", header: "Berlaku", hideOnMobile: true, render: (t: Tariff) => `${formatDate(t.effectiveFrom)}${t.effectiveTo ? ` – ${formatDate(t.effectiveTo)}` : " – ∞"}` },
+    { key: "status", header: "Status", render: (t: Tariff) => <ActiveBadge active={t.isActive} /> },
+    ...(can.update
+      ? [
+          {
+            key: "actions",
+            header: "Aksi",
+            render: (t: Tariff) => (
+              <div className="flex gap-1.5">
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(t)} aria-label="Edit tarif">
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setConfirmDelete(t)} aria-label="Hapus tarif">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ),
+          },
+        ]
+      : []),
+  ];
+
   return (
     <div className="space-y-4">
       <PageHeader
         title="Tarif"
-        subtitle="B2C selalu /kg. B2B bisa /kg, /koli, atau /cubic (m³) - pilih metode saat membuat tarif."
+        subtitle="B2C selalu /kg. B2B terikat ke satu customer dan bisa /kg, /koli, atau /cubic (m³)."
         icon={<Tag className="h-5 w-5" />}
         actions={
           can.create && (
             <Button onClick={openCreate}>
-              <Plus className="h-4 w-4" /> Tambah Tarif
+              <Plus className="h-4 w-4" /> Tambah Tarif {activeTab === "b2b" ? "B2B" : "B2C"}
             </Button>
           )
         }
       />
 
-      <Tabs defaultValue="list">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TariffTab | "activity")}>
         <TabsList>
-          <TabsTrigger value="list">Daftar</TabsTrigger>
+          <TabsTrigger value="b2c">B2C ({rowsByTab.b2c.length})</TabsTrigger>
+          <TabsTrigger value="b2b">B2B ({rowsByTab.b2b.length})</TabsTrigger>
           <TabsTrigger value="activity">Log Aktivitas</TabsTrigger>
         </TabsList>
-        <TabsContent value="list" className="mt-3">
+        <TabsContent value="b2c" className="mt-3">
           <DataTable
-            rows={rows}
+            rows={rowsByTab.b2c}
             loading={loading}
             search={search}
             onSearchChange={setSearch}
-            searchPlaceholder="Cari koridor / tipe…"
-            emptyMessage="Belum ada tarif. Klik “Tambah Tarif” untuk membuat."
-            columns={[
-              {
-                key: "lane",
-                header: "Koridor",
-                primary: true,
-                render: (t) => (
-                  <span className="font-semibold text-foreground">
-                    {t.origin} → {t.destination}
-                  </span>
-                ),
-              },
-              {
-                key: "type",
-                header: "Tipe",
-                render: (t) =>
-                  t.customerType ? (
-                    <span className="text-xs font-semibold uppercase text-primary">{t.customerType}</span>
-                  ) : (
-                    <span className="text-xs font-semibold uppercase text-muted-foreground">semua</span>
-                  ),
-              },
-              {
-                key: "rate",
-                header: "Tarif",
-                render: (t) => {
-                  const method = t.customerType === "b2b" ? (t.pricingMethod ?? "PER_KG") : "PER_KG";
-                  const rate = method === "PER_KOLI" ? t.ratePerKoli ?? 0 : method === "PER_CUBIC" ? t.ratePerCubic ?? 0 : t.ratePerKg;
-                  return (
-                    <span className="font-semibold">
-                      Rp{rate.toLocaleString("id-ID")} <span className="font-normal text-muted-foreground">{PRICING_METHOD_LABEL[method]}</span>
-                    </span>
-                  );
-                },
-              },
-              {
-                key: "rules",
-                header: "Aturan",
-                hideOnMobile: true,
-                render: (t) => {
-                  const method = t.customerType === "b2b" ? (t.pricingMethod ?? "PER_KG") : "PER_KG";
-                  if (method === "PER_KOLI") {
-                    return <span className="text-xs text-muted-foreground">min {formatNumber(t.minChargeableKoli ?? 1, 0)} koli / shipment</span>;
-                  }
-                  if (method === "PER_CUBIC") {
-                    return <span className="text-xs text-muted-foreground">min {formatNumber(t.minChargeableM3 ?? 0, 3)} m³ / shipment</span>;
-                  }
-                  return (
-                    <span className="text-xs text-muted-foreground">
-                      min {formatNumber(t.minChargeableKg)} kg · multiplier {formatNumber(t.volumetricMultiplier, 0)} kg/m³ ·{" "}
-                      {t.roundingMode === "UP" ? "round up" : "nearest"} {formatNumber(t.roundingUnitKg)} kg
-                    </span>
-                  );
-                },
-              },
-              { key: "effective", header: "Berlaku", hideOnMobile: true, render: (t) => `${formatDate(t.effectiveFrom)}${t.effectiveTo ? ` – ${formatDate(t.effectiveTo)}` : " – ∞"}` },
-              { key: "status", header: "Status", render: (t) => <ActiveBadge active={t.isActive} /> },
-              ...(can.update
-                ? [
-                    {
-                      key: "actions",
-                      header: "Aksi",
-                      render: (t: Tariff) => (
-                        <div className="flex gap-1.5">
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(t)} aria-label="Edit tarif">
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setConfirmDelete(t)} aria-label="Hapus tarif">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ),
-                    },
-                  ]
-                : []),
-            ]}
+            searchPlaceholder="Cari nama / koridor…"
+            emptyMessage="Belum ada tarif B2C. Klik “Tambah Tarif B2C” untuk membuat."
+            columns={[nameCol, rateCol, rulesCol, ...commonCols]}
+          />
+        </TabsContent>
+        <TabsContent value="b2b" className="mt-3">
+          <DataTable
+            rows={rowsByTab.b2b}
+            loading={loading}
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Cari nama / koridor / customer…"
+            emptyMessage="Belum ada tarif B2B. Klik “Tambah Tarif B2B” atau isi saat membuat customer B2B."
+            columns={[nameCol, customerCol, rateCol, rulesCol, ...commonCols]}
           />
         </TabsContent>
         <TabsContent value="activity" className="mt-3">
@@ -268,99 +243,17 @@ export function TariffsPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editing ? "Edit Tarif" : "Tambah Tarif"}</DialogTitle>
-            <DialogDescription>Satu kombinasi koridor + tipe customer hanya boleh punya satu tarif aktif.</DialogDescription>
+            <DialogTitle>
+              {editing ? "Edit Tarif" : "Tambah Tarif"} {dialogTab.toUpperCase()}
+            </DialogTitle>
+            <DialogDescription>
+              {dialogTab === "b2b"
+                ? "Tarif B2B terikat ke satu customer - hanya customer itu yang melihatnya saat membuat shipment."
+                : "Tarif B2C selalu per kg. Koridor yang sama boleh punya beberapa tarif selama namanya berbeda."}
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={onSubmit} className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Kota Asal" htmlFor="tf-origin">
-                <Input id="tf-origin" value={form.origin} onChange={(e) => setForm({ ...form, origin: e.target.value })} placeholder="Jakarta Pusat" required disabled={busy} />
-              </Field>
-              <Field label="Kota Tujuan" htmlFor="tf-destination">
-                <Input id="tf-destination" value={form.destination} onChange={(e) => setForm({ ...form, destination: e.target.value })} placeholder="Bandung" required disabled={busy} />
-              </Field>
-              <Field label="Tipe Customer" htmlFor="tf-type">
-                <FormSelect
-                  value={form.customerType}
-                  onValueChange={(value) => setForm({ ...form, customerType: value, pricingMethod: value === "b2b" ? form.pricingMethod : "PER_KG" })}
-                  placeholder="Semua tipe"
-                  options={[{ value: "b2b", label: "B2B" }, { value: "b2c", label: "B2C" }]}
-                  disabled={busy}
-                />
-              </Field>
-              {form.customerType === "b2b" ? (
-                <>
-                  <Field label="Metode Harga (B2B)" htmlFor="tf-method" hint="B2C selalu pakai /kg - B2B bisa pilih /kg, /koli, atau /cubic.">
-                    <FormSelect
-                      value={form.pricingMethod}
-                      onValueChange={(value) => setForm({ ...form, pricingMethod: value as TariffForm["pricingMethod"] })}
-                      options={[
-                        { value: "PER_KG", label: "Per kg" },
-                        { value: "PER_KOLI", label: "Per koli" },
-                        { value: "PER_CUBIC", label: "Per cubic (m³)" },
-                      ]}
-                      disabled={busy}
-                    />
-                  </Field>
-                  {form.pricingMethod === "PER_KG" && (
-                    <Field label="Tarif per kg (Rp)" htmlFor="tf-rate">
-                      <NumberInput id="tf-rate" value={form.ratePerKg} onChange={(e) => setForm({ ...form, ratePerKg: e.target.value })} placeholder="4500" required disabled={busy} />
-                    </Field>
-                  )}
-                  {form.pricingMethod === "PER_KOLI" && (
-                    <Field label="Tarif per koli (Rp)" htmlFor="tf-rate-koli">
-                      <NumberInput id="tf-rate-koli" value={form.ratePerKoli} onChange={(e) => setForm({ ...form, ratePerKoli: e.target.value })} placeholder="25000" required disabled={busy} />
-                    </Field>
-                  )}
-                  {form.pricingMethod === "PER_CUBIC" && (
-                    <Field label="Tarif per m³ (Rp)" htmlFor="tf-rate-cubic">
-                      <NumberInput id="tf-rate-cubic" value={form.ratePerCubic} onChange={(e) => setForm({ ...form, ratePerCubic: e.target.value })} placeholder="850000" required disabled={busy} />
-                    </Field>
-                  )}
-                </>
-              ) : (
-                <Field label="Tarif per kg (Rp)" htmlFor="tf-rate">
-                  <NumberInput id="tf-rate" value={form.ratePerKg} onChange={(e) => setForm({ ...form, ratePerKg: e.target.value })} placeholder="4500" required disabled={busy} />
-                </Field>
-              )}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Min. kg" htmlFor="tf-min">
-                  <NumberInput id="tf-min" value={form.minChargeableKg} onChange={(e) => setForm({ ...form, minChargeableKg: e.target.value })} disabled={busy} />
-                </Field>
-                <Field label="Multiplier (kg/m³)" htmlFor="tf-multiplier" hint="volumetrik = L×W×H/1.000.000 × ini">
-                  <NumberInput id="tf-multiplier" value={form.volumetricMultiplier} onChange={(e) => setForm({ ...form, volumetricMultiplier: e.target.value })} placeholder="250" disabled={busy} />
-                </Field>
-              </div>
-              {form.customerType === "b2b" && form.pricingMethod === "PER_KOLI" && (
-                <Field label="Min. koli" htmlFor="tf-min-koli" hint="Shipment selalu ditagih minimal sekian koli">
-                  <NumberInput id="tf-min-koli" value={form.minChargeableKoli} onChange={(e) => setForm({ ...form, minChargeableKoli: e.target.value })} disabled={busy} />
-                </Field>
-              )}
-              {form.customerType === "b2b" && form.pricingMethod === "PER_CUBIC" && (
-                <Field label="Min. m³" htmlFor="tf-min-cubic" hint="0 = tanpa batas minimum">
-                  <NumberInput id="tf-min-cubic" value={form.minChargeableM3} onChange={(e) => setForm({ ...form, minChargeableM3: e.target.value })} disabled={busy} />
-                </Field>
-              )}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Pembulatan" htmlFor="tf-rounding">
-                  <FormSelect
-                    value={form.roundingMode}
-                    onValueChange={(value) => setForm({ ...form, roundingMode: value })}
-                    options={[{ value: "UP", label: "Round up" }, { value: "NEAREST", label: "Nearest" }]}
-                    disabled={busy}
-                  />
-                </Field>
-                <Field label="Satuan (kg)" htmlFor="tf-unit">
-                  <NumberInput id="tf-unit" value={form.roundingUnitKg} onChange={(e) => setForm({ ...form, roundingUnitKg: e.target.value })} disabled={busy} />
-                </Field>
-              </div>
-              <Field label="Berlaku dari" htmlFor="tf-from">
-                <Input id="tf-from" type="date" value={form.effectiveFrom} onChange={(e) => setForm({ ...form, effectiveFrom: e.target.value })} required disabled={busy} />
-              </Field>
-              <Field label="Berlaku sampai" htmlFor="tf-to" hint="Kosongkan = tanpa batas">
-                <Input id="tf-to" type="date" value={form.effectiveTo} onChange={(e) => setForm({ ...form, effectiveTo: e.target.value })} disabled={busy} />
-              </Field>
-            </div>
+            <TariffFormFields tab={dialogTab} form={form} setForm={setForm} busy={busy} customerOptions={b2bCustomerOptions} />
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} disabled={busy}>
                 Batal
@@ -374,7 +267,7 @@ export function TariffsPage() {
       <AlertDialog open={!!confirmDelete} onOpenChange={(open) => !open && setConfirmDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Hapus tarif {confirmDelete ? `${confirmDelete.origin} → ${confirmDelete.destination}` : ""}?</AlertDialogTitle>
+            <AlertDialogTitle>Hapus tarif {confirmDelete ? tariffLabel(confirmDelete) : ""}?</AlertDialogTitle>
             <AlertDialogDescription>Tarif yang sudah dipakai menghitung harga akan dinonaktifkan, bukan dihapus.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

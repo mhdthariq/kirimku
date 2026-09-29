@@ -202,7 +202,8 @@ async function createDemoArrivalShipment(budiPartner: { id: number } | null): Pr
     db.customer.findUnique({ where: { code: "CUS-000005" } }),
     db.warehouse.findFirst({ where: { city: "Medan" } }),
     db.warehouse.findFirst({ where: { city: "Banda Aceh" } }),
-    db.tariff.findFirst({ where: { origin: "Medan", destination: "Banda Aceh", customerType: "b2c", isActive: true } }),
+    // "Reguler" explicitly — 2026-09-29: a corridor can have several named tariffs now.
+    db.tariff.findFirst({ where: { origin: "Medan", destination: "Banda Aceh", customerType: "b2c", name: "Reguler", isActive: true } }),
   ]);
   if (!sari || !medan || !bandaAceh) return;
 
@@ -267,7 +268,7 @@ async function createDemoArrivalShipment(budiPartner: { id: number } | null): Pr
     const r = computePricing(detailRows, tariffRow);
     await db.masterShipment.update({
       where: { id: shipment.id },
-      data: { chargeableWeightKg: r.chargeableKg, ratePerKg: tariffRow.ratePerKg, priceAmount: r.price, pricedAt: createdAt },
+      data: { chargeableWeightKg: r.chargeableKg, ratePerKg: tariffRow.ratePerKg, priceAmount: r.price, pricedAt: createdAt, pricingMethod: r.method },
     });
     // B2C — biaya ditanggung Marketing, tidak ada pembayaran customer.
     // Payment row dihapus sesuai aturan baru: B2C tidak ada DP / status pembayaran.
@@ -328,7 +329,8 @@ async function createB2BMasterResiShipment(budiPartner: { id: number } | null): 
     db.customer.findUnique({ where: { code: "CUS-000002" } }),
     db.warehouse.findFirst({ where: { city: "Medan" } }),
     db.warehouse.findFirst({ where: { city: "Banda Aceh" } }),
-    db.tariff.findFirst({ where: { origin: "Medan", destination: "Banda Aceh", customerType: "b2b", isActive: true } }),
+    // "Reguler" /kg explicitly — PT Maju Bersama also has a "Kolian" /koli tariff on this corridor.
+    db.tariff.findFirst({ where: { origin: "Medan", destination: "Banda Aceh", customerType: "b2b", name: "Reguler", isActive: true } }),
   ]);
   if (!maju || !medan || !bandaAceh) return;
 
@@ -398,7 +400,7 @@ async function createB2BMasterResiShipment(budiPartner: { id: number } | null): 
     invoicePrice = r.price;
     await db.masterShipment.update({
       where: { id: shipment.id },
-      data: { chargeableWeightKg: r.chargeableKg, ratePerKg: tariffRow.ratePerKg, priceAmount: r.price, pricedAt: createdAt },
+      data: { chargeableWeightKg: r.chargeableKg, ratePerKg: tariffRow.ratePerKg, priceAmount: r.price, pricedAt: createdAt, pricingMethod: r.method },
     });
     // DP / direct Payment untuk B2B dihapus — penagihan B2B dilakukan via invoice.
   }
@@ -865,23 +867,6 @@ async function runSeed(): Promise<void> {
     routes[r.name] = route.id;
   }
 
-  // ----- Tariffs -------------------------------------------------------------
-  // volumetricMultiplier (kg per m³) is configurable per tariff — pricing formula:
-  // volumetric kg = (L×W×H cm / 1.000.000) × multiplier
-  // Medan → Banda Aceh (~440 km east-coast corridor) — main route.
-  const tariffDefs = [
-    { origin: "Medan", destination: "Banda Aceh", customerType: "b2b", ratePerKg: 8000, volumetricMultiplier: 250 },
-    { origin: "Medan", destination: "Banda Aceh", customerType: "b2c", ratePerKg: 9500, volumetricMultiplier: 250 },
-    { origin: "Medan", destination: "Lhokseumawe", customerType: "b2b", ratePerKg: 5500, volumetricMultiplier: 250 },
-    { origin: "Medan", destination: "Lhokseumawe", customerType: "b2c", ratePerKg: 6500, volumetricMultiplier: 250 },
-  ];
-  const tariffByRoute: Record<string, { id: number; ratePerKg: number; minChargeableKg: number; volumetricMultiplier: number; roundingMode: string; roundingUnitKg: number }> = {};
-  for (const t of tariffDefs) {
-    const existing = await db.tariff.findFirst({ where: { origin: t.origin, destination: t.destination, customerType: t.customerType } });
-    const tariff = existing ?? (await db.tariff.create({ data: { ...t, minChargeableKg: 1, roundingMode: "UP", roundingUnitKg: 0.5, effectiveFrom: daysAgo(90) } }));
-    tariffByRoute[`${t.origin}|${t.destination}|${t.customerType}`] = tariff;
-  }
-
   // ----- Customers -------------------------------------------------------------
   // Revise round 10 — customer defs now include `email` (was missing before).
   // All 5 demo customers get a complete contact record so the resi prints
@@ -890,6 +875,10 @@ async function runSeed(): Promise<void> {
   // city, so the gudang data separation demo works. Customers in Medan are
   // visible to Admin Gudang Medan only; customers in Banda Aceh are visible
   // to Admin Gudang Banda Aceh only; etc. The owner sees all of them.
+  //
+  // Customers are seeded BEFORE tariffs (2026-09-29) because B2B tariffs are
+  // now tied to a specific customer (Tariff.customerId) — the tariff seed
+  // below needs `customers[name].id` to exist first.
   const customerDefs = [
     { code: "CUS-000001", type: "b2c", name: "Rina Amelia", phone: "081234000001", email: "rina.amelia@example.com", address: "Jl. T. Iskandar No. 12, Banda Aceh", warehouseId: "Banda Aceh" },
     { code: "CUS-000002", type: "b2b", name: "PT Maju Bersama", companyName: "PT Maju Bersama", phone: "081234000002", email: "admin@ptmajubersama.co.id", address: "Jl. Gatot Subroto No. 21, Medan", warehouseId: "Medan" },
@@ -915,6 +904,66 @@ async function runSeed(): Promise<void> {
     });
     customers[c.name] = { id: customer.id, type: c.type };
   }
+
+  // ----- Tariffs -------------------------------------------------------------
+  // volumetricMultiplier (kg per m³) is configurable per tariff — pricing formula:
+  // volumetric kg = (L×W×H cm / 1.000.000) × multiplier
+  //
+  // 2026-09-29 — reflects the B2B tariff-model change: B2B tariffs are now
+  // tied to ONE specific customer (customerId) and each corridor can have
+  // several tariffs as long as their `name` differs. B2C stays exactly like
+  // before — generic (no customerId), always /kg. To demo all 3 B2B pricing
+  // methods (§ Tariff.pricingMethod), the two demo B2B customers get:
+  //   - PT Maju Bersama (Medan → Banda Aceh): TWO tariffs, "Reguler" (/kg,
+  //     used by the existing MKT-000002/000005 demo shipments) and
+  //     "Kolian" (/koli) — same corridor, different name, different method.
+  //   - CV Sinar Jaya (Medan → Lhokseumawe): "Cubic" (/cubic, m³-based).
+  const tariffDefs = [
+    // B2C — generic, /kg only, unchanged behavior.
+    { name: "Reguler", origin: "Medan", destination: "Banda Aceh", customerType: "b2c" as const, customerId: null, pricingMethod: "PER_KG" as const, ratePerKg: 9500, volumetricMultiplier: 250 },
+    { name: "Reguler", origin: "Medan", destination: "Lhokseumawe", customerType: "b2c" as const, customerId: null, pricingMethod: "PER_KG" as const, ratePerKg: 6500, volumetricMultiplier: 250 },
+    // B2B — tied to a specific customer.
+    { name: "Reguler", origin: "Medan", destination: "Banda Aceh", customerType: "b2b" as const, customerId: customers["PT Maju Bersama"].id, pricingMethod: "PER_KG" as const, ratePerKg: 8000, volumetricMultiplier: 250 },
+    { name: "Kolian", origin: "Medan", destination: "Banda Aceh", customerType: "b2b" as const, customerId: customers["PT Maju Bersama"].id, pricingMethod: "PER_KOLI" as const, ratePerKoli: 22000, minChargeableKoli: 1 },
+    { name: "Cubic", origin: "Medan", destination: "Lhokseumawe", customerType: "b2b" as const, customerId: customers["CV Sinar Jaya"].id, pricingMethod: "PER_CUBIC" as const, ratePerCubic: 900000, minChargeableM3: 0 },
+  ];
+  const tariffByKey: Record<string, { id: number; ratePerKg: number; minChargeableKg: number; volumetricMultiplier: number; roundingMode: string; roundingUnitKg: number; pricingMethod: string; ratePerKoli: number | null; ratePerCubic: number | null }> = {};
+  for (const t of tariffDefs) {
+    const existing = await db.tariff.findFirst({ where: { origin: t.origin, destination: t.destination, customerType: t.customerType, name: t.name } });
+    const tariff =
+      existing ??
+      (await db.tariff.create({
+        data: {
+          name: t.name,
+          origin: t.origin,
+          destination: t.destination,
+          customerType: t.customerType,
+          customerId: t.customerId,
+          pricingMethod: t.pricingMethod,
+          ratePerKg: "ratePerKg" in t ? t.ratePerKg : 0,
+          ratePerKoli: "ratePerKoli" in t ? t.ratePerKoli : null,
+          ratePerCubic: "ratePerCubic" in t ? t.ratePerCubic : null,
+          minChargeableKoli: "minChargeableKoli" in t ? t.minChargeableKoli : 1,
+          minChargeableM3: "minChargeableM3" in t ? t.minChargeableM3 : 0,
+          minChargeableKg: 1,
+          volumetricMultiplier: "volumetricMultiplier" in t ? t.volumetricMultiplier : 250,
+          roundingMode: "UP",
+          roundingUnitKg: 0.5,
+          effectiveFrom: daysAgo(90),
+        },
+      }));
+    // Keyed by customer-facing lookup: B2B by customer id (tariff is theirs
+    // alone), B2C by corridor only (generic, shared by all B2C customers).
+    tariffByKey[`${t.origin}|${t.destination}|${t.customerType}|${t.customerType === "b2b" ? t.customerId : "generic"}|${t.name}`] = tariff;
+  }
+  // Default tariff per corridor+type used by the shipment seed below: the
+  // "Reguler" one — matches what the demo shipments were already priced with.
+  const tariffByRoute: Record<string, { id: number; ratePerKg: number; minChargeableKg: number; volumetricMultiplier: number; roundingMode: string; roundingUnitKg: number; pricingMethod: string; ratePerKoli: number | null; ratePerCubic: number | null }> = {
+    "Medan|Banda Aceh|b2c": tariffByKey["Medan|Banda Aceh|b2c|generic|Reguler"],
+    "Medan|Lhokseumawe|b2c": tariffByKey["Medan|Lhokseumawe|b2c|generic|Reguler"],
+    "Medan|Banda Aceh|b2b": tariffByKey[`Medan|Banda Aceh|b2b|${customers["PT Maju Bersama"].id}|Reguler`],
+    "Medan|Lhokseumawe|b2b": tariffByKey[`Medan|Lhokseumawe|b2b|${customers["CV Sinar Jaya"].id}|Cubic`],
+  };
 
   // ----- Shipments lifecycle -----------------------------------------------------
   if ((await db.masterShipment.count()) === 0) {
@@ -1096,6 +1145,13 @@ async function runSeed(): Promise<void> {
           where: { id: shipment.id },
           data: {
             chargeableWeightKg: r.chargeableKg, ratePerKg: tariff.ratePerKg, priceAmount: r.price, pricedAt: createdAt,
+            // 2026-09-29 — snapshot the pricing method actually used, same as
+            // the real /shipments/{id}/price endpoint, so the resi print and
+            // shipment detail show the right cells for B2B /koli or /cubic
+            // demo shipments (e.g. MKT-000003, CV Sinar Jaya, priced /cubic).
+            pricingMethod: r.method,
+            chargeableKoli: r.method === "PER_KOLI" ? r.chargeableKoli : null,
+            chargeableVolumeM3: r.method === "PER_CUBIC" ? r.chargeableVolumeM3 : null,
             ...(discount > 0
               ? {
                   discountAmount: discount,

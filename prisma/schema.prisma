@@ -239,6 +239,7 @@ model Customer {
   warehouse          Warehouse?       @relation("CustomerWarehouse", fields: [warehouseId], references: [id])
   invoices           Invoice[]
   shipments          MasterShipment[]
+  tariffs            Tariff[]         @relation("CustomerTariffs")
 }
 
 model MasterShipment {
@@ -566,9 +567,15 @@ model Delivery {
 
 model Tariff {
   id                   Int              @id @default(autoincrement())
+  /// Human-readable tariff name (e.g. "Reguler", "Express") — lets the same
+  /// corridor have several tariffs that differ only by name. Null on legacy rows.
+  name                 String?
   origin               String
   destination          String
   customerType         String?
+  /// B2B tariffs are tied to ONE specific B2B customer — only that customer
+  /// sees the tariff when creating a shipment. Always null for B2C tariffs.
+  customerId           Int?
   ratePerKg            Float
   minChargeableKg      Float            @default(1)
   volumetricMultiplier Float            @default(250)
@@ -594,6 +601,9 @@ model Tariff {
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
   shipments            MasterShipment[]
+  customer             Customer?        @relation("CustomerTariffs", fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([customerId])
 }
 
 model Payment {

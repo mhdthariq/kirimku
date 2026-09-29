@@ -12,9 +12,7 @@ import { DashboardPage } from "@/components/app/pages/dashboard-page";
 import { KurirDashboard } from "@/components/app/pages/kurir-dashboard-page";
 import { DriverDashboard } from "@/components/app/pages/driver-dashboard-page";
 import { VehicleOwnerDashboard } from "@/components/app/pages/vo-dashboard-page";
-import { PickupsPage } from "@/components/app/pages/pickups-page";
 import { ShipmentsPage } from "@/components/app/pages/shipments-page";
-import { DeliveriesPage } from "@/components/app/pages/deliveries-page";
 import { TransportsPage } from "@/components/app/pages/transports-page";
 import { TransportDetailPage } from "@/components/app/pages/transport-detail-page";
 import { VehiclesPage } from "@/components/app/pages/vehicles-page";
@@ -44,7 +42,7 @@ import { ProfilePage } from "@/components/app/pages/profile-page";
  * section here the same PR you delete its `case` from the switch and add
  * its `app/(dashboard)/<section>/page.tsx`.
  */
-const MIGRATED_SECTIONS = new Set(["tariffs", "customers", "gudang"]);
+const MIGRATED_SECTIONS = new Set(["tariffs", "customers", "gudang", "pickups", "deliveries"]);
 
 function Router() {
   const router = useRouter();
@@ -91,11 +89,13 @@ function RouterInner({ segments, query }: { segments: string[]; query: URLSearch
   const page = (() => {
     switch (section) {
       case "pickups":
-        return <PickupsPage />;
+        // Migrated to a real route (app/(dashboard)/pickups/page.tsx).
+        return null;
       case "shipments":
         return <ShipmentsPage shipmentId={segments[1] ? Number(segments[1]) : null} autoPrint={query.get("print") === "1"} />;
       case "deliveries":
-        return <DeliveriesPage />;
+        // Migrated to a real route (app/(dashboard)/deliveries/page.tsx).
+        return null;
       case "transports":
         // #/transports — list; #/transports/{id} — detail (Revision Part K)
         return segments[1] ? <TransportDetailPage transportId={Number(segments[1])} /> : <TransportsPage />;

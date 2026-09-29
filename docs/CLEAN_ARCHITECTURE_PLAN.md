@@ -5,12 +5,13 @@
 real routing, smaller files, a test suite, and less duplication — written so
 it can be executed later without breaking the app in the meantime.
 
-> **Progress (updated 2026-09-27):** Phase 1 (§4.1, `src/lib/**` unit tests)
-> is done. Phase 2 (§3, routing scaffolding) is started — the shared layout
-> and redirect infrastructure are in place, and the first 3 low-traffic
-> pages (Tariffs, Customers, Gudang) are migrated to real routes as a proof
-> of concept. See `docs/CHANGES_2026-09-27-phase2.md` for exactly what
-> changed. The rest of §3 (the remaining ~26 pages) is still open.
+> **Progress (updated 2026-09-29):** Phase 1 (§4.1, `src/lib/**` unit tests)
+> is done. Phase 2 (§3, routing scaffolding) is in progress — 5 pages are
+> now migrated to real routes: Tariffs, Customers, Gudang (2026-09-27), then
+> Pickups and Deliveries (2026-09-29, see `docs/CHANGES_2026-09-29-phase2.md`).
+> The scaffolding pattern is proven out at this point; the remaining ~24
+> pages are the same mechanical steps. Next up per the suggested order:
+> Dashboard, Access, then Shipments last (after Phase 3 splits it).
 
 This is a plan document, not a redo of the app. Nothing in this file has been
 applied to the code. It's meant to be picked up incrementally, a phase (or
@@ -248,7 +249,7 @@ If tackled in order, each phase leaves the app fully working:
 | Phase | Work | Est. | Status |
 |---|---|---|---|
 | 1 | Test scaffolding + `lib/*` unit tests (§4.1) | ~1 week | **Done** (2026-09-27) |
-| 2 | Routing scaffolding + migrate 3–4 low-traffic pages (§3) | ~1 week | **In progress** — scaffolding + Tariffs/Customers/Gudang done (2026-09-27); ~26 pages left |
+| 2 | Routing scaffolding + migrate 3–4 low-traffic pages (§3) | ~1 week | **In progress** — Tariffs/Customers/Gudang (2026-09-27), Pickups/Deliveries (2026-09-29) done; ~24 pages left |
 | 3 | Split `shipments-page.tsx` (§5) *before* migrating its route — smaller pieces are safer to move | ~1 week | Not started |
 | 4 | Migrate remaining pages, `shipments` last (§3) | ~2–3 weeks | Not started |
 | 5 | API route tests + Playwright smoke suite (§4.2, §4.4) | ~1.5 weeks | Not started |

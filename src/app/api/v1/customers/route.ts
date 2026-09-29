@@ -78,6 +78,10 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const type = body.type === "b2b" ? "b2b" : "b2c";
     const name = requireStr(body.name, "name");
+    // B2B: the company IS the customer (the name field is the PIC/contact).
+    if (type === "b2b" && !str(body.companyName)) {
+      return fail(422, "Nama perusahaan wajib diisi untuk customer B2B.", { companyName: ["Nama perusahaan wajib diisi untuk customer B2B."] });
+    }
 
     // Customer ↔ Marketing linkage ("customer connected to who"):
     // - a Marketing partner creating a customer → automatically THEIR customer

@@ -15,6 +15,9 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CustomerTariffPanel } from "@/components/app/customer-tariff-panel";
+import { buildTariffPayload, emptyTariffForm, validateTariffForm, type TariffFormState } from "@/lib/tariff-form";
+import { cn } from "@/lib/utils";
 
 interface CustomerForm {
   name: string;
@@ -51,6 +54,11 @@ export function CustomersPage() {
   const [form, setForm] = useState<CustomerForm>(EMPTY);
   const [busy, setBusy] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  // B2B tariff panel beside the create dialog (optional, skippable).
+  const [tariffForm, setTariffForm] = useState<TariffFormState>(emptyTariffForm());
+  const [tariffSkipped, setTariffSkipped] = useState(false);
+  const canCreateTariff = hasPermission(user, "tariff.create");
+  const showTariffPanel = !editing && form.type === "b2b" && canCreateTariff;
   const [confirmDelete, setConfirmDelete] = useState<Customer | null>(null);
 
   const rows = useMemo(() => {
@@ -71,6 +79,8 @@ export function CustomersPage() {
   function openCreate() {
     setEditing(null);
     setForm(EMPTY);
+    setTariffForm(emptyTariffForm());
+    setTariffSkipped(false);
     setFieldErrors({});
     setDialogOpen(true);
   }
@@ -117,8 +127,30 @@ export function CustomersPage() {
             warehouseId: form.warehouseId !== "none" ? Number(form.warehouseId) : null,
           }),
     };
+    // B2B: the company IS the customer, so it is required (PIC is the contact person).
+    if (form.type === "b2b" && !form.companyName.trim()) {
+      setFieldErrors({ companyName: "Nama perusahaan wajib diisi untuk customer B2B." });
+      setBusy(false);
+      return;
+    }
+    // Validate the optional tariff BEFORE creating anything, so the user isn't
+    // left with a half-done save. (customerId is filled after the customer exists.)
+    const withTariff = showTariffPanel && !tariffSkipped;
+    if (withTariff) {
+      const problem = validateTariffForm("b2b", { ...tariffForm, customerId: "pending" });
+      if (problem) {
+        toast.error(problem);
+        setBusy(false);
+        return;
+      }
+    }
+
+    const holder: { customer: Customer | null } = { customer: null };
     const ok = await runAction(
-      () => (editing ? apiPut(`/customers/${editing.id}`, payload) : apiPost("/customers", payload)),
+      async () => {
+        if (editing) return apiPut(`/customers/${editing.id}`, payload);
+        holder.customer = await apiPost<Customer>("/customers", payload);
+      },
       {
         success: editing ? "Customer diperbarui." : "Customer dibuat.",
         onError: (message) => {
@@ -127,6 +159,14 @@ export function CustomersPage() {
         },
       },
     );
+
+    if (ok && withTariff && holder.customer) {
+      const customerId = holder.customer.id;
+      await runAction(() => apiPost("/tariffs", buildTariffPayload("b2b", { ...tariffForm, customerId: String(customerId) })), {
+        success: "Tarif B2B dibuat & terikat ke customer.",
+        onError: () => toast.warning("Customer sudah dibuat, tetapi tarifnya gagal. Tambahkan lewat menu Tarif → tab B2B."),
+      });
+    }
     setBusy(false);
     if (ok) {
       setDialogOpen(false);
@@ -281,7 +321,7 @@ export function CustomersPage() {
 
       {/* Create / edit dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className={cn("max-h-[90vh] overflow-y-auto", showTariffPanel ? "sm:max-w-4xl" : "sm:max-w-lg")}>
           <DialogHeader>
             <DialogTitle>{editing ? `Edit Customer - ${editing.code}` : "Tambah Customer"}</DialogTitle>
             <DialogDescription>
@@ -289,11 +329,9 @@ export function CustomersPage() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={onSubmit} className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Nama" htmlFor="c-name" error={fieldErrors.name} className="sm:col-span-2">
-                <Input id="c-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Nama lengkap / PIC" required disabled={busy} />
-              </Field>
-              <Field label="Tipe Customer" htmlFor="c-type">
+            <div className={cn("grid gap-6", showTariffPanel && "lg:grid-cols-2")}>
+            <div className="grid content-start gap-4 sm:grid-cols-2">
+              <Field label="Tipe Customer" htmlFor="c-type" className="sm:col-span-2">
                 <FormSelect
                   value={form.type}
                   onValueChange={(value) => setForm({ ...form, type: value as "b2b" | "b2c" })}
@@ -301,11 +339,28 @@ export function CustomersPage() {
                   disabled={busy}
                 />
               </Field>
+              {/* B2B: the COMPANY comes first (it is the customer); the PIC is
+                  just the contact person. B2C: a single "Nama" field. */}
               {form.type === "b2b" && (
-                <Field label="Nama Perusahaan" htmlFor="c-company">
-                  <Input id="c-company" value={form.companyName} onChange={(e) => setForm({ ...form, companyName: e.target.value })} placeholder="PT / CV" disabled={busy} />
+                <Field label="Nama Perusahaan" htmlFor="c-company" error={fieldErrors.companyName} className="sm:col-span-2">
+                  <Input id="c-company" value={form.companyName} onChange={(e) => setForm({ ...form, companyName: e.target.value })} placeholder="PT / CV" required disabled={busy} />
                 </Field>
               )}
+              <Field
+                label={form.type === "b2b" ? "Nama PIC" : "Nama"}
+                htmlFor="c-name"
+                error={fieldErrors.name}
+                className="sm:col-span-2"
+              >
+                <Input
+                  id="c-name"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder={form.type === "b2b" ? "Nama penanggung jawab (PIC)" : "Nama lengkap"}
+                  required
+                  disabled={busy}
+                />
+              </Field>
               {/* Marketing (PIC) - "customer connected to who". Admin/owner only:
                   a Marketing user's customers are always connected to themselves. */}
               {!isMarketing && (
@@ -367,6 +422,10 @@ export function CustomersPage() {
               <Field label="Alamat" htmlFor="c-address" className="sm:col-span-2">
                 <Textarea id="c-address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} rows={2} placeholder="Alamat pengirim / penerima" disabled={busy} />
               </Field>
+            </div>
+            {showTariffPanel && (
+              <CustomerTariffPanel form={tariffForm} setForm={setTariffForm} busy={busy} skipped={tariffSkipped} onSkipChange={setTariffSkipped} />
+            )}
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} disabled={busy}>

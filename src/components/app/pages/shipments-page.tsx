@@ -37,6 +37,7 @@ import {
   type TrackingEvent,
 } from "@/lib/client-api";
 import { customerDisplayParts, customerPrimaryName } from "@/lib/customer-display";
+import { tariffLabel, tariffsForCustomer } from "@/lib/tariff-form";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
@@ -367,16 +368,14 @@ function ShipmentList() {
 
   // Route dropdown — only tariffs matching the selected customer's B2B/B2C label
   const selectedCustomer = (options?.customers ?? []).find((c) => String(c.id) === form.customerId) ?? null;
-  const routeOptions = (options?.tariffs ?? [])
+  // A B2B customer only sees the tariffs tied to THEM (see tariffsForCustomer);
+  // B2C customers see B2C + generic tariffs, never B2B ones.
+  const routeOptions = tariffsForCustomer(options?.tariffs ?? [], selectedCustomer)
     .filter((t) => {
       const now = Date.now();
       const startsAt = new Date(t.effectiveFrom).getTime();
       const endsAt = t.effectiveTo ? new Date(t.effectiveTo).getTime() : Number.POSITIVE_INFINITY;
-      return (
-        startsAt <= now &&
-        endsAt >= now &&
-        (!selectedCustomer || !t.customerType || t.customerType === selectedCustomer.type)
-      );
+      return startsAt <= now && endsAt >= now;
     })
     .map((t) => {
       // B2B tariffs may bill /kg, /koli, or /cubic (m³) - show the method +
@@ -391,7 +390,7 @@ function ShipmentList() {
             : `Rp${formatNumber(t.ratePerKg, 0)}/kg`;
       return {
         value: String(t.id),
-        label: `${t.origin} → ${t.destination} · ${t.customerType ? t.customerType.toUpperCase() : "SEMUA"} · ${rateLabel}`,
+        label: `${tariffLabel(t)} · ${t.customerType ? t.customerType.toUpperCase() : "SEMUA"} · ${rateLabel}`,
       };
     });
   const selectedTariff = (options?.tariffs ?? []).find((t) => String(t.id) === form.tariffId) ?? null;
@@ -663,8 +662,8 @@ function ShipmentList() {
                   value={form.customerId}
                   onValueChange={(v) => {
                     const cust = (options?.customers ?? []).find((c) => String(c.id) === v) ?? null;
-                    const stillValid = (options?.tariffs ?? []).some(
-                      (t) => String(t.id) === form.tariffId && (!cust || !t.customerType || t.customerType === cust.type),
+                    const stillValid = tariffsForCustomer(options?.tariffs ?? [], cust).some(
+                      (t) => String(t.id) === form.tariffId,
                     );
                     // Auto-fill Pengirim (sender) from the Customer master — the
                     // values are placed into editable inputs below so the user can
@@ -727,7 +726,15 @@ function ShipmentList() {
                 label="Rute (dari daftar tarif)"
                 htmlFor="s-tariff"
                 className="sm:col-span-2"
-                hint={selectedCustomer ? `Khusus customer ${selectedCustomer.type.toUpperCase()}` : "Pilih customer dulu"}
+                hint={
+                  !selectedCustomer
+                    ? "Pilih customer dulu"
+                    : selectedCustomer.type === "b2b" && routeOptions.length === 0
+                      ? "Customer B2B ini belum punya tarif aktif - buat di menu Tarif (tab B2B)."
+                      : selectedCustomer.type === "b2b"
+                        ? "Hanya tarif yang terdaftar untuk customer ini."
+                        : `Khusus customer ${selectedCustomer.type.toUpperCase()}`
+                }
               >
                 <FormSelect
                   value={form.tariffId}

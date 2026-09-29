@@ -114,11 +114,12 @@ function buildPrintByLabel(user: ReturnType<typeof useAuth>["user"]): string | n
  *       "printed at/by" footer trivia in this specific worst case
  *
  *   PACKAGE LABEL:
- *     36 (header) + 86 (code+QR) + 24 (master ref) + 50 (sender)
- *     + 50 (receiver) + 40 (address) + 40 (stats)
+ *     36 (header) + 86 (code+QR) + 24 (master ref)
+ *     + 78 (sender/receiver, side by side — same layout as the Master Resi)
+ *     + 40 (address) + 40 (stats)
  *     + 14 (B2B pricing-method mark, B2B only) + flex (description+footer)
- *     = 326px fixed (B2C, or B2B before pricing) → 52px+ for description/footer
- *     = 340px fixed for B2B → 38px+ for description/footer
+ *     = 304px fixed (B2C, or B2B before pricing) → 74px+ for description/footer
+ *     = 318px fixed for B2B → 60px+ for description/footer
  */
 export function ResiPrint({
   shipment,
@@ -550,15 +551,17 @@ export function ResiPrint({
             account name + role of the staff who triggered the print. */}
         <footer className="flex min-h-0 flex-1 flex-col justify-between gap-1 overflow-hidden px-3 py-2 text-[8px] leading-tight text-black">
           <div className="flex-1 min-h-0">
-            <p className="tracking-widest">
-              Dicetak: {new Date().toLocaleString("id-ID")}
-            </p>
-            {printByLabel && (
-              <p className="mt-0.5 truncate tracking-wide">
-                <span className="font-bold uppercase tracking-[0.08em]">Dicetak oleh:</span>{" "}
-                {printByLabel}
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="shrink-0 tracking-widest">
+                Dicetak: {new Date().toLocaleDateString("id-ID")}
               </p>
-            )}
+              {printByLabel && (
+                <p className="min-w-0 truncate text-right tracking-wide">
+                  <span className="font-bold uppercase tracking-[0.08em]">Dicetak oleh:</span>{" "}
+                  {printByLabel}
+                </p>
+              )}
+            </div>
           </div>
         </footer>
       </section>
@@ -671,37 +674,35 @@ export function ResiPrint({
               </div>
             </div>
 
-            {/* Pengirim - fixed 50px. Sender gets its own block (not
-                squeezed into a 2-column row) so the destination
-                handler can verify the shipper without ambiguity. */}
-            <div className="h-12.5 flex-none border-b border-black px-3">
-              <div className="flex h-full flex-col justify-center gap-0.5 overflow-hidden leading-none">
+            {/* Pengirim / Penerima - fixed 78px, side by side (same layout
+                as the Master Resi) instead of two stacked blocks, so both
+                are visible together without scrolling the eye down the
+                label. */}
+            <div className="h-19.5 flex-none grid grid-cols-2 border-b border-black">
+              <div className="flex min-w-0 flex-col justify-center gap-0.5 overflow-hidden border-r border-black px-3">
                 <SmallCaps>Pengirim</SmallCaps>
                 <p className="truncate text-[10px] font-extrabold leading-tight">
                   {pengirim.name}
                 </p>
-                <p className="truncate text-[8px] font-semibold text-black">
+                <p className="truncate text-[8px] font-semibold leading-tight text-black">
                   Telp: {pengirim.phone}
                 </p>
                 {pengirim.address && (
-                  <p className="line-clamp-1 text-[7px] font-normal text-black">
+                  <p className="line-clamp-2 text-[8px] font-normal leading-tight text-black">
                     {pengirim.address}
                   </p>
                 )}
               </div>
-            </div>
 
-            {/* Penerima - fixed 50px. Same treatment as pengirim. */}
-            <div className="h-12.5 flex-none border-b border-black px-3">
-              <div className="flex h-full flex-col justify-center gap-0.5 overflow-hidden leading-none">
+              <div className="flex min-w-0 flex-col justify-center gap-0.5 overflow-hidden px-3">
                 <SmallCaps>Penerima</SmallCaps>
                 <p className="truncate text-[10px] font-extrabold leading-tight">
                   {penerima.name}
                 </p>
-                <p className="truncate text-[8px] font-semibold text-black">
+                <p className="truncate text-[8px] font-semibold leading-tight text-black">
                   Telp: {penerima.contact}
                 </p>
-                <p className="line-clamp-1 text-[7px] font-normal text-black">
+                <p className="line-clamp-2 text-[8px] font-normal leading-tight text-black">
                   {penerima.address}
                 </p>
               </div>

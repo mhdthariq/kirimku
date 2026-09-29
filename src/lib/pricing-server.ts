@@ -21,6 +21,7 @@ export async function resolveTariff(master: {
   tariffId: number | null;
   origin: string;
   destination: string;
+  customerId?: number | null;
   customer: { type: string };
 }): Promise<{
   id: number;
@@ -37,6 +38,7 @@ export async function resolveTariff(master: {
   origin: string;
   destination: string;
   customerType: string | null;
+  customerId: number | null;
 } | null> {
   const now = new Date();
 
@@ -62,6 +64,8 @@ export async function resolveTariff(master: {
         { OR: [{ effectiveTo: null }, { effectiveTo: { gte: now } }] },
         // exact customer-type match first, generic (null) as fallback
         { OR: [{ customerType: master.customer.type }, { customerType: null }] },
+        // B2B tariffs are tied to one customer — never fall back to another customer's tariff
+        { OR: [{ customerId: null }, { customerId: master.customerId ?? -1 }] },
       ],
     },
     orderBy: [{ customerType: "desc" }, { effectiveFrom: "desc" }],
@@ -94,6 +98,7 @@ export async function pricingPreview(master: {
   tariffId: number | null;
   origin: string;
   destination: string;
+  customerId?: number | null;
   customer: { type: string };
   details: PricedDetailInput[];
   priceAmount: number | null;

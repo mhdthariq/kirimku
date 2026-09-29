@@ -17,11 +17,13 @@ export async function GET(req: NextRequest) {
               OR: [
                 { origin: { contains: search } },
                 { destination: { contains: search } },
+                { name: { contains: search } },
               ],
             }
           : {}),
       },
       orderBy: [{ origin: "asc" }, { destination: "asc" }, { customerType: "asc" }],
+      include: { customer: { select: { id: true, code: true, name: true, companyName: true } } },
     });
     return ok(tariffs);
   });
@@ -34,12 +36,29 @@ export async function POST(req: NextRequest) {
     const origin = requireStr(body.origin, "origin");
     const destination = requireStr(body.destination, "destination");
     const customerType = body.customerType === "b2b" || body.customerType === "b2c" ? body.customerType : null;
+    const name = str(body.name);
+
+    // B2B tariffs are tied to ONE specific B2B customer. B2C / generic tariffs
+    // are never customer-specific.
+    let customerId: number | null = null;
+    if (customerType === "b2b") {
+      const cid = num(body.customerId);
+      if (cid == null) return fail(422, "Tarif B2B wajib terikat ke satu customer B2B.", { customerId: ["Pilih customer B2B."] });
+      const customer = await db.customer.findUnique({ where: { id: cid } });
+      if (!customer || customer.type !== "b2b") {
+        return fail(422, "Customer tidak ditemukan / bukan B2B.", { customerId: ["Customer harus bertipe B2B."] });
+      }
+      customerId = customer.id;
+    }
+
+    // The same corridor may have several tariffs as long as the NAME differs
+    // (per customer for B2B). Only an identical name+corridor+customer clashes.
     const duplicate = await db.tariff.findFirst({
-      where: { origin, destination, customerType, isActive: true },
+      where: { origin, destination, customerType, customerId, name, isActive: true },
     });
     if (duplicate) {
-      return fail(422, `Tarif aktif ${origin} → ${destination}${customerType ? ` (${customerType})` : ""} sudah ada. Nonaktifkan dulu yang lama.`, {
-        origin: ["Tarif untuk kombinasi ini sudah ada."],
+      return fail(422, `Tarif aktif ${name ? `“${name}” ` : ""}${origin} → ${destination}${customerType ? ` (${customerType})` : ""} sudah ada. Pakai nama tarif lain atau nonaktifkan yang lama.`, {
+        name: ["Nama tarif sudah dipakai untuk koridor ini."],
       });
     }
 
@@ -58,9 +77,11 @@ export async function POST(req: NextRequest) {
 
     const tariff = await db.tariff.create({
       data: {
+        name,
         origin,
         destination,
         customerType,
+        customerId,
         ratePerKg: pricingMethodRaw === "PER_KG" ? requireNum(body.ratePerKg, "ratePerKg", 1) : num(body.ratePerKg) ?? 0,
         minChargeableKg: num(body.minChargeableKg) ?? 1,
         volumetricMultiplier: num(body.volumetricMultiplier) ?? 250,
@@ -76,7 +97,7 @@ export async function POST(req: NextRequest) {
         isActive: true,
       },
     });
-    await audit({ action: "created", entityType: "tariff", entityId: tariff.id, entityLabel: `${origin} → ${destination} (${customerType ?? "semua"})`, actor: user, after: tariff });
+    await audit({ action: "created", entityType: "tariff", entityId: tariff.id, entityLabel: `${name ? `${name} · ` : ""}${origin} → ${destination} (${customerType ?? "semua"})`, actor: user, after: tariff });
     return ok(tariff);
   });
 }

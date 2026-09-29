@@ -115,11 +115,11 @@ export function KurirDashboard() {
   }
 
   const stats = [
-    { label: "Pickup Ditugaskan", value: data.counts.pickupsAssigned, icon: MapPin, href: "#/pickups", tone: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
-    { label: "Paket Diambil", value: data.counts.pickupsPickedUp, icon: Truck, href: "#/pickups", tone: "bg-sky-500/10 text-sky-600 dark:text-sky-400" },
-    { label: "Pickup Selesai", value: data.counts.pickupsCompleted, icon: Package, href: "#/pickups", tone: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
-    { label: "Delivery Ditugaskan", value: data.counts.deliveriesAssigned, icon: ClipboardList, href: "#/deliveries", tone: "bg-violet-500/10 text-violet-600 dark:text-violet-400" },
-    { label: "Sudah Diantar", value: data.counts.deliveriesDelivered, icon: Camera, href: "#/deliveries", tone: "bg-primary/10 text-primary" },
+    { label: "Pickup Ditugaskan", value: data.counts.pickupsAssigned, icon: MapPin, href: "/pickups", tone: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
+    { label: "Paket Diambil", value: data.counts.pickupsPickedUp, icon: Truck, href: "/pickups", tone: "bg-sky-500/10 text-sky-600 dark:text-sky-400" },
+    { label: "Pickup Selesai", value: data.counts.pickupsCompleted, icon: Package, href: "/pickups", tone: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
+    { label: "Delivery Ditugaskan", value: data.counts.deliveriesAssigned, icon: ClipboardList, href: "/deliveries", tone: "bg-violet-500/10 text-violet-600 dark:text-violet-400" },
+    { label: "Sudah Diantar", value: data.counts.deliveriesDelivered, icon: Camera, href: "/deliveries", tone: "bg-primary/10 text-primary" },
   ];
 
   return (
@@ -216,7 +216,7 @@ export function KurirDashboard() {
               <span className="flex items-center gap-2">
                 <Truck className="h-4 w-4 text-primary" /> Pickup Saya
               </span>
-              <a href="#/pickups" className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
+              <a href="/pickups" className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
                 Semua pickup <ArrowRight className="h-3 w-3" />
               </a>
             </CardTitle>
@@ -309,7 +309,7 @@ export function KurirDashboard() {
               <span className="flex items-center gap-2">
                 <ClipboardList className="h-4 w-4 text-primary" /> Delivery Saya
               </span>
-              <a href="#/deliveries" className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
+              <a href="/deliveries" className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
                 Semua delivery <ArrowRight className="h-3 w-3" />
               </a>
             </CardTitle>

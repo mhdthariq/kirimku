@@ -63,7 +63,7 @@ export interface NavItem {
  * `#/...` hash router. Everything else still uses the hash router until
  * it's migrated. Add a route here the same PR you add its `page.tsx`.
  */
-const MIGRATED_ROUTES = new Set<string>(["/tariffs", "/customers", "/gudang"]);
+const MIGRATED_ROUTES = new Set<string>(["/tariffs", "/customers", "/gudang", "/pickups", "/deliveries"]);
 
 /** href for a legacy (not-yet-migrated) nav item — always absolute (`/#/x`,
  *  not `#/x`) so it resolves correctly even when the current page is

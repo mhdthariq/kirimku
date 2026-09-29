@@ -15,12 +15,23 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const data: Record<string, unknown> = {};
     if (body.origin !== undefined) data.origin = str(body.origin) ?? existing.origin;
     if (body.destination !== undefined) data.destination = str(body.destination) ?? existing.destination;
+    if (body.name !== undefined) data.name = str(body.name);
     if (body.customerType !== undefined) data.customerType = body.customerType === "b2b" || body.customerType === "b2c" ? body.customerType : null;
 
     // Resolve the effective customerType (after this update) and pricing
     // method together — B2C / generic tariffs are ALWAYS forced to PER_KG
     // server-side, regardless of what the client sends.
     const effectiveCustomerType = (data.customerType as string | null | undefined) !== undefined ? (data.customerType as string | null) : existing.customerType;
+    if (effectiveCustomerType !== "b2b") {
+      data.customerId = null;
+    } else if (body.customerId !== undefined) {
+      const cid = num(body.customerId);
+      const customer = cid != null ? await db.customer.findUnique({ where: { id: cid } }) : null;
+      if (!customer || customer.type !== "b2b") {
+        return fail(422, "Customer tidak ditemukan / bukan B2B.", { customerId: ["Customer harus bertipe B2B."] });
+      }
+      data.customerId = customer.id;
+    }
     const requestedMethod = body.pricingMethod === "PER_KOLI" || body.pricingMethod === "PER_CUBIC" ? body.pricingMethod : body.pricingMethod === "PER_KG" ? "PER_KG" : undefined;
     if (requestedMethod !== undefined) {
       data.pricingMethod = effectiveCustomerType === "b2b" ? requestedMethod : "PER_KG";
