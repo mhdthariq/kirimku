@@ -7,13 +7,13 @@ export async function GET(req: NextRequest) {
   return handle(req, async () => {
     await guard(req, "checkpoint.view");
     const params = req.nextUrl.searchParams;
-    const search = str(params.get("search"))?.toLowerCase();
+    const search = str(params.get("search"));
     const includeInactive = bool(params.get("include_inactive"), true);
 
     const routes = await db.route.findMany({
       where: {
         ...(includeInactive ? {} : { isActive: true }),
-        ...(search ? { OR: [{ name: { contains: search } }, { origin: { contains: search } }, { destination: { contains: search } }] } : {}),
+        ...(search ? { OR: [{ name: { contains: search, mode: "insensitive" } }, { origin: { contains: search, mode: "insensitive" } }, { destination: { contains: search, mode: "insensitive" } }] } : {}),
       },
       orderBy: { id: "desc" },
       include: { checkpoints: { orderBy: { sequence: "asc" } }, _count: { select: { transports: true } } },

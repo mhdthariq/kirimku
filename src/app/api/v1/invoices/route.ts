@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
   return handle(req, async () => {
     await guard(req, "invoice.view");
     const params = req.nextUrl.searchParams;
-    const search = str(params.get("search"))?.toLowerCase();
+    const search = str(params.get("search"));
     const status = str(params.get("status"));
 
     const invoices = await db.invoice.findMany({
@@ -17,9 +17,9 @@ export async function GET(req: NextRequest) {
         ...(search
           ? {
               OR: [
-                { invoiceNumber: { contains: search } },
-                { customer: { name: { contains: search } } },
-                { customer: { companyName: { contains: search } } },
+                { invoiceNumber: { contains: search, mode: "insensitive" } },
+                { customer: { name: { contains: search, mode: "insensitive" } } },
+                { customer: { companyName: { contains: search, mode: "insensitive" } } },
               ],
             }
           : {}),

@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     const entityId = num(params.get("entityId"));
     const action = str(params.get("action"));
     const actorId = num(params.get("actorId"));
-    const search = str(params.get("search"))?.toLowerCase();
+    const search = str(params.get("search"));
     const limit = Math.min(500, Math.max(1, num(params.get("limit")) ?? 100));
     const offset = Math.max(0, num(params.get("offset")) ?? 0);
 
@@ -31,9 +31,9 @@ export async function GET(req: NextRequest) {
       ...(search
         ? {
             OR: [
-              { entityLabel: { contains: search } },
-              { action: { contains: search } },
-              { actor: { name: { contains: search } } },
+              { entityLabel: { contains: search, mode: "insensitive" } },
+              { action: { contains: search, mode: "insensitive" } },
+              { actor: { name: { contains: search, mode: "insensitive" } } },
             ],
           }
         : {}),

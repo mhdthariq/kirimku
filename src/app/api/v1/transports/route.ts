@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   return handle(req, async () => {
     const user = await guard(req, "transport.view");
     const params = req.nextUrl.searchParams;
-    const search = str(params.get("search"))?.toLowerCase();
+    const search = str(params.get("search"));
     const status = str(params.get("status"));
     // ?mine=true — explicit executor view (driver / kenek)
     const mine = params.get("mine") === "true";
@@ -33,9 +33,9 @@ export async function GET(req: NextRequest) {
         ...(search
           ? {
               OR: [
-                { transportCode: { contains: search } },
-                { route: { name: { contains: search } } },
-                { vehicle: { vehicleNumber: { contains: search } } },
+                { transportCode: { contains: search, mode: "insensitive" } },
+                { route: { name: { contains: search, mode: "insensitive" } } },
+                { vehicle: { vehicleNumber: { contains: search, mode: "insensitive" } } },
               ],
             }
           : {}),

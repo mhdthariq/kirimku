@@ -32,7 +32,7 @@ async function customerGudangClause(user: {
 export async function GET(req: NextRequest) {
   return handle(req, async () => {
     const user = await guard(req, "customer.view");
-    const search = str(req.nextUrl.searchParams.get("search"))?.toLowerCase();
+    const search = str(req.nextUrl.searchParams.get("search"));
     const includeInactive = bool(req.nextUrl.searchParams.get("include_inactive"), true);
     // Marketing data separation: a marketing partner only sees THEIR customers.
     const partnerId = marketingScope(user);
@@ -46,10 +46,10 @@ export async function GET(req: NextRequest) {
         ...(search
           ? {
               OR: [
-                { name: { contains: search } },
-                { code: { contains: search } },
-                { companyName: { contains: search } },
-                { phone: { contains: search } },
+                { name: { contains: search, mode: "insensitive" } },
+                { code: { contains: search, mode: "insensitive" } },
+                { companyName: { contains: search, mode: "insensitive" } },
+                { phone: { contains: search, mode: "insensitive" } },
               ],
             }
           : {}),

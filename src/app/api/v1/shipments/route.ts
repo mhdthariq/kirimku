@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   return handle(req, async () => {
     const user = await guard(req, "shipment.view");
     const params = req.nextUrl.searchParams;
-    const search = str(params.get("search"))?.toLowerCase();
+    const search = str(params.get("search"));
     const status = str(params.get("status"));
     const customerType = str(params.get("customerType"));
     // Revise round 8 — optional filter by fulfillment mode (STANDARD / DIRECT).
@@ -31,10 +31,10 @@ export async function GET(req: NextRequest) {
         ...(search
           ? {
               OR: [
-                { masterCode: { contains: search } },
-                { origin: { contains: search } },
-                { destination: { contains: search } },
-                { customer: { name: { contains: search } } },
+                { masterCode: { contains: search, mode: "insensitive" } },
+                { origin: { contains: search, mode: "insensitive" } },
+                { destination: { contains: search, mode: "insensitive" } },
+                { customer: { name: { contains: search, mode: "insensitive" } } },
               ],
             }
           : {}),

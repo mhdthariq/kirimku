@@ -9,12 +9,12 @@ export async function GET(req: NextRequest) {
   return handle(req, async () => {
     await guard(req, "vehicle.view");
     const params = req.nextUrl.searchParams;
-    const search = str(params.get("search"))?.toLowerCase();
+    const search = str(params.get("search"));
     const status = str(params.get("status"));
     const vehicles = await db.vehicle.findMany({
       where: {
         ...(status ? { status } : {}),
-        ...(search ? { OR: [{ vehicleNumber: { contains: search } }, { name: { contains: search } }] } : {}),
+        ...(search ? { OR: [{ vehicleNumber: { contains: search, mode: "insensitive" } }, { name: { contains: search, mode: "insensitive" } }] } : {}),
       },
       orderBy: { id: "desc" },
       include: {

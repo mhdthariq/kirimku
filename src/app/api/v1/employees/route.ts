@@ -8,13 +8,13 @@ export async function GET(req: NextRequest) {
   return handle(req, async () => {
     await guard(req, "employee.view");
     const params = req.nextUrl.searchParams;
-    const search = str(params.get("search"))?.toLowerCase();
+    const search = str(params.get("search"));
     const includeInactive = bool(params.get("include_inactive"), true);
     const employees = await db.employee.findMany({
       where: {
         ...(includeInactive ? {} : { isActive: true }),
         ...(search
-          ? { OR: [{ name: { contains: search } }, { employeeNumber: { contains: search } }, { position: { contains: search } }] }
+          ? { OR: [{ name: { contains: search, mode: "insensitive" } }, { employeeNumber: { contains: search, mode: "insensitive" } }, { position: { contains: search, mode: "insensitive" } }] }
           : {}),
       },
       orderBy: { id: "asc" },

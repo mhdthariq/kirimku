@@ -116,6 +116,22 @@ async function main() {
 
 main()
   .catch((e) => {
+    // A "column/relation does not exist" error means the database's actual
+    // schema is behind schema.prisma — almost always because `db:push` (or
+    // `migrate deploy`) wasn't (re-)run after pulling schema changes. This
+    // is the #1 cause of "works on a fresh SQLite db, fails on an existing
+    // Postgres one": a fresh `db push` always matches schema.prisma exactly,
+    // an existing database only does once you've re-synced it.
+    const message = e instanceof Error ? e.message : String(e);
+    const isSchemaDrift = /column .* does not exist|relation .* does not exist|no such column|no such table/i.test(message);
+    if (isSchemaDrift) {
+      console.error("✖ Seed gagal — skema database belum sinkron dengan schema.prisma.");
+      console.error("  Jalankan salah satu dulu, baru ulangi `bun run db:seed`:");
+      console.error("    bun run db:push       (development — cepat, tanpa riwayat migrasi)");
+      console.error("    npx prisma migrate deploy   (production — pakai file migrasi di prisma/migrations)");
+      console.error("");
+      console.error("  Detail error asli:");
+    }
     console.error("✖ Seed gagal:", e);
     process.exitCode = 1;
   })

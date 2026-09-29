@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
   return handle(req, async () => {
     await guard(req, "tariff.view");
     const params = req.nextUrl.searchParams;
-    const search = str(params.get("search"))?.toLowerCase();
+    const search = str(params.get("search"));
     const activeOnly = bool(params.get("active_only"), false);
     const tariffs = await db.tariff.findMany({
       where: {
@@ -15,9 +15,9 @@ export async function GET(req: NextRequest) {
         ...(search
           ? {
               OR: [
-                { origin: { contains: search } },
-                { destination: { contains: search } },
-                { name: { contains: search } },
+                { origin: { contains: search, mode: "insensitive" } },
+                { destination: { contains: search, mode: "insensitive" } },
+                { name: { contains: search, mode: "insensitive" } },
               ],
             }
           : {}),

@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   return handle(req, async () => {
     await guard(req, "warehouse.view");
     const params = req.nextUrl.searchParams;
-    const search = str(params.get("search"))?.toLowerCase();
+    const search = str(params.get("search"));
     const includeInactive = bool(params.get("include_inactive"), true);
 
     const warehouses = await db.warehouse.findMany({
@@ -22,10 +22,10 @@ export async function GET(req: NextRequest) {
         ...(search
           ? {
               OR: [
-                { name: { contains: search } },
-                { code: { contains: search } },
-                { city: { contains: search } },
-                { address: { contains: search } },
+                { name: { contains: search, mode: "insensitive" } },
+                { code: { contains: search, mode: "insensitive" } },
+                { city: { contains: search, mode: "insensitive" } },
+                { address: { contains: search, mode: "insensitive" } },
               ],
             }
           : {}),

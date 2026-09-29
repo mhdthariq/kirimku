@@ -9,12 +9,12 @@ export async function GET(req: NextRequest) {
   return handle(req, async () => {
     await guard(req, "user.view");
     const params = req.nextUrl.searchParams;
-    const search = str(params.get("search"))?.toLowerCase();
+    const search = str(params.get("search"));
     const includeInactive = bool(params.get("include_inactive"), true);
     const users = await db.user.findMany({
       where: {
         ...(includeInactive ? {} : { isActive: true }),
-        ...(search ? { OR: [{ name: { contains: search } }, { username: { contains: search } }] } : {}),
+        ...(search ? { OR: [{ name: { contains: search, mode: "insensitive" } }, { username: { contains: search, mode: "insensitive" } }] } : {}),
       },
       orderBy: { id: "asc" },
       include: {

@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   return handle(req, async () => {
     const user = await guard(req, "pickup.view");
     const params = req.nextUrl.searchParams;
-    const search = str(params.get("search"))?.toLowerCase();
+    const search = str(params.get("search"));
     const status = str(params.get("status"));
     // ?mine=true — kurir executor view: only pickups assigned to me.
     // Revision Part Y — executor scoping is enforced SERVER-side: a user who
@@ -53,9 +53,9 @@ export async function GET(req: NextRequest) {
         ...(search
           ? {
               OR: [
-                { pickupCode: { contains: search } },
-                { master: { masterCode: { contains: search } } },
-                { master: { customer: { name: { contains: search } } } },
+                { pickupCode: { contains: search, mode: "insensitive" } },
+                { master: { masterCode: { contains: search, mode: "insensitive" } } },
+                { master: { customer: { name: { contains: search, mode: "insensitive" } } } },
               ],
             }
           : {}),

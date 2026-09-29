@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   return handle(req, async () => {
     const user = await guard(req, "delivery.view");
     const params = req.nextUrl.searchParams;
-    const search = str(params.get("search"))?.toLowerCase();
+    const search = str(params.get("search"));
     const status = str(params.get("status"));
     // ?mine=true — kurir executor view: only deliveries assigned to me.
     // Revision Part Y — executor scoping is enforced SERVER-side: a kurir
@@ -49,9 +49,9 @@ export async function GET(req: NextRequest) {
         ...(search
           ? {
               OR: [
-                { deliveryCode: { contains: search } },
-                { master: { masterCode: { contains: search } } },
-                { master: { customer: { name: { contains: search } } } },
+                { deliveryCode: { contains: search, mode: "insensitive" } },
+                { master: { masterCode: { contains: search, mode: "insensitive" } } },
+                { master: { customer: { name: { contains: search, mode: "insensitive" } } } },
               ],
             }
           : {}),
