@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { googleTileLayer } from "@/lib/map-tiles";
 import type { Checkpoint } from "@/lib/client-api";
 
 export interface TransportMapCheckpoint extends Checkpoint {
@@ -75,10 +76,7 @@ export function TransportMap({
     if (!containerRef.current || mapRef.current) return;
     const map = L.map(containerRef.current, { zoomControl: false, scrollWheelZoom: true }).setView([3.5952, 98.6722], 8);
     L.control.zoom({ position: "bottomleft" }).addTo(map);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    }).addTo(map);
+    googleTileLayer(L).addTo(map);
     mapRef.current = map;
     layerRef.current = L.layerGroup().addTo(map);
 

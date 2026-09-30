@@ -89,6 +89,42 @@ describe("computePricing — PER_KG (B2C and default B2B)", () => {
   });
 });
 
+describe("computePricing — B2B /kg is simple (entered weight × rate)", () => {
+  const b2bKg = (over: Partial<TariffLike> = {}) => tariff({ customerType: "b2b", ratePerKg: 8000, ...over });
+
+  it("bills the weight entered with NO rounding (0.3 kg is not rounded up to 0.5)", () => {
+    const r = computePricing([detail({ actualWeightKg: 3.3 })], b2bKg({ minChargeableKg: 1, roundingUnitKg: 2, roundingMode: "UP" }));
+    expect(r.simpleKg).toBe(true);
+    expect(r.chargeableKg).toBeCloseTo(3.3, 5);
+    expect(r.price).toBe(Math.round(3.3 * 8000));
+  });
+
+  it("still applies the tariff's Min kg", () => {
+    const r = computePricing([detail({ actualWeightKg: 0.3 })], b2bKg({ minChargeableKg: 5 }));
+    expect(r.chargeableKg).toBe(5);
+    expect(r.price).toBe(5 * 8000);
+  });
+
+  it("ignores volumetric weight completely", () => {
+    // 1 m³ box at multiplier 250 = 250 kg volumetric, but only 2 kg was entered
+    const r = computePricing([detail({ actualWeightKg: 2, lengthCm: 100, widthCm: 100, heightCm: 100 })], b2bKg({ minChargeableKg: 1 }));
+    expect(r.chargeableKg).toBe(2);
+    expect(r.price).toBe(2 * 8000);
+  });
+
+  it("sums the weight of all packages", () => {
+    const r = computePricing([detail({ actualWeightKg: 1.25 }), detail({ actualWeightKg: 2.5 })], b2bKg());
+    expect(r.chargeableKg).toBeCloseTo(3.75, 5);
+    expect(r.price).toBe(3.75 * 8000);
+  });
+
+  it("B2C /kg is unchanged (still volumetric + min + rounding)", () => {
+    const r = computePricing([detail({ actualWeightKg: 0.3 })], tariff({ customerType: "b2c", minChargeableKg: 1 }));
+    expect(r.simpleKg).toBe(false);
+    expect(r.chargeableKg).toBe(1);
+  });
+});
+
 describe("computePricing — PER_KOLI (B2B)", () => {
   it("charges per package (koli), ignoring weight/volume entirely", () => {
     const details = [detail({ actualWeightKg: 999 }), detail({ actualWeightKg: 0.001 })]; // weight shouldn't matter

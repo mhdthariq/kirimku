@@ -101,12 +101,15 @@ export function TariffFormFields({
         </>
       )}
 
-      {/* kg-only rules — hidden for /koli and /cubic (they never look at weight) */}
+      {/* Min kg: every /kg tariff (B2C and B2B) — hidden for /koli and /cubic */}
+      {v.showMinKg && (
+        <Field label="Min. kg" htmlFor={`${idPrefix}-min`} hint={tab === "b2b" ? "Ditagih minimal sekian kg" : undefined}>
+          <NumberInput id={`${idPrefix}-min`} value={form.minChargeableKg} onChange={(e) => set({ minChargeableKg: e.target.value })} disabled={busy} />
+        </Field>
+      )}
+      {/* Volumetric rules — B2C /kg only */}
       {v.showKgRules && (
         <>
-          <Field label="Min. kg" htmlFor={`${idPrefix}-min`}>
-            <NumberInput id={`${idPrefix}-min`} value={form.minChargeableKg} onChange={(e) => set({ minChargeableKg: e.target.value })} disabled={busy} />
-          </Field>
           <Field label="Multiplier (kg/m³)" htmlFor={`${idPrefix}-multiplier`} hint="volumetrik = L×W×H/1.000.000 × ini">
             <NumberInput id={`${idPrefix}-multiplier`} value={form.volumetricMultiplier} onChange={(e) => set({ volumetricMultiplier: e.target.value })} placeholder="250" disabled={busy} />
           </Field>

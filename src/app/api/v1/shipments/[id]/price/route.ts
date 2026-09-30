@@ -141,7 +141,9 @@ export async function POST(req: NextRequest, { params }: Params) {
         ? `Harga dihitung: ${r.chargeableKoli.toFixed(0)} koli × Rp${r.rateApplied.toLocaleString("id-ID")}/koli = Rp${r.price.toLocaleString("id-ID")}`
         : r.method === "PER_CUBIC"
           ? `Harga dihitung: ${r.chargeableVolumeM3.toFixed(3)} m³ × Rp${r.rateApplied.toLocaleString("id-ID")}/m³ = Rp${r.price.toLocaleString("id-ID")}`
-          : `Harga dihitung: chargeable ${r.chargeableKg.toFixed(1)} kg (aktual ${r.actualKg.toFixed(1)} kg, volumetrik ${r.volumetricKg.toFixed(2)} kg = L×W×H/1.000.000 × ${r.multiplier}) × Rp${r.rateApplied.toLocaleString("id-ID")} = Rp${r.price.toLocaleString("id-ID")}`;
+          : r.simpleKg
+            ? `Harga dihitung: ${r.actualKg.toFixed(2)} kg (berat yang diinput, min ${tariff.minChargeableKg} kg) → ditagih ${r.chargeableKg.toFixed(2)} kg × Rp${r.rateApplied.toLocaleString("id-ID")}/kg = Rp${r.price.toLocaleString("id-ID")}`
+            : `Harga dihitung: chargeable ${r.chargeableKg.toFixed(1)} kg (aktual ${r.actualKg.toFixed(1)} kg, volumetrik ${r.volumetricKg.toFixed(2)} kg = L×W×H/1.000.000 × ${r.multiplier}) × Rp${r.rateApplied.toLocaleString("id-ID")} = Rp${r.price.toLocaleString("id-ID")}`;
 
     await db.trackingEvent.create({
       data: {

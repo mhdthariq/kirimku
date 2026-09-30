@@ -301,7 +301,12 @@ export function ResiPrint({
   const statCells: { key: string; label: string; value: string; unit: string }[] = [
     { key: "jumlah", label: "Jumlah", value: String(totalPackages), unit: "pcs" },
   ];
-  if (showWeightStats) {
+  if (showWeightStats && isB2B && Math.abs(chargeableWeight - actualWeight) < 0.005) {
+    // B2B /kg bills the weight as entered: Aktual and Chargeable are the same
+    // number, so show a single Berat cell. (When the tariff's Min kg lifts the
+    // billed weight above the entered weight, both cells show, below.)
+    statCells.push({ key: "berat", label: "Berat", value: formatNumber(actualWeight, 2), unit: "kg" });
+  } else if (showWeightStats) {
     statCells.push(
       { key: "aktual", label: "Aktual", value: formatNumber(actualWeight), unit: "kg" },
       { key: "chargeable", label: "Chargeable", value: formatNumber(chargeableWeight), unit: "kg" },

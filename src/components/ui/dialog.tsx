@@ -5,11 +5,99 @@ import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { XIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+
+/**
+ * Unsaved-input guard (2026-10-01).
+ *
+ * Every Dialog now tracks whether the user typed / picked anything inside a
+ * <form> in its content. If they then dismiss it with Esc or the X button
+ * (or an outside click, for dialogs without a close button), we ask first
+ * instead of silently throwing their input away. Only DISMISS gestures are
+ * guarded: the explicit "Batal" button and the automatic close after a
+ * successful save call the parent's setState directly, so they never prompt.
+ * Dialogs without a form (details, confirmations) never prompt either.
+ */
+const DirtyContext = React.createContext<{ markDirty: () => void } | null>(null)
 
 function Dialog({
+  open,
+  defaultOpen,
+  onOpenChange,
+  confirmOnClose = true,
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Root>) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />
+}: React.ComponentProps<typeof DialogPrimitive.Root> & {
+  /** Ask before closing when the user has typed something. Default true. */
+  confirmOnClose?: boolean
+}) {
+  const isControlled = open !== undefined
+  const [innerOpen, setInnerOpen] = React.useState(defaultOpen ?? false)
+  const effectiveOpen = isControlled ? open : innerOpen
+  const dirtyRef = React.useRef(false)
+  const [confirming, setConfirming] = React.useState(false)
+
+  // A dialog that (re)opens or closes starts clean.
+  React.useEffect(() => {
+    dirtyRef.current = false
+    setConfirming(false)
+  }, [effectiveOpen])
+
+  const close = () => {
+    dirtyRef.current = false
+    setConfirming(false)
+    if (!isControlled) setInnerOpen(false)
+    onOpenChange?.(false)
+  }
+
+  const handleOpenChange = (next: boolean) => {
+    if (!next && confirmOnClose && dirtyRef.current) {
+      setConfirming(true)
+      return
+    }
+    if (!isControlled) setInnerOpen(next)
+    onOpenChange?.(next)
+  }
+
+  const ctx = React.useMemo(() => ({ markDirty: () => { dirtyRef.current = true } }), [])
+
+  return (
+    <DirtyContext.Provider value={ctx}>
+      <DialogPrimitive.Root
+        data-slot="dialog"
+        open={effectiveOpen}
+        onOpenChange={handleOpenChange}
+        {...props}
+      />
+      <AlertDialog open={confirming} onOpenChange={setConfirming}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tutup dan buang isian?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Data yang sudah Anda isi belum disimpan dan akan hilang jika formulir ditutup.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Lanjut mengisi</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={close}
+            >
+              Buang &amp; tutup
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </DirtyContext.Provider>
+  )
 }
 
 function DialogTrigger({
@@ -51,10 +139,18 @@ function DialogContent({
   children,
   showCloseButton = true,
   onPointerDownOutside,
+  onInput,
+  onChange,
+  onClick,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
+  const dirty = React.useContext(DirtyContext)
+  // Only edits made inside a <form> count as "input worth protecting".
+  const markIfForm = (target: EventTarget) => {
+    if (target instanceof Element && target.closest("form")) dirty?.markDirty()
+  }
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
@@ -67,6 +163,20 @@ function DialogContent({
         onPointerDownOutside={(event) => {
           if (showCloseButton) event.preventDefault();
           onPointerDownOutside?.(event);
+        }}
+        onInput={(e) => {
+          markIfForm(e.target)
+          onInput?.(e)
+        }}
+        onChange={(e) => {
+          markIfForm(e.target)
+          onChange?.(e)
+        }}
+        onClick={(e) => {
+          // Button-style controls (radio cards, checkboxes, switches) don't emit input events.
+          const t = e.target
+          if (t instanceof Element && t.closest('[role="radio"],[role="checkbox"],[role="switch"]')) markIfForm(t)
+          onClick?.(e)
         }}
         {...props}
       >

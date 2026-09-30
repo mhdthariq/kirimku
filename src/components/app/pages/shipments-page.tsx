@@ -1658,7 +1658,24 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
           <CardContent className="space-y-2.5">
             <Row label="Total paket" value={`${shipment.details.length} paket`} />
             <Row label="Total volume" value={`${(shipment.totals?.totalVolumeM3 ?? 0).toFixed(3)} m³`} />
-            {pricingMethod === "PER_KG" && (
+            {pricingMethod === "PER_KG" && (pricing?.simpleKg ?? shipment.customer?.type === "b2b") && (
+              <>
+                {/* B2B /kg: billed on the weight entered — no volumetric / min / rounding */}
+                <Row label="Berat (yang diinput)" value={`${formatNumber(actualWeight, 2)} kg`} />
+                <Row
+                  label={`Berat ditagih${pricing?.minChargeableKg ? ` (min ${formatNumber(pricing.minChargeableKg)} kg)` : ""}`}
+                  value={
+                    shipment.chargeableWeightKg != null
+                      ? `${formatNumber(shipment.chargeableWeightKg, 2)} kg`
+                      : pricing
+                        ? `${formatNumber(pricing.chargeableKg, 2)} kg (estimasi)`
+                        : "-"
+                  }
+                />
+                <Row label="Tarif" value={rateApplied ? `${formatRupiah(rateApplied)}/kg` : "-"} />
+              </>
+            )}
+            {pricingMethod === "PER_KG" && !(pricing?.simpleKg ?? shipment.customer?.type === "b2b") && (
               <>
                 <Row label="Berat aktual" value={`${formatNumber(actualWeight)} kg`} />
                 <Row

@@ -91,6 +91,7 @@ export interface PricingPreview {
   chargeableKoli: number;
   chargeableVolumeM3: number;
   rateApplied: number;
+  simpleKg: boolean;
 }
 
 /** Server-side preview used by GET /shipments/{id} so the UI never hardcodes the formula. */
@@ -126,5 +127,6 @@ export async function pricingPreview(master: {
     chargeableKoli: r.chargeableKoli,
     chargeableVolumeM3: r.chargeableVolumeM3,
     rateApplied: r.rateApplied,
+    simpleKg: r.simpleKg,
   };
 }

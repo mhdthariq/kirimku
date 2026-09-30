@@ -218,6 +218,8 @@ export interface PricingPreview {
   chargeableKoli?: number;
   chargeableVolumeM3?: number;
   rateApplied?: number;
+  /** B2B /kg: billed on the entered weight (floored at Min kg), no volumetric/rounding. */
+  simpleKg?: boolean;
 }
 
 export interface Shipment {

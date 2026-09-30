@@ -162,6 +162,7 @@ export function TariffsPage() {
       const method = t.customerType === "b2b" ? (t.pricingMethod ?? "PER_KG") : "PER_KG";
       if (method === "PER_KOLI") return <span className="text-xs text-muted-foreground">min {formatNumber(t.minChargeableKoli ?? 1, 0)} koli / shipment</span>;
       if (method === "PER_CUBIC") return <span className="text-xs text-muted-foreground">min {formatNumber(t.minChargeableM3 ?? 0, 3)} m³ / shipment</span>;
+      if (t.customerType === "b2b") return <span className="text-xs text-muted-foreground">min {formatNumber(t.minChargeableKg)} kg · berat yang diinput × tarif/kg</span>;
       return (
         <span className="text-xs text-muted-foreground">
           min {formatNumber(t.minChargeableKg)} kg · multiplier {formatNumber(t.volumetricMultiplier, 0)} kg/m³ · {t.roundingMode === "UP" ? "round up" : "nearest"} {formatNumber(t.roundingUnitKg)} kg

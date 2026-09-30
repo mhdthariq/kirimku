@@ -50,8 +50,10 @@ export function emptyTariffForm(today: string = new Date().toISOString().slice(0
 }
 
 export interface TariffFieldVisibility {
-  /** Min kg, multiplier, rounding mode and rounding unit — only /kg uses them. */
+  /** Multiplier, rounding mode and rounding unit — B2C /kg only. */
   showKgRules: boolean;
+  /** Min kg — every /kg tariff (B2C and B2B). */
+  showMinKg: boolean;
   showRatePerKg: boolean;
   showRatePerKoli: boolean;
   showRatePerCubic: boolean;
@@ -63,14 +65,16 @@ export interface TariffFieldVisibility {
 }
 
 /**
- * Which fields make sense for a tariff. The kg-specific rules (Min Kg,
- * Multiplier, Pembulatan, Satuan) are hidden for /koli and /cubic because
- * those methods never look at weight — showing them was wrong.
+ * Which fields make sense for a tariff. Min kg applies to every /kg tariff;
+ * Multiplier, Pembulatan and Satuan are B2C only. B2B /kg bills the weight
+ * the user entered (at least Min kg) × the rate, and /koli and /cubic never
+ * look at weight at all.
  */
 export function tariffFieldVisibility(tab: TariffTab, method: PricingMethod): TariffFieldVisibility {
   const effective: PricingMethod = tab === "b2b" ? method : "PER_KG";
   return {
-    showKgRules: effective === "PER_KG",
+    showKgRules: tab === "b2c",
+    showMinKg: effective === "PER_KG",
     showRatePerKg: effective === "PER_KG",
     showRatePerKoli: effective === "PER_KOLI",
     showRatePerCubic: effective === "PER_CUBIC",
@@ -87,6 +91,8 @@ const num = (v: string): number => Number(v);
 export function buildTariffPayload(tab: TariffTab, form: TariffFormState) {
   const method: PricingMethod = tab === "b2b" ? form.pricingMethod : "PER_KG";
   const isKg = method === "PER_KG";
+  // Multiplier / rounding: B2C /kg only. Min kg: any /kg tariff.
+  const usesKgRules = tab === "b2c";
   return {
     name: form.name.trim() || null,
     origin: form.origin.trim(),
@@ -101,9 +107,9 @@ export function buildTariffPayload(tab: TariffTab, form: TariffFormState) {
     minChargeableM3: method === "PER_CUBIC" ? num(form.minChargeableM3) || 0 : 0,
     // kg-only rules: real values for /kg, neutral defaults otherwise
     minChargeableKg: isKg ? num(form.minChargeableKg) || 1 : 1,
-    volumetricMultiplier: isKg ? num(form.volumetricMultiplier) || 250 : 250,
-    roundingMode: isKg ? form.roundingMode : "UP",
-    roundingUnitKg: isKg ? num(form.roundingUnitKg) || 0.5 : 0.5,
+    volumetricMultiplier: usesKgRules ? num(form.volumetricMultiplier) || 250 : 250,
+    roundingMode: usesKgRules ? form.roundingMode : "UP",
+    roundingUnitKg: usesKgRules ? num(form.roundingUnitKg) || 0.5 : 0.5,
     effectiveFrom: form.effectiveFrom,
     effectiveTo: form.effectiveTo === "" ? null : form.effectiveTo,
   };

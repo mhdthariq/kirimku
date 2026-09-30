@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { googleTileLayer } from "@/lib/map-tiles";
 
 /**
  * Simple single-point location picker (used by the Gudang, Pickup and
@@ -42,11 +43,7 @@ export function LeafletPicker({
 
     const map = L.map(containerRef.current, { scrollWheelZoom: true }).setView(center, zoom);
     // Google Maps roadmap tiles (replaces OpenStreetMap).
-    L.tileLayer("https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}", {
-      maxZoom: 20,
-      subdomains: ["mt0", "mt1", "mt2", "mt3"],
-      attribution: "© Google Maps",
-    }).addTo(map);
+    googleTileLayer(L).addTo(map);
     mapRef.current = map;
 
     const icon = L.divIcon({

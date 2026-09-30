@@ -17,12 +17,13 @@ describe("tariffFieldVisibility", () => {
     const v = tariffFieldVisibility("b2c", "PER_KOLI"); // method ignored for B2C
     expect(v).toMatchObject({ showKgRules: true, showRatePerKg: true, showMethodChoice: false, showCustomer: false, showRatePerKoli: false });
   });
-  it("B2B /kg: kg rules shown", () => {
-    expect(tariffFieldVisibility("b2b", "PER_KG")).toMatchObject({ showKgRules: true, showRatePerKg: true, showMethodChoice: true, showCustomer: true });
+  it("B2B /kg: rate + Min kg only — NO Multiplier / Pembulatan / Satuan", () => {
+    expect(tariffFieldVisibility("b2b", "PER_KG")).toMatchObject({ showKgRules: false, showMinKg: true, showRatePerKg: true, showMethodChoice: true, showCustomer: true });
   });
   it("B2B /koli: NO Min kg / Multiplier / Pembulatan / Satuan", () => {
     const v = tariffFieldVisibility("b2b", "PER_KOLI");
     expect(v.showKgRules).toBe(false);
+    expect(v.showMinKg).toBe(false);
     expect(v.showRatePerKg).toBe(false);
     expect(v).toMatchObject({ showRatePerKoli: true, showMinKoli: true, showRatePerCubic: false });
   });
@@ -41,6 +42,10 @@ describe("buildTariffPayload", () => {
   it("B2B /cubic sends ratePerCubic and min m³", () => {
     const p = buildTariffPayload("b2b", form({ customerId: "7", pricingMethod: "PER_CUBIC", ratePerCubic: "850000", minChargeableM3: "0.2" }));
     expect(p).toMatchObject({ ratePerCubic: 850000, minChargeableM3: 0.2, ratePerKoli: null, ratePerKg: 0 });
+  });
+  it("B2B /kg keeps Min kg but sends neutral multiplier/rounding defaults", () => {
+    const p = buildTariffPayload("b2b", form({ customerId: "7", pricingMethod: "PER_KG", ratePerKg: "8000", minChargeableKg: "5", volumetricMultiplier: "400", roundingMode: "NEAREST", roundingUnitKg: "2" }));
+    expect(p).toMatchObject({ pricingMethod: "PER_KG", ratePerKg: 8000, minChargeableKg: 5, volumetricMultiplier: 250, roundingMode: "UP", roundingUnitKg: 0.5 });
   });
   it("B2C is always /kg, has no customer, keeps kg rules", () => {
     const p = buildTariffPayload("b2c", form({ customerId: "7", pricingMethod: "PER_KOLI", ratePerKg: "4500", minChargeableKg: "3" }));

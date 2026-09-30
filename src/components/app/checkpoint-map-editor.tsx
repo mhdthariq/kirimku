@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { googleTileLayer } from "@/lib/map-tiles";
 import { toast } from "sonner";
 import { CheckCircle2, Crosshair, ExternalLink, GripVertical, Info, MapPin, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -206,10 +207,7 @@ export function CheckpointMapEditor({
       zoomControl: false,
     }).setView(boundsCenter, checkpoints.length > 0 ? 8 : 10);
     L.control.zoom({ position: "bottomleft" }).addTo(map);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    }).addTo(map);
+    googleTileLayer(L).addTo(map);
     mapRef.current = map;
 
     return () => {

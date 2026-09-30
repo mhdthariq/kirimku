@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { googleTileLayer } from "@/lib/map-tiles";
 
 export interface TaskMapPoint {
   id: number;
@@ -44,11 +45,7 @@ export function TaskPointsMap({ points, height = 320 }: { points: TaskMapPoint[]
     if (!containerRef.current || mapRef.current) return;
     // Revision Part H — default focus is Medan / North Sumatra (never Jakarta).
     const map = L.map(containerRef.current, { scrollWheelZoom: true }).setView([3.5952, 98.6722], 12);
-    L.tileLayer("https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}", {
-      maxZoom: 20,
-      subdomains: ["mt0", "mt1", "mt2", "mt3"],
-      attribution: "© Google Maps",
-    }).addTo(map);
+    googleTileLayer(L).addTo(map);
     layerRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
     return () => {
