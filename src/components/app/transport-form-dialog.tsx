@@ -10,9 +10,11 @@ import {
   type Options,
   type Shipment,
   type Transport,
+  type TransportDetail,
 } from "@/lib/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { Field, FormSelect, SubmitButton } from "@/components/app/form-parts";
+import { TransportFormCapacityPreview } from "@/components/app/capacity-status-card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -69,6 +71,10 @@ export function TransportFormDialog({
   const [form, setForm] = useState<TransportForm>(EMPTY);
   const [busy, setBusy] = useState(false);
   const [readyShipments, setReadyShipments] = useState<Shipment[]>([]);
+  // Capacity Round — in edit mode, fetch the transport's current shipments
+  // (with totals) so the capacity preview can project against them. The
+  // `editing` Transport row doesn't carry shipment totals.
+  const [editShipments, setEditShipments] = useState<TransportDetail["shipments"]>([]);
 
   // The parent (e.g. transport-detail-page.tsx) constructs `editing` as an
   // inline object literal — a NEW object reference on every parent render.
@@ -99,7 +105,13 @@ export function TransportFormDialog({
         shipmentIds: [],
         transportMode: editingNow.transportMode ?? "DIRECT",
       });
+      // Capacity Round — fetch the transport's current shipments (with totals)
+      // so the capacity preview can project against them in edit mode.
+      apiGet<TransportDetail>(`/transports/${editingNow.id}`)
+        .then((t) => setEditShipments(t.shipments ?? []))
+        .catch(() => setEditShipments([]));
     } else {
+      setEditShipments([]);
       setForm(EMPTY);
       // Revise round 9 — fetch BOTH STANDARD (RECEIVED_AT_GUDANG) and DIRECT
       // (CREATED / READY_FOR_PICKUP) shipments so the user can pick from
@@ -142,6 +154,19 @@ export function TransportFormDialog({
   const kenekOptions = employeesByPosition(options?.employees ?? [], "Kenek").map((e) => ({ value: String(e.id), label: e.name }));
   const routeOptions = (options?.routes ?? []).map((r) => ({ value: String(r.id), label: r.name }));
   const selectedRouteMeta = options?.routes?.find((r) => String(r.id) === form.routeId);
+  // Capacity Round — the selected vehicle, for the live capacity preview.
+  const selectedVehicle = options?.vehicles?.find((v) => String(v.id) === form.vehicleId) ?? null;
+  // Project the capacity against the shipments the operator has checked.
+  // In CREATE mode: the checked readyShipments. In EDIT mode: the transport's
+  // current assigned shipments (fetched above with their totals) — so the
+  // operator sees how the currently-assigned cargo loads the vehicle, and how
+  // changing the vehicle would change the status.
+  const previewShipments = !editing
+    ? readyShipments.filter((s) => form.shipmentIds.includes(s.id))
+    : editShipments.map((s) => ({
+        id: s.id,
+        totals: { totalActualKg: s.weightKg ?? 0, totalVolumeM3: s.volumeM3 ?? 0, totalPackages: s.packages ?? 0 },
+      }));
 
   function onRouteChange(v: string) {
     const route = options?.routes?.find((r) => String(r.id) === v);
@@ -344,7 +369,19 @@ export function TransportFormDialog({
                   })}
                 </div>
               )}
+              {/* Capacity Round — live preview of the selected vehicle's capacity
+                  against the checked shipments. Non-blocking (informational). */}
+              {selectedVehicle && (
+                <TransportFormCapacityPreview vehicle={selectedVehicle} selectedShipments={previewShipments} />
+              )}
             </div>
+          )}
+
+          {/* Capacity Round — in EDIT mode, show the capacity preview against
+              the transport's current assigned shipments + the selected vehicle
+              (so the operator sees how changing the vehicle affects the status). */}
+          {editing && selectedVehicle && (
+            <TransportFormCapacityPreview vehicle={selectedVehicle} selectedShipments={previewShipments} />
           )}
 
           <DialogFooter>

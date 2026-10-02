@@ -6,6 +6,7 @@ import { computePricing } from "@/lib/pricing";
 import { resolveTariff } from "@/lib/pricing-server";
 import { hasPermission } from "@/lib/auth";
 import { assertShipmentScope } from "@/lib/gudang-scope";
+import { checkPricingNotLocked } from "@/lib/business-rules/payment";
 import { walletSummary } from "@/lib/wallet";
 
 type Params = { params: Promise<{ id: string }> };
@@ -33,6 +34,10 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (!["CREATED", "READY_FOR_PICKUP", "PICKED_UP"].includes(master.status)) {
       return fail(422, "Harga hanya bisa dihitung sebelum shipment masuk gudang.");
     }
+    // Business Rules (Roadmap Phase 8) — pricing lock: once a VERIFIED payment
+    // exists, ordinary repricing is blocked (authorized adjustment needs audit).
+    const priceLockMsg = await checkPricingNotLocked(master.id);
+    if (priceLockMsg) return fail(422, priceLockMsg);
 
     const body = await req.json().catch(() => ({}));
     const overrideTariffId = num(body.tariffId);

@@ -50,6 +50,7 @@ model User {
   walletTransactionsCreated WalletTransaction[] @relation("WalletTransactionCreator")
   processedWithdrawals      WithdrawalRequest[] @relation("WithdrawalProcessor")
   reviewedWithdrawals       WithdrawalRequest[] @relation("WithdrawalReviewer")
+  systemSettingsUpdated    SystemSetting[]     @relation("SystemSettingUpdatedBy")
 }
 
 model Role {
@@ -369,6 +370,11 @@ model Vehicle {
   lengthM       Float?
   widthM        Float?
   heightM       Float?
+  /// Capacity Round — maximum number of koli (packages) the vehicle can carry.
+  /// Null = NOT CONFIGURED (the company has not set a koli limit). Zero is
+  /// treated as invalid/unconfigured too (see lib/capacity.ts). This is an
+  /// INFORMATIONAL operational indicator — it never blocks assignment.
+  maxKoli       Int?
   notes         String?
   ownerId       Int?
   createdAt     DateTime              @default(now())
@@ -737,6 +743,17 @@ model AuditLog {
   afterData   String?
   createdAt   DateTime @default(now())
   actor       User?    @relation(fields: [actorId], references: [id])
+}
+
+/// Capacity Round — company-level key/value system settings (e.g. the
+/// configurable capacity warning threshold). Small, append-only catalog.
+/// Only the Owner can write; everyone reads via the public /settings endpoint.
+model SystemSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+  updatedById Int?
+  updatedBy   User?   @relation("SystemSettingUpdatedBy", fields: [updatedById], references: [id])
 }
 
 model TransportSettlement {

@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import type { TransportLoad } from "@/lib/capacity";
 
 /**
  * Transport aggregate calculations (Revision Part L).
@@ -14,6 +15,11 @@ import { db } from "@/lib/db";
  * - Total Price  = SUM of each shipment's final recorded price (priceAmount) —
  *   prices are NEVER recalculated here.
  *
+ * Capacity Round additions:
+ * - totalActualWeightKg = SUM of actualWeightKg (PHYSICAL cargo weight — used
+ *   for vehicle weight capacity, NOT chargeable/billing weight).
+ * - totalKoli = COUNT of assigned DetailShipment/package records.
+ *
  * Everything is computed with database aggregation (a groupBy over the
  * detail rows of the involved shipments) rather than loading every package
  * into the frontend.
@@ -24,6 +30,10 @@ export interface TransportAggregates {
   totalWeightKg: number;
   totalVolumeM3: number;
   totalPrice: number | null;
+  /** Capacity Round — physical cargo weight (actualWeightKg sum). */
+  totalActualWeightKg: number;
+  /** Capacity Round — package/koli count (1 DetailShipment = 1 koli). */
+  totalKoli: number;
 }
 
 interface MasterLike {
@@ -37,14 +47,21 @@ export function aggregateTransport(
   masters: MasterLike[],
   volumeByMaster: Map<number, number>,
   actualKgByMaster: Map<number, number>,
+  packagesByMaster?: Map<number, number>,
 ): TransportAggregates {
   let totalWeightKg = 0;
   let totalVolumeM3 = 0;
   let priceSum = 0;
   let pricedCount = 0;
+  let totalActualWeightKg = 0;
+  let totalKoli = 0;
   for (const m of masters) {
     totalWeightKg += m.chargeableWeightKg ?? actualKgByMaster.get(m.id) ?? 0;
     totalVolumeM3 += volumeByMaster.get(m.id) ?? 0;
+    // Capacity Round — physical cargo weight (actualWeightKg), independent of
+    // the chargeable weight used for billing/totalWeightKg.
+    totalActualWeightKg += actualKgByMaster.get(m.id) ?? 0;
+    totalKoli += packagesByMaster?.get(m.id) ?? 0;
     if (m.priceAmount != null) {
       priceSum += m.priceAmount;
       pricedCount += 1;
@@ -56,6 +73,27 @@ export function aggregateTransport(
     totalVolumeM3: Math.round(totalVolumeM3 * 1_000_000) / 1_000_000,
     // null when no shipment is priced — the UI shows "—"
     totalPrice: pricedCount > 0 ? priceSum : null,
+    totalActualWeightKg: Math.round(totalActualWeightKg * 100) / 100,
+    totalKoli,
+  };
+}
+
+/**
+ * Capacity Round — build a `TransportLoad` (physical weight / volume / koli)
+ * for `calculateTransportCapacityStatus`. Uses ACTUAL weight (not chargeable)
+ * and the shared volume already aggregated by `detailAggregates`.
+ */
+export function transportLoadFromAggregates(
+  masters: MasterLike[],
+  volumeByMaster: Map<number, number>,
+  actualKgByMaster: Map<number, number>,
+  packagesByMaster: Map<number, number>,
+): TransportLoad {
+  const agg = aggregateTransport(masters, volumeByMaster, actualKgByMaster, packagesByMaster);
+  return {
+    totalActualWeightKg: agg.totalActualWeightKg,
+    totalVolumeM3: agg.totalVolumeM3,
+    totalKoli: agg.totalKoli,
   };
 }
 

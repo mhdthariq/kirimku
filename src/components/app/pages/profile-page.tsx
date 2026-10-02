@@ -10,6 +10,7 @@ import { Field, SubmitButton } from "@/components/app/form-parts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { CapacitySettingsCard } from "@/components/app/capacity-settings-card";
 
 /**
  * Profile (Revise.md §31/§32 menu "Profile") — every user sees their own
@@ -222,6 +223,7 @@ export function ProfilePage() {
           </section>
         </div>
       )}
+      {user?.isOwner && <CapacitySettingsCard />}
     </div>
   );
 }

@@ -62,6 +62,15 @@ export async function POST(req: NextRequest) {
     const dimsComplete = lengthM != null && widthM != null && heightM != null && lengthM > 0 && widthM > 0 && heightM > 0;
     const computedVolume = dimsComplete ? Math.round(lengthM! * widthM! * heightM! * 1000) / 1000 : null;
 
+    // Capacity Round — optional max koli (package count) limit. Null = NOT
+    // CONFIGURED. Negative values are rejected (invalid master data). Zero is
+    // allowed but treated as UNCONFIGURED by the capacity calc (plan §22).
+    const maxKoliRaw = num(body.maxKoli);
+    if (maxKoliRaw != null && maxKoliRaw < 0) {
+      return fail(422, "Max Koli tidak boleh negatif.", { maxKoli: ["Max Koli tidak boleh negatif."] });
+    }
+    const maxKoli = maxKoliRaw != null ? Math.round(maxKoliRaw) : null;
+
     const vehicle = await db.vehicle.create({
       data: {
         vehicleNumber,
@@ -74,6 +83,7 @@ export async function POST(req: NextRequest) {
         lengthM,
         widthM,
         heightM,
+        maxKoli,
         notes: str(body.notes),
         ownerId,
       },

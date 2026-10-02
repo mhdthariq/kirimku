@@ -16,6 +16,7 @@ import { ShipmentsPage } from "@/components/app/pages/shipments-page";
 import { TransportsPage } from "@/components/app/pages/transports-page";
 import { TransportDetailPage } from "@/components/app/pages/transport-detail-page";
 import { VehiclesPage } from "@/components/app/pages/vehicles-page";
+import { FleetCapacityPage } from "@/components/app/pages/fleet-capacity-page";
 import { RoutesPage } from "@/components/app/pages/routes-page";
 import { InvoicesPage } from "@/components/app/pages/invoices-page";
 import { InvoiceDetailPage } from "@/components/app/pages/invoice-detail-page";
@@ -109,6 +110,9 @@ function RouterInner({ segments, query }: { segments: string[]; query: URLSearch
         // Revise.md §32 — Vehicle Owner earnings view (same page, earnings tab)
         return <VOTransportHistoryPage initialTab="earnings" />;
       case "vehicles":
+        return <VehiclesPage />;
+      case "fleet-capacity":
+        // Merged into the Vehicles page "Kapasitas Armada" tab — redirect.
         return <VehiclesPage />;
       case "my-vehicles":
         // Revise.md §13/§32 — Vehicle Owner's own vehicles

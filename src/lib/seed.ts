@@ -461,14 +461,18 @@ async function createB2BMasterResiShipment(budiPartner: { id: number } | null): 
   // Open pickup task assigned to kurir Rizky (MKT-000008 — READY_FOR_PICKUP).
   const rizkyEmp = await db.employee.findFirst({ where: { position: "Kurir", name: { contains: "Rizky" } } });
   if (rizkyEmp) {
-    await db.pickup.create({
-      data: {
-        pickupCode: "PICK-2026-000008", masterId: shipment.id,
-        kurirId: rizkyEmp.id,
-        status: "ASSIGNED", notes: "B2B - cukup scan Master Resi di lokasi customer (invoice INV-2026-000002)",
-        createdAt: daysAgo(0.2), updatedAt: daysAgo(0.2),
-      },
-    });
+    // Idempotent: skip if a pickup already exists for this master.
+    const existing = await db.pickup.findFirst({ where: { masterId: shipment.id }, select: { id: true } });
+    if (!existing) {
+      await db.pickup.create({
+        data: {
+          pickupCode: "PICK-2026-000008", masterId: shipment.id,
+          kurirId: rizkyEmp.id,
+          status: "ASSIGNED", notes: "B2B - cukup scan Master Resi di lokasi customer (invoice INV-2026-000002)",
+          createdAt: daysAgo(0.2), updatedAt: daysAgo(0.2),
+        },
+      });
+    }
   }
 }
 
@@ -1197,6 +1201,9 @@ async function runSeed(): Promise<void> {
       // been received at the gudang (RECEIVED_AT_GUDANG and beyond).
       if (["PICKED_UP", "RECEIVED_AT_GUDANG", "IN_TRANSPORT", "DELIVERED"].includes(s.status)) {
         const arrivedAtGudang = s.status !== "PICKED_UP";
+        // Idempotent: skip if a pickup already exists for this master.
+        const existingPickup = await db.pickup.findFirst({ where: { masterId: shipment.id }, select: { id: true } });
+        if (existingPickup) continue;
         const pickup = await db.pickup.create({
           data: {
             pickupCode: `PICK-2026-${s.masterCode.slice(-6)}`, masterId: shipment.id,
@@ -1311,15 +1318,20 @@ async function runSeed(): Promise<void> {
     // here. Login as joko → open Pickups → see "PICK-2026-000002" with
     // the DIRECT badge → scan MasterResi at checkpoint 1 → take a photo →
     // confirm → tracking shows "Picked up from '{cp1 name}'".
-    await db.pickup.create({
-      data: {
-        pickupCode: "PICK-2026-000002", masterId: mkt9.id,
-        kurirId: usersByHandle.joko.employeeId,
-        status: "ASSIGNED",
-        notes: "Auto-assigned dari transport TRP-2026-000004 (DIRECT - driver pickup di checkpoint 1)",
-        createdAt: daysAgo(0.1), updatedAt: daysAgo(0.1),
-      },
-    });
+    // Idempotent: skip if a pickup already exists for this master (the
+    // seed may be re-run after a partial failure).
+    const existingPickupMkt9 = await db.pickup.findFirst({ where: { masterId: mkt9.id }, select: { id: true } });
+    if (!existingPickupMkt9) {
+      await db.pickup.create({
+        data: {
+          pickupCode: "PICK-2026-000002", masterId: mkt9.id,
+          kurirId: usersByHandle.joko.employeeId,
+          status: "ASSIGNED",
+          notes: "Auto-assigned dari transport TRP-2026-000004 (DIRECT - driver pickup di checkpoint 1)",
+          createdAt: daysAgo(0.1), updatedAt: daysAgo(0.1),
+        },
+      });
+    }
     await db.trackingEvent.create({
       data: {
         masterId: mkt9.id,
@@ -1333,14 +1345,18 @@ async function runSeed(): Promise<void> {
     // Demo path for the QR handover scan flow: login as rizky, scan every
     // detail barang QR, then confirm → tracking shows "Picked-up by Rizky Hidayat".
     const mkt1 = await db.masterShipment.findUniqueOrThrow({ where: { masterCode: "MKT-000001" } });
-    await db.pickup.create({
-      data: {
-        pickupCode: "PICK-2026-000001", masterId: mkt1.id,
-        kurirId: usersByHandle.rizky.employeeId,
-        status: "ASSIGNED", notes: "Ambil di reception kantor customer",
-        createdAt: daysAgo(0.2), updatedAt: daysAgo(0.2),
-      },
-    });
+    // Idempotent: skip if a pickup already exists for this master.
+    const existingPickupMkt1 = await db.pickup.findFirst({ where: { masterId: mkt1.id }, select: { id: true } });
+    if (!existingPickupMkt1) {
+      await db.pickup.create({
+        data: {
+          pickupCode: "PICK-2026-000001", masterId: mkt1.id,
+          kurirId: usersByHandle.rizky.employeeId,
+          status: "ASSIGNED", notes: "Ambil di reception kantor customer",
+          createdAt: daysAgo(0.2), updatedAt: daysAgo(0.2),
+        },
+      });
+    }
 
     // Open delivery task assigned to kurir Rizky (MKT-000003 — RECEIVED_AT_GUDANG).
     // Demo path for delivery QR scan: scan all packages, confirm with POD.

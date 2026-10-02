@@ -463,12 +463,36 @@ export interface Vehicle {
   lengthM?: number | null;
   widthM?: number | null;
   heightM?: number | null;
+  /** Capacity Round — max koli (package count). Null = NOT CONFIGURED. */
+  maxKoli?: number | null;
   notes: string | null;
   /** Revise.md §13 — linked Vehicle Owner (null = company-owned) */
   ownerId: number | null;
   owner?: { id: number; user: { name: string } } | null;
   assignments: { driverId: number | null; driver: { name: string } | null; kenek: { name: string } | null }[];
   _count?: { transports: number };
+}
+
+// ---------------------------------------------------------------------------
+// Capacity Round — informational vehicle capacity status (never blocks).
+// ---------------------------------------------------------------------------
+export type CapacityState = "OK" | "WARNING" | "OVERLIMIT" | "UNCONFIGURED";
+export type OverallCapacityState = "OK" | "WARNING" | "OVERLIMIT" | "PARTIALLY_CONFIGURED" | "UNCONFIGURED";
+
+export interface CapacityStatus {
+  current: number;
+  maximum: number | null;
+  utilizationPercent: number | null;
+  remaining: number | null;
+  overBy: number | null;
+  status: CapacityState;
+}
+
+export interface TransportCapacityStatus {
+  overallStatus: OverallCapacityState;
+  weight: CapacityStatus;
+  volume: CapacityStatus;
+  koli: CapacityStatus;
 }
 
 export interface Warehouse {
@@ -539,6 +563,13 @@ export interface TransportDropsBoard {
   groups: { checkpointId: number | null; shipmentIds: number[] }[];
   progress: { total: number; loaded: number; dropped: number; approved: number; allDropped: boolean; allApproved: boolean };
   vehicleEmpty: boolean;
+  /** Capacity Round (plan §18) — remaining cargo after each drop. */
+  loadSummary?: {
+    initialLoad: { totalActualWeightKg: number; totalVolumeM3: number; totalKoli: number };
+    remainingLoad: { totalActualWeightKg: number; totalVolumeM3: number; totalKoli: number };
+    droppedLoad: { totalActualWeightKg: number; totalVolumeM3: number; totalKoli: number };
+    remainingCapacity: TransportCapacityStatus;
+  };
 }
 
 export interface ReturnTaskRow {
@@ -604,6 +635,11 @@ export interface Transport {
   totalWeightKg: number;
   totalVolumeM3: number;
   totalPrice: number | null;
+  /** Capacity Round — physical cargo weight (actualWeightKg) + koli count */
+  totalActualWeightKg?: number;
+  totalKoli?: number;
+  /** Capacity Round — informational status (OK / OVERLIMIT / UNCONFIGURED) */
+  capacity?: TransportCapacityStatus;
   /** gudang(s) this transport belongs to (route endpoints + shipments) */
   gudangIds?: number[];
 }
@@ -633,6 +669,8 @@ export interface TransportDetail {
     status: string;
     maxWeightKg: number;
     maxVolumeM3: number;
+    /** Capacity Round — max koli (package count). Null = NOT CONFIGURED. */
+    maxKoli?: number | null;
   };
   driver: { id: number; name: string } | null;
   kenek: { id: number; name: string } | null;
@@ -673,6 +711,10 @@ export interface TransportDetail {
   totalWeightKg: number;
   totalVolumeM3: number;
   totalPrice: number | null;
+  /** Capacity Round — physical cargo weight (actualWeightKg) + koli count + status */
+  totalActualWeightKg?: number;
+  totalKoli?: number;
+  capacity?: TransportCapacityStatus;
 }
 
 /** Check-in response (POST /transports/{id}/checkins) — Revision Part O. */
@@ -838,7 +880,7 @@ export interface Permission {
 export interface Options {
   company: { name: string };
   employees: { id: number; name: string; position: string | null; warehouseId: number | null }[];
-  vehicles: { id: number; vehicleNumber: string; name: string | null; maxWeightKg: number; maxVolumeM3?: number; lengthM?: number | null; widthM?: number | null; heightM?: number | null }[];
+  vehicles: { id: number; vehicleNumber: string; name: string | null; maxWeightKg: number; maxVolumeM3?: number; maxKoli?: number | null; lengthM?: number | null; widthM?: number | null; heightM?: number | null }[];
   routes: { id: number; name: string; origin: string | null; destination: string | null }[];
   warehouses: { id: number; code: string; name: string; city: string | null; customerSupportContact?: string | null }[];
   customers: { id: number; code: string; name: string; type: string; companyName?: string | null; phone: string | null; email: string | null; address: string | null; marketingPartnerId?: number | null; warehouseId?: number | null; warehouseName?: string | null }[];
@@ -1155,6 +1197,17 @@ export interface DashboardData {
   marketing: MarketingDashboardSnapshot | null;
   /** Present for owner / admin-gudang / staff-gudang — gudang scan queue. */
   gudang: GudangDashboardWorkspace | null;
+  /** Capacity Round — fleet-wide capacity summary (active transports only).
+   *  Null when the user can't view transports. Informational, non-blocking. */
+  capacitySummary?: {
+    activeTransports: number;
+    overCapacityTransports: number;
+    warningTransports: number;
+    partiallyConfiguredTransports: number;
+    vehiclesOverWeight: number;
+    vehiclesOverVolume: number;
+    vehiclesOverKoli: number;
+  } | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -1355,6 +1408,7 @@ export interface VOTransportRow {
   transportCode: string;
   status: string;
   routeName: string;
+  vehicleId?: number;
   vehicleNumber: string;
   shipmentCount: number;
   transportValue: number;
@@ -1363,6 +1417,8 @@ export interface VOTransportRow {
   departedAt: string | null;
   arrivedAt: string | null;
   createdAt: string;
+  /** Capacity Round — live capacity status (informational, non-blocking). */
+  capacity?: TransportCapacityStatus;
   settlement: {
     settlementCode: string;
     status: string;
@@ -1373,6 +1429,62 @@ export interface VOTransportRow {
     ownerAmount: number;
     finalizedAt: string | null;
   } | null;
+}
+
+// ---------------------------------------------------------------------------
+// Capacity Round — Fleet Capacity overview (GET /fleet-capacity)
+// ---------------------------------------------------------------------------
+export interface FleetCapacityRow {
+  id: number;
+  vehicleNumber: string;
+  name: string | null;
+  status: string;
+  maxWeightKg: number;
+  maxVolumeM3: number;
+  maxKoli: number | null;
+  lengthM: number | null;
+  widthM: number | null;
+  heightM: number | null;
+  ownerId: number | null;
+  ownerName: string | null;
+  activeTransportCount: number;
+  activeLoad: { totalActualWeightKg: number; totalVolumeM3: number; totalKoli: number } | null;
+  activeCapacity: TransportCapacityStatus | null;
+}
+
+export interface FleetCapacitySummary {
+  total: number;
+  active: number;
+  idle: number;
+  overCapacity: number;
+  warning: number;
+  partiallyConfigured: number;
+  ok: number;
+  unconfiguredVehicles: number;
+}
+
+export interface FleetCapacityResponse {
+  vehicles: FleetCapacityRow[];
+  summary: FleetCapacitySummary;
+}
+
+/** Capacity Round — capacity-config change frequency per day (GET /capacity/trend). */
+export interface CapacityTrendBucket {
+  date: string;
+  label: string;
+  count: number;
+}
+export interface CapacityTrendResponse {
+  buckets: CapacityTrendBucket[];
+  total: number;
+}
+
+/** Capacity Round — company-level capacity settings (GET/PUT /settings). */
+export interface CapacitySettings {
+  warningThresholdPct: number;
+}
+export interface SettingsResponse {
+  capacity: CapacitySettings;
 }
 
 export interface FinanceSummary {

@@ -3,7 +3,10 @@ import { db } from "@/lib/db";
 import { guard, ok, handle, fail, num, str, dateOrNull } from "@/lib/api-helpers";
 import { hasPermission } from "@/lib/auth";
 import { audit, diffFields } from "@/lib/audit";
-import { aggregateTransport, detailAggregates, isExecutorOnly } from "@/lib/transport-totals";
+import { aggregateTransport, detailAggregates, isExecutorOnly, transportLoadFromAggregates } from "@/lib/transport-totals";
+import { calculateTransportCapacityStatus } from "@/lib/capacity";
+import { getCapacityWarningThreshold } from "@/lib/settings";
+import { checkVehicleAvailable } from "@/lib/business-rules/shipment-transport";
 import { assertTransportScope } from "@/lib/gudang-scope";
 import { crewAssignmentMessage, findActiveCrewAssignment } from "@/lib/transport-crew";
 
@@ -73,7 +76,19 @@ export async function GET(req: NextRequest, { params }: Params) {
     const masterIds = transport.shipments.map((s) => s.shipmentId);
     const { volumeByMaster, actualKgByMaster, packagesByMaster } = await detailAggregates(masterIds);
     const masters = transport.shipments.map((s) => s.master);
-    const agg = aggregateTransport(masters, volumeByMaster, actualKgByMaster);
+    const agg = aggregateTransport(masters, volumeByMaster, actualKgByMaster, packagesByMaster);
+    // Capacity Round — informational load vs vehicle capacity (never blocks).
+    const load = transportLoadFromAggregates(masters, volumeByMaster, actualKgByMaster, packagesByMaster);
+    const warningThreshold = await getCapacityWarningThreshold();
+    const capacity = calculateTransportCapacityStatus(
+      {
+        maxWeightKg: transport.vehicle.maxWeightKg,
+        maxVolumeM3: transport.vehicle.maxVolumeM3,
+        maxKoli: transport.vehicle.maxKoli,
+      },
+      load,
+      warningThreshold,
+    );
 
     // Warehouse names so the UI can render the dynamic "Arrived at {Gudang}"
     // status label for destination-side shipments.
@@ -104,6 +119,8 @@ export async function GET(req: NextRequest, { params }: Params) {
         status: transport.vehicle.status,
         maxWeightKg: transport.vehicle.maxWeightKg,
         maxVolumeM3: transport.vehicle.maxVolumeM3,
+        // Capacity Round — koli capacity (null = NOT CONFIGURED)
+        maxKoli: transport.vehicle.maxKoli,
       },
       driver: transport.driver ? { id: transport.driver.id, name: transport.driver.name } : null,
       kenek: transport.kenek ? { id: transport.kenek.id, name: transport.kenek.name } : null,
@@ -148,6 +165,10 @@ export async function GET(req: NextRequest, { params }: Params) {
       totalWeightKg: agg.totalWeightKg,
       totalVolumeM3: agg.totalVolumeM3,
       totalPrice: agg.totalPrice,
+      // Capacity Round — physical cargo weight + koli count + capacity status
+      totalActualWeightKg: agg.totalActualWeightKg,
+      totalKoli: agg.totalKoli,
+      capacity,
     });
   });
 }
@@ -215,6 +236,14 @@ export async function PUT(req: NextRequest, { params }: Params) {
       if (assignment.id == null) continue;
       const activeTransport = await findActiveCrewAssignment(assignment.id, existing.id);
       if (activeTransport) return fail(422, crewAssignmentMessage(assignment.role, activeTransport.transportCode));
+    }
+
+    // Business Rules (Roadmap Phase 7) — if the vehicle is being changed, the
+    // new vehicle must not be on another active transport (vehicle overlap).
+    const newVehicleId = (data.vehicleId as number | undefined) ?? existing.vehicleId;
+    if (newVehicleId !== existing.vehicleId) {
+      const vehicleConflictMsg = await checkVehicleAvailable(newVehicleId, existing.id);
+      if (vehicleConflictMsg) return fail(422, vehicleConflictMsg);
     }
 
     const transport = await db.transport.update({ where: { id: existing.id }, data });

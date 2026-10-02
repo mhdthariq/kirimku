@@ -6,6 +6,7 @@ import {
   Boxes,
   Calendar,
   Coins,
+  Download,
   PackageSearch,
   Pencil,
   Plus,
@@ -26,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TransportFormDialog } from "@/components/app/transport-form-dialog";
+import { CapacitySummaryInline } from "@/components/app/capacity-status-card";
 import { GudangScopeBadge, GudangTabBanner, GudangTabsTriggers, gudangTabValue, parseGudangTabValue } from "@/components/app/gudang-tabs";
 
 /**
@@ -103,6 +105,39 @@ export function TransportsPage({ historyMode = false }: { historyMode?: boolean 
     setConfirmDelete(null);
     const ok = await runAction(() => apiDelete(`/transports/${target.id}`), { success: "Transport dihapus." });
     if (ok) reload();
+  }
+
+  /** Export the filtered transport list to CSV, including capacity status
+   *  (overall + per-dimension) — for reporting / offline analysis. */
+  function exportCsv() {
+    const header = [
+      "kode", "status", "kendaraan", "rute", "koridor", "driver", "kenek",
+      "shipment_count", "total_koli", "total_berat_kg", "total_volume_m3", "total_harga",
+      "kapasitas_overall", "kapasitas_berat", "kapasitas_volume", "kapasitas_koli",
+      "rencana_berangkat", "rencana_tiba",
+    ];
+    const esc = (v: unknown) => {
+      const s = v == null ? "" : String(v);
+      return /["\n,]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const lines = rows.map((t) => [
+      t.transportCode, t.status, t.vehicleNumber, t.routeName ?? "",
+      `${t.origin ?? ""} → ${t.destination ?? ""}`,
+      t.driverName ?? "", t.kenekName ?? "",
+      t.shipmentCount, t.totalKoli ?? "", t.totalWeightKg, t.totalVolumeM3,
+      t.totalPrice ?? "",
+      t.capacity?.overallStatus ?? "",
+      t.capacity?.weight.status ?? "", t.capacity?.volume.status ?? "", t.capacity?.koli.status ?? "",
+      t.plannedDepartureAt ?? "", t.plannedArrivalAt ?? "",
+    ].map(esc).join(","));
+    const csv = [header.join(","), ...lines].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `transports-capacity-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   if (!can.view) {
@@ -203,6 +238,17 @@ export function TransportsPage({ historyMode = false }: { historyMode?: boolean 
             </div>
           ),
         },
+        {
+          key: "capacity",
+          header: "Kapasitas",
+          hideOnMobile: true,
+          render: (t) =>
+            t.capacity ? (
+              <CapacitySummaryInline capacity={t.capacity} showRing />
+            ) : (
+              <span className="text-[11px] text-muted-foreground">-</span>
+            ),
+        },
         { key: "status", header: "Status", render: (t) => <StatusBadge status={t.status} /> },
         {
           key: "settlement",
@@ -273,6 +319,9 @@ export function TransportsPage({ historyMode = false }: { historyMode?: boolean 
         actions={
           <>
             {!isOwner && !historyMode && <GudangScopeBadge gudangName={user?.warehouseName ?? null} />}
+            <Button variant="outline" size="sm" onClick={exportCsv} disabled={rows.length === 0}>
+              <Download className="h-4 w-4" /> Export CSV
+            </Button>
             {can.create && !historyMode && (
               <Button onClick={openCreate}>
                 <Plus className="h-4 w-4" /> Rencanakan Transport

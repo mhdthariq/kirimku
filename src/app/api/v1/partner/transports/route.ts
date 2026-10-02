@@ -2,12 +2,18 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { guard, ok, handle } from "@/lib/api-helpers";
 import { requirePartner } from "@/lib/wallet";
+import { detailAggregates, transportLoadFromAggregates } from "@/lib/transport-totals";
+import { calculateTransportCapacityStatus } from "@/lib/capacity";
+import { getCapacityWarningThreshold } from "@/lib/settings";
 
 /**
  * GET /api/v1/partner/transports — Vehicle Owner transport history (§16):
  * every transport performed with THEIR vehicles, with transport value,
  * profit-share percentage and owner earnings from the settlement snapshot.
  * Unsettled transports show the current profit-share config as a preview.
+ *
+ * Capacity Round — also returns the live capacity status per transport so
+ * the vehicle owner can see how loaded their vehicle was (informational).
  */
 export async function GET(req: NextRequest) {
   return handle(req, async () => {
@@ -19,13 +25,18 @@ export async function GET(req: NextRequest) {
       where: { vehicle: { ownerId: partner.id } },
       orderBy: { createdAt: "desc" },
       include: {
-        vehicle: { select: { id: true, vehicleNumber: true, name: true } },
+        vehicle: { select: { id: true, vehicleNumber: true, name: true, maxWeightKg: true, maxVolumeM3: true, maxKoli: true } },
         route: { select: { name: true } },
         settlement: true,
-        shipments: { include: { master: { select: { priceAmount: true } } } },
+        shipments: { include: { master: { select: { id: true, priceAmount: true } } } },
       },
       take: 200,
     });
+
+    // Capacity Round — one detailAggregates call for all transports' masters.
+    const allMasterIds = transports.flatMap((t) => t.shipments.map((s) => s.master.id));
+    const { volumeByMaster, actualKgByMaster, packagesByMaster } = await detailAggregates(allMasterIds);
+    const warningThreshold = await getCapacityWarningThreshold();
 
     const rows = transports.map((t) => {
       const shipmentsPrice = t.shipments.reduce((sum, ts) => sum + (ts.master.priceAmount ?? 0), 0);
@@ -34,6 +45,14 @@ export async function GET(req: NextRequest) {
       // CURRENT configuration, clearly flagged as not yet settled.
       const ownerPercent = settlement ? settlement.ownerPercent : partnerRow.partnerPercent;
       const transportValue = settlement ? settlement.transportValue : shipmentsPrice;
+      // Capacity Round — live capacity status (informational, non-blocking).
+      const masters = t.shipments.map((s) => ({ id: s.master.id, chargeableWeightKg: null, priceAmount: s.master.priceAmount }));
+      const load = transportLoadFromAggregates(masters, volumeByMaster, actualKgByMaster, packagesByMaster);
+      const capacity = calculateTransportCapacityStatus(
+        { maxWeightKg: t.vehicle.maxWeightKg, maxVolumeM3: t.vehicle.maxVolumeM3, maxKoli: t.vehicle.maxKoli },
+        load,
+        warningThreshold,
+      );
       return {
         id: t.id,
         transportCode: t.transportCode,
@@ -50,6 +69,7 @@ export async function GET(req: NextRequest) {
         transportValue,
         ownerPercent,
         ownerEarnings: settlement ? settlement.ownerAmount : null,
+        capacity,
         settlement: settlement
           ? {
               settlementCode: settlement.settlementCode,

@@ -40,6 +40,8 @@ import { formatDate, formatNumber, formatRupiah } from "@/components/app/form-pa
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { FleetCapacityWidget } from "@/components/app/capacity-status-card";
+import { CapacityTrendChart } from "@/components/app/capacity-trend-chart";
 
 const LIFECYCLE = ["CREATED", "READY_FOR_PICKUP", "PICKED_UP", "RECEIVED_AT_GUDANG", "IN_TRANSPORT", "AT_DEST_GUDANG", "ARRIVED_AT_GUDANG", "DELIVERED"];
 
@@ -351,6 +353,19 @@ export function DashboardPage() {
       {/* 4. Gudang workspace - Admin Gudang / Staff Gudang scan queue */}
       {data.gudang && (data.role === "admin-gudang" || data.role === "staff-gudang") && (
         <GudangScanQueue workspace={data.gudang} />
+      )}
+
+      {/* 3b. Fleet capacity widget + capacity-config change trend
+            (Capacity Round). Informational, non-blocking. Owner/admin only. */}
+      {(data.role === "owner" || data.role === "admin-kantor") && (
+        <div className="grid gap-4 lg:grid-cols-3">
+          {data.capacitySummary && (
+            <div className="lg:col-span-2">
+              <FleetCapacityWidget summary={data.capacitySummary} />
+            </div>
+          )}
+          <CapacityTrendChart days={14} />
+        </div>
       )}
 
       {/* 5. Operational details (filtered by period) - owner / admin-kantor only */}

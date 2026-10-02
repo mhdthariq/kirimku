@@ -7,6 +7,7 @@ import { apiGet, hasPermission, type VOTransportRow } from "@/lib/client-api";
 import { useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { StatusBadge } from "@/components/app/status-badge";
+import { CapacitySummaryInline } from "@/components/app/capacity-status-card";
 import { formatRupiah, formatDate } from "@/components/app/form-parts";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -99,6 +100,17 @@ export function VOTransportHistoryPage({ initialTab = "history" }: { initialTab?
                 render: (r) => <span className="font-mono text-xs">{r.vehicleNumber}</span>,
               },
               { key: "status", header: "Status", render: (r) => <StatusBadge status={r.status} /> },
+              {
+                key: "capacity",
+                header: "Kapasitas",
+                hideOnMobile: true,
+                render: (r) =>
+                  r.capacity ? (
+                    <CapacitySummaryInline capacity={r.capacity} />
+                  ) : (
+                    <span className="text-[11px] text-muted-foreground">-</span>
+                  ),
+              },
               {
                 key: "value",
                 header: "Nilai Transport",

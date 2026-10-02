@@ -4,6 +4,7 @@ import { guard, ok, handle, fail } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
 import { canTransition } from "@/lib/shipment-flow";
 import { assertShipmentScope } from "@/lib/gudang-scope";
+import { checkCancellationGuards } from "@/lib/business-rules/cancellation-guards";
 import { creditWallet } from "@/lib/wallet";
 
 type Params = { params: Promise<{ id: string }> };
@@ -30,6 +31,24 @@ export async function POST(req: NextRequest, { params }: Params) {
     await assertShipmentScope(user, master);
     if (!canTransition(master.status, "CANCELLED")) {
       return fail(422, `Shipment dengan status ${master.status} tidak bisa dibatalkan.`);
+    }
+
+    // Business Rules (Roadmap Phase 4) — cancellation guards: check for active
+    // transport assignment, active delivery, verified payments, active pickup.
+    const { error: cancelError, warnings: cancelWarnings } = await checkCancellationGuards(master.id, master.status);
+    if (cancelError) return fail(422, cancelError);
+    // Warnings are non-blocking — the cancel proceeds, but the operator is
+    // informed via the audit trail. The response includes the warnings so the
+    // UI can display them as a toast.
+    if (cancelWarnings.length > 0) {
+      await audit({
+        action: "status_change",
+        entityType: "shipment",
+        entityId: master.id,
+        entityLabel: `${master.masterCode} → CANCELLED (warnings)`,
+        actor: user,
+        after: { warnings: cancelWarnings },
+      });
     }
 
     // Look up the escrow hold (if any) for this shipment. Only B2C marketing

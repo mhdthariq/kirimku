@@ -4,6 +4,9 @@ import { guard, ok, handle, str } from "@/lib/api-helpers";
 import { hasPermission, type AuthUser } from "@/lib/auth";
 import { cityIndex, filterAuditEntriesForScope, inScope, scopeForUser, shipmentGudangIds, pickupGudangIds, deliveryGudangIds, transportGudangIds } from "@/lib/gudang-scope";
 import { computeTotals } from "@/lib/shipment-totals";
+import { detailAggregates, transportLoadFromAggregates } from "@/lib/transport-totals";
+import { calculateTransportCapacityStatus } from "@/lib/capacity";
+import { getCapacityWarningThreshold } from "@/lib/settings";
 import { walletSummary, requirePartner } from "@/lib/wallet";
 
 /**
@@ -252,6 +255,59 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // Capacity Round — fleet-wide capacity summary for the owner/admin dashboard.
+    // Computes live capacity status for active (PLANNED + DEPARTED) transports
+    // and aggregates how many are over-limit / warning / unconfigured. Informational.
+    let capacitySummary: {
+      activeTransports: number;
+      overCapacityTransports: number;
+      warningTransports: number;
+      partiallyConfiguredTransports: number;
+      vehiclesOverWeight: number;
+      vehiclesOverVolume: number;
+      vehiclesOverKoli: number;
+    } | null = null;
+    if (can("transport.view")) {
+      const activeTransports = await db.transport.findMany({
+        where: { status: { in: ["PLANNED", "DEPARTED"] } },
+        include: { vehicle: true, shipments: { include: { master: true } } },
+        take: 200,
+      });
+      const allMasterIds = activeTransports.flatMap((t) => t.shipments.map((s) => s.shipmentId));
+      const { volumeByMaster, actualKgByMaster, packagesByMaster } = await detailAggregates(allMasterIds);
+      const warningThreshold = await getCapacityWarningThreshold();
+      let overCapacity = 0;
+      let warning = 0;
+      let partiallyConfigured = 0;
+      let overWeight = 0;
+      let overVolume = 0;
+      let overKoli = 0;
+      for (const t of activeTransports) {
+        const masters = t.shipments.map((s) => s.master);
+        const load = transportLoadFromAggregates(masters, volumeByMaster, actualKgByMaster, packagesByMaster);
+        const cap = calculateTransportCapacityStatus(
+          { maxWeightKg: t.vehicle.maxWeightKg, maxVolumeM3: t.vehicle.maxVolumeM3, maxKoli: t.vehicle.maxKoli },
+          load,
+          warningThreshold,
+        );
+        if (cap.overallStatus === "OVERLIMIT") overCapacity++;
+        if (cap.overallStatus === "WARNING") warning++;
+        if (cap.overallStatus === "PARTIALLY_CONFIGURED") partiallyConfigured++;
+        if (cap.weight.status === "OVERLIMIT") overWeight++;
+        if (cap.volume.status === "OVERLIMIT") overVolume++;
+        if (cap.koli.status === "OVERLIMIT") overKoli++;
+      }
+      capacitySummary = {
+        activeTransports: activeTransports.length,
+        overCapacityTransports: overCapacity,
+        warningTransports: warning,
+        partiallyConfiguredTransports: partiallyConfigured,
+        vehiclesOverWeight: overWeight,
+        vehiclesOverVolume: overVolume,
+        vehiclesOverKoli: overKoli,
+      };
+    }
+
     return ok({
       role,
       permissions: {
@@ -337,6 +393,7 @@ export async function GET(req: NextRequest) {
       })),
       marketing: marketingSnapshot,
       gudang: gudangWorkspace,
+      capacitySummary,
     });
   });
 }

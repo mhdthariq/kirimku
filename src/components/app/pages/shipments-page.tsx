@@ -1558,7 +1558,12 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
       }
       acc[key].quantity += 1;
       acc[key].totalKg += d.actualWeightKg;
-      acc[key].volumeM3 += pkgVolume;
+      // Per-package volume — SET (not accumulate): all packages in the group
+      // share the same volume (it's part of the grouping key), so the group's
+      // volumeM3 is the per-package value. The total is volumeM3 × quantity
+      // (computed at display time). Accumulating here caused a double-multiply
+      // bug: g.volumeM3 was the total, then display multiplied by quantity again.
+      acc[key].volumeM3 = pkgVolume;
       return acc;
     }, {}),
   );
@@ -1953,8 +1958,8 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
                       header: "Volume (m³)",
                       render: (g) => (
                         <span className="tabular-nums">
-                          {g.volumeM3 > 0 ? `${g.volumeM3.toFixed(3)} m³` : "-"}
-                          {g.volumeM3 > 0 && <span className="ml-1 text-[10px] text-muted-foreground">({(g.volumeM3 / g.quantity).toFixed(3)}/paket)</span>}
+                          {g.volumeM3 > 0 ? `${(g.volumeM3 * g.quantity).toFixed(3)} m³` : "-"}
+                          {g.volumeM3 > 0 && <span className="ml-1 text-[10px] text-muted-foreground">({g.volumeM3.toFixed(3)}/paket)</span>}
                         </span>
                       ),
                     },

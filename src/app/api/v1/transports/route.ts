@@ -5,8 +5,11 @@ import { audit } from "@/lib/audit";
 import { nextCode } from "@/lib/code-generator";
 import { normalizeTransportMode } from "@/lib/transport-ops";
 import { cityIndex, inScope, scopeForUser, transportGudangIds } from "@/lib/gudang-scope";
-import { aggregateTransport, detailAggregates, isExecutorOnly } from "@/lib/transport-totals";
+import { aggregateTransport, detailAggregates, isExecutorOnly, transportLoadFromAggregates } from "@/lib/transport-totals";
+import { calculateTransportCapacityStatus } from "@/lib/capacity";
+import { getCapacityWarningThreshold } from "@/lib/settings";
 import { crewAssignmentMessage, findActiveCrewAssignment } from "@/lib/transport-crew";
+import { checkShipmentNotOnActiveTransport, checkVehicleAvailable } from "@/lib/business-rules/shipment-transport";
 
 export async function GET(req: NextRequest) {
   return handle(req, async () => {
@@ -69,11 +72,24 @@ export async function GET(req: NextRequest) {
     // price / count) instead of pushing every package to the frontend.
     const allMasterIds = transports.flatMap((t) => t.shipments.map((s) => s.shipmentId));
     const { volumeByMaster, actualKgByMaster, packagesByMaster } = await detailAggregates(allMasterIds);
+    // Capacity Round — company-level warning threshold (plan §31, configurable).
+    const warningThreshold = await getCapacityWarningThreshold();
 
     return ok(
       visible.map(({ t, gudangIds }) => {
         const masters = t.shipments.map((s) => s.master);
-        const agg = aggregateTransport(masters, volumeByMaster, actualKgByMaster);
+        const agg = aggregateTransport(masters, volumeByMaster, actualKgByMaster, packagesByMaster);
+        // Capacity Round — informational load vs vehicle capacity (never blocks).
+        const load = transportLoadFromAggregates(masters, volumeByMaster, actualKgByMaster, packagesByMaster);
+        const capacity = calculateTransportCapacityStatus(
+          {
+            maxWeightKg: t.vehicle.maxWeightKg,
+            maxVolumeM3: t.vehicle.maxVolumeM3,
+            maxKoli: t.vehicle.maxKoli,
+          },
+          load,
+          warningThreshold,
+        );
         return {
           id: t.id,
           transportCode: t.transportCode,
@@ -125,6 +141,11 @@ export async function GET(req: NextRequest) {
           totalWeightKg: agg.totalWeightKg,
           totalVolumeM3: agg.totalVolumeM3,
           totalPrice: agg.totalPrice,
+          // Capacity Round — physical cargo weight + koli count (for capacity)
+          totalActualWeightKg: agg.totalActualWeightKg,
+          totalKoli: agg.totalKoli,
+          // Capacity Round — informational status (OK / OVERLIMIT / UNCONFIGURED)
+          capacity,
           gudangIds,
         };
       }),
@@ -190,6 +211,16 @@ export async function POST(req: NextRequest) {
         );
       }
     }
+
+    // Business Rules (Roadmap Phase 2 + 7) — P0 data-integrity invariants:
+    // 1. One active transport per shipment (prevent double-loading).
+    // 2. Vehicle scheduling overlap (vehicle can't be on 2 active transports).
+    if (shipments.length > 0) {
+      const conflictMsg = await checkShipmentNotOnActiveTransport(shipments.map((s) => s.id));
+      if (conflictMsg) return fail(422, conflictMsg);
+    }
+    const vehicleConflictMsg = await checkVehicleAvailable(vehicleId);
+    if (vehicleConflictMsg) return fail(422, vehicleConflictMsg);
 
     // Planning fields — endpoints default to the route's. Rencana Berangkat &
     // Rencana Tiba are REQUIRED (the schedule must be complete before the

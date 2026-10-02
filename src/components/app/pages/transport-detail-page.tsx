@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
+import { motion } from "framer-motion";
 import {
   ArrowLeft,
   Calendar,
@@ -18,6 +19,7 @@ import {
   Route,
   Scale,
   Truck,
+  Printer,
   User,
   Users,
   Boxes,
@@ -35,6 +37,8 @@ import { CheckpointCheckinDialog } from "@/components/app/checkpoint-checkin-dia
 import { TransportFormDialog } from "@/components/app/transport-form-dialog";
 import { TransportDropsPanel } from "@/components/app/transport-drops-panel";
 import { TransportExpensesPanel } from "@/components/app/transport-expenses-panel";
+import { CapacityStatusCard } from "@/components/app/capacity-status-card";
+import { TransportManifestPrint } from "@/components/app/transport-manifest-print";
 import { PhotoDetailDialog, type PhotoDetail } from "@/components/app/photo-detail-dialog";
 import type { TransportMapCheckpoint } from "@/components/app/transport-map";
 import { Button } from "@/components/ui/button";
@@ -91,6 +95,7 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
   const [checkinOpen, setCheckinOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [manifestPrintId, setManifestPrintId] = useState<number | null>(null);
   // Revise round 9 — checkpoint photos dialog state. When the user clicks a
   // checkpoint record photo, we open the PhotoDetailDialog with all records
   // for that checkpoint so they can browse them at full size.
@@ -245,6 +250,9 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
                 <XCircle className="h-3.5 w-3.5" /> Hapus
               </Button>
             )}
+            <Button size="sm" variant="outline" onClick={() => setManifestPrintId(transport.id)}>
+              <Printer className="h-3.5 w-3.5" /> Cetak Manifest
+            </Button>
           </div>
         }
       />
@@ -427,6 +435,25 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
         />
       )}
 
+      {/* 3d. Vehicle capacity status (Capacity Round) — informational, never blocks. */}
+      {transport.capacity && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <Card className="overflow-hidden border-l-4 border-l-primary/30">
+            <CardContent className="pt-5">
+              <CapacityStatusCard
+                capacity={transport.capacity}
+                vehicleNumber={transport.vehicle.vehicleNumber}
+                vehicleName={transport.vehicle.name}
+              />
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
       {/* 4. Shipments in transport + totals (Parts K/L) */}
       <Card>
         <CardHeader className="pb-2">
@@ -448,12 +475,18 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
                 <Scale className="h-3.5 w-3.5" /> Total Berat
               </p>
               <p className="mt-1 text-xl font-bold text-foreground">{formatNumber(transport.totalWeightKg, 1)} <span className="text-xs font-medium text-muted-foreground">KG</span></p>
+              {transport.totalActualWeightKg != null && (
+                <p className="text-[10px] text-muted-foreground">Aktual: {formatNumber(transport.totalActualWeightKg, 1)} KG</p>
+              )}
             </div>
             <div className="rounded-xl border bg-muted/40 p-3">
               <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 <PackageSearch className="h-3.5 w-3.5" /> Total Volume
               </p>
               <p className="mt-1 text-xl font-bold text-foreground">{formatNumber(transport.totalVolumeM3, 2)} <span className="text-xs font-medium text-muted-foreground">M³</span></p>
+              {transport.totalKoli != null && (
+                <p className="text-[10px] text-muted-foreground">Koli: {formatNumber(transport.totalKoli, 0)}</p>
+              )}
             </div>
             <div className="rounded-xl border bg-muted/40 p-3">
               <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -583,6 +616,10 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
         description="Foto bukti check-in driver/kenek di setiap checkpoint sepanjang rute transport."
         photos={photoRecords ?? []}
       />
+
+      {/* Capacity Round — printable A4 transport manifest (surat jalan) with
+          vehicle + crew + capacity status + shipment list + signatures. */}
+      <TransportManifestPrint transportId={manifestPrintId} onClose={() => setManifestPrintId(null)} />
     </div>
   );
 }

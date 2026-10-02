@@ -42,6 +42,15 @@ export async function PUT(req: NextRequest, { params }: Params) {
     } else if (body.maxVolumeM3 !== undefined) {
       data.maxVolumeM3 = requireNum(body.maxVolumeM3, "maxVolumeM3", 0.1);
     }
+    // Capacity Round — optional max koli limit (null = NOT CONFIGURED).
+    // Negative rejected. Clearing the field ("" / null) sets it back to null.
+    if (body.maxKoli !== undefined) {
+      const maxKoliRaw = body.maxKoli === null || body.maxKoli === "" ? null : num(body.maxKoli);
+      if (maxKoliRaw != null && maxKoliRaw < 0) {
+        return fail(422, "Max Koli tidak boleh negatif.", { maxKoli: ["Max Koli tidak boleh negatif."] });
+      }
+      data.maxKoli = maxKoliRaw != null ? Math.round(maxKoliRaw) : null;
+    }
     // Revise.md §13 — link the vehicle to its Vehicle Owner (null = company).
     if (body.ownerId !== undefined) {
       const ownerId = body.ownerId === null || body.ownerId === "" ? null : num(body.ownerId);
@@ -55,7 +64,20 @@ export async function PUT(req: NextRequest, { params }: Params) {
       }
     }
     const vehicle = await db.vehicle.update({ where: { id: existing.id }, data });
-    await audit({ action: "updated", entityType: "vehicle", entityId: vehicle.id, entityLabel: vehicle.vehicleNumber, actor: user, before: diffFields(existing, vehicle as unknown as Record<string, unknown>) });
+    // Capacity Round — explicitly call out capacity-config changes (maxWeightKg /
+    // maxVolumeM3 / maxKoli) in the audit log so reviewers can spot them at a
+    // glance. The full field diff is still recorded via `before`.
+    const diff = diffFields(existing, vehicle as unknown as Record<string, unknown>);
+    const capacityFields = ["maxWeightKg", "maxVolumeM3", "maxKoli"];
+    const capacityChanges = capacityFields
+      .filter((f) => diff[f])
+      .map((f) => ({ field: f, before: (diff[f] as { before: unknown }).before, after: (diff[f] as { before: unknown }).after }));
+    const after: Record<string, unknown> = { ...vehicle };
+    if (capacityChanges.length > 0) {
+      after.capacityConfigChanged = true;
+      after.capacityChanges = capacityChanges;
+    }
+    await audit({ action: "updated", entityType: "vehicle", entityId: vehicle.id, entityLabel: vehicle.vehicleNumber, actor: user, before: diff, after });
     return ok(vehicle);
   });
 }

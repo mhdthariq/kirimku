@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Clock, Download, History, Search } from "lucide-react";
+import { Clock, Download, Gauge, History, Search } from "lucide-react";
 import { apiGetWithMeta, type AuditResponse, type AuditEntry } from "@/lib/client-api";
 import { useAuth } from "@/hooks/use-auth";
 import { hasPermission } from "@/lib/client-api";
@@ -53,6 +53,7 @@ const ACTION_STYLES: Record<string, string> = {
   change_password: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
   printed_resi: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
   printed_invoice: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
+  printed_manifest: "bg-indigo-500/15 text-indigo-600 dark:text-indigo-400",
 };
 
 const PAGE_SIZE = 30;
@@ -175,6 +176,12 @@ export function AuditPage() {
                     </span>
                     <Badge variant="outline" className="text-[10px]">{ENTITY_LABELS[entry.entityType] ?? entry.entityType}</Badge>
                     <span className="text-sm font-semibold text-foreground">{entry.entityLabel ?? `#${entry.entityId ?? "?"}`}</span>
+                    {/* Capacity Round — flag capacity-config changes at a glance */}
+                    {entry.afterData?.capacityConfigChanged && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-amber-300/60 bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
+                        <Gauge className="h-2.5 w-2.5" /> Kapasitas Diperbarui
+                      </span>
+                    )}
                   </div>
                   <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                     <span className="flex items-center gap-1">

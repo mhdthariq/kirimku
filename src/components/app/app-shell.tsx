@@ -27,6 +27,7 @@ import {
   CarFront,
   Warehouse,
   Briefcase,
+  Gauge,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { hasAnyPermission } from "@/lib/client-api";

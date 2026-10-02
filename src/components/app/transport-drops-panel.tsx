@@ -1,11 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CheckCircle2, MapPin, PackageCheck, PackageMinus, Undo2 } from "lucide-react";
+import { CheckCircle2, MapPin, PackageCheck, PackageMinus, Undo2, Scale, Box, TrendingDown } from "lucide-react";
 import { apiGet, apiPost, type TransportDropsBoard } from "@/lib/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { StatusBadge } from "@/components/app/status-badge";
-import { FormSelect } from "@/components/app/form-parts";
+import { OverallCapacityBadge } from "@/components/app/capacity-status-card";
+import { formatNumber, FormSelect } from "@/components/app/form-parts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -70,6 +71,53 @@ export function TransportDropsPanel({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Capacity Round (plan §18) — remaining cargo after each drop.
+            Shows initial → dropped → remaining per dimension + the remaining
+            capacity status. Updates live as the crew drops resi. */}
+        {board.loadSummary && board.loadSummary.initialLoad.totalKoli > 0 && (() => {
+          const ls = board.loadSummary;
+          const dims = [
+            { label: "Berat", icon: Scale, unit: "KG", digits: 1, init: ls.initialLoad.totalActualWeightKg, rem: ls.remainingLoad.totalActualWeightKg },
+            { label: "Volume", icon: Box, unit: "M³", digits: 2, init: ls.initialLoad.totalVolumeM3, rem: ls.remainingLoad.totalVolumeM3 },
+            { label: "Koli", icon: PackageMinus, unit: "koli", digits: 0, init: ls.initialLoad.totalKoli, rem: ls.remainingLoad.totalKoli },
+          ];
+          const totalDroppedPct = ls.initialLoad.totalKoli > 0 ? Math.round((ls.droppedLoad.totalKoli / ls.initialLoad.totalKoli) * 100) : 0;
+          return (
+            <div className="rounded-xl border bg-muted/30 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                  <TrendingDown className="h-3.5 w-3.5 text-primary" /> Sisa Muatan Kendaraan
+                </p>
+                <OverallCapacityBadge state={ls.remainingCapacity.overallStatus} className="!text-[10px]" />
+              </div>
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                {dims.map(({ label, icon: Icon, unit, digits, init, rem }) => {
+                  const droppedPct = init > 0 ? Math.min(100, Math.round(((init - rem) / init) * 100)) : 0;
+                  return (
+                    <div key={label} className="rounded-lg border bg-card px-2 py-1.5">
+                      <div className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        <Icon className="h-2.5 w-2.5" />{label}
+                      </div>
+                      <p className="mt-0.5 text-xs font-bold tabular-nums text-foreground">
+                        {formatNumber(rem, digits)}<span className="text-muted-foreground">/{formatNumber(init, digits)} {unit}</span>
+                      </p>
+                      <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
+                        <div className="h-full rounded-full bg-primary/60 transition-all" style={{ width: `${100 - droppedPct}%` }} />
+                      </div>
+                      <p className="mt-0.5 text-[9px] text-muted-foreground">{droppedPct}% diturunkan</p>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="mt-2 text-[10px] text-muted-foreground">
+                {board.vehicleEmpty
+                  ? "Kendaraan sudah kosong — semua resi diturunkan."
+                  : `${totalDroppedPct}% muatan awal sudah diturunkan · sisa ${formatNumber(ls.remainingLoad.totalKoli, 0)} koli di kendaraan.`}
+              </p>
+            </div>
+          );
+        })()}
+
         {board.groups.map((g) => {
           const cp = board.checkpoints.find((c) => c.id === g.checkpointId);
           return (
