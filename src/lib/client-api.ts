@@ -505,10 +505,65 @@ export interface Route {
   _count?: { transports: number };
 }
 
+/** One operational expense of a transport (BBM / Parkir / Makan / Bongkar). */
+export interface TransportExpenseRow {
+  id: number;
+  expenseCode: string;
+  transportId: number;
+  type: "BONGKAR" | "PARKIR" | "MAKAN" | "BBM";
+  amount: number;
+  description: string | null;
+  hasPhoto: boolean;
+  createdById: number | null;
+  createdAt: string;
+}
+
+/** Multi drop board — GET /transports/:id/drops */
+export interface TransportDropsBoard {
+  transportMode: "DIRECT" | "MULTI_DROP";
+  transportStatus: string;
+  deliveryApprovedAt: string | null;
+  checkpoints: { id: number; name: string; sequence: number; checkedIn: boolean; isFinal: boolean }[];
+  shipments: {
+    shipmentId: number;
+    masterCode: string;
+    customerName: string;
+    destination: string | null;
+    penerimaName: string | null;
+    dropCheckpointId: number | null;
+    effectiveDropCheckpointId: number | null;
+    dropStatus: string;
+    droppedAt: string | null;
+    deliveryApprovedAt: string | null;
+  }[];
+  groups: { checkpointId: number | null; shipmentIds: number[] }[];
+  progress: { total: number; loaded: number; dropped: number; approved: number; allDropped: boolean; allApproved: boolean };
+  vehicleEmpty: boolean;
+}
+
+export interface ReturnTaskRow {
+  id: number;
+  returnTaskCode: string;
+  status: string;
+  origin: string;
+  destination: string;
+  vehicleNumber: string;
+  driverName: string | null;
+  originalTransportId: number;
+  originalTransportCode: string;
+  returnTransportId: number | null;
+  returnTransportCode: string | null;
+  approvedAt: string | null;
+  createdAt: string;
+}
+
 export interface Transport {
   id: number;
   transportCode: string;
   status: string;
+  /** "DIRECT" (default) or "MULTI_DROP" — unrelated to a shipment's fulfillmentMode */
+  transportMode?: "DIRECT" | "MULTI_DROP";
+  deliveryApprovedAt?: string | null;
   routeId: number | null;
   routeName: string | null;
   routeCheckpoints?: Checkpoint[];

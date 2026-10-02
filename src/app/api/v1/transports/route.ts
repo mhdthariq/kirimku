@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { guard, ok, handle, fail, str, num, dateOrNull } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
 import { nextCode } from "@/lib/code-generator";
+import { normalizeTransportMode } from "@/lib/transport-ops";
 import { cityIndex, inScope, scopeForUser, transportGudangIds } from "@/lib/gudang-scope";
 import { aggregateTransport, detailAggregates, isExecutorOnly } from "@/lib/transport-totals";
 import { crewAssignmentMessage, findActiveCrewAssignment } from "@/lib/transport-crew";
@@ -227,6 +228,7 @@ export async function POST(req: NextRequest) {
           plannedDepartureAt,
           plannedArrivalAt,
           status: "PLANNED",
+          transportMode: normalizeTransportMode(body.transportMode),
         },
       });
       if (shipments.length > 0) {

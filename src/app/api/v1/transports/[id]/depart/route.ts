@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { guard, ok, handle, fail } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
+import { syncReturnTaskForTransport } from "@/lib/transport-ops-server";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -35,6 +36,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     const updated = await db.transport.update({ where: { id: transport.id }, data: { status: "DEPARTED", departedAt: new Date() } });
+    await syncReturnTaskForTransport(db, transport.id, "DEPARTED");
     for (const s of transport.shipments) {
       if (s.master.status === "RECEIVED_AT_GUDANG") {
         await db.masterShipment.update({ where: { id: s.shipmentId }, data: { status: "IN_TRANSPORT" } });

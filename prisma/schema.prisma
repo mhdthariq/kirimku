@@ -431,6 +431,10 @@ model Transport {
   driverId           Int?
   kenekId            Int?
   status             String               @default("PLANNED")
+  /// "DIRECT" (default — one destination, unchanged behaviour) or
+  /// "MULTI_DROP" (each resi gets its own drop checkpoint). NOTE: this is the
+  /// TRANSPORT mode, unrelated to MasterShipment.fulfillmentMode = "DIRECT".
+  transportMode      String               @default("DIRECT")
   origin             String?
   destination        String?
   plannedDepartureAt DateTime?
@@ -449,6 +453,12 @@ model Transport {
   vehicle            Vehicle              @relation(fields: [vehicleId], references: [id])
   settlement         TransportSettlement?
   shipments          TransportShipment[]
+  expenses           TransportExpense[]
+  /// Delivery approval of the WHOLE transport (all resi approved). Null until then.
+  deliveryApprovedAt DateTime?
+  deliveryApprovedById Int?
+  returnTasksFrom    ReturnTask[]         @relation("OriginalTransport")
+  returnTasksAs      ReturnTask[]         @relation("ReturnTransport")
 
   @@index([driverId, status])
   @@index([kenekId, status])
@@ -458,12 +468,67 @@ model Transport {
 model TransportShipment {
   transportId Int
   shipmentId  Int
+  /// Multi Drop: the checkpoint where THIS resi is unloaded. Null = the route's
+  /// final checkpoint (plain DIRECT transports never set it).
+  dropCheckpointId Int?
+  /// LOADED → AT_DROP_POINT → DROPPED → DELIVERY_PENDING → DELIVERY_APPROVED
+  dropStatus  String         @default("LOADED")
+  droppedAt   DateTime?
+  droppedById Int?
+  deliveryApprovedAt   DateTime?
+  deliveryApprovedById Int?
   master      MasterShipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
   transport   Transport      @relation(fields: [transportId], references: [id], onDelete: Cascade)
 
   @@id([transportId, shipmentId])
   @@index([transportId])
   @@index([shipmentId])
+  @@index([transportId, dropStatus])
+}
+
+/// Operational cost of a transport. A transport can have many of each type
+/// (several BBM fill-ups, several parking receipts...). Photo proof is optional.
+model TransportExpense {
+  id          Int       @id @default(autoincrement())
+  expenseCode String    @unique
+  transportId Int
+  /// BONGKAR | PARKIR | MAKAN | BBM
+  type        String
+  amount      Float
+  description String?
+  photoUrl    String?
+  createdById Int?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  transport   Transport @relation(fields: [transportId], references: [id], onDelete: Cascade)
+
+  @@index([transportId])
+  @@index([transportId, type])
+}
+
+/// "Resi Tugas Balik" — an empty vehicle going back after all its resi were
+/// delivery-approved. Becomes a real return Transport once approved.
+model ReturnTask {
+  id                  Int       @id @default(autoincrement())
+  returnTaskCode      String    @unique
+  originalTransportId Int
+  returnTransportId   Int?
+  vehicleId           Int
+  driverId            Int?
+  origin              String
+  destination         String
+  /// CREATED → APPROVED → PLANNED → DEPARTED → ARRIVED (or CANCELLED)
+  status              String    @default("CREATED")
+  createdById         Int?
+  approvedById        Int?
+  approvedAt          DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  originalTransport   Transport @relation("OriginalTransport", fields: [originalTransportId], references: [id])
+  returnTransport     Transport? @relation("ReturnTransport", fields: [returnTransportId], references: [id])
+
+  @@index([originalTransportId])
+  @@index([status])
 }
 
 model CheckpointRecord {

@@ -51,6 +51,13 @@ const STATUS_MAP: Record<string, { label: string; variant: "default" | "secondar
   PROCESSING: { label: "Diproses", variant: "default", pulse: true },
   RELEASED: { label: "Dirilis", variant: "default" },
   FINALIZED: { label: "Final", variant: "default" },
+  // Multi drop / delivery approval (per resi on a transport)
+  MULTI_DROP: { label: "Multi Drop", variant: "secondary" },
+  LOADED: { label: "Dimuat", variant: "outline" },
+  AT_DROP_POINT: { label: "Di Titik Drop", variant: "secondary", pulse: true },
+  DROPPED: { label: "Diturunkan", variant: "secondary" },
+  DELIVERY_PENDING: { label: "Menunggu Approval", variant: "secondary", pulse: true },
+  DELIVERY_APPROVED: { label: "Delivery Disetujui", variant: "default" },
 };
 
 export function StatusBadge({ status, className, label }: { status: string; className?: string; label?: string }) {

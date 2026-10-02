@@ -33,6 +33,8 @@ import { StatusBadge } from "@/components/app/status-badge";
 import { formatDate, formatNumber, formatRupiah } from "@/components/app/form-parts";
 import { CheckpointCheckinDialog } from "@/components/app/checkpoint-checkin-dialog";
 import { TransportFormDialog } from "@/components/app/transport-form-dialog";
+import { TransportDropsPanel } from "@/components/app/transport-drops-panel";
+import { TransportExpensesPanel } from "@/components/app/transport-expenses-panel";
 import { PhotoDetailDialog, type PhotoDetail } from "@/components/app/photo-detail-dialog";
 import type { TransportMapCheckpoint } from "@/components/app/transport-map";
 import { Button } from "@/components/ui/button";
@@ -99,6 +101,14 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
     // Edit & Remove are available for PLANNED transports only, gated on
     // transport.create (same rule as the list page + the API).
     manage: hasPermission(user, "transport.create"),
+    // Multi drop / delivery approval / return task / expenses
+    drop: hasPermission(user, "transport.arrive"),
+    approve: hasPermission(user, "transport.delivery.approve"),
+    createReturn: hasPermission(user, "return-task.create"),
+    expenseView: hasPermission(user, "transport.expense.view"),
+    expenseCreate: hasPermission(user, "transport.expense.create"),
+    expenseUpdate: hasPermission(user, "transport.expense.update"),
+    expenseDelete: hasPermission(user, "transport.expense.delete"),
   };
 
   async function onDelete() {
@@ -219,6 +229,7 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={transport.status} />
+            {transport.transportMode === "MULTI_DROP" && <StatusBadge status="MULTI_DROP" label="Multi Drop" />}
             {canCheckinNow && (
               <Button size="sm" onClick={() => setCheckinOpen(true)}>
                 <Camera className="h-3.5 w-3.5" /> Check-in Checkpoint
@@ -395,6 +406,26 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
           )}
         </CardContent>
       </Card>
+
+      {/* 3b. Multi drop board, delivery approval and return task. Re-mounted
+          (key) whenever a check-in or status change happens so it refetches. */}
+      <TransportDropsPanel
+        key={`drops:${transport.status}:${transport.checkpointRecords.length}`}
+        transportId={transport.id}
+        isCrew={isCrew}
+        can={{ assign: can.manage, drop: can.drop, approve: can.approve, createReturn: can.createReturn }}
+        onChanged={reload}
+      />
+
+      {/* 3c. Operational expenses: BBM / Parkir / Makan / Bongkar (multi transaction) */}
+      {can.expenseView && (
+        <TransportExpensesPanel
+          transportId={transport.id}
+          canCreate={can.expenseCreate}
+          canUpdate={can.expenseUpdate}
+          canDelete={can.expenseDelete}
+        />
+      )}
 
       {/* 4. Shipments in transport + totals (Parts K/L) */}
       <Card>

@@ -5,6 +5,7 @@ import { audit } from "@/lib/audit";
 import { nextCode } from "@/lib/code-generator";
 import { haversineMeters, metersToKmDisplay } from "@/lib/transport-totals";
 import { shipmentDestinationGudangIds, cityIndex } from "@/lib/gudang-scope";
+import { syncReturnTaskForTransport } from "@/lib/transport-ops-server";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -124,6 +125,14 @@ export async function POST(req: NextRequest, { params }: Params) {
           recordedAt: new Date(),
         },
       });
+      // Multi drop: the vehicle is now at this checkpoint, so every resi whose
+      // drop point is here becomes AT_DROP_POINT (ready to be unloaded).
+      if (transport.transportMode === "MULTI_DROP") {
+        await tx.transportShipment.updateMany({
+          where: { transportId: transport.id, dropCheckpointId: checkpoint.id, dropStatus: "LOADED" },
+          data: { dropStatus: "AT_DROP_POINT" },
+        });
+      }
       // last known transport position (Part K)
       await tx.transport.update({
         where: { id: transport.id },
@@ -134,6 +143,7 @@ export async function POST(req: NextRequest, { params }: Params) {
           where: { id: transport.id },
           data: { status: "DEPARTED", departedAt: new Date() },
         });
+        await syncReturnTaskForTransport(tx, transport.id, "DEPARTED");
         for (const s of transport.shipments) {
           if (s.master.status === "RECEIVED_AT_GUDANG") {
             await tx.masterShipment.update({ where: { id: s.shipmentId }, data: { status: "IN_TRANSPORT" } });
@@ -177,7 +187,15 @@ export async function POST(req: NextRequest, { params }: Params) {
         const warehouses = await tx.warehouse.findMany({ where: { isActive: true }, select: { id: true, name: true, city: true } });
         const whName = (id: number | null | undefined) => (id == null ? null : warehouses.find((w) => w.id === id)?.name ?? null);
         const originGudangName = whName(transport.shipments[0]?.master.originWarehouseId);
+        // Whatever is still on board reached the destination: it counts as dropped now.
+        await tx.transportShipment.updateMany({
+          where: { transportId: transport.id, dropStatus: { in: ["LOADED", "AT_DROP_POINT"] } },
+          data: { dropStatus: "DROPPED", droppedAt: new Date(), droppedById: user.id },
+        });
+        await syncReturnTaskForTransport(tx, transport.id, "ARRIVED");
         for (const s of transport.shipments) {
+          // Multi drop: resi already unloaded earlier were handled by the drop step.
+          if (s.dropStatus !== "LOADED" && s.dropStatus !== "AT_DROP_POINT") continue;
           const destIds = shipmentDestinationGudangIds(s.master, cityIdx);
           const arrivedWarehouseId = s.master.destinationWarehouseId ?? destIds[0] ?? null;
           const isDirect = (s.master.fulfillmentMode ?? "STANDARD") === "DIRECT";

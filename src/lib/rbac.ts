@@ -51,6 +51,18 @@ export const PERMISSIONS: { slug: string; module: string; description: string }[
   { slug: "transport.depart", module: "Transports", description: "Mark transport departed" },
   { slug: "transport.arrive", module: "Transports", description: "Mark transport arrived (admin override - arrival is normally auto-detected at the destination checkpoint)" },
   { slug: "transport.checkin", module: "Transports", description: "Checkpoint selfie check-in with GPS validation (driver/kenek)" },
+  // Transport operational expenses (BBM / Parkir / Makan / Bongkar) — many per transport
+  { slug: "transport.expense.view", module: "Transports", description: "View transport operational expenses" },
+  { slug: "transport.expense.create", module: "Transports", description: "Add transport operational expenses" },
+  { slug: "transport.expense.update", module: "Transports", description: "Edit transport operational expenses" },
+  { slug: "transport.expense.delete", module: "Transports", description: "Delete transport operational expenses" },
+  // Multi drop delivery approval (destination admin accepts the dropped resi)
+  { slug: "transport.delivery.view", module: "Transports", description: "View dropped resi awaiting delivery approval" },
+  { slug: "transport.delivery.approve", module: "Transports", description: "Approve delivery of dropped resi / of the whole transport" },
+  // Resi Tugas Balik (return task for an emptied vehicle)
+  { slug: "return-task.view", module: "Return Tasks", description: "View return tasks (resi tugas balik)" },
+  { slug: "return-task.create", module: "Return Tasks", description: "Create return tasks and their return transport" },
+  { slug: "return-task.approve", module: "Return Tasks", description: "Approve return tasks" },
   // Vehicle
   { slug: "vehicle.view", module: "Vehicles", description: "View vehicles" },
   { slug: "vehicle.create", module: "Vehicles", description: "Create vehicles" },
@@ -151,6 +163,7 @@ export const ROLE_TEMPLATES: { slug: string; name: string; description: string; 
       "wallet.topup.view", "wallet.topup.cancel",
       "wallet.withdrawal.view", "wallet.withdrawal.review", "wallet.withdrawal.process",
       "partner.view", "transport.settle",
+      "transport.expense.view", "return-task.view",
       "repair.view", "repair.create", "repair.update", "repair.delete",
       "financial.report.view",
     ],
@@ -195,6 +208,9 @@ export const ROLE_TEMPLATES: { slug: string; name: string; description: string; 
       "vehicle.view", "vehicle.create", "vehicle.update",
       "checkpoint.view", "checkpoint.create", "checkpoint.update", "checkpoint.delete",
       "transport.view", "transport.create", "transport.depart", "transport.arrive",
+      "transport.expense.view", "transport.expense.create", "transport.expense.update", "transport.expense.delete",
+      "transport.delivery.view", "transport.delivery.approve",
+      "return-task.view", "return-task.create", "return-task.approve",
       "shipment.view", "shipment.view_tracking", "shipment.confirm_arrival", "shipment.notify_marketing",
       "shipment.create", "shipment.update", "shipment_detail.view", "shipment_detail.create", "shipment_detail.update", "shipment_detail.delete",
       // Admin Gudang may print resi (Owner always may via the owner bypass)
@@ -244,6 +260,7 @@ export const ROLE_TEMPLATES: { slug: string; name: string; description: string; 
     description: "Linehaul driver: depart transport + checkpoint selfie check-in + DIRECT pickup & delivery (scan MasterResi + upload proof photo)",
     permissions: [
       "transport.view", "transport.depart", "transport.arrive", "transport.checkin",
+      "transport.expense.view", "transport.expense.create", "transport.expense.update",
       "shipment.view",
       // Step 4 — DIRECT shipment pickup & delivery workflow: a DIRECT
       // shipment is one where the driver picks up at the origin (checkpoint
@@ -263,6 +280,7 @@ export const ROLE_TEMPLATES: { slug: string; name: string; description: string; 
     description: "Linehaul assistant: view assigned transports + checkpoint selfie check-in + DIRECT delivery handover",
     permissions: [
       "transport.view", "transport.checkin", "shipment.view",
+      "transport.expense.view", "transport.expense.create",
       // Step 4 — kenek can assist the driver with DIRECT delivery handover
       // (scan packages + upload proof photo). Pickup view is granted so
       // they can also see DIRECT pickup tasks on the same transport when

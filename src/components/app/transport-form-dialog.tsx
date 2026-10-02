@@ -25,12 +25,14 @@ interface TransportForm {
   destination: string;
   plannedDepartureAt: string; // datetime-local
   plannedArrivalAt: string; // datetime-local
+  /** DIRECT (default) or MULTI_DROP — set at creation only */
+  transportMode: "DIRECT" | "MULTI_DROP";
   shipmentIds: number[];
 }
 
 const EMPTY: TransportForm = {
   routeId: "", vehicleId: "", driverId: "", kenekId: "",
-  origin: "", destination: "", plannedDepartureAt: "", plannedArrivalAt: "",
+  origin: "", destination: "", plannedDepartureAt: "", plannedArrivalAt: "", transportMode: "DIRECT",
   shipmentIds: [],
 };
 
@@ -95,6 +97,7 @@ export function TransportFormDialog({
         plannedDepartureAt: toLocalInput(editingNow.plannedDepartureAt ? new Date(editingNow.plannedDepartureAt) : null),
         plannedArrivalAt: toLocalInput(editingNow.plannedArrivalAt ? new Date(editingNow.plannedArrivalAt) : null),
         shipmentIds: [],
+        transportMode: editingNow.transportMode ?? "DIRECT",
       });
     } else {
       setForm(EMPTY);
@@ -187,6 +190,7 @@ export function TransportFormDialog({
     if (form.driverId) payload.driverId = Number(form.driverId);
     if (form.kenekId) payload.kenekId = Number(form.kenekId);
     if (!editing && form.shipmentIds.length > 0) payload.shipmentIds = form.shipmentIds;
+    if (!editing) payload.transportMode = form.transportMode;
     const ok = await runAction(
       () => (editing ? apiPut(`/transports/${editing.id}`, payload) : apiPost("/transports", payload)),
       { success: editing ? "Transport diperbarui." : "Transport direncanakan." },
@@ -229,6 +233,19 @@ export function TransportFormDialog({
                 disabled={busy}
               />
             </Field>
+            {!editing && (
+              <Field label="Mode Transport" htmlFor="t-mode" hint="Multi Drop: tiap resi bisa turun di checkpoint berbeda" className="sm:col-span-2">
+                <FormSelect
+                  value={form.transportMode}
+                  onValueChange={(v) => setForm({ ...form, transportMode: v as "DIRECT" | "MULTI_DROP" })}
+                  options={[
+                    { value: "DIRECT", label: "Direct - satu tujuan akhir" },
+                    { value: "MULTI_DROP", label: "Multi Drop - banyak titik turun" },
+                  ]}
+                  disabled={busy}
+                />
+              </Field>
+            )}
             <Field label="Driver" htmlFor="t-driver">
               <FormSelect value={form.driverId} onValueChange={(v) => setForm({ ...form, driverId: v })} placeholder="Pilih driver" options={driverOptions} disabled={busy} />
             </Field>

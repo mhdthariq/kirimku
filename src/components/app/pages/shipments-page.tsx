@@ -1953,8 +1953,8 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
                       header: "Volume (m³)",
                       render: (g) => (
                         <span className="tabular-nums">
-                          {g.volumeM3 > 0 ? `${(g.volumeM3 * g.quantity).toFixed(3)} m³` : "-"}
-                          {g.volumeM3 > 0 && <span className="ml-1 text-[10px] text-muted-foreground">({g.volumeM3.toFixed(3)}/paket)</span>}
+                          {g.volumeM3 > 0 ? `${g.volumeM3.toFixed(3)} m³` : "-"}
+                          {g.volumeM3 > 0 && <span className="ml-1 text-[10px] text-muted-foreground">({(g.volumeM3 / g.quantity).toFixed(3)}/paket)</span>}
                         </span>
                       ),
                     },

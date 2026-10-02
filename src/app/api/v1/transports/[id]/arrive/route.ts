@@ -4,6 +4,7 @@ import { guard, ok, handle, fail } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
 import { shipmentDestinationGudangIds, cityIndex } from "@/lib/gudang-scope";
 import { assertTransportScope } from "@/lib/gudang-scope";
+import { syncReturnTaskForTransport } from "@/lib/transport-ops-server";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -30,6 +31,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     const updated = await db.$transaction(async (tx) => {
       const result = await tx.transport.update({ where: { id: transport.id }, data: { status: "ARRIVED", arrivedAt: new Date() } });
       for (const s of transport.shipments) {
+        // Multi drop: resi already unloaded at an earlier checkpoint were handled by the drop step.
+        if (s.dropStatus !== "LOADED" && s.dropStatus !== "AT_DROP_POINT") continue;
         const destIds = shipmentDestinationGudangIds(s.master, cityIdx);
         const arrivedWarehouseId = s.master.destinationWarehouseId ?? destIds[0] ?? null;
         if (s.master.status === "IN_TRANSPORT") {
@@ -49,6 +52,13 @@ export async function POST(req: NextRequest, { params }: Params) {
           },
         });
       }
+      // Whatever is still on board reached the destination: it counts as dropped now,
+      // so delivery approval (and then the return task) can follow.
+      await tx.transportShipment.updateMany({
+        where: { transportId: transport.id, dropStatus: { in: ["LOADED", "AT_DROP_POINT"] } },
+        data: { dropStatus: "DROPPED", droppedAt: new Date(), droppedById: user.id },
+      });
+      await syncReturnTaskForTransport(tx, transport.id, "ARRIVED");
       return result;
     });
     await audit({ action: "status_change", entityType: "transport", entityId: transport.id, entityLabel: `${transport.transportCode} → ARRIVED`, actor: user });

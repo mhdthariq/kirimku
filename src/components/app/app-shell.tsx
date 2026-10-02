@@ -14,6 +14,7 @@ import {
   Package,
   Receipt,
   Route,
+  Undo2,
   Search,
   ShieldCheck,
   Tag,
@@ -63,7 +64,7 @@ export interface NavItem {
  * `#/...` hash router. Everything else still uses the hash router until
  * it's migrated. Add a route here the same PR you add its `page.tsx`.
  */
-const MIGRATED_ROUTES = new Set<string>(["/tariffs", "/customers", "/gudang", "/pickups", "/deliveries"]);
+const MIGRATED_ROUTES = new Set<string>(["/tariffs", "/customers", "/gudang", "/pickups", "/deliveries", "/return-tasks"]);
 
 /** href for a legacy (not-yet-migrated) nav item — always absolute (`/#/x`,
  *  not `#/x`) so it resolves correctly even when the current page is
@@ -83,6 +84,8 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { href: "/deliveries", label: "Deliveries", icon: ClipboardList, anyPermissions: ["delivery.view", "delivery.assign_kurir"], mobile: true },
       // Revision Part I — transport = road linehaul between gudang → road Route icon
       { href: "/transports", label: "Transports", icon: Route, anyPermissions: ["transport.view"], mobile: true },
+      // Resi Tugas Balik — emptied vehicle returning to origin (real route, not hash)
+      { href: "/return-tasks", label: "Tugas Balik", icon: Undo2, anyPermissions: ["return-task.view"] },
     ],
   },
   {
