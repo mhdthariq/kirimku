@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     // owner / marketing-scoped to themselves). General customers
     // (warehouseId = null) are visible to everyone.
     const scope = await scopeForUser(user);
-    const customerWarehouseClause = scope.unscoped
+    const customerWarehouseClause = scope.unscoped || marketingOwner != null
       ? {}
       : {
           OR: [

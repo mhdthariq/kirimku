@@ -20,6 +20,7 @@ import { formatNumber, formatRupiah } from "@/components/app/form-parts";
 import { cn } from "@/lib/utils";
 import { resiPricingMethodLabel, resiStatVisibility } from "@/lib/resi-display";
 import type { PricingMethod } from "@/lib/client-api";
+import { customerPrimaryName } from "@/lib/customer-display";
 
 type ResiShipment = Shipment & {
   details: DetailShipment[];
@@ -253,7 +254,7 @@ export function ResiPrint({
   // creation but editable per-shipment; fall back to the customer master
   // data when the per-shipment field is empty.
   const pengirim = {
-    name: shipment.pengirimName ?? shipment.customer?.name ?? "-",
+    name: shipment.pengirimName ?? (shipment.customer ? customerPrimaryName(shipment.customer) : "-"),
     phone: shipment.pengirimPhone ?? shipment.customer?.phone ?? "-",
     email: shipment.pengirimEmail ?? shipment.customer?.email ?? null,
     address: shipment.pengirimAddress ?? shipment.customer?.address ?? null,

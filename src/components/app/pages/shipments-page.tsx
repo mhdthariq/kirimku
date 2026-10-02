@@ -672,7 +672,7 @@ function ShipmentList() {
                       ...form,
                       customerId: v,
                       ...(stillValid ? {} : { tariffId: "" }),
-                      pengirimName: cust?.name ?? "",
+                      pengirimName: cust ? customerPrimaryName(cust) : "",
                       pengirimPhone: cust?.phone ?? "",
                       pengirimEmail: cust?.email ?? "",
                       pengirimAddress: cust?.address ?? "",
@@ -877,7 +877,7 @@ function ShipmentList() {
                     htmlFor="s-pengirim-name"
                     className="sm:col-span-2"
                     hint={
-                      selectedCustomer && form.pengirimName !== (selectedCustomer.name ?? "")
+                      selectedCustomer && form.pengirimName !== customerPrimaryName(selectedCustomer)
                         ? "Diubah dari data customer - override per-shipment."
                         : undefined
                     }
@@ -889,7 +889,7 @@ function ShipmentList() {
                       placeholder="mis. Andi Wijaya"
                       disabled={busy}
                       className={
-                        selectedCustomer && form.pengirimName !== (selectedCustomer.name ?? "")
+                        selectedCustomer && form.pengirimName !== customerPrimaryName(selectedCustomer)
                           ? "border-amber-400/60 bg-amber-50 dark:border-amber-500/40 dark:bg-amber-950/30"
                           : undefined
                       }
@@ -1396,7 +1396,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
 
   function openPengirimEdit() {
     setPengirimForm({
-      name: shipment?.pengirimName ?? shipment?.customer?.name ?? "",
+      name: shipment?.pengirimName ?? (shipment?.customer ? customerPrimaryName(shipment.customer) : ""),
       phone: shipment?.pengirimPhone ?? shipment?.customer?.phone ?? "",
       email: shipment?.pengirimEmail ?? shipment?.customer?.email ?? "",
       address: shipment?.pengirimAddress ?? shipment?.customer?.address ?? "",
@@ -1825,7 +1825,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
             </div>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
-            <Row label="Nama" value={shipment.pengirimName ?? shipment.customer?.name ?? "-"} />
+            <Row label="Nama" value={shipment.pengirimName ?? (shipment.customer ? customerPrimaryName(shipment.customer) : "-")} />
             <Row label="Telepon" value={shipment.pengirimPhone ?? shipment.customer?.phone ?? "-"} />
             <Row label="Email" value={shipment.pengirimEmail ?? shipment.customer?.email ?? "-"} />
             <p className="text-xs leading-relaxed text-muted-foreground">{shipment.pengirimAddress ?? shipment.customer?.address ?? "Alamat pengirim belum diisi"}</p>
