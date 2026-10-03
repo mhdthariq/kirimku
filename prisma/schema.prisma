@@ -718,6 +718,9 @@ model InvoiceLine {
   shipmentId  Int?
   invoice     Invoice         @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   shipment    MasterShipment? @relation(fields: [shipmentId], references: [id])
+
+  /// A shipment can be billed by at most one invoice line.
+  @@unique([shipmentId])
 }
 
 model InvoiceSettlement {

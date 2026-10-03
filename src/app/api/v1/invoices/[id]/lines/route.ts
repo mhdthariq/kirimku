@@ -36,7 +36,15 @@ export async function POST(req: NextRequest, { params }: Params) {
       shipmentId = shipment.id;
     }
 
-    const line = await db.invoiceLine.create({ data: { invoiceId: invoice.id, description, quantity, unitPrice, shipmentId } });
+    let line;
+    try {
+      line = await db.invoiceLine.create({ data: { invoiceId: invoice.id, description, quantity, unitPrice, shipmentId } });
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
+        return fail(422, "Shipment sudah termasuk dalam invoice lain.");
+      }
+      throw error;
+    }
     await audit({ action: "created", entityType: "invoice_line", entityId: line.id, entityLabel: `${invoice.invoiceNumber} · ${description}`, actor: user, after: line });
     return ok(line);
   });

@@ -143,18 +143,28 @@ export async function POST(req: NextRequest) {
     }
 
     const invoiceNumber = await nextCode("invoice", "INV-2026-", "invoiceNumber");
-    const invoice = await db.invoice.create({
-      data: {
-        invoiceNumber,
-        customerId,
-        status: "DRAFT",
-        issueDate: dateOrNull(body.issueDate),
-        dueDate: dateOrNull(body.dueDate),
-        notes: str(body.notes),
-        lines: { create: resolvedLines },
-      },
-      include: { lines: true },
-    });
+    let invoice;
+    try {
+      invoice = await db.invoice.create({
+        data: {
+          invoiceNumber,
+          customerId,
+          status: "DRAFT",
+          issueDate: dateOrNull(body.issueDate),
+          dueDate: dateOrNull(body.dueDate),
+          notes: str(body.notes),
+          lines: { create: resolvedLines },
+        },
+        include: { lines: true },
+      });
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
+        return fail(422, "Salah satu shipment sudah termasuk dalam invoice lain. Muat ulang daftar shipment lalu coba lagi.", {
+          lines: ["Shipment sudah ditagihkan pada invoice lain."],
+        });
+      }
+      throw error;
+    }
 
     // Revise.md §8 — when the invoice bills Marketing-created B2B shipments,
     // create the PENDING Marketing commission immediately (NO wallet credit

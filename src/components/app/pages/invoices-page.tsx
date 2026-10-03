@@ -58,6 +58,7 @@ export function InvoicesPage() {
   const [form, setForm] = useState<InvoiceForm>(EMPTY);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<Invoice | null>(null);
+  const [shipmentPickerOpen, setShipmentPickerOpen] = useState(false);
   const [detail, setDetail] = useState<Invoice | null>(null);
   const [settleOpen, setSettleOpen] = useState(false);
   const [settleTarget, setSettleTarget] = useState<Invoice | null>(null);
@@ -215,6 +216,9 @@ export function InvoicesPage() {
 
   const b2bCustomers = (options?.customers ?? []).filter((c) => c.type === "b2b");
   const customerOptions = b2bCustomers.map((c) => ({ value: String(c.id), label: c.companyName ?? "Nama perusahaan belum diisi" }));
+  const customerShipments = (options?.b2bShipments ?? []).filter(
+    (s) => (!form.customerId || s.customerId === Number(form.customerId)) && s.invoiceLines.length === 0 && !form.lines.some((line) => line.shipmentId === String(s.id)),
+  );
   const draftLinesTotal = form.lines.reduce((sum, l) => sum + (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0), 0);
 
   return (
@@ -376,7 +380,13 @@ export function InvoicesPage() {
               <Field label="Customer B2B" htmlFor="inv-customer">
                 <FormSelect
                   value={form.customerId}
-                  onValueChange={(v) => setForm({ ...form, customerId: v })}
+                  onValueChange={(v) =>
+                    setForm({
+                      ...form,
+                      customerId: v,
+                      lines: form.lines.map((line) => (line.shipmentId ? { ...line, shipmentId: "", description: "", unitPrice: "" } : line)),
+                    })
+                  }
                   placeholder={customerOptions.length ? "Pilih customer…" : "Belum ada customer B2B"}
                   options={customerOptions}
                   disabled={busy || customerOptions.length === 0}
@@ -395,61 +405,41 @@ export function InvoicesPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-foreground">Baris item</p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setForm((f) => ({ ...f, lines: [...f.lines, { description: "", quantity: "1", unitPrice: "", shipmentId: "" }] }))}
-                  disabled={busy}
-                >
-                  <Plus className="h-3.5 w-3.5" /> Baris
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setForm((f) => ({ ...f, lines: [...f.lines, { description: "", quantity: "1", unitPrice: "", shipmentId: "" }] }))}
+                    disabled={busy}
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Baris
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShipmentPickerOpen(true)}
+                    disabled={busy || !form.customerId || customerShipments.length === 0}
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add Shipment
+                  </Button>
+                </div>
               </div>
-              {/* Revise.md §7.1 - pick the customer's B2B shipments to bill;
-                  linked Marketing shipments attach the commission (§8). */}
               {(() => {
                 const allCustomerShipments = (options?.b2bShipments ?? []).filter(
                   (s) => !form.customerId || s.customerId === Number(form.customerId),
                 );
-                const customerShipments = allCustomerShipments.filter((s) => s.invoiceLines.length === 0);
                 const linkedPartner = form.lines
-                  .map((l) => customerShipments.find((s) => String(s.id) === l.shipmentId)?.createdByPartnerId ?? null)
+                  .map((l) => allCustomerShipments.find((s) => String(s.id) === l.shipmentId)?.createdByPartnerId ?? null)
                   .find((p) => p != null);
                 return (
                   <>
                     <div className="space-y-2">
                       {form.lines.map((line, i) => (
                         <div key={i} className="space-y-1.5 rounded-lg border p-2.5">
-                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_36px]">
-                            <FormSelect
-                              value={line.shipmentId}
-                              onValueChange={(shipmentId) => {
-                                const picked = customerShipments.find((s) => String(s.id) === shipmentId);
-                                setForm((f) => ({
-                                  ...f,
-                                  lines: f.lines.map((l, idx) =>
-                                    idx === i
-                                      ? {
-                                          ...l,
-                                          shipmentId,
-                                          ...(picked && !l.description
-                                            ? {
-                                                description: `${picked.masterCode} - pengiriman ${picked.origin} → ${picked.destination}`,
-                                                unitPrice: String(picked.priceAmount ?? ""),
-                                              }
-                                            : {}),
-                                        }
-                                      : l,
-                                  ),
-                                }));
-                              }}
-                              placeholder="- tanpa link shipment -"
-                              options={customerShipments.map((s) => ({
-                                value: String(s.id),
-                                label: `${s.masterCode} · ${formatRupiah(s.priceAmount)}${s.createdByPartnerId ? " · marketing" : ""}`,
-                              }))}
-                              disabled={busy}
-                            />
+                          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                            <span>{line.shipmentId ? `Shipment ${allCustomerShipments.find((s) => String(s.id) === line.shipmentId)?.masterCode ?? line.shipmentId}` : "Manual item"}</span>
                             <Button
                               type="button"
                               variant="ghost"
@@ -514,6 +504,50 @@ export function InvoicesPage() {
               <SubmitButton busy={busy}>Buat Invoice Draft</SubmitButton>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={shipmentPickerOpen} onOpenChange={setShipmentPickerOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add Shipment</DialogTitle>
+            <DialogDescription>Pilih shipment milik customer ini untuk ditambahkan ke invoice. Shipment yang sudah pernah ditagihkan tidak ditampilkan.</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-80 space-y-2 overflow-y-auto">
+            {customerShipments.length === 0 ? (
+              <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">Tidak ada shipment yang bisa ditambahkan.</p>
+            ) : (
+              customerShipments.map((shipment) => (
+                <Button
+                  key={shipment.id}
+                  type="button"
+                  variant="outline"
+                  className="h-auto w-full justify-between px-3 py-2 text-left"
+                  onClick={() => {
+                    setForm((current) => ({
+                      ...current,
+                      lines: [
+                        ...current.lines,
+                        {
+                          description: `${shipment.masterCode} - pengiriman ${shipment.origin} → ${shipment.destination}`,
+                          quantity: "1",
+                          unitPrice: String(shipment.priceAmount ?? ""),
+                          shipmentId: String(shipment.id),
+                        },
+                      ],
+                    }));
+                    setShipmentPickerOpen(false);
+                  }}
+                >
+                  <span>
+                    <span className="block font-mono text-xs font-semibold">{shipment.masterCode}</span>
+                    <span className="block text-xs text-muted-foreground">{shipment.origin} → {shipment.destination}</span>
+                  </span>
+                  <span className="shrink-0 text-xs font-semibold">{formatRupiah(shipment.priceAmount)}</span>
+                </Button>
+              ))
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 
