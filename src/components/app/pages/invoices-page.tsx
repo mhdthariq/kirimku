@@ -80,10 +80,8 @@ export function InvoicesPage() {
   }, [data, search, statusFilter]);
 
   const detailWithLines = useMemo(() => {
-    if (!detail) return null;
-    const base = data?.find((inv) => inv.id === detail.id);
-    return base ?? detail;
-  }, [detail, data]);
+    return detail;
+  }, [detail]);
 
   async function loadDetail(inv: Invoice) {
     try {
@@ -616,21 +614,29 @@ export function InvoicesPage() {
                   <p className="mb-1.5 text-xs font-semibold text-foreground">Riwayat Settlement</p>
                   <ul className="space-y-1 text-sm">
                     {((detailWithLines as Invoice & { settlements?: InvoiceSettlement[] }).settlements ?? []).map((s) => (
-                      <li key={s.id} className="flex flex-col gap-1 rounded-lg bg-muted/50 px-3 py-1.5 sm:flex-row sm:justify-between sm:items-center">
-                        <span className="text-muted-foreground">
-                          {formatDate(s.settledAt, true)} · {s.method}
-                          {s.reference && <span className="ml-1 text-xs">· {s.reference}</span>}
+                      <li key={s.id} className="flex flex-col gap-2 rounded-lg bg-muted/50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0">
+                          <p className="text-muted-foreground">
+                            {formatDate(s.settledAt, true)} · {s.method}
+                            {s.reference && <span className="ml-1 text-xs">· {s.reference}</span>}
+                          </p>
                           {s.proofUrl && (
-                            <a
-                              href={s.proofUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="ml-2 inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary hover:bg-primary/20"
-                            >
-                              <Paperclip className="h-3 w-3" /> Bukti
-                            </a>
+                            s.proofUrl.startsWith("data:image/") ? (
+                              <a href={s.proofUrl} target="_blank" rel="noreferrer" className="mt-2 block w-fit" aria-label={`Lihat bukti pembayaran ${formatDate(s.settledAt, true)}`}>
+                                <img src={s.proofUrl} alt="Bukti pembayaran" className="h-16 w-24 rounded border object-cover shadow-sm hover:opacity-80" />
+                              </a>
+                            ) : (
+                              <a
+                                href={s.proofUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="mt-1 inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary hover:bg-primary/20"
+                              >
+                                <Paperclip className="h-3 w-3" /> Buka bukti PDF
+                              </a>
+                            )
                           )}
-                        </span>
+                        </div>
                         <span className="font-semibold">{formatRupiah(s.amount)}</span>
                       </li>
                     ))}
