@@ -214,7 +214,7 @@ export function InvoicesPage() {
   }
 
   const b2bCustomers = (options?.customers ?? []).filter((c) => c.type === "b2b");
-  const customerOptions = b2bCustomers.map((c) => ({ value: String(c.id), label: `${c.name} (${c.code})` }));
+  const customerOptions = b2bCustomers.map((c) => ({ value: String(c.id), label: c.companyName ?? "Nama perusahaan belum diisi" }));
   const draftLinesTotal = form.lines.reduce((sum, l) => sum + (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0), 0);
 
   return (
