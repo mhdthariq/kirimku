@@ -791,6 +791,7 @@ export interface Invoice {
   invoiceNumber: string;
   customerId: number;
   customerName: string;
+  customerCompanyName: string | null;
   customerCode: string;
   customerType: string;
   status: string;
@@ -801,6 +802,7 @@ export interface Invoice {
   totalAmount: number;
   settledAmount: number;
   remainingAmount: number;
+  lastPaidAt: string | null;
   isOverdue: boolean;
   createdAt: string;
   lines?: InvoiceLine[];

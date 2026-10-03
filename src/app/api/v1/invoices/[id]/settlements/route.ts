@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { guard, ok, handle, fail, requireNum, str } from "@/lib/api-helpers";
+import { guard, ok, handle, fail, requireNum, str, dateOrNull } from "@/lib/api-helpers";
 import { audit } from "@/lib/audit";
 
 type Params = { params: Promise<{ id: string }> };
@@ -39,6 +39,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const amount = requireNum(body.amount, "amount", 1);
     const method = body.method === "TRANSFER" ? "TRANSFER" : "CASH";
     const reference = str(body.reference);
+    const settledAt = dateOrNull(body.settledAt) ?? new Date();
     // Optional receipt: a data URL image/PDF of the transfer slip / cash receipt.
     const proofUrl = str(body.proofUrl);
     if (proofUrl != null) {
@@ -67,7 +68,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     // commission ledger credit — all-or-nothing (§30 B2B Commission).
     const { settlement, commissionReleased } = await db.$transaction(async (tx) => {
       const settlement = await tx.invoiceSettlement.create({
-        data: { invoiceId: invoice.id, amount, method, reference, proofUrl, recordedById: user.id },
+        data: { invoiceId: invoice.id, amount, method, reference, proofUrl, recordedById: user.id, settledAt },
       });
       const updatedInvoice = await tx.invoice.update({ where: { id: invoice.id }, data: { status: newStatus } });
       void updatedInvoice;

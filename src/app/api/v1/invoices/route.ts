@@ -36,12 +36,17 @@ export async function GET(req: NextRequest) {
       invoices.map((inv) => {
         const total = inv.lines.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0);
         const settled = inv.settlements.reduce((sum, s) => sum + s.amount, 0);
+        const lastPaidAt = inv.settlements.reduce<Date | null>(
+          (latest, settlement) => (!latest || settlement.settledAt > latest ? settlement.settledAt : latest),
+          null,
+        );
         const isOverdue = inv.status === "SENT" && inv.dueDate != null && inv.dueDate < new Date();
         return {
           id: inv.id,
           invoiceNumber: inv.invoiceNumber,
           customerId: inv.customerId,
           customerName: inv.customer.companyName ?? inv.customer.name,
+          customerCompanyName: inv.customer.companyName,
           customerCode: inv.customer.code,
           customerType: inv.customer.type,
           status: inv.status,
@@ -52,6 +57,7 @@ export async function GET(req: NextRequest) {
           totalAmount: total,
           settledAmount: settled,
           remainingAmount: total - settled,
+          lastPaidAt,
           isOverdue,
           createdAt: inv.createdAt,
           // Revise.md §8 — commission status attached to the invoice

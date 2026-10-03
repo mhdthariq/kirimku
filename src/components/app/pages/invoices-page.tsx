@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Paperclip, Plus, Printer, Receipt, Send, Trash2, Wallet } from "lucide-react";
+import { Eye, Paperclip, Plus, Printer, Receipt, Send, Trash2, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { apiDelete, apiGet, apiPost, hasPermission, type Invoice, type InvoiceLine, type InvoiceSettlement, type Options } from "@/lib/client-api";
@@ -64,6 +64,7 @@ export function InvoicesPage() {
   const [settleAmount, setSettleAmount] = useState("");
   const [settleMethod, setSettleMethod] = useState("TRANSFER");
   const [settleRef, setSettleRef] = useState("");
+  const [settleDate, setSettleDate] = useState(new Date().toISOString().slice(0, 10));
   const [settleProof, setSettleProof] = useState<{ name: string; type: string; dataUrl: string } | null>(null);
   const [settleProofError, setSettleProofError] = useState("");
   const [printOpen, setPrintOpen] = useState(false);
@@ -165,6 +166,7 @@ export function InvoicesPage() {
           amount,
           method: settleMethod,
           reference: settleRef || null,
+            settledAt: settleDate || null,
           proofUrl: settleProof?.dataUrl ?? null,
         }),
       {
@@ -180,6 +182,7 @@ export function InvoicesPage() {
       setSettleTarget(null);
       setSettleAmount("");
       setSettleRef("");
+      setSettleDate(new Date().toISOString().slice(0, 10));
       setSettleProof(null);
       setSettleProofError("");
       reload();
@@ -269,7 +272,7 @@ export function InvoicesPage() {
                 header: "Customer",
                 render: (inv) => (
                   <div>
-                    <p className="text-sm font-medium text-foreground">{inv.customerName}</p>
+                    <p className="text-sm font-medium text-foreground">{inv.customerCompanyName ?? inv.customerName}</p>
                     <p className="text-xs text-muted-foreground">{inv.linesCount} baris item</p>
                   </div>
                 ),
@@ -285,6 +288,17 @@ export function InvoicesPage() {
                     )}
                   </div>
                 ),
+              },
+              {
+                key: "lastPaid",
+                header: "Last Paid",
+                hideOnMobile: true,
+                render: (inv) => (inv.lastPaidAt ? formatDate(inv.lastPaidAt, true) : "-"),
+              },
+              {
+                key: "remaining",
+                header: "Sisa",
+                render: (inv) => <span className={inv.remainingAmount > 0 ? "font-semibold text-destructive" : "text-primary"}>{formatRupiah(inv.remainingAmount)}</span>,
               },
               { key: "due", header: "Jatuh Tempo", hideOnMobile: true, render: (inv) => formatDate(inv.dueDate) },
               {
@@ -307,6 +321,9 @@ export function InvoicesPage() {
                 header: "Aksi",
                 render: (inv) => (
                   <div className="flex flex-wrap gap-1.5">
+                    <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => loadDetail(inv)} aria-label={`Lihat riwayat ${inv.invoiceNumber}`} title="Lihat riwayat pembayaran">
+                      <Eye className="h-3.5 w-3.5" />
+                    </Button>
                     <Button variant="outline" size="sm" className="h-7" onClick={() => (window.location.hash = `#/invoices/${inv.id}`)}>
                       Detail
                     </Button>
@@ -326,6 +343,7 @@ export function InvoicesPage() {
                           // fetch (which previously caused silent no-ops).
                           setSettleTarget(inv);
                           setSettleAmount(String(Math.round(inv.remainingAmount)));
+                          setSettleDate(new Date().toISOString().slice(0, 10));
                           setSettleOpen(true);
                         }}
                       >
@@ -523,7 +541,7 @@ export function InvoicesPage() {
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-lg border bg-muted/20 p-3">
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Ditagihkan kepada</p>
-                  <p className="mt-1 font-semibold text-foreground">{(detailWithLines as Invoice & { customer?: { companyName?: string | null } }).customer?.companyName ?? detailWithLines.customerName}</p>
+                  <p className="mt-1 font-semibold text-foreground">{(detailWithLines as Invoice & { customer?: { companyName?: string | null } }).customer?.companyName ?? detailWithLines.customerCompanyName ?? detailWithLines.customerName}</p>
                   <p className="text-xs text-muted-foreground">{detailWithLines.customerCode}</p>
                   {(detailWithLines as Invoice & { customer?: { address?: string | null } }).customer?.address && <p className="mt-1 text-xs text-muted-foreground">{(detailWithLines as Invoice & { customer?: { address?: string | null } }).customer?.address}</p>}
                 </div>
@@ -638,6 +656,9 @@ export function InvoicesPage() {
           <form onSubmit={onSettle} className="space-y-4">
             <Field label="Jumlah (Rp)" htmlFor="st-amount">
               <NumberInput id="st-amount" value={settleAmount} onChange={(e) => setSettleAmount(e.target.value)} required disabled={busy} />
+            </Field>
+            <Field label="Tanggal pembayaran" htmlFor="st-date">
+              <Input id="st-date" type="date" value={settleDate} onChange={(e) => setSettleDate(e.target.value)} required disabled={busy} />
             </Field>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Metode" htmlFor="st-method">
