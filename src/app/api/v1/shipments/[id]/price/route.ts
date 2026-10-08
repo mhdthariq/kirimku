@@ -1,13 +1,13 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle, fail, num } from "@/lib/api-helpers";
-import { audit } from "@/lib/audit";
-import { computePricing } from "@/lib/pricing";
-import { resolveTariff } from "@/lib/pricing-server";
-import { hasPermission } from "@/lib/auth";
-import { assertShipmentScope } from "@/lib/gudang-scope";
-import { checkPricingNotLocked } from "@/lib/business-rules/payment";
-import { walletSummary } from "@/lib/wallet";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle, fail, num } from "@/composition/api-helpers";
+import { audit } from "@/infrastructure/services/audit";
+import { computePricing } from "@/domain/pricing";
+import { resolveTariff } from "@/composition/pricing-server";
+import { hasPermission } from "@/infrastructure/auth/auth";
+import { assertShipmentScope } from "@/infrastructure/services/gudang-scope";
+import { checkPricingNotLocked } from "@/infrastructure/services/business-rules/payment";
+import { walletSummary } from "@/infrastructure/services/wallet";
 
 type Params = { params: Promise<{ id: string }> };
 

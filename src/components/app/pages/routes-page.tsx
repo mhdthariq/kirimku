@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { ArrowLeft, Check, MapPin, Pencil, Plus, RotateCcw, Trash2, Waypoints } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
-import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type Route as RouteModel, type Checkpoint } from "@/lib/client-api";
+import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type Route as RouteModel, type Checkpoint } from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
@@ -21,7 +21,7 @@ const CheckpointMapEditor = dynamic(
   () => import("@/components/app/checkpoint-map-editor").then((m) => m.CheckpointMapEditor),
   {
     ssr: false,
-    loading: () => <Skeleton className="h-[440px] w-full rounded-xl" />,
+    loading: () => <Skeleton className="h-110 w-full rounded-xl" />,
   },
 );
 import type { DraftCheckpoint } from "@/components/app/checkpoint-map-editor";

@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle, str } from "@/lib/api-helpers";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle, str } from "@/composition/api-helpers";
 
 /** GET /return-tasks?status=&search= */
 export async function GET(req: NextRequest) {

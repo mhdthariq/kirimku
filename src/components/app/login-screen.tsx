@@ -17,7 +17,7 @@ import {
   NEXT_PUBLIC_IS_PREVIEW,
   NEXT_PUBLIC_IS_DEV,
   NEXT_PUBLIC_PREVIEW_CORP_ID,
-} from "@/lib/runtime-mode";
+} from "@/shared/runtime-mode";
 
 /**
  * Runtime mode (Revise round 7): the app now ships with THREE modes:
@@ -133,18 +133,17 @@ export function LoginScreen() {
 
         <div className="relative max-w-md">
           <h1 className="text-[34px] font-bold leading-[1.15] tracking-tight text-white xl:text-[40px]">
-            Kendalikan seluruh perjalanan kiriman Anda dari satu tempat.
+            Kelola kiriman dari satu tempat.
           </h1>
           <p className="mt-4 text-[15px] leading-relaxed text-white/85">
-            Dari pickup kurir, penyimpanan gudang, transport antar kota dengan checkpoint GPS,
-            hingga delivery dan settlement - semuanya terlacak dan teraudit.
+            Pantau kiriman dari penjemputan hingga diterima.
           </p>
 
           <div className="mt-8 grid grid-cols-3 gap-3">
             {[
-              { icon: Package, label: "End-to-end tracking" },
-              { icon: MapPin, label: "GPS checkpoints" },
-              { icon: ShieldCheck, label: "Audit trail penuh" },
+              { icon: Package, label: "Lacak kiriman" },
+              { icon: MapPin, label: "Lokasi perjalanan" },
+              { icon: ShieldCheck, label: "Riwayat aktivitas" },
             ].map((f) => (
               <div key={f.label} className="rounded-xl bg-white/10 p-3 backdrop-blur-sm">
                 <f.icon className="h-5 w-5 text-white" />
@@ -156,7 +155,7 @@ export function LoginScreen() {
           <div className="mt-10 flex items-center gap-6 border-t border-white/15 pt-6">
             <div>
               <p className="text-2xl font-bold text-white">6</p>
-              <p className="text-[11px] text-white/80">Status lifecycle</p>
+              <p className="text-[11px] text-white/80">Status kiriman</p>
             </div>
             <div>
               <p className="text-2xl font-bold text-white">3+</p>
@@ -201,7 +200,7 @@ export function LoginScreen() {
 
             <h2 className="text-2xl font-bold tracking-tight text-foreground">Masuk ke akun Anda</h2>
             <p className="mt-1.5 text-sm text-foreground/70">
-              Gunakan username dan password Anda. Sesi berlaku 12 jam.
+              Sesi berlaku 12 jam.
             </p>
 
             <form onSubmit={onSubmit} className="mt-7 space-y-4">
@@ -238,11 +237,10 @@ export function LoginScreen() {
                   <p className="text-[11px] text-foreground/60">
                     {NEXT_PUBLIC_IS_PREVIEW ? (
                       <>
-                        ID Perusahaan untuk Preview. Default <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">TRIAL</code> -
-                        dapat diganti bila ingin login ke tenant lain.
+                        Gunakan <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">TRIAL</code> untuk demo, atau ID perusahaan Anda.
                       </>
                     ) : (
-                      <>ID Perusahaan untuk menggunakan Aplikasi ini.</>
+                      <>Gunakan ID yang diberikan perusahaan Anda.</>
                     )}
                   </p>
                 </div>
@@ -264,10 +262,10 @@ export function LoginScreen() {
                   <span>
                     <span className="font-semibold">{MODE_LABEL}</span>
                     {NEXT_PUBLIC_IS_PREVIEW && (
-                      <> - build staging/UAT. Akun demo aktif, license server tetap dihubungi.</>
+                      <> - akun demo tersedia.</>
                     )}
                     {NEXT_PUBLIC_IS_DEV && (
-                      <> - tanpa Corporate ID, license server dilewati (pakai DATABASE_URL lokal).</>
+                      <> - tanpa Corporate ID.</>
                     )}
                   </span>
                 </div>

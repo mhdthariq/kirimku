@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { ok, handle, fail, str } from "@/lib/api-helpers";
-import { ensureRbac } from "@/lib/rbac";
-import { ensureSeed } from "@/lib/seed";
-import { isDefaultTenant } from "@/lib/tenant-context";
-import { computeTotals } from "@/lib/shipment-totals";
-import { STATUS_LABELS } from "@/lib/shipment-flow";
+import { db } from "@/infrastructure/persistence/db";
+import { ok, handle, fail, str } from "@/composition/api-helpers";
+import { ensureRbac } from "@/infrastructure/auth/rbac";
+import { ensureSeed } from "@/infrastructure/services/seed";
+import { isDefaultTenant } from "@/infrastructure/persistence/tenant-context";
+import { computeTotals } from "@/infrastructure/services/shipment-totals";
+import { STATUS_LABELS } from "@/domain/shipment-flow";
 
 type Params = { params: Promise<{ resi: string }> };
 

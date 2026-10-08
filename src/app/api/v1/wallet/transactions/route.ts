@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
-import { guard, ok, handle } from "@/lib/api-helpers";
-import { requirePartner, getOrCreateWallet } from "@/lib/wallet";
-import { db } from "@/lib/db";
+import { guard, ok, handle } from "@/composition/api-helpers";
+import { requirePartner, getOrCreateWallet } from "@/infrastructure/services/wallet";
+import { db } from "@/infrastructure/persistence/db";
 
 /**
  * GET /api/v1/wallet/transactions — own wallet ledger history (§24/§28).

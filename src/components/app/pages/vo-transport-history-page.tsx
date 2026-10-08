@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Eye, History, TrendingUp } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { apiGet, hasPermission, type VOTransportRow } from "@/lib/client-api";
+import { apiGet, hasPermission, type VOTransportRow } from "@/infrastructure/http/client-api";
 import { useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { StatusBadge } from "@/components/app/status-badge";

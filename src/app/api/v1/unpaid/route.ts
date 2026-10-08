@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle } from "@/lib/api-helpers";
-import { cityIndex, inScope, scopeForUser, shipmentGudangIds } from "@/lib/gudang-scope";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle } from "@/composition/api-helpers";
+import { cityIndex, inScope, scopeForUser, shipmentGudangIds } from "@/infrastructure/services/gudang-scope";
 
 /** Unpaid B2C shipments (priced, not yet settled) — scoped to the user's gudang. */
 export async function GET(req: NextRequest) {

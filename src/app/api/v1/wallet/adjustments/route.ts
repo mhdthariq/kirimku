@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
-import { guard, ok, handle, fail, requireNum, str, bool } from "@/lib/api-helpers";
-import { requirePartner, creditWallet, debitWallet, walletSummary, financeAudit } from "@/lib/wallet";
-import { db } from "@/lib/db";
+import { guard, ok, handle, fail, requireNum, str, bool } from "@/composition/api-helpers";
+import { requirePartner, creditWallet, debitWallet, walletSummary, financeAudit } from "@/infrastructure/services/wallet";
+import { db } from "@/infrastructure/persistence/db";
 
 /**
  * POST /api/v1/wallet/adjustments — Owner Company correction entry (§29).

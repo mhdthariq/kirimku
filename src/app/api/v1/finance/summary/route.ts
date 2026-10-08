@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle } from "@/lib/api-helpers";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle } from "@/composition/api-helpers";
 
 /**
  * GET /api/v1/finance/summary — company financial dashboard (§33/§34):

@@ -30,8 +30,8 @@ import {
   Gauge,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { hasAnyPermission } from "@/lib/client-api";
-import { NEXT_PUBLIC_SHOW_TRACKING_LINK } from "@/lib/runtime-mode";
+import { hasAnyPermission } from "@/infrastructure/http/client-api";
+import { NEXT_PUBLIC_SHOW_TRACKING_LINK } from "@/shared/runtime-mode";
 import { Logo } from "@/components/app/logo";
 import { ThemeToggle } from "@/components/app/theme-toggle";
 import { InstallAppMenuItem } from "@/components/app/pwa";
@@ -46,7 +46,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/utils";
 
 export interface NavItem {
   href: string;
@@ -144,7 +144,7 @@ function NavLink({
       ? "bg-primary text-primary-foreground shadow-sm"
       : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
   );
-  const iconClassName = cn("h-[18px] w-[18px] shrink-0", active ? "text-primary-foreground" : "text-muted-foreground group-hover:text-accent-foreground");
+  const iconClassName = cn("h-4.5 w-4.5 shrink-0", active ? "text-primary-foreground" : "text-muted-foreground group-hover:text-accent-foreground");
 
   if (MIGRATED_ROUTES.has(item.href)) {
     return (
@@ -415,7 +415,7 @@ export function AppShell({
                       {user.name.split(" ").map((n) => n[0]).slice(0, 2).join("")}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="hidden max-w-[120px] truncate text-xs font-semibold text-foreground sm:block">
+                  <span className="hidden max-w-30 truncate text-xs font-semibold text-foreground sm:block">
                     {user.name}
                   </span>
                 </button>
@@ -466,7 +466,7 @@ export function AppShell({
           {mobileItems.map((item) => {
             const active = path.startsWith(item.href);
             const className = cn(
-              "flex min-w-[64px] flex-1 flex-col items-center gap-0.5 px-2 py-2 text-[10px] font-medium transition-colors",
+              "flex min-w-16 flex-1 flex-col items-center gap-0.5 px-2 py-2 text-[10px] font-medium transition-colors",
               active ? "text-primary" : "text-muted-foreground hover:text-foreground",
             );
             const inner = (

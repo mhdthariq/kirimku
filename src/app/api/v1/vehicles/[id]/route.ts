@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle, fail, str, requireNum, num } from "@/lib/api-helpers";
-import { audit, diffFields } from "@/lib/audit";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle, fail, str, requireNum, num } from "@/composition/api-helpers";
+import { audit, diffFields } from "@/infrastructure/services/audit";
 
 /** Resolve & validate a Vehicle Owner partner for vehicle ownership (§13). */
 async function resolveOwner(ownerId: number | null) {
@@ -67,11 +67,11 @@ export async function PUT(req: NextRequest, { params }: Params) {
     // Capacity Round — explicitly call out capacity-config changes (maxWeightKg /
     // maxVolumeM3 / maxKoli) in the audit log so reviewers can spot them at a
     // glance. The full field diff is still recorded via `before`.
-    const diff = diffFields(existing, vehicle as unknown as Record<string, unknown>);
+    const diff = diffFields(existing, vehicle);
     const capacityFields = ["maxWeightKg", "maxVolumeM3", "maxKoli"];
     const capacityChanges = capacityFields
       .filter((f) => diff[f])
-      .map((f) => ({ field: f, before: (diff[f] as { before: unknown }).before, after: (diff[f] as { before: unknown }).after }));
+      .map((f) => ({ field: f, before: diff[f].before, after: diff[f].after }));
     const after: Record<string, unknown> = { ...vehicle };
     if (capacityChanges.length > 0) {
       after.capacityConfigChanged = true;

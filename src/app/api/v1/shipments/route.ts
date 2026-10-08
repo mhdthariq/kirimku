@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle, fail, str, num } from "@/lib/api-helpers";
-import { audit } from "@/lib/audit";
-import { nextCode, nextDetailCodes } from "@/lib/code-generator";
-import { hasPermission } from "@/lib/auth";
-import { totalsByMaster } from "@/lib/shipment-totals";
-import { cityIndex, inScope, shipmentGudangIds, scopeForUser } from "@/lib/gudang-scope";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle, fail, str, num } from "@/composition/api-helpers";
+import { audit } from "@/infrastructure/services/audit";
+import { nextCode, nextDetailCodes } from "@/infrastructure/services/code-generator";
+import { hasPermission } from "@/infrastructure/auth/auth";
+import { totalsByMaster } from "@/infrastructure/services/shipment-totals";
+import { cityIndex, inScope, shipmentGudangIds, scopeForUser } from "@/infrastructure/services/gudang-scope";
 
 export async function GET(req: NextRequest) {
   return handle(req, async () => {

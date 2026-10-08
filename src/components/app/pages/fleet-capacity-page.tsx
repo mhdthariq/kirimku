@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Download, Gauge, GaugeCircle, History, PackageMinus, Scale, Box, Package, Truck, AlertTriangle, ShieldCheck, Search, Wand2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { apiGet, apiPost, hasPermission, type FleetCapacityResponse, type FleetCapacityRow } from "@/lib/client-api";
+import { apiGet, apiPost, hasPermission, type FleetCapacityResponse, type CapacityState, type FleetCapacityRow } from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { CapacityRing, OverallCapacityBadge } from "@/components/app/capacity-status-card";
@@ -23,7 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/utils";
 
 /**
  * Fleet Capacity overview (Capacity Round) — a dedicated page showing every
@@ -102,7 +102,7 @@ export function FleetCapacityPage() {
     <div className="space-y-4">
       <PageHeader
         title="Kapasitas Armada"
-        subtitle="Overview kapasitas seluruh kendaraan — konfigurasi limit + beban live dari transport aktif (PLANNED + DEPARTED). Informatif, tidak memblokir."
+        subtitle="Batas kapasitas dan muatan transport yang direncanakan atau berjalan. Informasi ini tidak memblokir operasional."
         icon={<Gauge className="h-5 w-5" />}
         actions={
           <>
@@ -312,8 +312,9 @@ function CapacityRingMini({ row }: { row: FleetCapacityRow }) {
   return <CapacityRing capacity={row.activeCapacity} size={36} />;
 }
 
-function DimensionChip({ label, state }: { label: string; state: "OK" | "OVERLIMIT" | "UNCONFIGURED" }) {
+function DimensionChip({ label, state }: { label: string; state: CapacityState }) {
   const cls = state === "OK" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+    : state === "WARNING" ? "bg-orange-100 text-orange-700 dark:bg-orange-950/50 dark:text-orange-300"
     : state === "OVERLIMIT" ? "bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300"
     : "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300";
   return (

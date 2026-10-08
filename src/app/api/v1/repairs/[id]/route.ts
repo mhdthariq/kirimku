@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle, fail, requireStr, requireNum, str, num, dateOrNull } from "@/lib/api-helpers";
-import { financeAudit } from "@/lib/wallet";
-import { appendRepairLedger, logRepairAction } from "@/lib/repair-helpers";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle, fail, requireStr, requireNum, str, num, dateOrNull } from "@/composition/api-helpers";
+import { financeAudit } from "@/infrastructure/services/wallet";
+import { appendRepairLedger, logRepairAction } from "@/infrastructure/services/repair-helpers";
 
 type Params = { params: Promise<{ id: string }> };
 

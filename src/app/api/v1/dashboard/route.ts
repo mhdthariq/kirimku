@@ -1,13 +1,13 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle, str } from "@/lib/api-helpers";
-import { hasPermission, type AuthUser } from "@/lib/auth";
-import { cityIndex, filterAuditEntriesForScope, inScope, scopeForUser, shipmentGudangIds, pickupGudangIds, deliveryGudangIds, transportGudangIds } from "@/lib/gudang-scope";
-import { computeTotals } from "@/lib/shipment-totals";
-import { detailAggregates, transportLoadFromAggregates } from "@/lib/transport-totals";
-import { calculateTransportCapacityStatus } from "@/lib/capacity";
-import { getCapacityWarningThreshold } from "@/lib/settings";
-import { walletSummary, requirePartner } from "@/lib/wallet";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle, str } from "@/composition/api-helpers";
+import { hasPermission, type AuthUser } from "@/infrastructure/auth/auth";
+import { cityIndex, filterAuditEntriesForScope, inScope, scopeForUser, shipmentGudangIds, pickupGudangIds, deliveryGudangIds, transportGudangIds } from "@/infrastructure/services/gudang-scope";
+import { computeTotals } from "@/infrastructure/services/shipment-totals";
+import { detailAggregates, transportLoadFromAggregates } from "@/infrastructure/services/transport-totals";
+import { calculateTransportCapacityStatus } from "@/domain/capacity";
+import { getCapacityWarningThreshold } from "@/infrastructure/services/settings";
+import { walletSummary, requirePartner } from "@/infrastructure/services/wallet";
 
 /**
  * Owner / operational dashboard (Revise.md — Owner Dashboard redesign).

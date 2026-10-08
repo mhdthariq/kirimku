@@ -1,8 +1,8 @@
 "use client";
 
 import { Field, FormSelect, Input, NumberInput } from "@/components/app/form-parts";
-import { tariffFieldVisibility, type TariffFormState, type TariffTab } from "@/lib/tariff-form";
-import type { PricingMethod } from "@/lib/client-api";
+import { tariffFieldVisibility, type TariffFormState, type TariffTab } from "@/presentation/tariff-form";
+import type { PricingMethod } from "@/infrastructure/http/client-api";
 
 const METHOD_OPTIONS: { value: PricingMethod; label: string }[] = [
   { value: "PER_KG", label: "Per kg" },

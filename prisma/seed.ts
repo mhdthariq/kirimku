@@ -26,8 +26,8 @@
  *   B2B Master Resi scan option (single Master Resi scan covers all
  *   packages — no per-package scan required).
  */
-import { ensureSeed } from "../src/lib/seed";
-import { db } from "../src/lib/db";
+import { ensureSeed } from "@/infrastructure/services/seed";
+import { db } from "@/infrastructure/persistence/db";
 
 async function main() {
   console.log("→ Menjalankan seeder mock-up data...");

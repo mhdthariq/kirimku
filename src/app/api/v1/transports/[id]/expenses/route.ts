@@ -1,10 +1,10 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle, fail, num, str } from "@/lib/api-helpers";
-import { audit } from "@/lib/audit";
-import { nextCode } from "@/lib/code-generator";
-import { summarizeExpenses, validateExpense } from "@/lib/transport-ops";
-import { assertTransportAccess, parseOptionalPhoto } from "@/lib/transport-ops-server";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle, fail, num, str } from "@/composition/api-helpers";
+import { audit } from "@/infrastructure/services/audit";
+import { nextCode } from "@/infrastructure/services/code-generator";
+import { summarizeExpenses, validateExpense } from "@/domain/transport-ops";
+import { assertTransportAccess, parseOptionalPhoto } from "@/infrastructure/services/transport-ops-server";
 
 type Params = { params: Promise<{ id: string }> };
 

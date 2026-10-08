@@ -14,14 +14,14 @@ import {
   History,
   Banknote,
 } from "lucide-react";
-import { apiGet, type VehicleOwnerDashboard } from "@/lib/client-api";
+import { apiGet, type VehicleOwnerDashboard } from "@/infrastructure/http/client-api";
 import { useApiData } from "@/hooks/use-api-data";
 import { PageHeader } from "@/components/app/data-table";
 import { StatusBadge } from "@/components/app/status-badge";
 import { TX_LABELS } from "@/components/app/pages/wallet-page";
 import { formatRupiah, formatDate, formatNumber } from "@/components/app/form-parts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/utils";
 
 const VEHICLE_STATUS_META: Record<string, { label: string; tone: string }> = {
   ACTIVE: { label: "Aktif", tone: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
@@ -94,7 +94,7 @@ export function VehicleOwnerDashboard() {
     <div className="space-y-4">
       <PageHeader
         title="Dashboard Vehicle Owner"
-        subtitle="Armada, earnings, repair, dan wallet Anda - hanya milik Anda (§39)."
+        subtitle="Armada, penghasilan, perbaikan, dan saldo Anda."
         icon={<CarFront className="h-5 w-5" />}
         actions={
           data.recentRepairLogs.length > 0 ? (

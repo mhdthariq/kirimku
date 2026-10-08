@@ -2,12 +2,12 @@
 
 import { useApiData } from "@/hooks/use-api-data";
 import { Clock, History, Loader2, Package, RefreshCw } from "lucide-react";
-import { apiGetWithMeta, hasPermission, type AuditEntry, type AuditResponse } from "@/lib/client-api";
+import { apiGetWithMeta, hasPermission, type AuditEntry, type AuditResponse } from "@/infrastructure/http/client-api";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/components/app/form-parts";
 import { AuditDataViewer } from "@/components/app/audit-data-viewer";
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/utils";
 
 const ACTION_STYLES: Record<string, string> = {
   created: "bg-primary/10 text-primary",
@@ -99,7 +99,7 @@ export function ActivityLogPanel({
           <ol className="relative ml-3 space-y-0 border-l pl-4">
             {entries.map((entry) => (
               <li key={entry.id} className="relative pb-4 pt-1 last:pb-1">
-                <span className="absolute -left-[21px] top-1.5 flex h-2.5 w-2.5 rounded-full border-2 border-card bg-primary" />
+                <span className="absolute -left-5.25 top-1.5 flex h-2.5 w-2.5 rounded-full border-2 border-card bg-primary" />
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span
                     className={cn(

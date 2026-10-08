@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { Clock, Gauge, History, X } from "lucide-react";
-import { apiGet, type AuditEntry } from "@/lib/client-api";
+import { apiGet, type AuditEntry } from "@/infrastructure/http/client-api";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatDate } from "@/components/app/form-parts";
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/utils";
 
 /**
  * Vehicle Capacity History dialog (Capacity Round) — shows the audit trail of
@@ -86,7 +86,7 @@ export function VehicleCapacityHistoryDialog({
                 | undefined;
               return (
                 <li key={e.id} className="relative pb-4 pt-1">
-                  <span className="absolute -left-[21px] top-2 flex h-2.5 w-2.5 rounded-full border-2 border-card bg-amber-500" />
+                  <span className="absolute -left-5.25 top-2 flex h-2.5 w-2.5 rounded-full border-2 border-card bg-amber-500" />
                   <div className="rounded-lg border bg-card p-2.5">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">

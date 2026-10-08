@@ -25,8 +25,8 @@
  * Demo account created:
  *   owner  / ChangeMeOwner#2026   (akses penuh — satu-satunya user di sistem)
  */
-import { seedOwnerOnly } from "../src/lib/seed";
-import { db } from "../src/lib/db";
+import { seedOwnerOnly } from "@/infrastructure/services/seed";
+import { db } from "@/infrastructure/persistence/db";
 
 async function main() {
   console.log("→ Menjalankan seeder OWNER SAJA (tanpa staff, gudang, partner, atau data lain)...");

@@ -32,7 +32,7 @@ export function ThemeProvider({
   const [systemDark, setSystemDark] = useState(() =>
     typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches,
   );
-  const resolvedTheme = theme === "system" && enableSystem ? (systemDark ? "dark" : "light") : theme;
+  const resolvedTheme: "light" | "dark" = theme === "system" ? (enableSystem && systemDark ? "dark" : "light") : theme;
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");

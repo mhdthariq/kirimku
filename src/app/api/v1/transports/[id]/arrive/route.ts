@@ -1,10 +1,10 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle, fail } from "@/lib/api-helpers";
-import { audit } from "@/lib/audit";
-import { shipmentDestinationGudangIds, cityIndex } from "@/lib/gudang-scope";
-import { assertTransportScope } from "@/lib/gudang-scope";
-import { syncReturnTaskForTransport } from "@/lib/transport-ops-server";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle, fail } from "@/composition/api-helpers";
+import { audit } from "@/infrastructure/services/audit";
+import { shipmentDestinationGudangIds, cityIndex } from "@/infrastructure/services/gudang-scope";
+import { assertTransportScope } from "@/infrastructure/services/gudang-scope";
+import { syncReturnTaskForTransport } from "@/infrastructure/services/transport-ops-server";
 
 type Params = { params: Promise<{ id: string }> };
 

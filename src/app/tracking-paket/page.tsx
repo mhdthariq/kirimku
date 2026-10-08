@@ -25,7 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatDate, formatNumber } from "@/components/app/form-parts";
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/utils";
 
 /**
  * Public tracking page at /tracking-paket.
@@ -155,7 +155,7 @@ export default function TrackingPaketPage() {
   const progress = data ? progressIndex(data.status) : -1;
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-primary/5 via-background to-background">
+    <main className="min-h-screen bg-linear-to-b from-primary/5 via-background to-background">
       {/* Header */}
       <header className="border-b bg-background/80 backdrop-blur">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-4">
@@ -179,7 +179,7 @@ export default function TrackingPaketPage() {
         <div className="text-center">
           <h1 className="text-2xl font-bold tracking-tight sm:text-4xl">Lacak Paket Anda</h1>
           <p className="mt-2 text-sm text-muted-foreground sm:text-base">
-            Masukkan <b>No. Master Resi</b> (mis. <span className="font-mono">MKT-000001</span>) untuk melihat status pengiriman dan daftar paket.
+            Masukkan <b>No. Master Resi</b> pada bukti pengiriman Anda.
           </p>
         </div>
 
@@ -206,8 +206,8 @@ export default function TrackingPaketPage() {
         {/* Helper chip row */}
         {!data && !error && (
           <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-xs text-muted-foreground">
-            <span className="rounded-full border bg-card px-3 py-1">No login required</span>
-            <span className="rounded-full border bg-card px-3 py-1">Real-time status</span>
+            <span className="rounded-full border bg-card px-3 py-1">Tanpa login</span>
+            <span className="rounded-full border bg-card px-3 py-1">Status pengiriman</span>
             <span className="rounded-full border bg-card px-3 py-1">Lihat semua paket</span>
           </div>
         )}
@@ -223,7 +223,7 @@ export default function TrackingPaketPage() {
                 <p className="text-sm font-semibold text-destructive">Resi tidak ditemukan</p>
                 <p className="mt-1 text-sm text-muted-foreground">{error}</p>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  Pastikan nomor yang Anda masukkan benar. Master Resi tertera pada resi / receipt pengiriman Anda, formatnya biasanya <span className="font-mono">MKT-XXXXXX</span>.
+                  Periksa Master Resi pada bukti pengiriman, biasanya <span className="font-mono">MKT-XXXXXX</span>.
                 </p>
               </div>
             </CardContent>
@@ -272,7 +272,7 @@ export default function TrackingPaketPage() {
                         </span>
                         <span className={cn("h-0.5 flex-1", idx === PROGRESS_STEPS.length - 1 ? "bg-transparent" : idx < progress ? "bg-primary" : "bg-border")} />
                       </div>
-                      <span className={cn("max-w-[80px] text-[10px] leading-tight", done ? "font-semibold text-foreground" : "text-muted-foreground")}>
+                      <span className={cn("max-w-20 text-[10px] leading-tight", done ? "font-semibold text-foreground" : "text-muted-foreground")}>
                         {step.label}
                       </span>
                     </li>
@@ -411,7 +411,7 @@ export default function TrackingPaketPage() {
                 <ol className="relative border-l border-border pl-6">
                   {data.trackingEvents.map((ev) => (
                     <li key={ev.id} className="mb-5 last:mb-0">
-                      <span className="absolute -left-[14px] flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-primary/10 text-primary">
+                      <span className="absolute -left-3.5 flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-primary/10 text-primary">
                         {eventIcon(ev.event)}
                       </span>
                       <div className="rounded-lg border bg-card p-3">

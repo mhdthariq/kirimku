@@ -1,11 +1,9 @@
-"use client";
-
 import { useCallback, useEffect, useRef, useState } from "react";
 import jsQR from "jsqr";
 import { Camera, CameraOff, Keyboard, ScanLine, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/app/form-parts";
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/utils";
 
 export type ScanMethod = "SCANNED" | "TYPED";
 
@@ -169,7 +167,7 @@ export function ScanConsole({ onScan, disabled, placeholder = "Arahkan QR ke kam
             <video ref={videoRef} className="h-44 w-full object-cover sm:h-56" playsInline muted autoPlay aria-label="Pratinjau kamera scan" />
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
               <div className={cn("h-32 w-32 rounded-xl border-2 transition-colors", flash ? "border-emerald-400" : "border-white/70")}>
-                <div className={cn("m-[46px] h-9 w-9 rounded-lg transition-colors", flash ? "bg-emerald-400/80" : "bg-white/30")} />
+                <div className={cn("m-11.5 h-9 w-9 rounded-lg transition-colors", flash ? "bg-emerald-400/80" : "bg-white/30")} />
               </div>
             </div>
             <div className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-medium text-white">

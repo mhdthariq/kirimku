@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle, requireStr, str, bool, num } from "@/lib/api-helpers";
-import { audit } from "@/lib/audit";
-import { nextCode } from "@/lib/code-generator";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle, requireStr, str, bool, num } from "@/composition/api-helpers";
+import { audit } from "@/infrastructure/services/audit";
+import { nextCode } from "@/infrastructure/services/code-generator";
 
 export async function GET(req: NextRequest) {
   return handle(req, async () => {

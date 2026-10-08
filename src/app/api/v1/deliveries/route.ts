@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle, fail, requireStr, str, num } from "@/lib/api-helpers";
-import { audit } from "@/lib/audit";
-import { nextCode } from "@/lib/code-generator";
-import { cityIndex, deliveryGudangIds, inScope, scopeForUser } from "@/lib/gudang-scope";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle, fail, requireStr, str, num } from "@/composition/api-helpers";
+import { audit } from "@/infrastructure/services/audit";
+import { nextCode } from "@/infrastructure/services/code-generator";
+import { cityIndex, deliveryGudangIds, inScope, scopeForUser } from "@/infrastructure/services/gudang-scope";
 
 /** Executor = view-only delivery user without assign rights (kurir). */
 function executorOnly(user: { isOwner: boolean; permissions: string[] }): boolean {

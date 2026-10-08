@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle, fail, str, num } from "@/lib/api-helpers";
-import { audit, diffFields } from "@/lib/audit";
-import { scanProgress } from "@/lib/scan-flow";
-import { assertShipmentScope } from "@/lib/gudang-scope";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle, fail, str, num } from "@/composition/api-helpers";
+import { audit, diffFields } from "@/infrastructure/services/audit";
+import { scanProgress } from "@/infrastructure/services/scan-flow";
+import { assertShipmentScope } from "@/infrastructure/services/gudang-scope";
 
 type Params = { params: Promise<{ id: string }> };
 

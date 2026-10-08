@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle, fail } from "@/lib/api-helpers";
-import { audit } from "@/lib/audit";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle, fail } from "@/composition/api-helpers";
+import { audit } from "@/infrastructure/services/audit";
 
 /**
  * POST /api/v1/fleet-capacity/bulk-configure-koli — Owner-only bulk action.
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
         entityLabel: v.vehicleNumber,
         actor: user,
         before: { maxKoli: null },
-        after: { maxKoli, capacityConfigChanged: true, capacityChanges: [{ field: "maxKoli", before: null, after: koli }] },
+        after: { maxKoli: koli, capacityConfigChanged: true, capacityChanges: [{ field: "maxKoli", before: null, after: koli }] },
       });
     }
 

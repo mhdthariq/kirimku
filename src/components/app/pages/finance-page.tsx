@@ -14,12 +14,12 @@ import {
   Wrench,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { apiGet, hasPermission, type FinanceSummary } from "@/lib/client-api";
+import { apiGet, hasPermission, type FinanceSummary } from "@/infrastructure/http/client-api";
 import { useApiData } from "@/hooks/use-api-data";
 import { PageHeader } from "@/components/app/data-table";
 import { StatusBadge } from "@/components/app/status-badge";
 import { formatRupiah, formatDate } from "@/components/app/form-parts";
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/utils";
 
 /**
  * Finance Dashboard (Revise.md §33/§34) — Admin Kantor / Owner Company:
@@ -103,9 +103,8 @@ export function FinancePage() {
                 <Wallet className="h-4 w-4" /> Profit dari Pembayaran Invoice
               </p>
               <p className="mt-0.5 text-[11px] text-muted-foreground">
-                Setiap Rupiah yang dibayar customer (lunas <b>atau parsial</b>) langsung menjadi <b>profit perusahaan</b> -
-                komisi Marketing baru dirilis saat invoice <b>lunas penuh</b> (§9), sehingga pembayaran parsial tetap
-                milik perusahaan dan bukan utang ke partner.
+                Pembayaran, termasuk parsial, masuk ke <b>profit perusahaan</b>.
+                Komisi Marketing dirilis setelah invoice <b>lunas penuh</b>.
               </p>
             </div>
             <span className="hidden rounded-md bg-primary/10 px-2 py-1 text-[10px] font-semibold text-primary sm:inline">

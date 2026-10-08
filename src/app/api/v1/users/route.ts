@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { hashPassword } from "@/lib/auth";
-import { guard, ok, handle, fail, requireStr, str, bool, num } from "@/lib/api-helpers";
-import { audit } from "@/lib/audit";
-import { ensurePartnerProfile } from "@/lib/partner";
+import { db } from "@/infrastructure/persistence/db";
+import { hashPassword } from "@/infrastructure/auth/auth";
+import { guard, ok, handle, fail, requireStr, str, bool, num } from "@/composition/api-helpers";
+import { audit } from "@/infrastructure/services/audit";
+import { ensurePartnerProfile } from "@/infrastructure/services/partner";
 
 export async function GET(req: NextRequest) {
   return handle(req, async () => {

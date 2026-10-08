@@ -2,7 +2,7 @@
 
 import { Camera, ImageIcon } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { hasPermission } from "@/lib/client-api";
+import { hasPermission } from "@/infrastructure/http/client-api";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 

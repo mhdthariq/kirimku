@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle, str, num } from "@/lib/api-helpers";
-import { filterAuditEntriesForScope, scopeForUser } from "@/lib/gudang-scope";
+import type { Prisma } from "@prisma/client";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle, str, num } from "@/composition/api-helpers";
+import { filterAuditEntriesForScope, scopeForUser } from "@/infrastructure/services/gudang-scope";
 
 /**
  * Audit timeline. Supports per-menu filtering via ?entityType=customer|shipment|...
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
     const limit = Math.min(500, Math.max(1, num(params.get("limit")) ?? 100));
     const offset = Math.max(0, num(params.get("offset")) ?? 0);
 
-    const where = {
+    const where: Prisma.AuditLogWhereInput = {
       ...(entityType ? { entityType } : {}),
       ...(entityId != null ? { entityId } : {}),
       ...(action ? { action } : {}),

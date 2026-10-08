@@ -13,7 +13,7 @@ import {
   Truck,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { apiGet, type PickupTask, type DeliveryTask } from "@/lib/client-api";
+import { apiGet, type PickupTask, type DeliveryTask } from "@/infrastructure/http/client-api";
 import { useApiData } from "@/hooks/use-api-data";
 import { DatePeriodFilter } from "@/components/app/date-period-filter";
 import { StatusBadge } from "@/components/app/status-badge";
@@ -25,7 +25,7 @@ import dynamic from "next/dynamic";
 
 const TaskPointsMap = dynamic(() => import("@/components/app/task-points-map").then((m) => m.TaskPointsMap), {
   ssr: false,
-  loading: () => <Skeleton className="h-[320px] w-full rounded-lg" />,
+  loading: () => <Skeleton className="h-80 w-full rounded-lg" />,
 });
 
 interface KurirDashboardData {
@@ -38,7 +38,7 @@ interface KurirDashboardData {
     deliveriesDelivered: number;
   };
   pickups: (PickupTask & { customerPhone: string | null })[];
-  deliveries: DeliveryTask[];
+  deliveries: (DeliveryTask & { penerimaName: string | null })[];
   note?: string;
 }
 

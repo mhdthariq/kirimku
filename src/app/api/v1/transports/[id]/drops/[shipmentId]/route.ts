@@ -1,12 +1,12 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle, fail, num } from "@/lib/api-helpers";
-import { hasPermission } from "@/lib/auth";
-import { audit } from "@/lib/audit";
-import { nextCode } from "@/lib/code-generator";
-import { cityIndex, shipmentDestinationGudangIds } from "@/lib/gudang-scope";
-import { canAssignDrop, canDrop, effectiveDropCheckpointId, normalizeTransportMode } from "@/lib/transport-ops";
-import { assertTransportAccess, isAssignedCrew } from "@/lib/transport-ops-server";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle, fail, num } from "@/composition/api-helpers";
+import { hasPermission } from "@/infrastructure/auth/auth";
+import { audit } from "@/infrastructure/services/audit";
+import { nextCode } from "@/infrastructure/services/code-generator";
+import { cityIndex, shipmentDestinationGudangIds } from "@/infrastructure/services/gudang-scope";
+import { canAssignDrop, canDrop, effectiveDropCheckpointId, normalizeTransportMode } from "@/domain/transport-ops";
+import { assertTransportAccess, isAssignedCrew } from "@/infrastructure/services/transport-ops-server";
 
 type Params = { params: Promise<{ id: string; shipmentId: string }> };
 

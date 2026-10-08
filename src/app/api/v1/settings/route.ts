@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle, fail, num } from "@/lib/api-helpers";
-import { audit } from "@/lib/audit";
-import { getCapacitySettings, invalidateCapacitySettingsCache, SETTING_CAPACITY_WARNING_THRESHOLD } from "@/lib/settings";
-import { DEFAULT_WARNING_THRESHOLD } from "@/lib/capacity";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle, fail, num } from "@/composition/api-helpers";
+import { audit } from "@/infrastructure/services/audit";
+import { getCapacitySettings, invalidateCapacitySettingsCache, SETTING_CAPACITY_WARNING_THRESHOLD } from "@/infrastructure/services/settings";
+import { DEFAULT_WARNING_THRESHOLD } from "@/domain/capacity";
 
 /**
  * GET /api/v1/settings — public company-level capacity settings.

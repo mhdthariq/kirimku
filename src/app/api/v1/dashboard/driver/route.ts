@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle, str } from "@/lib/api-helpers";
-import { detailAggregates } from "@/lib/transport-totals";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle, str } from "@/composition/api-helpers";
+import { detailAggregates } from "@/infrastructure/services/transport-totals";
 
 /**
  * Driver / Kenek operational dashboard (Revision Parts T, U, W).

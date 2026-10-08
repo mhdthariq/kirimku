@@ -1,15 +1,15 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle, fail, str, num, dateOrNull } from "@/lib/api-helpers";
-import { audit } from "@/lib/audit";
-import { nextCode } from "@/lib/code-generator";
-import { normalizeTransportMode } from "@/lib/transport-ops";
-import { cityIndex, inScope, scopeForUser, transportGudangIds } from "@/lib/gudang-scope";
-import { aggregateTransport, detailAggregates, isExecutorOnly, transportLoadFromAggregates } from "@/lib/transport-totals";
-import { calculateTransportCapacityStatus } from "@/lib/capacity";
-import { getCapacityWarningThreshold } from "@/lib/settings";
-import { crewAssignmentMessage, findActiveCrewAssignment } from "@/lib/transport-crew";
-import { checkShipmentNotOnActiveTransport, checkVehicleAvailable } from "@/lib/business-rules/shipment-transport";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle, fail, str, num, dateOrNull } from "@/composition/api-helpers";
+import { audit } from "@/infrastructure/services/audit";
+import { nextCode } from "@/infrastructure/services/code-generator";
+import { normalizeTransportMode } from "@/domain/transport-ops";
+import { cityIndex, inScope, scopeForUser, transportGudangIds } from "@/infrastructure/services/gudang-scope";
+import { aggregateTransport, detailAggregates, isExecutorOnly, transportLoadFromAggregates } from "@/infrastructure/services/transport-totals";
+import { calculateTransportCapacityStatus } from "@/domain/capacity";
+import { getCapacityWarningThreshold } from "@/infrastructure/services/settings";
+import { crewAssignmentMessage, findActiveCrewAssignment } from "@/infrastructure/services/transport-crew";
+import { checkShipmentNotOnActiveTransport, checkVehicleAvailable } from "@/infrastructure/services/business-rules/shipment-transport";
 
 export async function GET(req: NextRequest) {
   return handle(req, async () => {

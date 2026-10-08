@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Eye, Paperclip, Plus, Printer, Receipt, Send, Trash2, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
-import { apiDelete, apiGet, apiPost, hasPermission, type Invoice, type InvoiceLine, type InvoiceSettlement, type Options } from "@/lib/client-api";
+import { apiDelete, apiGet, apiPost, hasPermission, type Invoice, type InvoiceLine, type InvoiceSettlement, type Options } from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
@@ -171,8 +171,8 @@ export function InvoicesPage() {
       {
         success:
           amount >= (target.remainingAmount ?? 0) - 0.01 && target.commission
-            ? "Pelunasan dicatat - komisi Marketing dirilis ke wallet (atomic, §9)."
-            : "Settlement dicatat - pembayaran parsial, komisi tetap PENDING (§8.1).",
+            ? "Pelunasan dicatat. Komisi Marketing masuk ke saldo."
+            : "Pembayaran dicatat. Komisi menunggu pelunasan penuh.",
       },
     );
     setBusy(false);
@@ -586,7 +586,7 @@ export function InvoicesPage() {
                 </div>
               </div>
               <div className="overflow-x-auto rounded-lg border">
-                <table className="w-full min-w-[480px] text-sm">
+                <table className="w-full min-w-120 text-sm">
                   <thead>
                     <tr className="border-b bg-muted/50 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
                       <th className="px-3 py-2 font-semibold">Deskripsi</th>

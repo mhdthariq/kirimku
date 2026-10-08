@@ -28,7 +28,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { apiDelete, apiGet, hasPermission, type Transport, type TransportDetail } from "@/lib/client-api";
+import { apiDelete, apiGet, hasPermission, type Transport, type TransportDetail, type TransportDropsBoard } from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader } from "@/components/app/data-table";
 import { StatusBadge } from "@/components/app/status-badge";
@@ -57,7 +57,7 @@ import {
 
 const TransportMap = dynamic(() => import("@/components/app/transport-map").then((m) => m.TransportMap), {
   ssr: false,
-  loading: () => <Skeleton className="h-[340px] w-full rounded-xl" />,
+  loading: () => <Skeleton className="h-85 w-full rounded-xl" />,
 });
 
 function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
@@ -90,6 +90,10 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
   const canViewProofPhotos = hasPermission(user, "proof_photo.view");
   const { data: transport, loading, reload } = useApiData<TransportDetail>(
     () => apiGet<TransportDetail>(`/transports/${transportId}`),
+    [transportId],
+  );
+  const { data: drops } = useApiData<TransportDropsBoard>(
+    () => apiGet<TransportDropsBoard>(`/transports/${transportId}/drops`),
     [transportId],
   );
   const [checkinOpen, setCheckinOpen] = useState(false);
@@ -234,7 +238,7 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={transport.status} />
-            {transport.transportMode === "MULTI_DROP" && <StatusBadge status="MULTI_DROP" label="Multi Drop" />}
+            {drops?.transportMode === "MULTI_DROP" && <StatusBadge status="MULTI_DROP" label="Multi Drop" />}
             {canCheckinNow && (
               <Button size="sm" onClick={() => setCheckinOpen(true)}>
                 <Camera className="h-3.5 w-3.5" /> Check-in Checkpoint
@@ -363,7 +367,7 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
                     {records.length > 0 && (
                       <div className="mt-2.5 flex flex-wrap gap-2">
                         {records.slice(0, 4).map((r) => (
-                          <div key={r.id} className="w-[104px] space-y-1">
+                          <div key={r.id} className="w-26 space-y-1">
                             {/* Revise round 9 - checkpoint record photo. Click opens
                                 the PhotoDetailDialog (full-size view). Display is
                                 gated by proof_photo.view (Admin Gudang + Owner). */}

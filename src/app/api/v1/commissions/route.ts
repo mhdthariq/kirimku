@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle, fail } from "@/lib/api-helpers";
-import { requirePartner } from "@/lib/wallet";
-import { str } from "@/lib/api-helpers";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle, fail } from "@/composition/api-helpers";
+import { requirePartner } from "@/infrastructure/services/wallet";
+import { str } from "@/composition/api-helpers";
 
 /**
  * GET /api/v1/commissions — Marketing's own B2B commission list (§40:

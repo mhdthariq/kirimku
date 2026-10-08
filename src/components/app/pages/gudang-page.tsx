@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { ChevronDown, MapPin, Pencil, Plus, Trash2, Warehouse as WarehouseIcon } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type GudangWorkspace, type Warehouse } from "@/lib/client-api";
+import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type GudangWorkspace, type Warehouse } from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
@@ -16,12 +16,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/utils";
 import { CoordinatePasteField } from "@/components/app/coordinate-paste-field";
 
 const LeafletPicker = dynamic(() => import("@/components/app/leaflet-picker").then((m) => m.LeafletPicker), {
   ssr: false,
-  loading: () => <Skeleton className="h-[280px] w-full rounded-lg" />,
+  loading: () => <Skeleton className="h-70 w-full rounded-lg" />,
 });
 
 interface GudangForm {

@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle, fail, requireNum, str } from "@/lib/api-helpers";
-import { requirePartner, assertAvailableBalance, financeAudit } from "@/lib/wallet";
-import { nextCode } from "@/lib/code-generator";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle, fail, requireNum, str } from "@/composition/api-helpers";
+import { requirePartner, assertAvailableBalance, financeAudit } from "@/infrastructure/services/wallet";
+import { nextCode } from "@/infrastructure/services/code-generator";
 
 /**
  * Partner withdrawals (§23–§27) — Marketing AND Vehicle Owner can request

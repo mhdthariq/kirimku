@@ -2,7 +2,7 @@
 
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { History } from "lucide-react";
-import { apiGet, type CapacityTrendResponse } from "@/lib/client-api";
+import { apiGet, type CapacityTrendResponse } from "@/infrastructure/http/client-api";
 import { useApiData } from "@/hooks/use-api-data";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,7 +19,7 @@ export function CapacityTrendChart({ days = 14 }: { days?: number }) {
     [days],
   );
 
-  if (loading && !data) return <Skeleton className="h-[180px] w-full rounded-xl" />;
+  if (loading && !data) return <Skeleton className="h-45 w-full rounded-xl" />;
   const buckets = data?.buckets ?? [];
   const total = data?.total ?? 0;
   const maxCount = Math.max(1, ...buckets.map((b) => b.count));
@@ -44,7 +44,7 @@ export function CapacityTrendChart({ days = 14 }: { days?: number }) {
         {buckets.length === 0 ? (
           <p className="py-10 text-center text-sm text-muted-foreground">Tidak ada data.</p>
         ) : (
-          <div className="h-[140px] w-full">
+          <div className="h-35 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={buckets} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                 <XAxis dataKey="label" tick={{ fontSize: 9 }} interval="preserveStartEnd" stroke="#94a3b8" />

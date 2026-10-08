@@ -31,7 +31,7 @@ import {
   MapPin,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { apiGet, hasPermission, type DashboardData, type DashboardApprovalItem, type GudangDashboardWorkspace, type MarketingDashboardSnapshot } from "@/lib/client-api";
+import { apiGet, hasPermission, type DashboardData, type DashboardApprovalItem, type GudangDashboardWorkspace, type MarketingDashboardSnapshot } from "@/infrastructure/http/client-api";
 import { useApiData } from "@/hooks/use-api-data";
 import { PageHeader } from "@/components/app/data-table";
 import { DatePeriodFilter } from "@/components/app/date-period-filter";
@@ -39,7 +39,7 @@ import { StatusBadge } from "@/components/app/status-badge";
 import { formatDate, formatNumber, formatRupiah } from "@/components/app/form-parts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/utils";
 import { FleetCapacityWidget } from "@/components/app/capacity-status-card";
 import { CapacityTrendChart } from "@/components/app/capacity-trend-chart";
 
@@ -283,7 +283,7 @@ export function DashboardPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <PageHeader
           title={`${greeting}, ${user?.name.split(" ")[0]}`}
-          subtitle={`${roleLabel[data.role]} · Ringkasan operasional periode ${formatDate(from)} → ${formatDate(to)} (${data.period.days} hari).`}
+          subtitle={`${roleLabel[data.role]} · ${formatDate(from)} → ${formatDate(to)} (${data.period.days} hari)`}
         />
         <DatePeriodFilter from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t); }} />
       </div>
@@ -306,7 +306,7 @@ export function DashboardPage() {
                   Perlu Approval Anda
                 </CardTitle>
                 <p className="text-xs text-muted-foreground">
-                  Aktivitas yang perlu Anda tinjau &amp; setujui - Top Up, Withdrawal, Payment, dan Komisi Marketing yang siap dirilis.
+                  Tinjau pengajuan dan komisi yang siap dirilis.
                 </p>
               </CardHeader>
             </Card>
@@ -385,7 +385,7 @@ export function DashboardPage() {
                   const count = data.statusCounts?.[status] ?? 0;
                   const height = Math.max(4, Math.round((count / maxStatus) * 96));
                   return (
-                    <a key={status} href="#/shipments" className="group flex min-w-[64px] flex-1 flex-col items-center gap-1.5">
+                    <a key={status} href="#/shipments" className="group flex min-w-16 flex-1 flex-col items-center gap-1.5">
                       <span className="text-xs font-bold text-foreground">{count}</span>
                       <div
                         className="w-full rounded-t-md bg-primary/80 transition-all group-hover:bg-primary"

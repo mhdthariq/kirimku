@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Briefcase, CheckCircle2, Coins, Route as RouteIcon } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { apiGet, apiPost, hasPermission, type Invoice, type Transport } from "@/lib/client-api";
+import { apiGet, apiPost, hasPermission, type Invoice, type Transport } from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { StatusBadge } from "@/components/app/status-badge";

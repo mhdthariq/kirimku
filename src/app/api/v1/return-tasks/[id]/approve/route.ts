@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle, fail } from "@/lib/api-helpers";
-import { audit } from "@/lib/audit";
-import { canApproveReturnTask } from "@/lib/transport-ops";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle, fail } from "@/composition/api-helpers";
+import { audit } from "@/infrastructure/services/audit";
+import { canApproveReturnTask } from "@/domain/transport-ops";
 
 type Params = { params: Promise<{ id: string }> };
 

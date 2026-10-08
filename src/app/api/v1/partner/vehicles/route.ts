@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle } from "@/lib/api-helpers";
-import { requirePartner } from "@/lib/wallet";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle } from "@/composition/api-helpers";
+import { requirePartner } from "@/infrastructure/services/wallet";
 
 /**
  * GET /api/v1/partner/vehicles — Vehicle Owner's OWN vehicles (§13/§39):

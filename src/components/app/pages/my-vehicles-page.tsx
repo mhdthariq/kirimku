@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { CarFront } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { apiGet, hasPermission, type Vehicle } from "@/lib/client-api";
+import { apiGet, hasPermission, type Vehicle } from "@/infrastructure/http/client-api";
 import { useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { StatusBadge } from "@/components/app/status-badge";

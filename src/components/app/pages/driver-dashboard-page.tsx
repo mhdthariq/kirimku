@@ -22,7 +22,7 @@ import {
   Users,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { apiGet, type Checkpoint } from "@/lib/client-api";
+import { apiGet, type Checkpoint } from "@/infrastructure/http/client-api";
 import { useApiData } from "@/hooks/use-api-data";
 import { DatePeriodFilter } from "@/components/app/date-period-filter";
 import { StatusBadge } from "@/components/app/status-badge";
@@ -35,7 +35,7 @@ import { Button } from "@/components/ui/button";
 
 const TransportMap = dynamic(() => import("@/components/app/transport-map").then((m) => m.TransportMap), {
   ssr: false,
-  loading: () => <Skeleton className="h-[260px] w-full rounded-xl" />,
+  loading: () => <Skeleton className="h-65 w-full rounded-xl" />,
 });
 
 export interface DriverTransportSummary {

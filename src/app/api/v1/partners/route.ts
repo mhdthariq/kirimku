@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle, str } from "@/lib/api-helpers";
-import { walletSummary } from "@/lib/wallet";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle, str } from "@/composition/api-helpers";
+import { walletSummary } from "@/infrastructure/services/wallet";
 
 /**
  * GET /api/v1/partners — company-side partner list with wallets (§34

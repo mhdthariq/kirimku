@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { hashPassword } from "@/lib/auth";
-import { guard, ok, handle, fail, str } from "@/lib/api-helpers";
-import { audit } from "@/lib/audit";
+import { db } from "@/infrastructure/persistence/db";
+import { hashPassword } from "@/infrastructure/auth/auth";
+import { guard, ok, handle, fail, str } from "@/composition/api-helpers";
+import { audit } from "@/infrastructure/services/audit";
 
 type Params = { params: Promise<{ id: string }> };
 

@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle, fail } from "@/lib/api-helpers";
-import { dropProgress, effectiveDropCheckpointId, groupByDropCheckpoint, isVehicleEmpty, normalizeTransportMode } from "@/lib/transport-ops";
-import { assertTransportAccess } from "@/lib/transport-ops-server";
-import { detailAggregates, transportLoadFromAggregates } from "@/lib/transport-totals";
-import { calculateTransportCapacityStatus } from "@/lib/capacity";
-import { getCapacityWarningThreshold } from "@/lib/settings";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle, fail } from "@/composition/api-helpers";
+import { dropProgress, effectiveDropCheckpointId, groupByDropCheckpoint, isVehicleEmpty, normalizeTransportMode } from "@/domain/transport-ops";
+import { assertTransportAccess } from "@/infrastructure/services/transport-ops-server";
+import { detailAggregates, transportLoadFromAggregates } from "@/infrastructure/services/transport-totals";
+import { calculateTransportCapacityStatus } from "@/domain/capacity";
+import { getCapacityWarningThreshold } from "@/infrastructure/services/settings";
 
 type Params = { params: Promise<{ id: string }> };
 

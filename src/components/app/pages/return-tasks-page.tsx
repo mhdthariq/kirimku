@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { CheckCheck, Truck, Undo2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { apiGet, apiPost, hasPermission, type ReturnTaskRow } from "@/lib/client-api";
+import { apiGet, apiPost, hasPermission, type ReturnTaskRow } from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { StatusBadge } from "@/components/app/status-badge";

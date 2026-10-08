@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Camera, CheckCircle2, ClipboardList, PackageCheck, Pencil, Plus, QrCode, XCircle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { apiDelete, apiGet, apiPost, apiPut, hasPermission, employeesByPosition, type DeliveryTask, type Options, type Shipment } from "@/lib/client-api";
+import { apiDelete, apiGet, apiPost, apiPut, hasPermission, employeesByPosition, type DeliveryTask, type Options, type Shipment } from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/utils";
 import { CoordinatePasteField } from "@/components/app/coordinate-paste-field";
 
 interface DeliveryForm {

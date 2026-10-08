@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle, fail, requireNum, str } from "@/lib/api-helpers";
-import { financeAudit } from "@/lib/wallet";
-import { nextCode } from "@/lib/code-generator";
-import { COMPANY_BANK } from "@/lib/company";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle, fail, requireNum, str } from "@/composition/api-helpers";
+import { financeAudit } from "@/infrastructure/services/wallet";
+import { nextCode } from "@/infrastructure/services/code-generator";
+import { COMPANY_BANK } from "@/shared/company";
 
 const MIN_TOP_UP_AMOUNT = 10_000;
 // data URL image/PDF proof — keep in sync with the repair proof limits

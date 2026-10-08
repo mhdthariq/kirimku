@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle, fail, str, requireNum, num, dateOrNull } from "@/lib/api-helpers";
-import { audit, diffFields } from "@/lib/audit";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle, fail, str, requireNum, num, dateOrNull } from "@/composition/api-helpers";
+import { audit, diffFields } from "@/infrastructure/services/audit";
 
 type Params = { params: Promise<{ id: string }> };
 

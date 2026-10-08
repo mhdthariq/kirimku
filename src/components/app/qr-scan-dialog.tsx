@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Camera, CheckCircle2, MapPin, PackageCheck, Phone, QrCode, ScanLine, TriangleAlert, User, X } from "lucide-react";
 import { toast } from "sonner";
-import { apiGet, apiPost, type PaymentSummary, type ScanProgress, type ScanResponse } from "@/lib/client-api";
+import { apiGet, apiPost, type PaymentSummary, type ScanProgress, type ScanResponse } from "@/infrastructure/http/client-api";
 import { ScanConsole, type ScanMethod } from "@/components/app/scan-console";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { Input, Textarea } from "@/components/app/form-parts";
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/utils";
 
 export interface ScanTaskInfo {
   id: number;

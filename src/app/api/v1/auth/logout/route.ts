@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
-import { destroySession, getTokenFromRequest, getAuthUser } from "@/lib/auth";
-import { audit } from "@/lib/audit";
-import { ok, handle } from "@/lib/api-helpers";
+import { destroySession, getTokenFromRequest, getAuthUser } from "@/infrastructure/auth/auth";
+import { audit } from "@/infrastructure/services/audit";
+import { ok, handle } from "@/composition/api-helpers";
 
 export async function POST(req: NextRequest) {
   return handle(req, async () => {

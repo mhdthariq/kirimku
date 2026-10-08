@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle, requireStr, str, num, bool } from "@/lib/api-helpers";
-import { audit } from "@/lib/audit";
-import { nextCode } from "@/lib/code-generator";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle, requireStr, str, num, bool } from "@/composition/api-helpers";
+import { audit } from "@/infrastructure/services/audit";
+import { nextCode } from "@/infrastructure/services/code-generator";
 
 /**
  * Gudang (warehouse) master data. A gudang is a physical node shipments

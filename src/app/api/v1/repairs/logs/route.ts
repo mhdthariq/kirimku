@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle, fail, str, num } from "@/lib/api-helpers";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle, fail, str, num } from "@/composition/api-helpers";
 
 /**
  * GET /api/v1/repairs/logs — repair action log feed.

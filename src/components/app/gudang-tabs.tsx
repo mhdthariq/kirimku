@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { Warehouse as WarehouseIcon } from "lucide-react";
 import { TabsTrigger } from "@/components/ui/tabs";
-import type { Options } from "@/lib/client-api";
+import type { Options } from "@/infrastructure/http/client-api";
 
 // ---------------------------------------------------------------------------
 // Per-gudang tabs (owner view) + gudang scope badge (staff view)

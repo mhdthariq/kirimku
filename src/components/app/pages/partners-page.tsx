@@ -3,14 +3,14 @@
 import { useState } from "react";
 import { Briefcase, CarFront, CheckCircle2, MapPin, Users } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { apiGet, apiPut, hasPermission, type PartnerRow, type Options } from "@/lib/client-api";
+import { apiGet, apiPut, hasPermission, type PartnerRow, type Options } from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActiveBadge } from "@/components/app/status-badge";
 import { Field, FormSelect, NumberInput, SubmitButton, formatRupiah } from "@/components/app/form-parts";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/utils";
 
 /**
  * Partner management (Revise.md §4/§34 "Partner Wallets"): view all partners

@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { hashPassword, verifyPassword } from "@/lib/auth";
-import { guard, ok, handle, fail, str } from "@/lib/api-helpers";
-import { audit } from "@/lib/audit";
+import { db } from "@/infrastructure/persistence/db";
+import { hashPassword, verifyPassword } from "@/infrastructure/auth/auth";
+import { guard, ok, handle, fail, str } from "@/composition/api-helpers";
+import { audit } from "@/infrastructure/services/audit";
 
 /**
  * GET /api/v1/profile — own profile + partner info (bank account etc.).

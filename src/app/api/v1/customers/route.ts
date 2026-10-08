@@ -1,9 +1,10 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle, fail, requireStr, str, bool, num } from "@/lib/api-helpers";
-import { audit } from "@/lib/audit";
-import { nextCode } from "@/lib/code-generator";
-import { scopeForUser } from "@/lib/gudang-scope";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle, fail, requireStr, str, bool, num } from "@/composition/api-helpers";
+import { audit } from "@/infrastructure/services/audit";
+import { nextCode } from "@/infrastructure/services/code-generator";
+import { scopeForUser } from "@/infrastructure/services/gudang-scope";
+import type { AuthUser } from "@/infrastructure/auth/auth";
 
 /** Helper: marketing partners only ever see / manage customers connected to
  *  them (Customer.marketingPartnerId). Admin/owner accounts see everyone. */
@@ -14,11 +15,7 @@ function marketingScope(user: { partnerType: string | null; partnerId: number | 
 /** Helper: gudang-scoped customer filter. Customers with warehouseId set are
  *  only visible to that gudang's admins; general customers (warehouseId=null)
  *  are visible to everyone. Owners / unscoped users see all customers. */
-async function customerGudangClause(user: {
-  isOwner: boolean;
-  permissions: string[];
-  employeeId: number | null;
-}) {
+async function customerGudangClause(user: AuthUser) {
   const scope = await scopeForUser(user);
   if (scope.unscoped) return {};
   return {

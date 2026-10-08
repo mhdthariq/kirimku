@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Store, UserCheck } from "lucide-react";
-import { apiPost, type GudangWalkInItem } from "@/lib/client-api";
+import { apiPost, type GudangWalkInItem } from "@/infrastructure/http/client-api";
 import { runAction } from "@/hooks/use-api-data";
 import { Field, FormSelect, SubmitButton, Textarea } from "@/components/app/form-parts";
 import { Button } from "@/components/ui/button";

@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle, fail } from "@/lib/api-helpers";
-import { audit } from "@/lib/audit";
-import { canTransition } from "@/lib/shipment-flow";
-import { assertShipmentScope } from "@/lib/gudang-scope";
-import { checkCancellationGuards } from "@/lib/business-rules/cancellation-guards";
-import { creditWallet } from "@/lib/wallet";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle, fail } from "@/composition/api-helpers";
+import { audit } from "@/infrastructure/services/audit";
+import { canTransition } from "@/domain/shipment-flow";
+import { assertShipmentScope } from "@/infrastructure/services/gudang-scope";
+import { checkCancellationGuards } from "@/infrastructure/services/business-rules/cancellation-guards";
+import { creditWallet } from "@/infrastructure/services/wallet";
 
 type Params = { params: Promise<{ id: string }> };
 

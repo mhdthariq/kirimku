@@ -2,16 +2,16 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Clock, Download, Gauge, History, Search } from "lucide-react";
-import { apiGetWithMeta, type AuditResponse, type AuditEntry } from "@/lib/client-api";
+import { apiGetWithMeta, type AuditResponse, type AuditEntry } from "@/infrastructure/http/client-api";
 import { useAuth } from "@/hooks/use-auth";
-import { hasPermission } from "@/lib/client-api";
+import { hasPermission } from "@/infrastructure/http/client-api";
 import { PageHeader } from "@/components/app/data-table";
 import { FormSelect, formatDate } from "@/components/app/form-parts";
 import { AuditDataViewer } from "@/components/app/audit-data-viewer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/utils";
 
 const ENTITY_LABELS: Record<string, string> = {
   auth: "Auth",
@@ -168,7 +168,7 @@ export function AuditPage() {
           <ol className="relative ml-2 space-y-0 border-l pl-5">
             {entries.map((entry) => (
               <li key={entry.id} className="relative pb-5 pt-1">
-                <span className="absolute -left-[23px] top-2 flex h-2.5 w-2.5 rounded-full border-2 border-card bg-primary" />
+                <span className="absolute -left-5.75 top-2 flex h-2.5 w-2.5 rounded-full border-2 border-card bg-primary" />
                 <div className="rounded-xl border bg-card p-3.5">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide", ACTION_STYLES[entry.action] ?? "bg-muted text-muted-foreground")}>
@@ -177,7 +177,7 @@ export function AuditPage() {
                     <Badge variant="outline" className="text-[10px]">{ENTITY_LABELS[entry.entityType] ?? entry.entityType}</Badge>
                     <span className="text-sm font-semibold text-foreground">{entry.entityLabel ?? `#${entry.entityId ?? "?"}`}</span>
                     {/* Capacity Round — flag capacity-config changes at a glance */}
-                    {entry.afterData?.capacityConfigChanged && (
+                    {entry.afterData?.capacityConfigChanged === true && (
                       <span className="inline-flex items-center gap-1 rounded-full border border-amber-300/60 bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
                         <Gauge className="h-2.5 w-2.5" /> Kapasitas Diperbarui
                       </span>

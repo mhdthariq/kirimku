@@ -12,7 +12,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { apiGet, apiPost, hasPermission, type PartnerRow, type TopUpRequest, type TopUpsResponse } from "@/lib/client-api";
+import { apiGet, apiPost, hasPermission, type PartnerRow, type TopUpRequest, type TopUpsResponse } from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { StatusBadge } from "@/components/app/status-badge";
@@ -56,7 +56,7 @@ export function TopUpManagementPage() {
     <div className="space-y-4">
       <PageHeader
         title="Top Up"
-        subtitle="Admin Kantor membuat top up untuk partner Marketing beserta bukti transfer → Owner memverifikasi (saldo bertambah atomik saat VERIFIED)."
+        subtitle="Admin Kantor mengajukan top up dengan bukti transfer. Saldo bertambah setelah verifikasi Owner."
         icon={<Receipt className="h-5 w-5" />}
         actions={canCreate ? <Button onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4" /> Tambah Top Up</Button> : undefined}
       />

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { CheckCircle2, MapPin, PackageCheck, PackageMinus, Undo2, Scale, Box, TrendingDown } from "lucide-react";
-import { apiGet, apiPost, type TransportDropsBoard } from "@/lib/client-api";
+import { apiGet, apiPost, type TransportDropsBoard } from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { StatusBadge } from "@/components/app/status-badge";
 import { OverallCapacityBadge } from "@/components/app/capacity-status-card";

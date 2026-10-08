@@ -10,12 +10,12 @@ The project covers shipment creation, pickup and delivery, warehouse operations,
 - TypeScript
 - Tailwind CSS 4
 - shadcn/ui
-- Prisma
-- SQLite (default)
+- Prisma / Prisma Client 6.11.1
+- PostgreSQL
 - Leaflet
 - Bun (recommended)
 
-The database can be moved to Supabase Postgres when needed. See `.env.example` and `docs/02-database.md`.
+The current Prisma schema targets PostgreSQL. Configure a compatible `DATABASE_URL` before database-backed execution; older database/revision docs may describe the historical SQLite setup.
 
 More detailed documentation is available in [`docs/`](docs/).
 
@@ -36,13 +36,21 @@ Make sure you have:
 bun install
 ```
 
-### 2. Create the database schema (REQUIRED)
+### 2. Configure PostgreSQL and generate the client
+
+Set `DATABASE_URL` in `.env` to your PostgreSQL connection URL. The current local value is incompatible with the PostgreSQL provider. Then generate the pinned client:
+
+```bash
+bun run db:generate
+```
+
+The Prisma 6.11.1 client has been regenerated for the current schema; this does not initialize or migrate your database. For a disposable development database only, review the schema before syncing it:
 
 ```bash
 bun run db:push
 ```
 
-This creates the local SQLite database at `db/custom.db` and syncs every table, index, and relation declared in `prisma/schema.prisma`. **Required before the app can run.**
+`db:push` syncs the PostgreSQL schema and includes `--accept-data-loss`; do not use it blindly against existing or production data. No database migrations were run as part of the layered restructuring.
 
 ### 3. Add demo data (OPTIONAL)
 
@@ -70,7 +78,9 @@ http://localhost:3000
 
 ```bash
 npm install
-npx prisma db push --accept-data-loss
+npx prisma generate
+# Optional: disposable development database only; may lose data
+npx prisma db push
 npx tsx prisma/seed.ts
 npm run dev
 ```
@@ -81,6 +91,7 @@ npm run dev
 
 ```bash
 bun run lint --max-warnings 0
+bunx tsc --noEmit --incremental false
 bun run test
 bun run test:ui
 bun run test:api
@@ -94,28 +105,15 @@ See [the testing guide](docs/testing.md) for test isolation, regression coverage
 
 ## Environment
 
-Copy the example environment file if you need to change the default configuration:
+Configure `.env` with a PostgreSQL `DATABASE_URL`; there is no SQLite default in the current schema. Do not assume the current local URL is usable with PostgreSQL.
 
-```bash
-cp .env.example .env
-```
-
-By default, the application uses:
-
-```text
-db/custom.db
-```
-
-For Supabase Postgres configuration, see:
-
-- `.env.example`
-- [`docs/02-database.md`](docs/02-database.md)
+Prisma and Prisma Client are pinned to 6.11.1. If an editor using a Prisma 7 language server reports that the datasource `url` is invalid, match the language server to Prisma 6 rather than deleting `url = env("DATABASE_URL")` from the schema.
 
 ---
 
 ## Updating an Existing Installation
 
-If you have already run an older version of the project, update the generated Prisma Client and database before starting the application.
+If you have already run an older version, regenerate Prisma Client and review database compatibility before starting. Moving from a historical SQLite database to PostgreSQL requires a separate data/schema migration plan.
 
 Some older versions used different Prisma relations, including:
 
@@ -124,7 +122,7 @@ Some older versions used different Prisma relations, including:
 - `TransportShipment.master`
 - `HandoverScan` for QR handover records
 
-If you see errors such as `Unknown field "driver"` or `Unknown field "master"`, clean the old generated files and sync the current schema.
+If you see errors such as `Unknown field "driver"` or `Unknown field "master"`, regenerate the client from the current schema. This is separate from applying database changes.
 
 ```bash
 # Stop the development server first
@@ -133,8 +131,7 @@ rm -rf .next
 rm -rf node_modules/.prisma
 
 bun install
-bun run db:push
-bun run db:seed
+bun run db:generate
 bun run dev
 ```
 
@@ -147,7 +144,7 @@ Remove-Item -Recurse -Force node_modules\.prisma
 
 For a completely clean setup, use a fresh copy of the project and follow the Getting Started section above.
 
-> The project does not include `db/custom.db` in the repository, so a fresh copy starts with a new local database.
+> A fresh checkout does not initialize PostgreSQL. Provision and configure a development database separately.
 
 ---
 
@@ -339,7 +336,7 @@ Seed data is defined in:
 
 ```text
 prisma/seed.ts
-src/lib/seed.ts
+src/infrastructure/services/seed.ts
 ```
 
 The seed data is intended for development and testing.
@@ -373,18 +370,7 @@ bun run db:seed
 bunx prisma studio
 ```
 
-To start with a completely empty SQLite database, remove:
-
-```text
-db/custom.db
-```
-
-Then run:
-
-```bash
-bun run db:push
-bun run db:seed
-```
+For an empty demo setup, provision a separate disposable PostgreSQL database, configure its URL, review the schema sync, then seed it. Do not reset or overwrite an existing database merely to update the generated client.
 
 ---
 
@@ -392,8 +378,7 @@ bun run db:seed
 
 ```text
 .
-├── db/
-│   └── custom.db
+
 ├── docs/
 ├── prisma/
 │   ├── schema.prisma
@@ -405,10 +390,23 @@ bun run db:seed
 │   │   ├── api/v1/
 │   │   ├── layout.tsx
 │   │   └── page.tsx
+│   ├── components/       # Application UI and shared UI primitives
+│   ├── hooks/            # Client-side hooks
+│   ├── domain/           # Pure capacity, pricing, shipment-flow, transport-ops rules
+│   ├── application/      # Pricing repository port and service/use case
+│   ├── infrastructure/   # Persistence, auth, HTTP, Prisma adapter, legacy DB helpers
+│   ├── composition/      # api-helpers and pricing-server wiring
+│   ├── presentation/     # Display, form, and browser helpers
+│   └── shared/           # Shared utilities
+├── tests/                # Tests; legacy helper paths retained temporarily
+│   ├── app/api/
 │   ├── components/
 │   ├── hooks/
-│   └── lib/
-├── .env.example
+│   ├── lib/              # Existing helper suites (historical location)
+│   ├── application/      # Pricing service tests; further suites planned
+│   ├── architecture/     # Domain/application dependency constraints
+│   └── setup.ts
+
 └── package.json
 ```
 
@@ -418,11 +416,11 @@ The main API is under:
 src/app/api/v1/
 ```
 
-The application logic and shared helpers are under:
+Routes and HTTP handlers stay in `src/app/`; application UI stays in `src/components/app/`; reusable UI primitives stay in `src/components/ui/`. Tests are kept outside production source in `tests/`.
 
-```text
-src/lib/
-```
+This is an **incremental migration, not full Clean Architecture**. `src/lib/` has been removed and imports rewritten. Pricing is the completed port/use-case slice, with a repository port, pure domain rules, Prisma adapter, and composition wiring. Other API routes still directly use Prisma; legacy DB-dependent business helpers remain in infrastructure.
+
+Domain/application dependency constraints are tested in `tests/architecture/`. Existing helper tests remain in `tests/lib/` for now; layer-mirroring domain, presentation, shared, and further application folders are planned. See [architecture](docs/01-architecture.md), [testing](docs/testing.md), and [ADR 001](docs/adr-001-incremental-layered-migration.md). Historical revision docs may remain archival.
 
 ---
 
@@ -517,7 +515,7 @@ or:
 | `bun run build` | Create a production build |
 | `bun run start` | Start the production build |
 | `bun run lint` | Run ESLint |
-| `bun run db:push` | Sync Prisma schema to SQLite |
+| `bun run db:push` | Sync PostgreSQL schema (accepts data loss; development only) |
 | `bun run db:seed` | Seed development data |
 | `bun run db:generate` | Generate Prisma Client |
 

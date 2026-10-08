@@ -1,15 +1,13 @@
-"use client";
-
 import { useState } from "react";
 import { AlertTriangle, Gauge, Save } from "lucide-react";
-import { apiGet, apiPut, type SettingsResponse } from "@/lib/client-api";
+import { apiGet, apiPut, type SettingsResponse } from "@/infrastructure/http/client-api";
 import { useAuth } from "@/hooks/use-auth";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/utils";
 
 /**
  * Capacity Settings card (Capacity Round) — owner-only section on the profile
@@ -61,7 +59,7 @@ export function CapacitySettingsCard() {
         ) : (
           <form onSubmit={onSave} className="space-y-3">
             <div className="flex flex-wrap items-end gap-3">
-              <div className="flex-1 min-w-[200px]">
+              <div className="flex-1 min-w-50">
                 <label htmlFor="warning-threshold" className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                   Threshold Warning (%)
                 </label>
@@ -97,8 +95,8 @@ export function CapacitySettingsCard() {
             <div className="flex items-start gap-1.5 rounded-lg border border-dashed bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <p>
-                Default 90%. Semua status kapasitas bersifat <span className="font-semibold">informatif</span> — operator tetap
-                dapat menugaskan resi meskipun kendaraan over limit (plan §31 SOFT limit preview).
+                Ambang awal 90%. Status kapasitas bersifat <span className="font-semibold">informatif</span> — resi tetap
+                dapat ditugaskan meskipun muatan melebihi kapasitas.
               </p>
             </div>
           </form>

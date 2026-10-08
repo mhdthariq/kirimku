@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Camera, CheckCircle2, Crosshair, Loader2, MapPin, RefreshCw, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
-import { apiPost, type CheckinResponse, type Checkpoint } from "@/lib/client-api";
+import { apiPost, type CheckinResponse, type Checkpoint } from "@/infrastructure/http/client-api";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FormSelect, formatNumber } from "@/components/app/form-parts";

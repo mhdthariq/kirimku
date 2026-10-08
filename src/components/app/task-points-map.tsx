@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { googleTileLayer } from "@/lib/map-tiles";
+import { googleTileLayer } from "@/presentation/map-tiles";
 
 export interface TaskMapPoint {
   id: number;

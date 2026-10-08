@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
-import { guard, ok, handle } from "@/lib/api-helpers";
-import { requirePartner, walletSummary } from "@/lib/wallet";
-import { db } from "@/lib/db";
+import { guard, ok, handle } from "@/composition/api-helpers";
+import { requirePartner, walletSummary } from "@/infrastructure/services/wallet";
+import { db } from "@/infrastructure/persistence/db";
 
 /**
  * GET /api/v1/wallet — own wallet summary (§24): balance, reserved, available.

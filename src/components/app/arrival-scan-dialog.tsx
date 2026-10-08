@@ -9,14 +9,14 @@ import {
   type GudangTransportArrivalItem,
   type ScanProgress,
   type ScanResponse,
-} from "@/lib/client-api";
+} from "@/infrastructure/http/client-api";
 import { runAction } from "@/hooks/use-api-data";
 import { ScanConsole, type ScanMethod } from "@/components/app/scan-console";
 import { Field, FormSelect, Textarea } from "@/components/app/form-parts";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/utils";
 
 type Feedback = { kind: "ok" | "warn" | "info"; text: string } | null;
 

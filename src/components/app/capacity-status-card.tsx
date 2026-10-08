@@ -6,9 +6,9 @@ import type {
   CapacityStatus,
   OverallCapacityState,
   TransportCapacityStatus,
-} from "@/lib/client-api";
-import { calculateTransportCapacityStatus, type TransportLoad, type VehicleCapacity } from "@/lib/capacity";
-import { cn } from "@/lib/utils";
+} from "@/infrastructure/http/client-api";
+import { calculateTransportCapacityStatus, type TransportLoad, type VehicleCapacity } from "@/domain/capacity";
+import { cn } from "@/shared/utils";
 import { formatNumber } from "@/components/app/form-parts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 

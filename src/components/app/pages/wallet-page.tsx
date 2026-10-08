@@ -21,7 +21,7 @@ import {
   type WalletSummaryData,
   type WalletTransaction,
   type WithdrawalRequest,
-} from "@/lib/client-api";
+} from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { StatusBadge } from "@/components/app/status-badge";
@@ -37,7 +37,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/utils";
 
 /**
  * Partner Wallet (Revise.md §31 Marketing / §32 Vehicle Owner):

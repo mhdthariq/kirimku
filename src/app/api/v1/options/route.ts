@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle } from "@/lib/api-helpers";
-import { scopeForUser } from "@/lib/gudang-scope";
-import { currentCompanyName } from "@/lib/tenant-context";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle } from "@/composition/api-helpers";
+import { scopeForUser } from "@/infrastructure/services/gudang-scope";
+import { currentCompanyName } from "@/infrastructure/persistence/tenant-context";
 
 /** Lightweight dropdown options for any authenticated user (ids + labels only). */
 export async function GET(req: NextRequest) {

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import QRCode from "qrcode";
 import { Printer, X } from "lucide-react";
-import { COMPANY_NAME } from "@/lib/company";
+import { COMPANY_NAME } from "@/shared/company";
 import {
   apiGet,
   apiPost,
@@ -13,14 +13,14 @@ import {
   type Options,
   type Shipment,
   type ShipmentTotals,
-} from "@/lib/client-api";
+} from "@/infrastructure/http/client-api";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { formatNumber, formatRupiah } from "@/components/app/form-parts";
-import { cn } from "@/lib/utils";
-import { resiPricingMethodLabel, resiStatVisibility } from "@/lib/resi-display";
-import type { PricingMethod } from "@/lib/client-api";
-import { customerPrimaryName } from "@/lib/customer-display";
+import { cn } from "@/shared/utils";
+import { resiPricingMethodLabel, resiStatVisibility } from "@/presentation/resi-display";
+import type { PricingMethod } from "@/infrastructure/http/client-api";
+import { customerPrimaryName } from "@/presentation/customer-display";
 
 type ResiShipment = Shipment & {
   details: DetailShipment[];

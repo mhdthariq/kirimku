@@ -23,7 +23,7 @@ import {
   hasPermission,
   type VehicleRepairRow,
   type RepairActionLogRow,
-} from "@/lib/client-api";
+} from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { StatusBadge } from "@/components/app/status-badge";
@@ -49,7 +49,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/utils";
 
 /**
  * Repair Verification (simplified §19/§22 flow) — dual mode:
@@ -296,7 +296,7 @@ export function RepairLogTimeline({ logs, showRepairCode }: { logs: RepairAction
         const changedFields = Object.keys(changes);
         return (
           <li key={log.id} className="relative pb-4 pt-1 last:pb-1">
-            <span className={cn("absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-card", meta.dot)} />
+            <span className={cn("absolute -left-5.25 top-1.5 h-2.5 w-2.5 rounded-full border-2 border-card", meta.dot)} />
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide", meta.badge)}>
                 {meta.icon} {meta.label}

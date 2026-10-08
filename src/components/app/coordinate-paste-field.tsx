@@ -1,9 +1,7 @@
-"use client";
-
 import { useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { Field, Input } from "@/components/app/form-parts";
-import { formatCoordinates, googleMapsLink, parseCoordinates } from "@/lib/coordinates";
+import { formatCoordinates, googleMapsLink, parseCoordinates } from "@/shared/coordinates";
 
 /**
  * Single "paste coordinates" field (fix, 2026-09-26) — replaces the old

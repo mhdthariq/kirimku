@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Banknote, CheckCircle2, Upload, XCircle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { apiGet, apiPost, hasPermission, type WithdrawalRequest } from "@/lib/client-api";
+import { apiGet, apiPost, hasPermission, type WithdrawalRequest } from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { StatusBadge } from "@/components/app/status-badge";
@@ -42,7 +42,7 @@ export function WithdrawalManagementPage() {
     <div className="space-y-4">
       <PageHeader
         title="Withdrawal Requests"
-        subtitle="Partner mengajukan → Owner menyetujui → perusahaan transfer bank (PROCESSING) → COMPLETED dengan bukti. Penyelesaian mendebit wallet secara atomik (§30)."
+        subtitle="Penarikan perlu persetujuan Owner dan bukti transfer. Saldo dipotong saat penarikan selesai."
         icon={<Banknote className="h-5 w-5" />}
         actions={
           <div className="rounded-xl border bg-card px-4 py-2">
@@ -117,7 +117,7 @@ export function WithdrawalManagementPage() {
                   </Button>
                 )}
                 {canProcess && r.status === "PROCESSING" && (
-                  <Button size="sm" className="h-7" onClick={() => act(`/withdrawals/${r.id}/complete`, { proofUrl: "attachment://bank-transfer-receipt" }, "Withdrawal COMPLETED - wallet didebit atomik + ledger WITHDRAWAL.")}>
+                  <Button size="sm" className="h-7" onClick={() => act(`/withdrawals/${r.id}/complete`, { proofUrl: "attachment://bank-transfer-receipt" }, "Penarikan selesai. Saldo telah dipotong.")}>
                     <Upload className="h-3.5 w-3.5" /> Selesaikan + Bukti
                   </Button>
                 )}

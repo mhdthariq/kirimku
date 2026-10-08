@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle } from "@/lib/api-helpers";
-import { detailAggregates, transportLoadFromAggregates } from "@/lib/transport-totals";
-import { calculateTransportCapacityStatus } from "@/lib/capacity";
-import { getCapacityWarningThreshold } from "@/lib/settings";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle } from "@/composition/api-helpers";
+import { detailAggregates, transportLoadFromAggregates } from "@/infrastructure/services/transport-totals";
+import { calculateTransportCapacityStatus } from "@/domain/capacity";
+import { getCapacityWarningThreshold } from "@/infrastructure/services/settings";
 
 /**
  * GET /api/v1/fleet-capacity — Fleet Capacity overview (Capacity Round).

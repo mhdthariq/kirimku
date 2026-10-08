@@ -3,10 +3,10 @@
 import { useMemo, useRef, useState } from "react";
 import { Camera, Fuel, HandCoins, ParkingCircle, Pencil, Plus, Trash2, Utensils, Wallet, X } from "lucide-react";
 import { toast } from "sonner";
-import { apiDelete, apiGet, apiPost, apiPut, type TransportExpenseRow } from "@/lib/client-api";
+import { apiDelete, apiGet, apiPost, apiPut, type TransportExpenseRow } from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
-import { EXPENSE_LABEL, EXPENSE_TYPES, summarizeExpenses, validateExpense, type ExpenseType } from "@/lib/transport-ops";
-import { fileToCompressedJpeg } from "@/lib/image-file";
+import { EXPENSE_LABEL, EXPENSE_TYPES, summarizeExpenses, validateExpense, type ExpenseType } from "@/domain/transport-ops";
+import { fileToCompressedJpeg } from "@/presentation/image-file";
 import { Field, FormSelect, Input, NumberInput, SubmitButton, formatDate, formatRupiah } from "@/components/app/form-parts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

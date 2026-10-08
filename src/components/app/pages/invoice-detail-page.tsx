@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import { apiGet, type Invoice, type InvoiceLine } from "@/lib/client-api";
+import { apiGet, type Invoice, type InvoiceLine } from "@/infrastructure/http/client-api";
 import { InvoicePrint } from "@/components/app/invoice-print";
 import { Button } from "@/components/ui/button";
 

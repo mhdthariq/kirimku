@@ -1,14 +1,14 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle, fail, num, str, dateOrNull } from "@/lib/api-helpers";
-import { hasPermission } from "@/lib/auth";
-import { audit, diffFields } from "@/lib/audit";
-import { aggregateTransport, detailAggregates, isExecutorOnly, transportLoadFromAggregates } from "@/lib/transport-totals";
-import { calculateTransportCapacityStatus } from "@/lib/capacity";
-import { getCapacityWarningThreshold } from "@/lib/settings";
-import { checkVehicleAvailable } from "@/lib/business-rules/shipment-transport";
-import { assertTransportScope } from "@/lib/gudang-scope";
-import { crewAssignmentMessage, findActiveCrewAssignment } from "@/lib/transport-crew";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle, fail, num, str, dateOrNull } from "@/composition/api-helpers";
+import { hasPermission } from "@/infrastructure/auth/auth";
+import { audit, diffFields } from "@/infrastructure/services/audit";
+import { aggregateTransport, detailAggregates, isExecutorOnly, transportLoadFromAggregates } from "@/infrastructure/services/transport-totals";
+import { calculateTransportCapacityStatus } from "@/domain/capacity";
+import { getCapacityWarningThreshold } from "@/infrastructure/services/settings";
+import { checkVehicleAvailable } from "@/infrastructure/services/business-rules/shipment-transport";
+import { assertTransportScope } from "@/infrastructure/services/gudang-scope";
+import { crewAssignmentMessage, findActiveCrewAssignment } from "@/infrastructure/services/transport-crew";
 
 type Params = { params: Promise<{ id: string }> };
 

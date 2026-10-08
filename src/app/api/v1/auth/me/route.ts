@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
-import { guard, ok, handle } from "@/lib/api-helpers";
-import { currentCompanyName } from "@/lib/tenant-context";
+import { guard, ok, handle } from "@/composition/api-helpers";
+import { currentCompanyName } from "@/infrastructure/persistence/tenant-context";
 
 export async function GET(req: NextRequest) {
   return handle(req, async () => {

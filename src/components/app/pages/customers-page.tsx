@@ -4,8 +4,8 @@ import { useMemo, useState } from "react";
 import { MapPin, Pencil, Plus, Trash2, UserRoundCheck, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
-import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type Customer, type Options } from "@/lib/client-api";
-import { customerDisplayParts } from "@/lib/customer-display";
+import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type Customer, type Options } from "@/infrastructure/http/client-api";
+import { customerDisplayParts } from "@/presentation/customer-display";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
@@ -16,8 +16,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CustomerTariffPanel } from "@/components/app/customer-tariff-panel";
-import { buildTariffPayload, emptyTariffForm, validateTariffForm, type TariffFormState } from "@/lib/tariff-form";
-import { cn } from "@/lib/utils";
+import { buildTariffPayload, emptyTariffForm, validateTariffForm, type TariffFormState } from "@/presentation/tariff-form";
+import { cn } from "@/shared/utils";
 
 interface CustomerForm {
   name: string;
@@ -208,8 +208,8 @@ export function CustomersPage() {
         title="Customers"
         subtitle={
           isMarketing
-            ? "Customer Anda sendiri - setiap marketing hanya melihat customer yang terhubung dengannya."
-            : "Master data pelanggan B2B dan B2C beserta Marketing pengelolanya (PIC) dan Gudang-nya."
+            ? "Pelanggan yang terhubung dengan Anda."
+            : "Pelanggan B2B dan B2C, Marketing pengelola, dan gudang."
         }
         icon={<Users className="h-5 w-5" />}
         actions={

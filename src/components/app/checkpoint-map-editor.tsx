@@ -1,9 +1,7 @@
-"use client";
-
 import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { googleTileLayer } from "@/lib/map-tiles";
+import { googleTileLayer } from "@/presentation/map-tiles";
 import { toast } from "sonner";
 import { CheckCircle2, Crosshair, ExternalLink, GripVertical, Info, MapPin, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";

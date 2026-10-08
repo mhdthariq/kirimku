@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -11,7 +9,7 @@ import {
   type Shipment,
   type Transport,
   type TransportDetail,
-} from "@/lib/client-api";
+} from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { Field, FormSelect, SubmitButton } from "@/components/app/form-parts";
 import { TransportFormCapacityPreview } from "@/components/app/capacity-status-card";

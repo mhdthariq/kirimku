@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Camera, CheckCircle2, MapPin, Pencil, Phone, Plus, QrCode, Truck, User, XCircle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { apiDelete, apiGet, apiPost, apiPut, hasPermission, employeesByPosition, type PickupTask, type Options, type Shipment } from "@/lib/client-api";
+import { apiDelete, apiGet, apiPost, apiPut, hasPermission, employeesByPosition, type PickupTask, type Options, type Shipment } from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";

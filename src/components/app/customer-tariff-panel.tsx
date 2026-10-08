@@ -3,9 +3,9 @@
 import { Boxes, Package, Ruler, Scale } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TariffFormFields } from "@/components/app/tariff-form-fields";
-import { cn } from "@/lib/utils";
-import type { PricingMethod } from "@/lib/client-api";
-import type { TariffFormState } from "@/lib/tariff-form";
+import { cn } from "@/shared/utils";
+import type { PricingMethod } from "@/infrastructure/http/client-api";
+import type { TariffFormState } from "@/presentation/tariff-form";
 
 const METHODS: { value: PricingMethod; label: string; hint: string; icon: typeof Scale }[] = [
   { value: "PER_KG", label: "Per kg", hint: "Berat / volumetrik", icon: Scale },

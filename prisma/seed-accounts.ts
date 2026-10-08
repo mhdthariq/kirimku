@@ -53,8 +53,8 @@
  *   maya   / Demo#Pass2026        (vehicle owner)
  *   yusuf  / Demo#Pass2026        (vehicle owner)
  */
-import { seedAccountsOnly } from "../src/lib/seed";
-import { db } from "../src/lib/db";
+import { seedAccountsOnly } from "@/infrastructure/services/seed";
+import { db } from "@/infrastructure/persistence/db";
 
 async function main() {
   console.log("→ Menjalankan seeder AKUN SAJA (tanpa data mock-up operasional)...");

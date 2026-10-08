@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle, str, num } from "@/lib/api-helpers";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle, str, num } from "@/composition/api-helpers";
 
 /**
  * Kurir operational dashboard (Revision Part R).

@@ -3,7 +3,7 @@
 import { History } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { hasPermission } from "@/lib/client-api";
+import { hasPermission } from "@/infrastructure/http/client-api";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";

@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { apiGet, apiPost, getCorpId, getToken, setCorpId, setToken, type SessionUser } from "@/lib/client-api";
+import { apiGet, apiPost, getCorpId, getToken, setCorpId, setToken, type SessionUser } from "@/infrastructure/http/client-api";
 
 interface CompanyInfo {
   name: string;

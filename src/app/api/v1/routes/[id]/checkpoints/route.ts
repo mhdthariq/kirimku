@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle, fail, HttpError } from "@/lib/api-helpers";
-import { audit } from "@/lib/audit";
-import { MIN_CHECKPOINTS } from "@/lib/shipment-flow";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle, fail, HttpError } from "@/composition/api-helpers";
+import { audit } from "@/infrastructure/services/audit";
+import { MIN_CHECKPOINTS } from "@/domain/shipment-flow";
 
 type Params = { params: Promise<{ id: string }> };
 

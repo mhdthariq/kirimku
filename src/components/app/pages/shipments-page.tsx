@@ -35,9 +35,9 @@ import {
   type Options,
   type Shipment,
   type TrackingEvent,
-} from "@/lib/client-api";
-import { customerDisplayParts, customerPrimaryName } from "@/lib/customer-display";
-import { tariffLabel, tariffsForCustomer } from "@/lib/tariff-form";
+} from "@/infrastructure/http/client-api";
+import { customerDisplayParts, customerPrimaryName } from "@/presentation/customer-display";
+import { tariffLabel, tariffsForCustomer } from "@/presentation/tariff-form";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
@@ -54,7 +54,7 @@ import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/utils";
 
 interface ShipmentForm {
   customerId: string;
@@ -401,7 +401,7 @@ function ShipmentList() {
     <div className="space-y-4">
       <PageHeader
         title="Shipments"
-        subtitle="Master shipment beserta lifecycle CREATED → DELIVERED."
+        subtitle="Kiriman dari pembuatan hingga diterima."
         icon={<Package className="h-5 w-5" />}
         actions={
           <>
@@ -1833,7 +1833,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
               <ol className="relative ml-2 space-y-0 border-l pl-5">
                 {shipment.trackingEvents.map((ev) => (
                   <li key={ev.id} className="relative pb-4 last:pb-0">
-                    <span className="absolute -left-[23px] top-1 flex h-2.5 w-2.5 rounded-full border-2 border-card bg-primary" />
+                    <span className="absolute -left-5.75 top-1 flex h-2.5 w-2.5 rounded-full border-2 border-card bg-primary" />
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-xs font-bold text-foreground">{ev.event}</span>
                       <span className="text-[11px] text-muted-foreground">{formatDate(ev.occurredAt, true)}</span>

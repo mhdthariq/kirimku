@@ -3,8 +3,8 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { googleTileLayer } from "@/lib/map-tiles";
-import type { Checkpoint } from "@/lib/client-api";
+import { googleTileLayer } from "@/presentation/map-tiles";
+import type { Checkpoint } from "@/infrastructure/http/client-api";
 
 export interface TransportMapCheckpoint extends Checkpoint {
   checkedIn: boolean;

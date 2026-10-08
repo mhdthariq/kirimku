@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { guard, ok, handle, fail, requireStr, slugify, str } from "@/lib/api-helpers";
-import { audit } from "@/lib/audit";
+import { db } from "@/infrastructure/persistence/db";
+import { guard, ok, handle, fail, requireStr, slugify, str } from "@/composition/api-helpers";
+import { audit } from "@/infrastructure/services/audit";
 
 export async function GET(req: NextRequest) {
   return handle(req, async () => {

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { KeyRound, Pencil, Plus, ShieldCheck, Trash2, UserPlus, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
-import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type Employee, type UserAccount, type Role, type Permission, type Options } from "@/lib/client-api";
+import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type Employee as ApiEmployee, type UserAccount, type Role, type Permission, type Options } from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
@@ -15,6 +15,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+
+type Employee = Omit<ApiEmployee, "user"> & {
+  user?: (Omit<NonNullable<ApiEmployee["user"]>, "roles"> & { roles: UserAccount["roles"] }) | null;
+};
 
 export function AccessPage() {
   const { user } = useAuth();
@@ -40,7 +44,7 @@ export function AccessPage() {
     <div className="space-y-4">
       <PageHeader
         title="Access Control"
-        subtitle="Employees, akun user, dan role dengan permission terperinci."
+        subtitle="Karyawan, akun, peran, dan hak akses."
         icon={<ShieldCheck className="h-5 w-5" />}
       />
 
@@ -417,7 +421,7 @@ function EmployeesTab({ can }: { can: { employeeCreate: boolean; employeeUpdate:
             header: "Gudang",
             render: (e) =>
               e.warehouse ? (
-                <Badge variant="outline" className="max-w-[180px] truncate text-[11px]">{e.warehouse.name}</Badge>
+                <Badge variant="outline" className="max-w-45 truncate text-[11px]">{e.warehouse.name}</Badge>
               ) : (
                 <span className="text-xs text-muted-foreground" title="Data operational kosong - hanya Owner melihat semua gudang">belum ditugaskan</span>
               ),

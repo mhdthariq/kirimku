@@ -1,12 +1,12 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { verifyPassword, createSession } from "@/lib/auth";
-import { ensureRbac } from "@/lib/rbac";
-import { ensureSeed } from "@/lib/seed";
-import { audit } from "@/lib/audit";
-import { ok, fail, handle, requireStr } from "@/lib/api-helpers";
-import { isDefaultTenant, currentCompanyName } from "@/lib/tenant-context";
-import type { AuthUser } from "@/lib/auth";
+import { db } from "@/infrastructure/persistence/db";
+import { verifyPassword, createSession } from "@/infrastructure/auth/auth";
+import { ensureRbac } from "@/infrastructure/auth/rbac";
+import { ensureSeed } from "@/infrastructure/services/seed";
+import { audit } from "@/infrastructure/services/audit";
+import { ok, fail, handle, requireStr } from "@/composition/api-helpers";
+import { isDefaultTenant, currentCompanyName } from "@/infrastructure/persistence/tenant-context";
+import type { AuthUser } from "@/infrastructure/auth/auth";
 
 export async function POST(req: NextRequest) {
   return handle(req, async () => {

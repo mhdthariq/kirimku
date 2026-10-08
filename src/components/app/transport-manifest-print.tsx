@@ -3,12 +3,12 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Printer, X } from "lucide-react";
-import { COMPANY_NAME } from "@/lib/company";
-import { apiGet, apiPost, type TransportDetail } from "@/lib/client-api";
+import { COMPANY_NAME } from "@/shared/company";
+import { apiGet, apiPost, type TransportDetail, type TransportDropsBoard } from "@/infrastructure/http/client-api";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { formatNumber, formatDate, formatRupiah } from "@/components/app/form-parts";
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/utils";
 
 interface TransportManifestPrintProps {
   transportId: number | null;
@@ -27,12 +27,14 @@ interface TransportManifestPrintProps {
 export function TransportManifestPrint({ transportId, onClose }: TransportManifestPrintProps) {
   const { user } = useAuth();
   const [transport, setTransport] = useState<TransportDetail | null>(null);
+  const [transportMode, setTransportMode] = useState<TransportDropsBoard["transportMode"] | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     if (transportId == null) {
       const t = setTimeout(() => {
         setTransport(null);
+        setTransportMode(null);
         setReady(false);
       }, 0);
       return () => clearTimeout(t);
@@ -43,12 +45,16 @@ export function TransportManifestPrint({ transportId, onClose }: TransportManife
       if (cancelled) return;
       setReady(false);
     }, 0);
-    apiGet<TransportDetail>(`/transports/${transportId}`)
-      .then((t) => {
+    Promise.all([
+      apiGet<TransportDetail>(`/transports/${transportId}`),
+      apiGet<TransportDropsBoard>(`/transports/${transportId}/drops`).catch(() => null),
+    ])
+      .then(([t, drops]) => {
         if (cancelled) return;
         settled = true;
         clearTimeout(timer);
         setTransport(t);
+        setTransportMode(drops?.transportMode ?? null);
         setReady(true);
       })
       .catch(() => {
@@ -101,7 +107,7 @@ export function TransportManifestPrint({ transportId, onClose }: TransportManife
         }
       `}</style>
       <div id="manifest-print-portal" className="fixed inset-0 z-[100] overflow-y-auto bg-black/50 p-4 print:bg-white print:p-0">
-        <div className="manifest-toolbar mx-auto mb-3 flex max-w-[820px] items-center justify-between print:hidden">
+        <div className="manifest-toolbar mx-auto mb-3 flex max-w-205 items-center justify-between print:hidden">
           <p className="text-sm font-semibold text-white">Pratinjau Manifest Transport</p>
           <div className="flex gap-2">
             <Button size="sm" onClick={doPrint} disabled={!ready}>
@@ -113,7 +119,7 @@ export function TransportManifestPrint({ transportId, onClose }: TransportManife
           </div>
         </div>
 
-        <div className="manifest-sheet mx-auto max-w-[820px] rounded-xl bg-white p-8 text-black shadow-xl print:rounded-none print:shadow-none">
+        <div className="manifest-sheet mx-auto max-w-205 rounded-xl bg-white p-8 text-black shadow-xl print:rounded-none print:shadow-none">
           {!transport ? (
             <p className="py-20 text-center text-gray-500">{ready ? "Transport tidak ditemukan." : "Memuat…"}</p>
           ) : (
@@ -136,7 +142,7 @@ export function TransportManifestPrint({ transportId, onClose }: TransportManife
                 <Info label="Kendaraan" value={`${transport.vehicle.vehicleNumber}${transport.vehicle.name ? ` — ${transport.vehicle.name}` : ""}`} />
                 <Info label="Status" value={transport.status} />
                 <Info label="Rute" value={transport.routeName ?? "-"} />
-                <Info label="Mode" value={transport.checkpoints.length > 0 ? (transport.transportMode ?? "DIRECT") : "DIRECT"} />
+                <Info label="Mode" value={transportMode ?? "—"} />
                 <Info label="Koridor" value={`${transport.origin ?? "?"} → ${transport.destination ?? "?"}`} />
                 <Info label="Driver" value={transport.driver?.name ?? "-"} />
                 <Info label="Rencana Berangkat" value={transport.plannedDepartureAt ? formatDate(transport.plannedDepartureAt, true) : "-"} />

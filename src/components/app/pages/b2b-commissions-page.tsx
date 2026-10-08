@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { Briefcase, TrendingUp } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { apiGet, hasPermission, type CommissionRow, type Shipment } from "@/lib/client-api";
+import { apiGet, hasPermission, type CommissionRow, type Shipment } from "@/infrastructure/http/client-api";
 import { useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { StatusBadge, TypeBadge } from "@/components/app/status-badge";
@@ -51,7 +51,7 @@ export function B2BCommissionsPage() {
     <div className="space-y-4">
       <PageHeader
         title="B2B & Komisi"
-        subtitle="Invoice B2B milik perusahaan - komisi Anda dirilis ke wallet hanya setelah invoice LUNAS penuh (§9)."
+        subtitle="Komisi masuk ke saldo Anda setelah invoice B2B lunas penuh."
         icon={<Briefcase className="h-5 w-5" />}
         actions={
           <div className="flex flex-wrap gap-2">

@@ -1,849 +1,851 @@
 generator client {
-  provider = "prisma-client-js"
+    provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+    provider = "postgresql"
+    // Required by pinned Prisma 6.11.1; Prisma 7 language servers may incorrectly
+    // flag this. The 6.11 config API cannot replace it with datasource.url.
+    url      = env("DATABASE_URL")
 }
 
 model Employee {
-  id                Int                 @id @default(autoincrement())
-  employeeNumber    String              @unique
-  name              String
-  phone             String?
-  position          String?
-  warehouseId       Int?
-  isActive          Boolean             @default(true)
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  warehouse         Warehouse?          @relation(fields: [warehouseId], references: [id])
-  drivenTransports  Transport[]         @relation("TransportDriver")
-  kenekTransports   Transport[]         @relation("TransportKenek")
-  user              User?
-  driverAssignments VehicleAssignment[] @relation("VehicleAssignmentDriver")
-  kenekAssignments  VehicleAssignment[] @relation("VehicleAssignmentKenek")
+    id                Int                 @id @default(autoincrement())
+    employeeNumber    String              @unique
+    name              String
+    phone             String?
+    position          String?
+    warehouseId       Int?
+    isActive          Boolean             @default(true)
+    createdAt         DateTime            @default(now())
+    updatedAt         DateTime            @updatedAt
+    warehouse         Warehouse?          @relation(fields: [warehouseId], references: [id])
+    drivenTransports  Transport[]         @relation("TransportDriver")
+    kenekTransports   Transport[]         @relation("TransportKenek")
+    user              User?
+    driverAssignments VehicleAssignment[] @relation("VehicleAssignmentDriver")
+    kenekAssignments  VehicleAssignment[] @relation("VehicleAssignmentKenek")
 }
 
 model User {
-  id                        Int                 @id @default(autoincrement())
-  username                  String              @unique
-  name                      String
-  passwordHash              String
-  isOwner                   Boolean             @default(false)
-  isActive                  Boolean             @default(true)
-  employeeId                Int?                @unique
-  createdAt                 DateTime            @default(now())
-  updatedAt                 DateTime            @updatedAt
-  auditLogs                 AuditLog[]
-  checkpointRecords         CheckpointRecord[]
-  handoverScans             HandoverScan[]
-  partner                   Partner?
-  payments                  Payment[]           @relation("PaymentRecorder")
-  paymentsVerified          Payment[]           @relation("PaymentVerifier")
-  repairActionLogsMade      RepairActionLog[]   @relation("RepairActionLogBy")
-  sessions                  SessionToken[]
-  verifiedTopUps            TopUpRequest[]      @relation("TopUpVerifier")
-  trackingEvents            TrackingEvent[]     @relation("TrackingActor")
-  employee                  Employee?           @relation(fields: [employeeId], references: [id])
-  roles                     UserRole[]
-  walletTransactionsCreated WalletTransaction[] @relation("WalletTransactionCreator")
-  processedWithdrawals      WithdrawalRequest[] @relation("WithdrawalProcessor")
-  reviewedWithdrawals       WithdrawalRequest[] @relation("WithdrawalReviewer")
-  systemSettingsUpdated    SystemSetting[]     @relation("SystemSettingUpdatedBy")
+    id                        Int                 @id @default(autoincrement())
+    username                  String              @unique
+    name                      String
+    passwordHash              String
+    isOwner                   Boolean             @default(false)
+    isActive                  Boolean             @default(true)
+    employeeId                Int?                @unique
+    createdAt                 DateTime            @default(now())
+    updatedAt                 DateTime            @updatedAt
+    auditLogs                 AuditLog[]
+    checkpointRecords         CheckpointRecord[]
+    handoverScans             HandoverScan[]
+    partner                   Partner?
+    payments                  Payment[]           @relation("PaymentRecorder")
+    paymentsVerified          Payment[]           @relation("PaymentVerifier")
+    repairActionLogsMade      RepairActionLog[]   @relation("RepairActionLogBy")
+    sessions                  SessionToken[]
+    verifiedTopUps            TopUpRequest[]      @relation("TopUpVerifier")
+    trackingEvents            TrackingEvent[]     @relation("TrackingActor")
+    employee                  Employee?           @relation(fields: [employeeId], references: [id])
+    roles                     UserRole[]
+    walletTransactionsCreated WalletTransaction[] @relation("WalletTransactionCreator")
+    processedWithdrawals      WithdrawalRequest[] @relation("WithdrawalProcessor")
+    reviewedWithdrawals       WithdrawalRequest[] @relation("WithdrawalReviewer")
+    systemSettingsUpdated     SystemSetting[]     @relation("SystemSettingUpdatedBy")
 }
 
 model Role {
-  id          Int              @id @default(autoincrement())
-  slug        String           @unique
-  name        String
-  description String?
-  isSystem    Boolean          @default(false)
-  permissions RolePermission[]
-  users       UserRole[]
+    id          Int              @id @default(autoincrement())
+    slug        String           @unique
+    name        String
+    description String?
+    isSystem    Boolean          @default(false)
+    permissions RolePermission[]
+    users       UserRole[]
 }
 
 model Permission {
-  id          Int              @id @default(autoincrement())
-  slug        String           @unique
-  module      String
-  description String
-  roles       RolePermission[]
+    id          Int              @id @default(autoincrement())
+    slug        String           @unique
+    module      String
+    description String
+    roles       RolePermission[]
 }
 
 model UserRole {
-  userId Int
-  roleId Int
-  role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+    userId Int
+    roleId Int
+    role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+    user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@id([userId, roleId])
+    @@id([userId, roleId])
 }
 
 model RolePermission {
-  roleId       Int
-  permissionId Int
-  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
-  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+    roleId       Int
+    permissionId Int
+    permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+    role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
-  @@id([roleId, permissionId])
+    @@id([roleId, permissionId])
 }
 
 model SessionToken {
-  id        Int      @id @default(autoincrement())
-  token     String   @unique
-  userId    Int
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    id        Int      @id @default(autoincrement())
+    token     String   @unique
+    userId    Int
+    expiresAt DateTime
+    createdAt DateTime @default(now())
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model CodeSequence {
-  key       String   @id
-  nextValue Int
-  updatedAt DateTime @updatedAt
+    key       String   @id
+    nextValue Int
+    updatedAt DateTime @updatedAt
 }
 
 model Partner {
-  id                   Int                   @id @default(autoincrement())
-  userId               Int                   @unique
-  type                 String
-  companyPercent       Float                 @default(80)
-  partnerPercent       Float                 @default(20)
-  bankName             String?
-  bankAccountName      String?
-  bankAccountNumber    String?
-  isActive             Boolean               @default(true)
-  notes                String?
-  /// Revise round 7 — Partner Alignment: optional gudang this marketing
-  /// partner is aligned to. Null = "umum" (general — serves every gudang).
-  /// Used to clarify which gudang a marketing affiliate belongs to.
-  warehouseId          Int?
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
-  warehouse            Warehouse?            @relation("PartnerAlignmentWarehouse", fields: [warehouseId], references: [id])
-  customers            Customer[]            @relation("CustomerMarketingOwner")
-  commissions          MarketingCommission[]
-  shipmentsCreated     MasterShipment[]      @relation("ShipmentCreatorPartner")
-  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  topUps               TopUpRequest[]
-  transportSettlements TransportSettlement[]
-  vehicles             Vehicle[]
-  repairs              VehicleRepair[]
-  wallet               Wallet?
-  withdrawals          WithdrawalRequest[]
+    id                   Int                   @id @default(autoincrement())
+    userId               Int                   @unique
+    type                 String
+    companyPercent       Float                 @default(80)
+    partnerPercent       Float                 @default(20)
+    bankName             String?
+    bankAccountName      String?
+    bankAccountNumber    String?
+    isActive             Boolean               @default(true)
+    notes                String?
+    /// Revise round 7 — Partner Alignment: optional gudang this marketing
+    /// partner is aligned to. Null = "umum" (general — serves every gudang).
+    /// Used to clarify which gudang a marketing affiliate belongs to.
+    warehouseId          Int?
+    createdAt            DateTime              @default(now())
+    updatedAt            DateTime              @updatedAt
+    warehouse            Warehouse?            @relation("PartnerAlignmentWarehouse", fields: [warehouseId], references: [id])
+    customers            Customer[]            @relation("CustomerMarketingOwner")
+    commissions          MarketingCommission[]
+    shipmentsCreated     MasterShipment[]      @relation("ShipmentCreatorPartner")
+    user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+    topUps               TopUpRequest[]
+    transportSettlements TransportSettlement[]
+    vehicles             Vehicle[]
+    repairs              VehicleRepair[]
+    wallet               Wallet?
+    withdrawals          WithdrawalRequest[]
 }
 
 model Wallet {
-  id           Int                 @id @default(autoincrement())
-  partnerId    Int                 @unique
-  balance      Float               @default(0)
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
-  partner      Partner             @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-  transactions WalletTransaction[]
+    id           Int                 @id @default(autoincrement())
+    partnerId    Int                 @unique
+    balance      Float               @default(0)
+    createdAt    DateTime            @default(now())
+    updatedAt    DateTime            @updatedAt
+    partner      Partner             @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+    transactions WalletTransaction[]
 }
 
 model WalletTransaction {
-  id            Int      @id @default(autoincrement())
-  walletId      Int
-  type          String
-  amount        Float
-  direction     String
-  balanceBefore Float
-  balanceAfter  Float
-  referenceType String?
-  referenceId   Int?
-  businessRef   String   @unique
-  status        String   @default("COMPLETED")
-  description   String?
-  createdById   Int?
-  createdAt     DateTime @default(now())
-  createdBy     User?    @relation("WalletTransactionCreator", fields: [createdById], references: [id])
-  wallet        Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+    id            Int      @id @default(autoincrement())
+    walletId      Int
+    type          String
+    amount        Float
+    direction     String
+    balanceBefore Float
+    balanceAfter  Float
+    referenceType String?
+    referenceId   Int?
+    businessRef   String   @unique
+    status        String   @default("COMPLETED")
+    description   String?
+    createdById   Int?
+    createdAt     DateTime @default(now())
+    createdBy     User?    @relation("WalletTransactionCreator", fields: [createdById], references: [id])
+    wallet        Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
 
-  @@index([walletId, createdAt])
+    @@index([walletId, createdAt])
 }
 
 model TopUpRequest {
-  id                         Int       @id @default(autoincrement())
-  requestCode                String    @unique
-  partnerId                  Int
-  amount                     Float
-  status                     String    @default("PENDING_VERIFICATION")
-  partnerNote                String?
-  partnerProofUrl            String?
-  proofUrl                   String?
-  rejectReason               String?
-  requestedById              Int
-  submittedForVerificationAt DateTime?
-  verifiedById               Int?
-  verifiedAt                 DateTime?
-  walletTransactionId        Int?
-  createdAt                  DateTime  @default(now())
-  updatedAt                  DateTime  @updatedAt
-  partner                    Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-  verifiedBy                 User?     @relation("TopUpVerifier", fields: [verifiedById], references: [id])
+    id                         Int       @id @default(autoincrement())
+    requestCode                String    @unique
+    partnerId                  Int
+    amount                     Float
+    status                     String    @default("PENDING_VERIFICATION")
+    partnerNote                String?
+    partnerProofUrl            String?
+    proofUrl                   String?
+    rejectReason               String?
+    requestedById              Int
+    submittedForVerificationAt DateTime?
+    verifiedById               Int?
+    verifiedAt                 DateTime?
+    walletTransactionId        Int?
+    createdAt                  DateTime  @default(now())
+    updatedAt                  DateTime  @updatedAt
+    partner                    Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+    verifiedBy                 User?     @relation("TopUpVerifier", fields: [verifiedById], references: [id])
 
-  @@index([partnerId, status])
-  @@index([status])
+    @@index([partnerId, status])
+    @@index([status])
 }
 
 model WithdrawalRequest {
-  id                  Int       @id @default(autoincrement())
-  requestCode         String    @unique
-  partnerId           Int
-  amount              Float
-  status              String    @default("PENDING")
-  bankName            String?
-  bankAccountName     String?
-  bankAccountNumber   String?
-  partnerNote         String?
-  transferProofUrl    String?
-  rejectReason        String?
-  requestedById       Int
-  reviewedById        Int?
-  reviewedAt          DateTime?
-  processedById       Int?
-  processedAt         DateTime?
-  completedAt         DateTime?
-  walletTransactionId Int?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  partner             Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-  processedBy         User?     @relation("WithdrawalProcessor", fields: [processedById], references: [id])
-  reviewedBy          User?     @relation("WithdrawalReviewer", fields: [reviewedById], references: [id])
+    id                  Int       @id @default(autoincrement())
+    requestCode         String    @unique
+    partnerId           Int
+    amount              Float
+    status              String    @default("PENDING")
+    bankName            String?
+    bankAccountName     String?
+    bankAccountNumber   String?
+    partnerNote         String?
+    transferProofUrl    String?
+    rejectReason        String?
+    requestedById       Int
+    reviewedById        Int?
+    reviewedAt          DateTime?
+    processedById       Int?
+    processedAt         DateTime?
+    completedAt         DateTime?
+    walletTransactionId Int?
+    createdAt           DateTime  @default(now())
+    updatedAt           DateTime  @updatedAt
+    partner             Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+    processedBy         User?     @relation("WithdrawalProcessor", fields: [processedById], references: [id])
+    reviewedBy          User?     @relation("WithdrawalReviewer", fields: [reviewedById], references: [id])
 
-  @@index([partnerId, status])
-  @@index([status])
+    @@index([partnerId, status])
+    @@index([status])
 }
 
 model Customer {
-  id                 Int              @id @default(autoincrement())
-  code               String           @unique
-  type               String           @default("b2c")
-  name               String
-  companyName        String?
-  phone              String?
-  email              String?
-  address            String?
-  isActive           Boolean          @default(true)
-  marketingPartnerId Int?
-  /// Revise round 7 — Gudang attachment for customers. Null = "umum"
-  /// (general — visible to every gudang). When set, the customer is
-  /// attached to a specific gudang and only that gudang's admin/staff
-  /// see it in their customer list (gudang data separation).
-  warehouseId        Int?
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
-  marketingPartner   Partner?         @relation("CustomerMarketingOwner", fields: [marketingPartnerId], references: [id])
-  warehouse          Warehouse?       @relation("CustomerWarehouse", fields: [warehouseId], references: [id])
-  invoices           Invoice[]
-  shipments          MasterShipment[]
-  tariffs            Tariff[]         @relation("CustomerTariffs")
+    id                 Int              @id @default(autoincrement())
+    code               String           @unique
+    type               String           @default("b2c")
+    name               String
+    companyName        String?
+    phone              String?
+    email              String?
+    address            String?
+    isActive           Boolean          @default(true)
+    marketingPartnerId Int?
+    /// Revise round 7 — Gudang attachment for customers. Null = "umum"
+    /// (general — visible to every gudang). When set, the customer is
+    /// attached to a specific gudang and only that gudang's admin/staff
+    /// see it in their customer list (gudang data separation).
+    warehouseId        Int?
+    createdAt          DateTime         @default(now())
+    updatedAt          DateTime         @updatedAt
+    marketingPartner   Partner?         @relation("CustomerMarketingOwner", fields: [marketingPartnerId], references: [id])
+    warehouse          Warehouse?       @relation("CustomerWarehouse", fields: [warehouseId], references: [id])
+    invoices           Invoice[]
+    shipments          MasterShipment[]
+    tariffs            Tariff[]         @relation("CustomerTariffs")
 }
 
 model MasterShipment {
-  id                     Int                 @id @default(autoincrement())
-  masterCode             String              @unique
-  resi                   String?             @unique
-  customerId             Int
-  tariffId               Int?
-  status                 String              @default("CREATED")
-  /// Revise round 8 — Fulfillment Mode. "STANDARD" = the existing
-  /// kurir → company warehouse → transport → destination warehouse →
-  /// kurir delivery flow. "DIRECT" = driver picks up directly at the
-  /// origin warehouse (external or own) and delivers directly to the
-  /// destination warehouse, bypassing the company warehouse scan flow.
-  /// Existing rows default to "STANDARD" — no data migration required.
-  fulfillmentMode        String              @default("STANDARD")
-  origin                 String
-  destination            String
-  originWarehouseId      Int?
-  destinationWarehouseId Int?
-  arrivedWarehouseId     Int?
-  destReceivedAt         DateTime?
-  penerimaName           String?
-  penerimaAddress        String?
-  penerimaContact        String?
-  pengirimName           String?
-  pengirimPhone          String?
-  pengirimEmail          String?
-  pengirimAddress        String?
-  chargeableWeightKg     Float?
-  ratePerKg              Float?
-  /// Snapshot of the tariff's pricing method at the time price was
-  /// computed ("PER_KG" | "PER_KOLI" | "PER_CUBIC"). Null = legacy rows
-  /// priced before this feature existed — treated as PER_KG.
-  pricingMethod          String?
-  /// Chargeable koli count snapshot — set only when pricingMethod = PER_KOLI.
-  chargeableKoli         Float?
-  /// Chargeable volume (m³) snapshot — set only when pricingMethod = PER_CUBIC.
-  chargeableVolumeM3     Float?
-  priceAmount            Float?
-  pricedAt               DateTime?
-  insuranceAmount        Float               @default(0)
-  discountAmount         Float               @default(0)
-  discountPercentage     Float?
-  finalPriceAmount       Float?
-  discountFundedBy       String              @default("COMPANY")
-  createdByPartnerId     Int?
-  createdAt              DateTime            @default(now())
-  updatedAt              DateTime            @updatedAt
-  deliveries             Delivery[]
-  details                DetailShipment[]
-  invoiceLines           InvoiceLine[]
-  createdByPartner       Partner?            @relation("ShipmentCreatorPartner", fields: [createdByPartnerId], references: [id])
-  customer               Customer            @relation(fields: [customerId], references: [id])
-  tariff                 Tariff?             @relation(fields: [tariffId], references: [id])
-  payments               Payment[]
-  pickups                Pickup[]
-  trackingEvents         TrackingEvent[]
-  transportItems         TransportShipment[]
+    id                     Int                 @id @default(autoincrement())
+    masterCode             String              @unique
+    resi                   String?             @unique
+    customerId             Int
+    tariffId               Int?
+    status                 String              @default("CREATED")
+    /// Revise round 8 — Fulfillment Mode. "STANDARD" = the existing
+    /// kurir → company warehouse → transport → destination warehouse →
+    /// kurir delivery flow. "DIRECT" = driver picks up directly at the
+    /// origin warehouse (external or own) and delivers directly to the
+    /// destination warehouse, bypassing the company warehouse scan flow.
+    /// Existing rows default to "STANDARD" — no data migration required.
+    fulfillmentMode        String              @default("STANDARD")
+    origin                 String
+    destination            String
+    originWarehouseId      Int?
+    destinationWarehouseId Int?
+    arrivedWarehouseId     Int?
+    destReceivedAt         DateTime?
+    penerimaName           String?
+    penerimaAddress        String?
+    penerimaContact        String?
+    pengirimName           String?
+    pengirimPhone          String?
+    pengirimEmail          String?
+    pengirimAddress        String?
+    chargeableWeightKg     Float?
+    ratePerKg              Float?
+    /// Snapshot of the tariff's pricing method at the time price was
+    /// computed ("PER_KG" | "PER_KOLI" | "PER_CUBIC"). Null = legacy rows
+    /// priced before this feature existed — treated as PER_KG.
+    pricingMethod          String?
+    /// Chargeable koli count snapshot — set only when pricingMethod = PER_KOLI.
+    chargeableKoli         Float?
+    /// Chargeable volume (m³) snapshot — set only when pricingMethod = PER_CUBIC.
+    chargeableVolumeM3     Float?
+    priceAmount            Float?
+    pricedAt               DateTime?
+    insuranceAmount        Float               @default(0)
+    discountAmount         Float               @default(0)
+    discountPercentage     Float?
+    finalPriceAmount       Float?
+    discountFundedBy       String              @default("COMPANY")
+    createdByPartnerId     Int?
+    createdAt              DateTime            @default(now())
+    updatedAt              DateTime            @updatedAt
+    deliveries             Delivery[]
+    details                DetailShipment[]
+    invoiceLines           InvoiceLine[]
+    createdByPartner       Partner?            @relation("ShipmentCreatorPartner", fields: [createdByPartnerId], references: [id])
+    customer               Customer            @relation(fields: [customerId], references: [id])
+    tariff                 Tariff?             @relation(fields: [tariffId], references: [id])
+    payments               Payment[]
+    pickups                Pickup[]
+    trackingEvents         TrackingEvent[]
+    transportItems         TransportShipment[]
 }
 
 model DetailShipment {
-  id             Int            @id @default(autoincrement())
-  detailCode     String         @unique
-  masterId       Int
-  description    String
-  lengthCm       Float?
-  widthCm        Float?
-  heightCm       Float?
-  /// Revise round 11 — optional direct volume entry (m³). When set, this
-  /// value is used directly for the package volume (no L×W×H computation).
-  /// Use case: irregularly-shaped packages where entering dimensions is
-  /// impractical — the user just measures the volume and enters it.
-  /// When null, volume is computed from L×W×H/1.000.000 (existing behavior).
-  volumeM3       Float?
-  actualWeightKg Float          @default(0)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  master         MasterShipment @relation(fields: [masterId], references: [id], onDelete: Cascade)
+    id             Int            @id @default(autoincrement())
+    detailCode     String         @unique
+    masterId       Int
+    description    String
+    lengthCm       Float?
+    widthCm        Float?
+    heightCm       Float?
+    /// Revise round 11 — optional direct volume entry (m³). When set, this
+    /// value is used directly for the package volume (no L×W×H computation).
+    /// Use case: irregularly-shaped packages where entering dimensions is
+    /// impractical — the user just measures the volume and enters it.
+    /// When null, volume is computed from L×W×H/1.000.000 (existing behavior).
+    volumeM3       Float?
+    actualWeightKg Float          @default(0)
+    createdAt      DateTime       @default(now())
+    updatedAt      DateTime       @updatedAt
+    master         MasterShipment @relation(fields: [masterId], references: [id], onDelete: Cascade)
 }
 
 model TrackingEvent {
-  id          Int            @id @default(autoincrement())
-  masterId    Int
-  event       String
-  description String?
-  actorId     Int?
-  occurredAt  DateTime       @default(now())
-  actor       User?          @relation("TrackingActor", fields: [actorId], references: [id])
-  master      MasterShipment @relation(fields: [masterId], references: [id], onDelete: Cascade)
+    id          Int            @id @default(autoincrement())
+    masterId    Int
+    event       String
+    description String?
+    actorId     Int?
+    occurredAt  DateTime       @default(now())
+    actor       User?          @relation("TrackingActor", fields: [actorId], references: [id])
+    master      MasterShipment @relation(fields: [masterId], references: [id], onDelete: Cascade)
 }
 
 model Warehouse {
-  id                     Int        @id @default(autoincrement())
-  code                   String     @unique
-  name                   String
-  city                    String?
-  address                String?
-  latitude               Float?
-  longitude              Float?
-  customerSupportContact String?
-  isActive               Boolean    @default(true)
-  notes                  String?
-  createdAt              DateTime   @default(now())
-  updatedAt              DateTime   @updatedAt
-  employees              Employee[]
-  /// Revise round 7 — marketing partners aligned to this gudang (Partner Alignment).
-  alignedPartners        Partner[]  @relation("PartnerAlignmentWarehouse")
-  /// Revise round 7 — customers attached to this gudang (gudang data separation for customers).
-  customers              Customer[]  @relation("CustomerWarehouse")
+    id                     Int        @id @default(autoincrement())
+    code                   String     @unique
+    name                   String
+    city                   String?
+    address                String?
+    latitude               Float?
+    longitude              Float?
+    customerSupportContact String?
+    isActive               Boolean    @default(true)
+    notes                  String?
+    createdAt              DateTime   @default(now())
+    updatedAt              DateTime   @updatedAt
+    employees              Employee[]
+    /// Revise round 7 — marketing partners aligned to this gudang (Partner Alignment).
+    alignedPartners        Partner[]  @relation("PartnerAlignmentWarehouse")
+    /// Revise round 7 — customers attached to this gudang (gudang data separation for customers).
+    customers              Customer[] @relation("CustomerWarehouse")
 }
 
 model Vehicle {
-  id            Int                   @id @default(autoincrement())
-  vehicleNumber String                @unique
-  name          String?
-  status        String                @default("ACTIVE")
-  maxWeightKg   Float
-  /// Maximum cargo volume in m³. Revise round 9: when lengthM/widthM/heightM
-  /// are all set, this is auto-computed as (L × W × H) and the form field
-  /// becomes read-only. The user can still override by clearing the
-  /// dimensions and typing a value directly.
-  maxVolumeM3   Float
-  /// Revise round 9 — physical cargo box dimensions in meters.
-  /// When all three are set, maxVolumeM3 is auto-computed as L × W × H.
-  /// Displayed on the Vehicles page as "Ukuran" before "Kapasitas".
-  lengthM       Float?
-  widthM        Float?
-  heightM       Float?
-  /// Capacity Round — maximum number of koli (packages) the vehicle can carry.
-  /// Null = NOT CONFIGURED (the company has not set a koli limit). Zero is
-  /// treated as invalid/unconfigured too (see lib/capacity.ts). This is an
-  /// INFORMATIONAL operational indicator — it never blocks assignment.
-  maxKoli       Int?
-  notes         String?
-  ownerId       Int?
-  createdAt     DateTime              @default(now())
-  updatedAt     DateTime              @updatedAt
-  transports    Transport[]
-  settlements   TransportSettlement[]
-  owner         Partner?              @relation(fields: [ownerId], references: [id])
-  assignments   VehicleAssignment[]
-  repairs       VehicleRepair[]
+    id            Int                   @id @default(autoincrement())
+    vehicleNumber String                @unique
+    name          String?
+    status        String                @default("ACTIVE")
+    maxWeightKg   Float
+    /// Maximum cargo volume in m³. Revise round 9: when lengthM/widthM/heightM
+    /// are all set, this is auto-computed as (L × W × H) and the form field
+    /// becomes read-only. The user can still override by clearing the
+    /// dimensions and typing a value directly.
+    maxVolumeM3   Float
+    /// Revise round 9 — physical cargo box dimensions in meters.
+    /// When all three are set, maxVolumeM3 is auto-computed as L × W × H.
+    /// Displayed on the Vehicles page as "Ukuran" before "Kapasitas".
+    lengthM       Float?
+    widthM        Float?
+    heightM       Float?
+    /// Capacity Round — maximum number of koli (packages) the vehicle can carry.
+    /// Null = NOT CONFIGURED (the company has not set a koli limit). Zero is
+    /// treated as invalid/unconfigured too (see lib/capacity.ts). This is an
+    /// INFORMATIONAL operational indicator — it never blocks assignment.
+    maxKoli       Int?
+    notes         String?
+    ownerId       Int?
+    createdAt     DateTime              @default(now())
+    updatedAt     DateTime              @updatedAt
+    transports    Transport[]
+    settlements   TransportSettlement[]
+    owner         Partner?              @relation(fields: [ownerId], references: [id])
+    assignments   VehicleAssignment[]
+    repairs       VehicleRepair[]
 }
 
 model VehicleAssignment {
-  id        Int       @id @default(autoincrement())
-  vehicleId Int
-  driverId  Int?
-  kenekId   Int?
-  validFrom DateTime  @default(now())
-  validTo   DateTime?
-  driver    Employee? @relation("VehicleAssignmentDriver", fields: [driverId], references: [id])
-  kenek     Employee? @relation("VehicleAssignmentKenek", fields: [kenekId], references: [id])
-  vehicle   Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+    id        Int       @id @default(autoincrement())
+    vehicleId Int
+    driverId  Int?
+    kenekId   Int?
+    validFrom DateTime  @default(now())
+    validTo   DateTime?
+    driver    Employee? @relation("VehicleAssignmentDriver", fields: [driverId], references: [id])
+    kenek     Employee? @relation("VehicleAssignmentKenek", fields: [kenekId], references: [id])
+    vehicle   Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 
-  @@unique([vehicleId, driverId, kenekId, validFrom])
+    @@unique([vehicleId, driverId, kenekId, validFrom])
 }
 
 model Route {
-  id          Int          @id @default(autoincrement())
-  name        String
-  origin      String?
-  destination String?
-  isActive    Boolean      @default(true)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  checkpoints Checkpoint[]
-  transports  Transport[]
+    id          Int          @id @default(autoincrement())
+    name        String
+    origin      String?
+    destination String?
+    isActive    Boolean      @default(true)
+    createdAt   DateTime     @default(now())
+    updatedAt   DateTime     @updatedAt
+    checkpoints Checkpoint[]
+    transports  Transport[]
 }
 
 model Checkpoint {
-  id           Int                @id @default(autoincrement())
-  routeId      Int
-  name         String
-  sequence     Int
-  latitude     Float
-  longitude    Float
-  radiusMeters Int                @default(100)
-  isActive     Boolean            @default(true)
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-  route        Route              @relation(fields: [routeId], references: [id], onDelete: Cascade)
-  records      CheckpointRecord[]
+    id           Int                @id @default(autoincrement())
+    routeId      Int
+    name         String
+    sequence     Int
+    latitude     Float
+    longitude    Float
+    radiusMeters Int                @default(100)
+    isActive     Boolean            @default(true)
+    createdAt    DateTime           @default(now())
+    updatedAt    DateTime           @updatedAt
+    route        Route              @relation(fields: [routeId], references: [id], onDelete: Cascade)
+    records      CheckpointRecord[]
 
-  @@unique([routeId, sequence])
+    @@unique([routeId, sequence])
 }
 
 model Transport {
-  id                 Int                  @id @default(autoincrement())
-  transportCode      String               @unique
-  routeId            Int?
-  vehicleId          Int
-  driverId           Int?
-  kenekId            Int?
-  status             String               @default("PLANNED")
-  /// "DIRECT" (default — one destination, unchanged behaviour) or
-  /// "MULTI_DROP" (each resi gets its own drop checkpoint). NOTE: this is the
-  /// TRANSPORT mode, unrelated to MasterShipment.fulfillmentMode = "DIRECT".
-  transportMode      String               @default("DIRECT")
-  origin             String?
-  destination        String?
-  plannedDepartureAt DateTime?
-  plannedArrivalAt   DateTime?
-  currentLatitude    Float?
-  currentLongitude   Float?
-  lastLocationAt     DateTime?
-  departedAt         DateTime?
-  arrivedAt          DateTime?
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
-  checkpointRecords  CheckpointRecord[]
-  driver             Employee?            @relation("TransportDriver", fields: [driverId], references: [id])
-  kenek              Employee?            @relation("TransportKenek", fields: [kenekId], references: [id])
-  route              Route?               @relation(fields: [routeId], references: [id])
-  vehicle            Vehicle              @relation(fields: [vehicleId], references: [id])
-  settlement         TransportSettlement?
-  shipments          TransportShipment[]
-  expenses           TransportExpense[]
-  /// Delivery approval of the WHOLE transport (all resi approved). Null until then.
-  deliveryApprovedAt DateTime?
-  deliveryApprovedById Int?
-  returnTasksFrom    ReturnTask[]         @relation("OriginalTransport")
-  returnTasksAs      ReturnTask[]         @relation("ReturnTransport")
+    id                   Int                  @id @default(autoincrement())
+    transportCode        String               @unique
+    routeId              Int?
+    vehicleId            Int
+    driverId             Int?
+    kenekId              Int?
+    status               String               @default("PLANNED")
+    /// "DIRECT" (default — one destination, unchanged behaviour) or
+    /// "MULTI_DROP" (each resi gets its own drop checkpoint). NOTE: this is the
+    /// TRANSPORT mode, unrelated to MasterShipment.fulfillmentMode = "DIRECT".
+    transportMode        String               @default("DIRECT")
+    origin               String?
+    destination          String?
+    plannedDepartureAt   DateTime?
+    plannedArrivalAt     DateTime?
+    currentLatitude      Float?
+    currentLongitude     Float?
+    lastLocationAt       DateTime?
+    departedAt           DateTime?
+    arrivedAt            DateTime?
+    createdAt            DateTime             @default(now())
+    updatedAt            DateTime             @updatedAt
+    checkpointRecords    CheckpointRecord[]
+    driver               Employee?            @relation("TransportDriver", fields: [driverId], references: [id])
+    kenek                Employee?            @relation("TransportKenek", fields: [kenekId], references: [id])
+    route                Route?               @relation(fields: [routeId], references: [id])
+    vehicle              Vehicle              @relation(fields: [vehicleId], references: [id])
+    settlement           TransportSettlement?
+    shipments            TransportShipment[]
+    expenses             TransportExpense[]
+    /// Delivery approval of the WHOLE transport (all resi approved). Null until then.
+    deliveryApprovedAt   DateTime?
+    deliveryApprovedById Int?
+    returnTasksFrom      ReturnTask[]         @relation("OriginalTransport")
+    returnTasksAs        ReturnTask[]         @relation("ReturnTransport")
 
-  @@index([driverId, status])
-  @@index([kenekId, status])
-  @@index([status])
+    @@index([driverId, status])
+    @@index([kenekId, status])
+    @@index([status])
 }
 
 model TransportShipment {
-  transportId Int
-  shipmentId  Int
-  /// Multi Drop: the checkpoint where THIS resi is unloaded. Null = the route's
-  /// final checkpoint (plain DIRECT transports never set it).
-  dropCheckpointId Int?
-  /// LOADED → AT_DROP_POINT → DROPPED → DELIVERY_PENDING → DELIVERY_APPROVED
-  dropStatus  String         @default("LOADED")
-  droppedAt   DateTime?
-  droppedById Int?
-  deliveryApprovedAt   DateTime?
-  deliveryApprovedById Int?
-  master      MasterShipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
-  transport   Transport      @relation(fields: [transportId], references: [id], onDelete: Cascade)
+    transportId          Int
+    shipmentId           Int
+    /// Multi Drop: the checkpoint where THIS resi is unloaded. Null = the route's
+    /// final checkpoint (plain DIRECT transports never set it).
+    dropCheckpointId     Int?
+    /// LOADED → AT_DROP_POINT → DROPPED → DELIVERY_PENDING → DELIVERY_APPROVED
+    dropStatus           String         @default("LOADED")
+    droppedAt            DateTime?
+    droppedById          Int?
+    deliveryApprovedAt   DateTime?
+    deliveryApprovedById Int?
+    master               MasterShipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+    transport            Transport      @relation(fields: [transportId], references: [id], onDelete: Cascade)
 
-  @@id([transportId, shipmentId])
-  @@index([transportId])
-  @@index([shipmentId])
-  @@index([transportId, dropStatus])
+    @@id([transportId, shipmentId])
+    @@index([transportId])
+    @@index([shipmentId])
+    @@index([transportId, dropStatus])
 }
 
 /// Operational cost of a transport. A transport can have many of each type
 /// (several BBM fill-ups, several parking receipts...). Photo proof is optional.
 model TransportExpense {
-  id          Int       @id @default(autoincrement())
-  expenseCode String    @unique
-  transportId Int
-  /// BONGKAR | PARKIR | MAKAN | BBM
-  type        String
-  amount      Float
-  description String?
-  photoUrl    String?
-  createdById Int?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  transport   Transport @relation(fields: [transportId], references: [id], onDelete: Cascade)
+    id          Int       @id @default(autoincrement())
+    expenseCode String    @unique
+    transportId Int
+    /// BONGKAR | PARKIR | MAKAN | BBM
+    type        String
+    amount      Float
+    description String?
+    photoUrl    String?
+    createdById Int?
+    createdAt   DateTime  @default(now())
+    updatedAt   DateTime  @updatedAt
+    transport   Transport @relation(fields: [transportId], references: [id], onDelete: Cascade)
 
-  @@index([transportId])
-  @@index([transportId, type])
+    @@index([transportId])
+    @@index([transportId, type])
 }
 
 /// "Resi Tugas Balik" — an empty vehicle going back after all its resi were
 /// delivery-approved. Becomes a real return Transport once approved.
 model ReturnTask {
-  id                  Int       @id @default(autoincrement())
-  returnTaskCode      String    @unique
-  originalTransportId Int
-  returnTransportId   Int?
-  vehicleId           Int
-  driverId            Int?
-  origin              String
-  destination         String
-  /// CREATED → APPROVED → PLANNED → DEPARTED → ARRIVED (or CANCELLED)
-  status              String    @default("CREATED")
-  createdById         Int?
-  approvedById        Int?
-  approvedAt          DateTime?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  originalTransport   Transport @relation("OriginalTransport", fields: [originalTransportId], references: [id])
-  returnTransport     Transport? @relation("ReturnTransport", fields: [returnTransportId], references: [id])
+    id                  Int        @id @default(autoincrement())
+    returnTaskCode      String     @unique
+    originalTransportId Int
+    returnTransportId   Int?
+    vehicleId           Int
+    driverId            Int?
+    origin              String
+    destination         String
+    /// CREATED → APPROVED → PLANNED → DEPARTED → ARRIVED (or CANCELLED)
+    status              String     @default("CREATED")
+    createdById         Int?
+    approvedById        Int?
+    approvedAt          DateTime?
+    createdAt           DateTime   @default(now())
+    updatedAt           DateTime   @updatedAt
+    originalTransport   Transport  @relation("OriginalTransport", fields: [originalTransportId], references: [id])
+    returnTransport     Transport? @relation("ReturnTransport", fields: [returnTransportId], references: [id])
 
-  @@index([originalTransportId])
-  @@index([status])
+    @@index([originalTransportId])
+    @@index([status])
 }
 
 model CheckpointRecord {
-  id             Int        @id @default(autoincrement())
-  transportId    Int
-  checkpointId   Int
-  latitude       Float
-  longitude      Float
-  withinRadius   Boolean
-  photoUrl       String?
-  distanceMeters Float?
-  recordedById   Int?
-  recordedAt     DateTime   @default(now())
-  checkpoint     Checkpoint @relation(fields: [checkpointId], references: [id], onDelete: Cascade)
-  recordedBy     User?      @relation(fields: [recordedById], references: [id])
-  transport      Transport  @relation(fields: [transportId], references: [id], onDelete: Cascade)
+    id             Int        @id @default(autoincrement())
+    transportId    Int
+    checkpointId   Int
+    latitude       Float
+    longitude      Float
+    withinRadius   Boolean
+    photoUrl       String?
+    distanceMeters Float?
+    recordedById   Int?
+    recordedAt     DateTime   @default(now())
+    checkpoint     Checkpoint @relation(fields: [checkpointId], references: [id], onDelete: Cascade)
+    recordedBy     User?      @relation(fields: [recordedById], references: [id])
+    transport      Transport  @relation(fields: [transportId], references: [id], onDelete: Cascade)
 
-  @@index([transportId, recordedAt])
-  @@index([checkpointId])
+    @@index([transportId, recordedAt])
+    @@index([checkpointId])
 }
 
 model Pickup {
-  id          Int            @id @default(autoincrement())
-  pickupCode  String         @unique
-  masterId    Int
-  kurirId     Int?
-  status      String         @default("ASSIGNED")
-  notes       String?
-  /// Revise round 8 — optional pickup photo (proof of pickup). Display is
-  /// gated by proof_photo.view (Admin Gudang + Owner by default).
-  photoUrl    String?
-  /// Pickup point coordinates — plotted RED on the kurir's task map so the
-  /// courier can see exactly where to collect the package.
-  latitude    Float?
-  longitude   Float?
-  createdAt   DateTime       @default(now())
-  completedAt DateTime?
-  updatedAt   DateTime       @updatedAt
-  scans       HandoverScan[]
-  master      MasterShipment @relation(fields: [masterId], references: [id], onDelete: Cascade)
+    id          Int            @id @default(autoincrement())
+    pickupCode  String         @unique
+    masterId    Int
+    kurirId     Int?
+    status      String         @default("ASSIGNED")
+    notes       String?
+    /// Revise round 8 — optional pickup photo (proof of pickup). Display is
+    /// gated by proof_photo.view (Admin Gudang + Owner by default).
+    photoUrl    String?
+    /// Pickup point coordinates — plotted RED on the kurir's task map so the
+    /// courier can see exactly where to collect the package.
+    latitude    Float?
+    longitude   Float?
+    createdAt   DateTime       @default(now())
+    completedAt DateTime?
+    updatedAt   DateTime       @updatedAt
+    scans       HandoverScan[]
+    master      MasterShipment @relation(fields: [masterId], references: [id], onDelete: Cascade)
 
-  @@index([kurirId, status])
-  @@index([masterId, status])
+    @@index([kurirId, status])
+    @@index([masterId, status])
 }
 
 model HandoverScan {
-  id          Int       @id @default(autoincrement())
-  pickupId    Int?
-  deliveryId  Int?
-  context     String    @default("pickup")
-  masterId    Int?
-  scanLevel   String
-  detailId    Int?
-  payload     String
-  result      String
-  method      String    @default("TYPED")
-  scannedById Int?
-  scannedAt   DateTime  @default(now())
-  delivery    Delivery? @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
-  pickup      Pickup?   @relation(fields: [pickupId], references: [id], onDelete: Cascade)
-  scannedBy   User?     @relation(fields: [scannedById], references: [id])
+    id          Int       @id @default(autoincrement())
+    pickupId    Int?
+    deliveryId  Int?
+    context     String    @default("pickup")
+    masterId    Int?
+    scanLevel   String
+    detailId    Int?
+    payload     String
+    result      String
+    method      String    @default("TYPED")
+    scannedById Int?
+    scannedAt   DateTime  @default(now())
+    delivery    Delivery? @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+    pickup      Pickup?   @relation(fields: [pickupId], references: [id], onDelete: Cascade)
+    scannedBy   User?     @relation(fields: [scannedById], references: [id])
 }
 
 model Discrepancy {
-  id           Int       @id @default(autoincrement())
-  masterId     Int
-  pickupId     Int?
-  type         String
-  description  String
-  resolvedById Int?
-  resolvedAt   DateTime?
-  resolution   String?
-  createdAt    DateTime  @default(now())
+    id           Int       @id @default(autoincrement())
+    masterId     Int
+    pickupId     Int?
+    type         String
+    description  String
+    resolvedById Int?
+    resolvedAt   DateTime?
+    resolution   String?
+    createdAt    DateTime  @default(now())
 }
 
 model Delivery {
-  id              Int            @id @default(autoincrement())
-  deliveryCode    String         @unique
-  masterId        Int
-  kurirId         Int?
-  status          String         @default("ASSIGNED")
-  /// Free-text proof of delivery — typically the receiver's name as typed
-  /// by the kurir at handover. NOT a photo URL.
-  proofOfDelivery String?
-  /// Revise round 8 — optional delivery photo (proof of delivery image).
-  /// Display is gated by proof_photo.view (Admin Gudang + Owner default).
-  /// When set, the deliveries page renders it as a thumbnail instead of
-  /// (or in addition to) the text `proofOfDelivery`.
-  photoUrl        String?
-  notes           String?
-  /// Delivery point coordinates — plotted GREEN on the kurir's task map so
-  /// the courier can see exactly where to drop the package off.
-  latitude        Float?
-  longitude       Float?
-  createdAt       DateTime       @default(now())
-  completedAt     DateTime?
-  updatedAt       DateTime       @updatedAt
-  master          MasterShipment @relation(fields: [masterId], references: [id], onDelete: Cascade)
-  scans           HandoverScan[]
+    id              Int            @id @default(autoincrement())
+    deliveryCode    String         @unique
+    masterId        Int
+    kurirId         Int?
+    status          String         @default("ASSIGNED")
+    /// Free-text proof of delivery — typically the receiver's name as typed
+    /// by the kurir at handover. NOT a photo URL.
+    proofOfDelivery String?
+    /// Revise round 8 — optional delivery photo (proof of delivery image).
+    /// Display is gated by proof_photo.view (Admin Gudang + Owner default).
+    /// When set, the deliveries page renders it as a thumbnail instead of
+    /// (or in addition to) the text `proofOfDelivery`.
+    photoUrl        String?
+    notes           String?
+    /// Delivery point coordinates — plotted GREEN on the kurir's task map so
+    /// the courier can see exactly where to drop the package off.
+    latitude        Float?
+    longitude       Float?
+    createdAt       DateTime       @default(now())
+    completedAt     DateTime?
+    updatedAt       DateTime       @updatedAt
+    master          MasterShipment @relation(fields: [masterId], references: [id], onDelete: Cascade)
+    scans           HandoverScan[]
 }
 
 model Tariff {
-  id                   Int              @id @default(autoincrement())
-  /// Human-readable tariff name (e.g. "Reguler", "Express") — lets the same
-  /// corridor have several tariffs that differ only by name. Null on legacy rows.
-  name                 String?
-  origin               String
-  destination          String
-  customerType         String?
-  /// B2B tariffs are tied to ONE specific B2B customer — only that customer
-  /// sees the tariff when creating a shipment. Always null for B2C tariffs.
-  customerId           Int?
-  ratePerKg            Float
-  minChargeableKg      Float            @default(1)
-  volumetricMultiplier Float            @default(250)
-  roundingMode         String           @default("UP")
-  roundingUnitKg       Float            @default(0.5)
-  /// B2B pricing method — "PER_KG" | "PER_KOLI" | "PER_CUBIC". B2C tariffs
-  /// (customerType = "b2c" or generic/null) are always forced to "PER_KG"
-  /// server-side; only B2B tariffs may pick /koli or /cubic. Choosing a
-  /// tariff at shipment-creation time is how the operator picks the method.
-  pricingMethod        String           @default("PER_KG")
-  /// Rate per koli (package/collie) — used when pricingMethod = "PER_KOLI".
-  ratePerKoli          Float?
-  /// Rate per m³ — used when pricingMethod = "PER_CUBIC".
-  ratePerCubic         Float?
-  /// Minimum chargeable koli count (PER_KOLI method). Default 1 — a
-  /// shipment is always billed at least 1 koli.
-  minChargeableKoli    Float            @default(1)
-  /// Minimum chargeable volume in m³ (PER_CUBIC method). Default 0 = no floor.
-  minChargeableM3      Float            @default(0)
-  effectiveFrom        DateTime
-  effectiveTo          DateTime?
-  isActive             Boolean          @default(true)
-  createdAt            DateTime         @default(now())
-  updatedAt            DateTime         @updatedAt
-  shipments            MasterShipment[]
-  customer             Customer?        @relation("CustomerTariffs", fields: [customerId], references: [id], onDelete: SetNull)
+    id                   Int              @id @default(autoincrement())
+    /// Human-readable tariff name (e.g. "Reguler", "Express") — lets the same
+    /// corridor have several tariffs that differ only by name. Null on legacy rows.
+    name                 String?
+    origin               String
+    destination          String
+    customerType         String?
+    /// B2B tariffs are tied to ONE specific B2B customer — only that customer
+    /// sees the tariff when creating a shipment. Always null for B2C tariffs.
+    customerId           Int?
+    ratePerKg            Float
+    minChargeableKg      Float            @default(1)
+    volumetricMultiplier Float            @default(250)
+    roundingMode         String           @default("UP")
+    roundingUnitKg       Float            @default(0.5)
+    /// B2B pricing method — "PER_KG" | "PER_KOLI" | "PER_CUBIC". B2C tariffs
+    /// (customerType = "b2c" or generic/null) are always forced to "PER_KG"
+    /// server-side; only B2B tariffs may pick /koli or /cubic. Choosing a
+    /// tariff at shipment-creation time is how the operator picks the method.
+    pricingMethod        String           @default("PER_KG")
+    /// Rate per koli (package/collie) — used when pricingMethod = "PER_KOLI".
+    ratePerKoli          Float?
+    /// Rate per m³ — used when pricingMethod = "PER_CUBIC".
+    ratePerCubic         Float?
+    /// Minimum chargeable koli count (PER_KOLI method). Default 1 — a
+    /// shipment is always billed at least 1 koli.
+    minChargeableKoli    Float            @default(1)
+    /// Minimum chargeable volume in m³ (PER_CUBIC method). Default 0 = no floor.
+    minChargeableM3      Float            @default(0)
+    effectiveFrom        DateTime
+    effectiveTo          DateTime?
+    isActive             Boolean          @default(true)
+    createdAt            DateTime         @default(now())
+    updatedAt            DateTime         @updatedAt
+    shipments            MasterShipment[]
+    customer             Customer?        @relation("CustomerTariffs", fields: [customerId], references: [id], onDelete: SetNull)
 
-  @@index([customerId])
+    @@index([customerId])
 }
 
 model Payment {
-  id           Int            @id @default(autoincrement())
-  masterId     Int
-  method       String
-  amount       Float
-  status       String         @default("RECORDED")
-  reference    String?
-  recordedById Int?
-  verifiedById Int?
-  createdAt    DateTime       @default(now())
-  verifiedAt   DateTime?
-  master       MasterShipment @relation(fields: [masterId], references: [id], onDelete: Cascade)
-  recordedBy   User?          @relation("PaymentRecorder", fields: [recordedById], references: [id])
-  verifiedBy   User?          @relation("PaymentVerifier", fields: [verifiedById], references: [id])
+    id           Int            @id @default(autoincrement())
+    masterId     Int
+    method       String
+    amount       Float
+    status       String         @default("RECORDED")
+    reference    String?
+    recordedById Int?
+    verifiedById Int?
+    createdAt    DateTime       @default(now())
+    verifiedAt   DateTime?
+    master       MasterShipment @relation(fields: [masterId], references: [id], onDelete: Cascade)
+    recordedBy   User?          @relation("PaymentRecorder", fields: [recordedById], references: [id])
+    verifiedBy   User?          @relation("PaymentVerifier", fields: [verifiedById], references: [id])
 }
 
 model Invoice {
-  id            Int                  @id @default(autoincrement())
-  invoiceNumber String               @unique
-  customerId    Int
-  status        String               @default("DRAFT")
-  issueDate     DateTime?
-  dueDate       DateTime?
-  notes         String?
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
-  customer      Customer             @relation(fields: [customerId], references: [id])
-  lines         InvoiceLine[]
-  settlements   InvoiceSettlement[]
-  commission    MarketingCommission?
+    id            Int                  @id @default(autoincrement())
+    invoiceNumber String               @unique
+    customerId    Int
+    status        String               @default("DRAFT")
+    issueDate     DateTime?
+    dueDate       DateTime?
+    notes         String?
+    createdAt     DateTime             @default(now())
+    updatedAt     DateTime             @updatedAt
+    customer      Customer             @relation(fields: [customerId], references: [id])
+    lines         InvoiceLine[]
+    settlements   InvoiceSettlement[]
+    commission    MarketingCommission?
 }
 
 model InvoiceLine {
-  id          Int             @id @default(autoincrement())
-  invoiceId   Int
-  description String
-  quantity    Float           @default(1)
-  unitPrice   Float
-  shipmentId  Int?
-  invoice     Invoice         @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  shipment    MasterShipment? @relation(fields: [shipmentId], references: [id])
+    id          Int             @id @default(autoincrement())
+    invoiceId   Int
+    description String
+    quantity    Float           @default(1)
+    unitPrice   Float
+    shipmentId  Int?
+    invoice     Invoice         @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+    shipment    MasterShipment? @relation(fields: [shipmentId], references: [id])
 
-  /// A shipment can be billed by at most one invoice line.
-  @@unique([shipmentId])
+    /// A shipment can be billed by at most one invoice line.
+    @@unique([shipmentId])
 }
 
 model InvoiceSettlement {
-  id           Int      @id @default(autoincrement())
-  invoiceId    Int
-  amount       Float
-  method       String
-  reference    String?
-  proofUrl     String?
-  recordedById Int?
-  settledAt    DateTime @default(now())
-  invoice      Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+    id           Int      @id @default(autoincrement())
+    invoiceId    Int
+    amount       Float
+    method       String
+    reference    String?
+    proofUrl     String?
+    recordedById Int?
+    settledAt    DateTime @default(now())
+    invoice      Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 }
 
 model AuditLog {
-  id          Int      @id @default(autoincrement())
-  action      String
-  entityType  String
-  entityId    Int?
-  entityLabel String?
-  actorId     Int?
-  beforeData  String?
-  afterData   String?
-  createdAt   DateTime @default(now())
-  actor       User?    @relation(fields: [actorId], references: [id])
+    id          Int      @id @default(autoincrement())
+    action      String
+    entityType  String
+    entityId    Int?
+    entityLabel String?
+    actorId     Int?
+    beforeData  String?
+    afterData   String?
+    createdAt   DateTime @default(now())
+    actor       User?    @relation(fields: [actorId], references: [id])
 }
 
 /// Capacity Round — company-level key/value system settings (e.g. the
 /// configurable capacity warning threshold). Small, append-only catalog.
 /// Only the Owner can write; everyone reads via the public /settings endpoint.
 model SystemSetting {
-  key       String   @id
-  value     String
-  updatedAt DateTime @updatedAt
-  updatedById Int?
-  updatedBy   User?   @relation("SystemSettingUpdatedBy", fields: [updatedById], references: [id])
+    key         String   @id
+    value       String
+    updatedAt   DateTime @updatedAt
+    updatedById Int?
+    updatedBy   User?    @relation("SystemSettingUpdatedBy", fields: [updatedById], references: [id])
 }
 
 model TransportSettlement {
-  id                  Int       @id @default(autoincrement())
-  settlementCode      String    @unique
-  transportId         Int       @unique
-  vehicleId           Int
-  ownerId             Int
-  transportValue      Float
-  companyPercent      Float
-  ownerPercent        Float
-  companyAmount       Float
-  ownerAmount         Float
-  status              String    @default("FINALIZED")
-  finalizedById       Int?
-  finalizedAt         DateTime?
-  walletTransactionId Int?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  owner               Partner   @relation(fields: [ownerId], references: [id])
-  transport           Transport @relation(fields: [transportId], references: [id])
-  vehicle             Vehicle   @relation(fields: [vehicleId], references: [id])
+    id                  Int       @id @default(autoincrement())
+    settlementCode      String    @unique
+    transportId         Int       @unique
+    vehicleId           Int
+    ownerId             Int
+    transportValue      Float
+    companyPercent      Float
+    ownerPercent        Float
+    companyAmount       Float
+    ownerAmount         Float
+    status              String    @default("FINALIZED")
+    finalizedById       Int?
+    finalizedAt         DateTime?
+    walletTransactionId Int?
+    createdAt           DateTime  @default(now())
+    updatedAt           DateTime  @updatedAt
+    owner               Partner   @relation(fields: [ownerId], references: [id])
+    transport           Transport @relation(fields: [transportId], references: [id])
+    vehicle             Vehicle   @relation(fields: [vehicleId], references: [id])
 
-  @@index([ownerId, createdAt])
+    @@index([ownerId, createdAt])
 }
 
 model VehicleRepair {
-  id                  Int       @id @default(autoincrement())
-  repairCode          String    @unique
-  vehicleId           Int
-  ownerId             Int
-  description         String
-  amount              Float
-  repairDate          DateTime
-  workshopVendor      String?
-  proofUrl            String?
-  relatedTransportId  Int?
-  notes               String?
-  status              String    @default("VERIFIED")
-  deductedAmount      Float     @default(0)
-  createdById         Int?
-  walletTransactionId Int?
-  verifiedAt          DateTime?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  owner               Partner   @relation(fields: [ownerId], references: [id])
-  vehicle             Vehicle   @relation(fields: [vehicleId], references: [id])
+    id                  Int       @id @default(autoincrement())
+    repairCode          String    @unique
+    vehicleId           Int
+    ownerId             Int
+    description         String
+    amount              Float
+    repairDate          DateTime
+    workshopVendor      String?
+    proofUrl            String?
+    relatedTransportId  Int?
+    notes               String?
+    status              String    @default("VERIFIED")
+    deductedAmount      Float     @default(0)
+    createdById         Int?
+    walletTransactionId Int?
+    verifiedAt          DateTime?
+    createdAt           DateTime  @default(now())
+    updatedAt           DateTime  @updatedAt
+    owner               Partner   @relation(fields: [ownerId], references: [id])
+    vehicle             Vehicle   @relation(fields: [vehicleId], references: [id])
 
-  @@index([ownerId, status])
-  @@index([vehicleId])
+    @@index([ownerId, status])
+    @@index([vehicleId])
 }
 
 model RepairActionLog {
-  id            Int      @id @default(autoincrement())
-  repairId      Int
-  repairCode    String
-  ownerId       Int
-  vehicleNumber String
-  action        String
-  detail        String?
-  changes       String?
-  amount        Float?
-  actorId       Int?
-  actorName     String?
-  createdAt     DateTime @default(now())
-  actor         User?    @relation("RepairActionLogBy", fields: [actorId], references: [id])
+    id            Int      @id @default(autoincrement())
+    repairId      Int
+    repairCode    String
+    ownerId       Int
+    vehicleNumber String
+    action        String
+    detail        String?
+    changes       String?
+    amount        Float?
+    actorId       Int?
+    actorName     String?
+    createdAt     DateTime @default(now())
+    actor         User?    @relation("RepairActionLogBy", fields: [actorId], references: [id])
 
-  @@index([repairId])
-  @@index([ownerId, createdAt])
+    @@index([repairId])
+    @@index([ownerId, createdAt])
 }
 
 model MarketingCommission {
-  id                  Int       @id @default(autoincrement())
-  commissionCode      String    @unique
-  partnerId           Int
-  invoiceId           Int       @unique
-  invoiceAmount       Float
-  companyPercent      Float
-  partnerPercent      Float
-  commissionAmount    Float
-  status              String    @default("PENDING")
-  walletTransactionId Int?
-  releasedAt          DateTime?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  invoice             Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  partner             Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+    id                  Int       @id @default(autoincrement())
+    commissionCode      String    @unique
+    partnerId           Int
+    invoiceId           Int       @unique
+    invoiceAmount       Float
+    companyPercent      Float
+    partnerPercent      Float
+    commissionAmount    Float
+    status              String    @default("PENDING")
+    walletTransactionId Int?
+    releasedAt          DateTime?
+    createdAt           DateTime  @default(now())
+    updatedAt           DateTime  @updatedAt
+    invoice             Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+    partner             Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
 
-  @@index([partnerId, status])
+    @@index([partnerId, status])
 }
