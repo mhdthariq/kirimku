@@ -6,6 +6,8 @@ import { pricingPreview } from "@/composition/pricing-server";
 import { computeTotals } from "@/infrastructure/services/shipment-totals";
 import { paymentSummary } from "@/infrastructure/services/scan-flow";
 import { assertShipmentScope } from "@/infrastructure/services/gudang-scope";
+import { hasPermission } from "@/infrastructure/auth/auth";
+import { Prisma } from "@prisma/client";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -102,16 +104,46 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
 export async function DELETE(req: NextRequest, { params }: Params) {
   return handle(req, async () => {
-    const user = await guard(req, "shipment.delete");
-    const { id } = await params;
-    const existing = await db.masterShipment.findUnique({ where: { id: Number(id) } });
-    if (!existing) return fail(404, "Shipment tidak ditemukan.");
-    await assertShipmentScope(user, existing);
-    if (existing.status !== "CREATED") {
-      return fail(422, "Shipment hanya bisa dihapus saat status CREATED. Gunakan Cancel untuk shipment yang sudah berjalan.");
+    const user = await guard(req);
+    if (!hasPermission(user, "shipment.delete") && !hasPermission(user, "shipment.delete_cancelled")) {
+      return fail(403, "Missing permission: shipment.delete or shipment.delete_cancelled");
     }
-    await db.masterShipment.delete({ where: { id: existing.id } });
-    await audit({ action: "deleted", entityType: "shipment", entityId: existing.id, entityLabel: existing.masterCode, actor: user, before: existing });
+    const { id } = await params;
+    const shipmentId = Number(id);
+    if (!Number.isSafeInteger(shipmentId) || shipmentId <= 0) return fail(422, "ID shipment tidak valid.");
+    const result = await db.$transaction(async (tx) => {
+      const existing = await tx.masterShipment.findUnique({
+        where: { id: shipmentId },
+        include: { _count: { select: { invoiceLines: true, payments: true, pickups: true, deliveries: true, transportItems: true } } },
+      });
+      if (!existing) return fail(404, "Shipment tidak ditemukan.");
+      await assertShipmentScope(user, existing);
+      if (!["CREATED", "CANCELLED"].includes(existing.status)) {
+        return fail(422, "Shipment hanya bisa dihapus saat status CREATED atau CANCELLED.");
+      }
+      const permission = existing.status === "CANCELLED" ? "shipment.delete_cancelled" : "shipment.delete";
+      if (!hasPermission(user, permission)) return fail(403, `Missing permission: ${permission}`);
+      // Keep financial and operational history, including non-FK references.
+      const details = await tx.detailShipment.findMany({ where: { masterId: existing.id }, select: { id: true } });
+      const [walletCount, scanCount, discrepancyCount] = await Promise.all([
+        tx.walletTransaction.count({ where: { referenceType: "shipment", referenceId: existing.id } }),
+        tx.handoverScan.count({ where: { OR: [{ masterId: existing.id }, { detailId: { in: details.map((detail) => detail.id) } }] } }),
+        tx.discrepancy.count({ where: { masterId: existing.id } }),
+      ]);
+      if (Object.values(existing._count).some((count) => count > 0) || walletCount > 0 || scanCount > 0 || discrepancyCount > 0) {
+        return fail(422, "Shipment memiliki catatan keuangan atau operasional terkait dan tidak bisa dihapus.");
+      }
+      await tx.masterShipment.delete({ where: { id: existing.id } });
+      return { before: existing };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }).catch((error: unknown) => {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && ["P2034", "P2003", "P2025"].includes(error.code)) {
+        return fail(409, "Shipment atau catatan terkait berubah bersamaan. Silakan muat ulang dan coba lagi.");
+      }
+      throw error;
+    });
+    if (!("before" in result)) return result;
+    const { _count, ...before } = result.before;
+    await audit({ action: "deleted", entityType: "shipment", entityId: before.id, entityLabel: before.masterCode, actor: user, before });
     return ok({ deleted: true });
   });
 }

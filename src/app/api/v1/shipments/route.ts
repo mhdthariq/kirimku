@@ -14,6 +14,10 @@ export async function GET(req: NextRequest) {
     const search = str(params.get("search"));
     const status = str(params.get("status"));
     const customerType = str(params.get("customerType"));
+    const invoiceFilter = str(params.get("invoice")) ?? "all";
+    if (!["all", "on_invoice", "not_invoice"].includes(invoiceFilter)) {
+      return fail(422, "Filter invoice tidak valid.");
+    }
     // Revise round 8 — optional filter by fulfillment mode (STANDARD / DIRECT).
     // Used by the Shipments page Regular / Direct tabs.
     const modeParam = str(params.get("fulfillmentMode"))?.toUpperCase();
@@ -26,6 +30,8 @@ export async function GET(req: NextRequest) {
           ? { createdByPartnerId: marketingOwner ?? -1 }
           : {}),
         ...(status ? { status } : {}),
+        ...(invoiceFilter === "on_invoice" ? { invoiceLines: { some: {} } } : {}),
+        ...(invoiceFilter === "not_invoice" ? { invoiceLines: { none: {} } } : {}),
         ...(fulfillmentMode ? { fulfillmentMode } : {}),
         ...(customerType ? { customer: { type: customerType } } : {}),
         ...(search

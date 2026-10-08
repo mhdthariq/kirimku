@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import {
   apiDelete,
+  apiFetch,
   apiGet,
   apiPost,
   apiPut,
@@ -113,6 +114,7 @@ const EMPTY_DETAIL: DetailForm = { description: "", quantity: "1", lengthCm: "",
 /** Row type for the "Ringkas" (grouped) detail view — pure UI aggregation. */
 interface DetailGroupRow {
   id: string;
+  items: DetailShipment[];
   description: string;
   dims: string;
   // Revise round 11 — per-group volume (m³). Computed from L×W×H OR the
@@ -138,6 +140,7 @@ function ShipmentList() {
     create: hasPermission(user, "shipment.create"),
     cancel: hasPermission(user, "shipment.cancel"),
     delete: hasPermission(user, "shipment.delete"),
+    deleteCancelled: hasPermission(user, "shipment.delete_cancelled"),
     confirmArrival: hasPermission(user, "shipment.confirm_arrival"),
     // Cetak Resi is permission-gated: only Admin Gudang & the Owner for now —
     // users without it never see the print buttons.
@@ -157,6 +160,7 @@ function ShipmentList() {
   );
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [invoiceFilter, setInvoiceFilter] = useState("all");
   const [tab, setTab] = useState("regular");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState<ShipmentForm>(EMPTY_SHIPMENT);
@@ -187,6 +191,7 @@ function ShipmentList() {
     return data.filter(
       (s) =>
         (statusFilter === "all" || s.status === statusFilter) &&
+        (invoiceFilter === "all" || (invoiceFilter === "on_invoice" ? (s.invoiceLines?.length ?? 0) > 0 : (s.invoiceLines?.length ?? 0) === 0)) &&
         // Revise round 8 — Fulfillment Mode filter:
         //  - "regular" tab → only STANDARD
         //  - "direct"  tab → only DIRECT
@@ -207,7 +212,7 @@ function ShipmentList() {
           s.destination.toLowerCase().includes(q) ||
           (s.penerimaName ?? "").toLowerCase().includes(q)),
     );
-  }, [data, search, statusFilter, activeGudangId, isRegularTab, isDirectTab]);
+  }, [data, search, statusFilter, invoiceFilter, activeGudangId, isRegularTab, isDirectTab]);
 
   /** Auto-pick Gudang Asal & Gudang Tujuan from the selected rute (tariff):
    *  the warehouse whose city matches the tariff's origin/destination is
@@ -287,11 +292,15 @@ function ShipmentList() {
       pengirimEmail: form.pengirimEmail || null,
       pengirimAddress: form.pengirimAddress || null,
     };
-    const ok = await runAction(() => apiPost("/shipments", payload), { success: "Shipment dibuat (CREATED). Tambahkan detail barang lalu submit untuk pickup." });
+    let created: Pick<Shipment, "id"> | undefined;
+    const ok = await runAction(async () => {
+      created = await apiPost<Pick<Shipment, "id">>("/shipments", payload);
+    }, { success: "Shipment dibuat (CREATED). Tambahkan detail barang lalu submit untuk pickup." });
     setBusy(false);
     if (ok) {
       setDialogOpen(false);
-      reload();
+      if (created?.id != null) window.location.hash = `#/shipments/${created.id}`;
+      else reload();
     }
   }
 
@@ -465,6 +474,11 @@ function ShipmentList() {
             searchPlaceholder="Cari resi / customer / kota…"
             toolbar={
               <div className="flex max-w-full flex-wrap items-center gap-1.5">
+                <select aria-label="Filter invoice" value={invoiceFilter} onChange={(e) => setInvoiceFilter(e.target.value)} className="h-7 rounded-md border bg-background px-2 text-[11px]">
+                  <option value="all">All invoices</option>
+                  <option value="on_invoice">On invoice</option>
+                  <option value="not_invoice">Not on invoice</option>
+                </select>
                 {[
                   { key: "all", label: "All" },
                   { key: "CREATED", label: "Created" },
@@ -629,7 +643,7 @@ function ShipmentList() {
                         <Printer className="h-4 w-4" />
                       </Button>
                     )}
-                    {can.delete && s.status === "CREATED" && (
+                    {((can.delete && s.status === "CREATED") || (can.deleteCancelled && s.status === "CANCELLED")) && (
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setConfirmDelete(s)} aria-label="Hapus shipment">
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -1013,7 +1027,7 @@ function ShipmentList() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Hapus shipment {confirmDelete?.masterCode}?</AlertDialogTitle>
-            <AlertDialogDescription>Hanya shipment CREATED yang bisa dihapus. Shipment yang sudah berjalan dibatalkan lewat tombol Cancel di halaman detail.</AlertDialogDescription>
+            <AlertDialogDescription>Shipment CREATED atau CANCELLED akan dihapus permanen beserta detail paketnya. Shipment dengan catatan keuangan atau operasional terkait tidak bisa dihapus.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Batal</AlertDialogCancel>
@@ -1268,6 +1282,8 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
   const { user } = useAuth();
   const can = {
     update: hasPermission(user, "shipment.update"),
+    delete: hasPermission(user, "shipment.delete"),
+    deleteCancelled: hasPermission(user, "shipment.delete_cancelled"),
     cancel: hasPermission(user, "shipment.cancel"),
     submitPickup: hasPermission(user, "shipment.update") || hasPermission(user, "pickup.create"),
     detailCreate: hasPermission(user, "shipment_detail.create"),
@@ -1301,10 +1317,13 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
 
   const [detailOpen, setDetailOpen] = useState(false);
   const [editingDetail, setEditingDetail] = useState<DetailShipment | null>(null);
+  const [editingGroup, setEditingGroup] = useState<DetailShipment[] | null>(null);
+  const [deletingGroup, setDeletingGroup] = useState<DetailShipment[] | null>(null);
   const [detailForm, setDetailForm] = useState<DetailForm>(EMPTY_DETAIL);
   const [busy, setBusy] = useState(false);
   const [confirmDeleteDetail, setConfirmDeleteDetail] = useState<DetailShipment | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [confirmDeleteShipment, setConfirmDeleteShipment] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
   const autoPrintHandled = useRef(false);
   const [penerimaOpen, setPenerimaOpen] = useState(false);
@@ -1436,12 +1455,14 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
 
   function openDetailCreate() {
     setEditingDetail(null);
+    setEditingGroup(null);
     setDetailForm(EMPTY_DETAIL);
     setDetailOpen(true);
   }
 
   function openDetailEdit(d: DetailShipment) {
     setEditingDetail(d);
+    setEditingGroup(null);
     setDetailForm({
       description: d.description,
       quantity: "1",
@@ -1457,12 +1478,17 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
 
   async function onDetailSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (busy) return;
     if (!editingDetail) {
       const qty = Math.round(Number(detailForm.quantity) || 0);
       if (qty < 1 || qty > 500) {
         toast.error("Jumlah paket harus antara 1–500.");
         return;
       }
+    }
+    if (detailForm.volumeM3 !== "" && (!/^\d+(?:\.\d+)?$/.test(detailForm.volumeM3) || !Number.isFinite(Number(detailForm.volumeM3)))) {
+      toast.error("Volume harus berupa angka desimal positif atau nol (mis. 0.009).");
+      return;
     }
     setBusy(true);
     const base = {
@@ -1478,11 +1504,16 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
     const payload = editingDetail ? base : { ...base, quantity: Math.round(Number(detailForm.quantity) || 1) };
     const ok = await runAction(
       () =>
-        editingDetail
+        editingGroup
+          // Atomic backend contract: validate every ID and mutate all or none.
+          ? apiPut(`/shipments/${shipment!.id}/details/batch`, { ...base, detailIds: editingGroup.map((d) => d.id) })
+          : editingDetail
           ? apiPut(`/shipment-details/${editingDetail.id}`, payload)
           : apiPost(`/shipments/${shipment!.id}/details`, payload),
       {
-        success: editingDetail
+        success: editingGroup
+          ? `${editingGroup.length} paket diperbarui.`
+          : editingDetail
           ? "Detail diperbarui."
           : `${Math.round(Number(detailForm.quantity) || 1)} paket dibuat - setiap paket punya kode unik.`,
       },
@@ -1495,11 +1526,20 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
   }
 
   async function onDetailDelete() {
-    if (!confirmDeleteDetail) return;
-    const target = confirmDeleteDetail;
-    setConfirmDeleteDetail(null);
-    const ok = await runAction(() => apiDelete(`/shipment-details/${target.id}`), { success: "Detail dihapus." });
-    if (ok) refresh();
+    if (busy || (!confirmDeleteDetail && !deletingGroup)) return;
+    setBusy(true);
+    const ok = await runAction(
+      () => deletingGroup
+        ? apiFetch(`/shipments/${shipment!.id}/details/batch`, { method: "DELETE", body: { detailIds: deletingGroup.map((d) => d.id) } })
+        : apiDelete(`/shipment-details/${confirmDeleteDetail!.id}`),
+      { success: deletingGroup ? `${deletingGroup.length} paket dihapus.` : "Detail dihapus." },
+    );
+    setBusy(false);
+    if (ok) {
+      setConfirmDeleteDetail(null);
+      setDeletingGroup(null);
+      refresh();
+    }
   }
 
   // Server-computed pricing preview — the client never hardcodes the volumetric formula anymore.
@@ -1526,12 +1566,13 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
       const w = d.widthCm ?? 0;
       const h = d.heightCm ?? 0;
       const vol = d.volumeM3 ?? 0;
-      const key = `${d.description}|${l}|${w}|${h}|${vol}|${d.actualWeightKg}`;
+      const key = JSON.stringify([d.description, d.lengthCm, d.widthCm, d.heightCm, d.volumeM3, d.actualWeightKg]);
       // Revise round 11 — per-package volume: use volumeM3 when set, otherwise L×W×H/1e6.
       const pkgVolume = vol > 0 ? vol : (l * w * h) / 1_000_000;
       if (!acc[key]) {
         acc[key] = {
           id: key,
+          items: [],
           description: d.description,
           dims: l || w || h ? `${formatNumber(l, 0)}×${formatNumber(w, 0)}×${formatNumber(h, 0)}` : "-",
           volumeM3: 0,
@@ -1540,6 +1581,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
           totalKg: 0,
         };
       }
+      acc[key].items.push(d);
       acc[key].quantity += 1;
       acc[key].totalKg += d.actualWeightKg;
       // Per-package volume — SET (not accumulate): all packages in the group
@@ -1584,7 +1626,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
             )}
             {/* Walk-in: customer came straight to the gudang - confirm arrival
                 directly instead of requesting a kurir pickup. Permission-gated. */}
-            {can.confirmArrival && ["CREATED", "READY_FOR_PICKUP"].includes(shipment.status) && (
+            {can.confirmArrival && shipment.fulfillmentMode !== "DIRECT" && ["CREATED", "READY_FOR_PICKUP"].includes(shipment.status) && (
               <Button variant="secondary" onClick={() => setWalkInTask(toWalkInItem(shipment))}>
                 <UserCheck className="h-4 w-4" /> Tiba di Gudang
               </Button>
@@ -1597,6 +1639,11 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
             {can.printResi && shipment.status !== "CANCELLED" && shipment.details.length > 0 && (
               <Button variant="secondary" onClick={() => setPrintOpen(true)}>
                 <Printer className="h-4 w-4" /> Cetak Resi
+              </Button>
+            )}
+            {((can.delete && shipment.status === "CREATED") || (can.deleteCancelled && shipment.status === "CANCELLED")) && (
+              <Button variant="outline" className="text-destructive" onClick={() => setConfirmDeleteShipment(true)}>
+                <Trash2 className="h-4 w-4" /> Hapus shipment
               </Button>
             )}
             {can.cancel && shipment.status !== "CANCELLED" && shipment.status !== "DELIVERED" && (
@@ -1958,6 +2005,30 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
                       ),
                     },
                     { key: "total", header: "Total Berat", render: (g) => <span className="font-semibold">{formatNumber(g.totalKg)} kg</span> },
+                    ...(isEditable && (can.detailUpdate || can.detailDelete) ? [{
+                      key: "actions",
+                      header: "Aksi",
+                      render: (g: DetailGroupRow) => (
+                        <div className="flex gap-1.5">
+                          {can.detailUpdate && (
+                            <Button variant="ghost" size="icon" disabled={busy} aria-label={`Edit semua ${g.quantity} paket ${g.description}`} onClick={() => {
+                              openDetailEdit(g.items[0]);
+                              setEditingGroup(g.items);
+                            }}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {can.detailDelete && (
+                            <Button variant="ghost" size="icon" disabled={busy} className="text-destructive hover:text-destructive" aria-label={`Hapus semua ${g.quantity} paket ${g.description}`} onClick={() => {
+                              setConfirmDeleteDetail(null);
+                              setDeletingGroup(g.items);
+                            }}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      ),
+                    }] : []),
                   ]}
                 />
               </TabsContent>
@@ -1976,9 +2047,11 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingDetail ? `Edit Detail - ${editingDetail.detailCode}` : "Tambah Detail Barang"}</DialogTitle>
+            <DialogTitle>{editingGroup ? `Edit ${editingGroup.length} Paket - ${editingGroup[0].description}` : editingDetail ? `Edit Detail - ${editingDetail.detailCode}` : "Tambah Detail Barang"}</DialogTitle>
             <DialogDescription>
-              {editingDetail
+              {editingGroup
+                ? `Perubahan diterapkan ke semua ${editingGroup.length} paket dalam kelompok ini. Kode paket tetap sama.`
+                : editingDetail
                 ? "1 baris = 1 paket. Volumetrik: L×W×H cm / 1.000.000 × multiplier tarif."
                 : "Isi jumlah paket - sistem membuat N baris, masing-masing dengan kode unik (mis. 10 → DTL-…-01 s/d DTL-…-10)."}
             </DialogDescription>
@@ -2017,13 +2090,15 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
                 className="sm:col-span-2"
                 hint="Isi jika paket berbentuk tidak beraturan (skip dimensi). Kosongkan untuk hitung otomatis dari P×L×T."
               >
-                <NumberInput
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  pattern="[0-9]+([.][0-9]+)?"
                   id="d-volume"
                   value={detailForm.volumeM3}
                   onChange={(e) => setDetailForm({ ...detailForm, volumeM3: e.target.value })}
                   placeholder="mis. 0.009 (opsional)"
-                  step="0.001"
-                  min="0"
+
                   disabled={busy}
                 />
               </Field>
@@ -2038,17 +2113,45 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!confirmDeleteDetail} onOpenChange={(open) => !open && setConfirmDeleteDetail(null)}>
+      <AlertDialog open={!!confirmDeleteDetail || !!deletingGroup} onOpenChange={(open) => {
+              if (!open && !busy) {
+                setConfirmDeleteDetail(null);
+                setDeletingGroup(null);
+              }
+            }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Hapus detail {confirmDeleteDetail?.detailCode}?</AlertDialogTitle>
-            <AlertDialogDescription>Hanya bisa dihapus saat shipment masih CREATED / READY_FOR_PICKUP.</AlertDialogDescription>
+            <AlertDialogTitle>{deletingGroup ? `Hapus semua ${deletingGroup.length} paket ${deletingGroup[0].description}?` : `Hapus detail ${confirmDeleteDetail?.detailCode}?`}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deletingGroup && "Semua paket dalam kelompok ini akan dihapus sekaligus. "}
+              Hanya bisa dihapus saat shipment masih CREATED / READY_FOR_PICKUP.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={onDetailDelete}>
+            <AlertDialogAction variant="destructive" disabled={busy} onClick={(e) => { e.preventDefault(); void onDetailDelete(); }}>
               Ya, hapus
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmDeleteShipment} onOpenChange={(open) => !busy && setConfirmDeleteShipment(open)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus shipment {shipment.masterCode}?</AlertDialogTitle>
+            <AlertDialogDescription>Shipment akan dihapus permanen beserta detail paketnya. Shipment dengan catatan keuangan atau operasional terkait tidak bisa dihapus.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Batal</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" disabled={busy} onClick={async (e) => {
+              e.preventDefault();
+              if (busy) return;
+              setBusy(true);
+              const deleted = await runAction(() => apiDelete(`/shipments/${shipment.id}`), { success: "Shipment dihapus." });
+              setBusy(false);
+              if (deleted) window.location.hash = "#/shipments";
+            }}>Ya, hapus</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -2143,7 +2246,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
       )}
 
       {/* Walk-in arrival dialog - customer hands the package over at the gudang counter */}
-      {can.confirmArrival && (
+      {can.confirmArrival && shipment.fulfillmentMode !== "DIRECT" && (
         <WalkInDialog
           key={walkInTask ? `walk-${walkInTask.id}-${walkInTask.status}` : "walk-none"}
           task={walkInTask}
