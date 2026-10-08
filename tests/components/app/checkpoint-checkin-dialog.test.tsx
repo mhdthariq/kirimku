@@ -5,7 +5,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CheckpointCheckinDialog } from "../../../src/components/app/checkpoint-checkin-dialog";
 
-vi.mock("@/lib/client-api", () => ({
+vi.mock("@/infrastructure/http/client-api", () => ({
   apiGet: vi.fn().mockResolvedValue({ progress: null }),
   apiPost: vi.fn(),
 }));

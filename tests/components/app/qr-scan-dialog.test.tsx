@@ -5,7 +5,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { QrScanDialog } from "../../../src/components/app/qr-scan-dialog";
 
-vi.mock("@/lib/client-api", () => ({
+vi.mock("@/infrastructure/http/client-api", () => ({
   apiGet: vi.fn().mockResolvedValue({ progress: { allScanned: true, isB2B: false, total: 0, scanned: 0, details: [] } }),
   apiPost: vi.fn(),
 }));

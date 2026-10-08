@@ -1,0 +1,11 @@
+{
+  "lsp": {
+    "prisma-language-server": {
+      "settings": {
+        "prisma": {
+          "pinToPrisma6": true
+        }
+      }
+    }
+  }
+}

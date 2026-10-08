@@ -6,20 +6,20 @@ const mocks = vi.hoisted(() => ({
   transaction: vi.fn(), updateDelivery: vi.fn(), updateShipment: vi.fn(), tracking: vi.fn(),
   scope: vi.fn(), assignment: vi.fn(), progress: vi.fn(), audit: vi.fn(),
 }));
-vi.mock("@/lib/db", () => ({ db: { delivery: { findUnique: mocks.find }, employee: { findUnique: mocks.employee },
+vi.mock("@/infrastructure/persistence/db", () => ({ db: { delivery: { findUnique: mocks.find }, employee: { findUnique: mocks.employee },
   transport: { findFirst: mocks.transport }, $transaction: mocks.transaction,
 } }));
-vi.mock("@/lib/auth", () => ({ getAuthUser: mocks.getAuthUser, hasPermission: mocks.hasPermission }));
-vi.mock("@/lib/rbac", () => ({ ensureRbac: vi.fn() }));
-vi.mock("@/lib/seed", () => ({ ensureSeed: vi.fn() }));
-vi.mock("@/lib/audit", () => ({ audit: mocks.audit }));
-vi.mock("@/lib/gudang-scope", () => ({ assertShipmentScope: mocks.scope }));
-vi.mock("@/lib/scan-flow", () => ({ assertKurirAssignment: mocks.assignment, scanProgress: mocks.progress }));
-vi.mock("@/lib/license", () => ({ LicenseError: class extends Error {} }));
-vi.mock("@/lib/tenant-context", () => ({ resolveTenantContext: vi.fn(),
+vi.mock("@/infrastructure/auth/auth", () => ({ getAuthUser: mocks.getAuthUser, hasPermission: mocks.hasPermission }));
+vi.mock("@/infrastructure/auth/rbac", () => ({ ensureRbac: vi.fn() }));
+vi.mock("@/infrastructure/services/seed", () => ({ ensureSeed: vi.fn() }));
+vi.mock("@/infrastructure/services/audit", () => ({ audit: mocks.audit }));
+vi.mock("@/infrastructure/services/gudang-scope", () => ({ assertShipmentScope: mocks.scope }));
+vi.mock("@/infrastructure/services/scan-flow", () => ({ assertKurirAssignment: mocks.assignment, scanProgress: mocks.progress }));
+vi.mock("@/infrastructure/http/license", () => ({ LicenseError: class extends Error {} }));
+vi.mock("@/infrastructure/persistence/tenant-context", () => ({ resolveTenantContext: vi.fn(),
   runWithTenant: (_tenant: unknown, fn: () => unknown) => fn(), isDefaultTenant: () => false,
 }));
-import { HttpError } from "@/lib/api-helpers";
+import { HttpError } from "@/shared/http-error";
 import { POST } from "../../../../../../../src/app/api/v1/deliveries/[id]/complete/route";
 
 const actor = { id: 7, name: "Courier", permissions: ["delivery.confirm"], isOwner: false };
