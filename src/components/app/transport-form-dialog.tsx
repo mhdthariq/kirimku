@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   apiGet,
@@ -55,7 +55,17 @@ export function toLocalInput(d: Date | null | undefined): string {
  * - Picking a Rute auto-fills Asal & Tujuan from the route — the values land
  *   in editable inputs so the user can still override them.
  */
-export function TransportFormDialog({
+export function TransportFormDialog(props: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  editing: Transport | null;
+  onSaved: () => void;
+}) {
+  if (!props.open) return null;
+  return <TransportFormSession key={props.editing?.id ?? "create"} {...props} />;
+}
+
+function TransportFormSession({
   open,
   onOpenChange,
   editing,
@@ -68,7 +78,22 @@ export function TransportFormDialog({
   onSaved: () => void;
 }) {
   const { data: options } = useApiData<Options>(() => apiGet<Options>("/options"), []);
-  const [form, setForm] = useState<TransportForm>(EMPTY);
+  const [form, setForm] = useState<TransportForm>(() => {
+    if (!editing) return EMPTY;
+    return {
+        routeId: editing.routeId ? String(editing.routeId) : "",
+        vehicleId: String(editing.vehicleId),
+        driverId: "",
+        kenekId: "",
+        origin: editing.origin ?? "",
+        destination: editing.destination ?? "",
+        plannedDepartureAt: toLocalInput(editing.plannedDepartureAt ? new Date(editing.plannedDepartureAt) : null),
+        plannedArrivalAt: toLocalInput(editing.plannedArrivalAt ? new Date(editing.plannedArrivalAt) : null),
+        shipmentIds: [],
+        transportMode: editing.transportMode ?? "DIRECT",
+    };
+
+  });
   const [busy, setBusy] = useState(false);
   const [readyShipments, setReadyShipments] = useState<Shipment[]>([]);
   // Capacity Round — in edit mode, fetch the transport's current shipments
@@ -76,43 +101,15 @@ export function TransportFormDialog({
   // `editing` Transport row doesn't carry shipment totals.
   const [editShipments, setEditShipments] = useState<TransportDetail["shipments"]>([]);
 
-  // The parent (e.g. transport-detail-page.tsx) constructs `editing` as an
-  // inline object literal — a NEW object reference on every parent render.
-  // If we used `editing` directly in the effect deps below, the form would
-  // be reset to the initial values on every parent re-render (e.g. when a
-  // sibling dialog opens, or when the auth context changes), wiping out
-  // whatever the user had typed mid-edit. We use a stable primitive key
-  // (editing?.id) as the dep and read the full `editing` via a ref so the
-  // body always sees the latest value.
-  const editingRef = useRef(editing);
-  editingRef.current = editing;
   const editingId = editing?.id;
-
-  // (Re)initialize the form every time the dialog opens.
   useEffect(() => {
-    if (!open) return;
-    const editingNow = editingRef.current;
-    if (editingNow) {
-      setForm({
-        routeId: editingNow.routeId ? String(editingNow.routeId) : "",
-        vehicleId: String(editingNow.vehicleId),
-        driverId: "",
-        kenekId: "",
-        origin: editingNow.origin ?? "",
-        destination: editingNow.destination ?? "",
-        plannedDepartureAt: toLocalInput(editingNow.plannedDepartureAt ? new Date(editingNow.plannedDepartureAt) : null),
-        plannedArrivalAt: toLocalInput(editingNow.plannedArrivalAt ? new Date(editingNow.plannedArrivalAt) : null),
-        shipmentIds: [],
-        transportMode: editingNow.transportMode ?? "DIRECT",
-      });
+    if (editingId != null) {
       // Capacity Round — fetch the transport's current shipments (with totals)
       // so the capacity preview can project against them in edit mode.
-      apiGet<TransportDetail>(`/transports/${editingNow.id}`)
+      apiGet<TransportDetail>(`/transports/${editingId}`)
         .then((t) => setEditShipments(t.shipments ?? []))
         .catch(() => setEditShipments([]));
     } else {
-      setEditShipments([]);
-      setForm(EMPTY);
       // Revise round 9 — fetch BOTH STANDARD (RECEIVED_AT_GUDANG) and DIRECT
       // (CREATED / READY_FOR_PICKUP) shipments so the user can pick from
       // either fulfillment mode when loading a transport. The server-side
@@ -144,8 +141,7 @@ export function TransportFormDialog({
         setReadyShipments(merged);
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, editingId]);
+  }, [editingId]);
 
   // Position-filtered crew dropdowns: Driver select lists ONLY drivers and the
   // Kenek select ONLY keneks. Falls back to the full list only when no

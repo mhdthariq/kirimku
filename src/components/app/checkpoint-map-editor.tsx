@@ -67,11 +67,11 @@ function CoordinateInput({
 }) {
   const [text, setText] = useState(String(value));
 
-  // Sync from parent when the parent value changes externally (marker drag,
-  // paste-coords helper, selection change, etc.).
-  useEffect(() => {
+  const [previousValue, setPreviousValue] = useState(value);
+  if (previousValue !== value) {
+    setPreviousValue(value);
     setText(String(value));
-  }, [value]);
+  }
 
   function commit() {
     const trimmed = text.trim();

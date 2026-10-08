@@ -54,10 +54,15 @@ function compressToJpeg(source: HTMLVideoElement, maxSide = 720): string {
  * - take a selfie with the camera (getUserMedia only)
  * - submit → server validates the radius and stores photo + location + user
  */
-export function CheckpointCheckinDialog({ open, onOpenChange, transportId, transportCode, checkpoints, onDone }: CheckinDialogProps) {
-  const [checkpointId, setCheckpointId] = useState<number | null>(null);
+export function CheckpointCheckinDialog(props: CheckinDialogProps) {
+  if (!props.open) return null;
+  return <CheckpointCheckinSession key={props.transportId} {...props} />;
+}
+
+function CheckpointCheckinSession({ open, onOpenChange, transportId, transportCode, checkpoints, onDone }: CheckinDialogProps) {
+  const [checkpointId, setCheckpointId] = useState<number | null>(() => checkpoints.find((c) => !c.checkedIn)?.id ?? null);
   const [coords, setCoords] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
-  const [locating, setLocating] = useState(false);
+  const [locating, setLocating] = useState(() => typeof navigator !== "undefined" && !!navigator.geolocation);
   const [photo, setPhoto] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,32 +70,33 @@ export function CheckpointCheckinDialog({ open, onOpenChange, transportId, trans
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const aliveRef = useRef(false);
   const pending = checkpoints.filter((c) => !c.checkedIn);
   const selected = checkpoints.find((c) => c.id === checkpointId) ?? null;
 
-  // reset when opened
   useEffect(() => {
-    if (open) {
-      setCheckpointId(pending[0]?.id ?? null);
-      setPhoto(null);
-      setError(null);
-      setCoords(null);
-    }
-     
-  }, [open]);
-
-  // cleanup camera on close
-  useEffect(() => {
-    if (!open) stopCamera();
-    return () => stopCamera();
-     
-  }, [open]);
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    };
+  }, []);
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     setCameraOn(false);
   }, []);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    const stream = streamRef.current;
+    if (!cameraOn || !video || !stream) return;
+    video.srcObject = stream;
+    void video.play().catch(() => undefined);
+    return () => { video.srcObject = null; };
+  }, [cameraOn]);
 
   const startCamera = useCallback(async () => {
     setError(null);
@@ -99,15 +105,15 @@ export function CheckpointCheckinDialog({ open, onOpenChange, transportId, trans
         video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false,
       });
+      if (!aliveRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      streamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = stream;
       setCameraOn(true);
-      requestAnimationFrame(() => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          void videoRef.current.play();
-        }
-      });
     } catch {
+      if (!aliveRef.current) return;
       setError("Kamera tidak dapat diakses - izin kamera wajib untuk check-in.");
     }
   }, []);
@@ -132,6 +138,7 @@ export function CheckpointCheckinDialog({ open, onOpenChange, transportId, trans
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        if (!aliveRef.current) return;
         setCoords({
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
@@ -140,6 +147,7 @@ export function CheckpointCheckinDialog({ open, onOpenChange, transportId, trans
         setLocating(false);
       },
       () => {
+        if (!aliveRef.current) return;
         setLocating(false);
         setError("Lokasi tidak dapat diambil - pastikan izin lokasi aktif, lalu coba lagi.");
       },
@@ -147,11 +155,24 @@ export function CheckpointCheckinDialog({ open, onOpenChange, transportId, trans
     );
   }, []);
 
-  // auto-locate once when a checkpoint is selected and we have no fix yet
   useEffect(() => {
-    if (open && selected && !coords && !locating) locate();
-     
-  }, [open, selected?.id]);
+    if (!navigator.geolocation) return;
+    let active = true;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        if (!active) return;
+        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: Math.round(pos.coords.accuracy) });
+        setLocating(false);
+      },
+      () => {
+        if (!active) return;
+        setLocating(false);
+        setError("Lokasi tidak dapat diambil - pastikan izin lokasi aktif, lalu coba lagi.");
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 5000 },
+    );
+    return () => { active = false; };
+  }, []);
 
   const liveDistance = selected && coords ? distanceMeters(coords.lat, coords.lng, selected.latitude, selected.longitude) : null;
   const radiusM = selected?.radiusMeters ?? 0;
@@ -176,15 +197,17 @@ export function CheckpointCheckinDialog({ open, onOpenChange, transportId, trans
         longitude: coords.lng,
         photo,
       });
+      if (!aliveRef.current) return;
       toast.success(res.message);
       onOpenChange(false);
       onDone();
     } catch (err) {
+      if (!aliveRef.current) return;
       // The server explains precisely why a check-in was rejected (distance
       // vs radius) — surface it verbatim (Revision Part O).
       setError(err instanceof Error ? err.message : "Check-in gagal.");
     } finally {
-      setSubmitting(false);
+      if (aliveRef.current) setSubmitting(false);
     }
   }
 

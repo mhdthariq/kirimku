@@ -27,7 +27,9 @@ import {
  * successful save call the parent's setState directly, so they never prompt.
  * Dialogs without a form (details, confirmations) never prompt either.
  */
-const DirtyContext = React.createContext<{ markDirty: () => void } | null>(null)
+const DirtyContext = React.createContext<{ markDirty: () => void } | null>(
+    null,
+);
 
 function Dialog({
   open,
@@ -42,24 +44,26 @@ function Dialog({
   const isControlled = open !== undefined
   const [innerOpen, setInnerOpen] = React.useState(defaultOpen ?? false)
   const effectiveOpen = isControlled ? open : innerOpen
-  const dirtyRef = React.useRef(false)
+    const [dirty, setDirty] = React.useState(false);
   const [confirming, setConfirming] = React.useState(false)
+    const [previousOpen, setPreviousOpen] = React.useState(effectiveOpen);
 
-  // A dialog that (re)opens or closes starts clean.
-  React.useEffect(() => {
-    dirtyRef.current = false
+    // Reset the guard before children render, including parent-driven closes.
+    if (previousOpen !== effectiveOpen) {
+        setPreviousOpen(effectiveOpen);
+        setDirty(false);
     setConfirming(false)
-  }, [effectiveOpen])
+    }
 
   const close = () => {
-    dirtyRef.current = false
+        setDirty(false);
     setConfirming(false)
     if (!isControlled) setInnerOpen(false)
     onOpenChange?.(false)
   }
 
   const handleOpenChange = (next: boolean) => {
-    if (!next && confirmOnClose && dirtyRef.current) {
+        if (!next && confirmOnClose && dirty) {
       setConfirming(true)
       return
     }
@@ -67,7 +71,14 @@ function Dialog({
     onOpenChange?.(next)
   }
 
-  const ctx = React.useMemo(() => ({ markDirty: () => { dirtyRef.current = true } }), [])
+    const ctx = React.useMemo(
+        () => ({
+            markDirty: () => {
+                setDirty(true);
+            },
+        }),
+        [],
+    );
 
   return (
     <DirtyContext.Provider value={ctx}>
@@ -80,9 +91,12 @@ function Dialog({
       <AlertDialog open={confirming} onOpenChange={setConfirming}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Tutup dan buang isian?</AlertDialogTitle>
+                        <AlertDialogTitle>
+                            Tutup dan buang isian?
+                        </AlertDialogTitle>
             <AlertDialogDescription>
-              Data yang sudah Anda isi belum disimpan dan akan hilang jika formulir ditutup.
+                            Data yang sudah Anda isi belum disimpan dan akan
+                            hilang jika formulir ditutup.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -127,7 +141,7 @@ function DialogOverlay({
       data-slot="dialog-overlay"
       className={cn(
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
-        className
+                className,
       )}
       {...props}
     />
@@ -149,7 +163,8 @@ function DialogContent({
   const dirty = React.useContext(DirtyContext)
   // Only edits made inside a <form> count as "input worth protecting".
   const markIfForm = (target: EventTarget) => {
-    if (target instanceof Element && target.closest("form")) dirty?.markDirty()
+        if (target instanceof Element && target.closest("form"))
+            dirty?.markDirty();
   }
   return (
     <DialogPortal data-slot="dialog-portal">
@@ -158,7 +173,7 @@ function DialogContent({
         data-slot="dialog-content"
         className={cn(
           "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 flex max-h-[calc(100dvh-2rem)] w-[calc(100%-1.5rem)] translate-x-[-50%] translate-y-[-50%] flex-col gap-4 overflow-y-auto overscroll-contain rounded-lg border p-4 shadow-lg duration-200 sm:max-w-lg sm:p-6",
-          className
+                    className,
         )}
         onPointerDownOutside={(event) => {
           if (showCloseButton) event.preventDefault();
@@ -175,7 +190,13 @@ function DialogContent({
         onClick={(e) => {
           // Button-style controls (radio cards, checkboxes, switches) don't emit input events.
           const t = e.target
-          if (t instanceof Element && t.closest('[role="radio"],[role="checkbox"],[role="switch"]')) markIfForm(t)
+                    if (
+                        t instanceof Element &&
+                        t.closest(
+                            '[role="radio"],[role="checkbox"],[role="switch"]',
+                        )
+                    )
+                        markIfForm(t);
           onClick?.(e)
         }}
         {...props}
@@ -199,7 +220,10 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="dialog-header"
-      className={cn("flex shrink-0 flex-col gap-2 pr-8 text-center sm:text-left", className)}
+            className={cn(
+                "flex shrink-0 flex-col gap-2 pr-8 text-center sm:text-left",
+                className,
+            )}
       {...props}
     />
   )
@@ -211,7 +235,7 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
       data-slot="dialog-footer"
       className={cn(
         "-mx-4 -mb-4 mt-1 flex flex-col-reverse gap-2 border-t bg-background px-4 pt-3 pb-4 sm:-mx-6 sm:-mb-6 sm:flex-row sm:justify-end sm:px-6 sm:pb-6",
-        className
+                className,
       )}
       {...props}
     />

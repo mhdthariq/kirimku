@@ -212,7 +212,6 @@ export function TransportExpensesPanel({
                 <input ref={fileRef} id="x-photo" type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onPickPhoto(e.target.files?.[0])} />
                 {form.photo ? (
                   <div className="relative w-fit">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={form.photo} alt="Bukti biaya" className="max-h-40 rounded-md border" />
                     <Button type="button" size="icon" variant="secondary" className="absolute -right-2 -top-2 h-6 w-6 rounded-full" onClick={() => setForm({ ...form, photo: "" })} aria-label="Hapus foto">
                       <X className="h-3 w-3" />
@@ -249,7 +248,6 @@ export function TransportExpensesPanel({
             <DialogTitle>{viewPhoto?.title}</DialogTitle>
             <DialogDescription>Foto bukti biaya</DialogDescription>
           </DialogHeader>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           {viewPhoto && <img src={viewPhoto.src} alt={viewPhoto.title} className="max-h-[70vh] w-full rounded-md object-contain" />}
         </DialogContent>
       </Dialog>

@@ -43,18 +43,17 @@ export function TariffsPage() {
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<Tariff | null>(null);
 
-  const matches = (t: Tariff, q: string) =>
-    !q ||
-    t.origin.toLowerCase().includes(q) ||
-    t.destination.toLowerCase().includes(q) ||
-    (t.name ?? "").toLowerCase().includes(q) ||
-    (t.customer ? customerPrimaryName({ ...t.customer, type: "b2b" }) : "").toLowerCase().includes(q);
-
   const rowsByTab = useMemo(() => {
     const q = search.toLowerCase();
-    const all = (data ?? []).filter((t) => matches(t, q));
+    const all = (data ?? []).filter((t) =>
+      !q ||
+      t.origin.toLowerCase().includes(q) ||
+      t.destination.toLowerCase().includes(q) ||
+      (t.name ?? "").toLowerCase().includes(q) ||
+      (t.customer ? customerPrimaryName({ ...t.customer, type: "b2b" }) : "").toLowerCase().includes(q),
+    );
     return { b2c: all.filter((t) => tariffTabOf(t) === "b2c"), b2b: all.filter((t) => tariffTabOf(t) === "b2b") };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [data, search]);
 
   const b2bCustomerOptions = useMemo(

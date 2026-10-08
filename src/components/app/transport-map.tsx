@@ -66,11 +66,17 @@ export function TransportMap({
   // Keep refs to the latest raw values so the effect body reads the most
   // up-to-date data without forcing re-runs on identity changes.
   const checkpointsRef = useRef(checkpoints);
-  checkpointsRef.current = checkpoints;
+
   const currentPositionRef = useRef(currentPosition);
-  currentPositionRef.current = currentPosition;
+
   const checkinsRef = useRef(checkins);
-  checkinsRef.current = checkins;
+
+
+  useEffect(() => {
+    checkpointsRef.current = checkpoints;
+    currentPositionRef.current = currentPosition;
+    checkinsRef.current = checkins;
+  }, [checkpoints, currentPosition, checkins]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -161,7 +167,6 @@ export function TransportMap({
     if (all.length > 0) {
       map.fitBounds(L.latLngBounds(all).pad(0.25), { animate: false });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkpointsKey, positionKey, checkinsKey, fitTo]);
 
   return (

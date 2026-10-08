@@ -69,7 +69,12 @@ function MethodBadge({ method }: { method: string | null }) {
  *   Kurir tidak menarik pembayaran dari customer — setelah semua paket ter-scan,
  *   hanya tombol Konfirmasi yang ditampilkan (tanpa field sisa/metode/catatan).
  */
-export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanDialogProps) {
+export function QrScanDialog(props: QrScanDialogProps) {
+  if (!props.open || !props.task) return null;
+  return <QrScanSession key={`${props.mode}:${props.task.id}`} {...props} />;
+}
+
+function QrScanSession({ open, onOpenChange, mode, task, onDone }: QrScanDialogProps) {
   const [progress, setProgress] = useState<ScanProgress | null>(null);
   const [payment, setPayment] = useState<PaymentSummary | null>(null);
   const [feedback, setFeedback] = useState<Feedback>(null);
@@ -91,6 +96,7 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const aliveRef = useRef(false);
 
   const basePath = mode === "pickup" ? `/pickups/${task?.id}` : `/deliveries/${task?.id}`;
   const isPickup = mode === "pickup";
@@ -99,19 +105,16 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
   // Load scan state when dialog opens
   useEffect(() => {
     if (!open || !task) return;
-    setProgress(null);
-    setPayment(null);
-    setFeedback(null);
-    setNotes("");
-    setProof("");
-    setPhoto(null);
+    let active = true;
     apiGet<{ progress: ScanProgress; paymentSummary?: PaymentSummary }>(basePath)
       .then((d) => {
+        if (!active) return;
         setProgress(d.progress);
         setPayment(d.paymentSummary ?? null);
       })
-      .catch(() => setFeedback({ kind: "warn", text: "Gagal memuat daftar paket." }));
-  }, [open, task, basePath]);
+      .catch(() => { if (active) setFeedback({ kind: "warn", text: "Gagal memuat daftar paket." }); });
+    return () => { active = false; };
+  }, [open, basePath]);
 
   // Step 5 — stop the camera when the dialog closes (frees the stream so
   // the camera light turns off and the next open can re-acquire cleanly).
@@ -121,9 +124,13 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
     setCameraOn(false);
   }, []);
   useEffect(() => {
-    if (!open) stopCamera();
-    return () => stopCamera();
-  }, [open, stopCamera]);
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    };
+  }, []);
 
   // Step 5 — open the device camera (rear-facing preferred for shooting
   // package labels / receiver handover). Mirrors the checkpoint-checkin
@@ -131,6 +138,15 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
   // knows to grant camera permission. NOTE: file upload is intentionally
   // NOT supported — the photo MUST be taken live with the camera so it's
   // proof of the actual handover, not a pre-existing image.
+  useEffect(() => {
+    const video = videoRef.current;
+    const stream = streamRef.current;
+    if (!cameraOn || !video || !stream) return;
+    video.srcObject = stream;
+    void video.play().catch(() => undefined);
+    return () => { video.srcObject = null; };
+  }, [cameraOn]);
+
   const startCamera = useCallback(async () => {
     setCameraError(null);
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
@@ -142,15 +158,15 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
         video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false,
       });
+      if (!aliveRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      streamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = stream;
       setCameraOn(true);
-      requestAnimationFrame(() => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          void videoRef.current.play();
-        }
-      });
     } catch (err) {
+      if (!aliveRef.current) return;
       const name = err instanceof DOMException ? err.name : "";
       setCameraError(
         name === "NotAllowedError"
@@ -189,6 +205,7 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
       setBusy(true);
       try {
         const res = await apiPost<ScanResponse>(`${basePath}/scans`, { payload: code, method });
+        if (!aliveRef.current) return;
         setProgress(res.progress);
         const result = res.scan.result;
         setFeedback({
@@ -196,9 +213,10 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
           text: res.message,
         });
       } catch (err) {
+        if (!aliveRef.current) return;
         setFeedback({ kind: "warn", text: err instanceof Error ? err.message : "Scan gagal." });
       } finally {
-        setBusy(false);
+        if (aliveRef.current) setBusy(false);
       }
     },
     [task, busy, basePath],
@@ -225,6 +243,7 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
       // foto bukti serah terima.
       const body = isPickup ? { photoUrl: photo } : { proofOfDelivery: proof.trim(), notes: notes || null, photoUrl: photo };
       const res = await apiPost<{ tracking: string }>(`${basePath}/${isPickup ? "confirm" : "complete"}`, body);
+      if (!aliveRef.current) return;
       toast.success(
         isPickup
           ? `Paket ${task.code} telah diambil (Picked Up) - tracking: ${res.tracking ?? "Picked-up"}. Pickup selesai otomatis saat paket tiba di gudang.`
@@ -233,9 +252,10 @@ export function QrScanDialog({ open, onOpenChange, mode, task, onDone }: QrScanD
       onOpenChange(false);
       onDone();
     } catch (err) {
+      if (!aliveRef.current) return;
       setFeedback({ kind: "warn", text: err instanceof Error ? err.message : "Konfirmasi gagal." });
     } finally {
-      setConfirming(false);
+      if (aliveRef.current) setConfirming(false);
     }
   }, [task, confirming, isPickup, proof, notes, photo, basePath, onOpenChange, onDone]);
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 /** Simple data loader with manual refresh + error toast handling. */
@@ -9,26 +9,53 @@ export function useApiData<T>(fetcher: () => Promise<T>, deps: unknown[] = []) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+    // Inline fetchers are common: only the caller's dependencies select a new loader.
+    const [request, setRequest] = useState(() => ({
+        fetcher,
+        deps: [...deps],
+    }));
+    if (
+        request.deps.length !== deps.length ||
+        deps.some((dep, i) => !Object.is(dep, request.deps[i]))
+    ) {
+        setRequest({ fetcher, deps: [...deps] });
     setLoading(true);
     setError(null);
-    try {
-      const result = await fetcher();
-      setData(result);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Gagal memuat data.";
-      setError(message);
-    } finally {
-      setLoading(false);
     }
-     
-  }, deps);
+    const sequence = useRef(0);
+
+  const load = useCallback(() => {
+    const id = ++sequence.current;
+    // The async boundary also converts a synchronously throwing fetcher to a rejection.
+    const fetchData = async () => request.fetcher();
+    return fetchData().then(
+      (result) => {
+        if (id !== sequence.current) return;
+        setData(result);
+        setLoading(false);
+      },
+      (err: unknown) => {
+        if (id !== sequence.current) return;
+        setError(err instanceof Error ? err.message : "Gagal memuat data.");
+        setLoading(false);
+      },
+    );
+  }, [request]);
 
   useEffect(() => {
-    load();
+        void load();
+        return () => {
+            sequence.current++;
+        };
   }, [load]);
 
-  return { data, loading, error, reload: load, setData };
+    const reload = useCallback(() => {
+        setLoading(true);
+        setError(null);
+        return load();
+    }, [load]);
+
+    return { data, loading, error, reload, setData };
 }
 
 /** Run an async action with busy state + success/error toasts. */

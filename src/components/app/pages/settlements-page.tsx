@@ -218,7 +218,7 @@ export function SettlementsPage() {
                     header: "Aksi",
                     render: (r) =>
                       r.status !== "SETTLED" && r.remainingAmount > 0 && hasPermission(user, "payment.verify") ? (
-                        <Button size="sm" variant="outline" className="h-7" onClick={() => window.location.assign(`#/invoices`)}>
+                        <Button size="sm" variant="outline" className="h-7" onClick={() => window.location.assign(new URL("#/invoices", window.location.href).href)}>
                           Catat Pembayaran
                         </Button>
                       ) : (

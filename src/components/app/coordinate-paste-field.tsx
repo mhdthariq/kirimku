@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { Field, Input } from "@/components/app/form-parts";
 import { formatCoordinates, googleMapsLink, parseCoordinates } from "@/lib/coordinates";
@@ -35,17 +35,16 @@ export function CoordinatePasteField({
   );
   const [error, setError] = useState<string | null>(null);
 
-  // Keep the text field in sync when the value changes from elsewhere (e.g.
-  // clicking/dragging the map below) — but don't clobber what the user is
-  // actively typing if it still parses to the same point.
-  useEffect(() => {
+  const [previousCoordinates, setPreviousCoordinates] = useState({ latitude, longitude });
+  if (previousCoordinates.latitude !== latitude || previousCoordinates.longitude !== longitude) {
+    setPreviousCoordinates({ latitude, longitude });
     const point = latitude != null && longitude != null ? { lat: latitude, lng: longitude } : null;
     const parsedRaw = parseCoordinates(raw);
     const matches =
       point && parsedRaw && Math.abs(point.lat - parsedRaw.lat) < 1e-6 && Math.abs(point.lng - parsedRaw.lng) < 1e-6;
     if (!matches) setRaw(formatCoordinates(point));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [latitude, longitude]);
+    setError(null);
+  }
 
   function handleChange(value: string) {
     setRaw(value);

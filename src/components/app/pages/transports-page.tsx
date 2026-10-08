@@ -285,7 +285,7 @@ export function TransportsPage({ historyMode = false }: { historyMode?: boolean 
               {/* Revise.md §14/§15 - settle ARRIVED partner transports (credits
                   the Vehicle Owner wallet atomically) */}
               {t.status === "ARRIVED" && t.vehicleOwnerId != null && !t.settlement && can.settle && (
-                <Button size="sm" variant="secondary" className="h-7" onClick={() => window.location.assign("#/settlements")}>
+                <Button size="sm" variant="secondary" className="h-7" onClick={() => window.location.assign(new URL("#/settlements", window.location.href).href)}>
                   <Coins className="h-3.5 w-3.5" /> Settle
                 </Button>
               )}

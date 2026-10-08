@@ -1,33 +1,23 @@
 import { defineConfig } from "vitest/config";
-import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-/**
- * Vitest config (added 2026-09-27, Phase 1 of docs/CLEAN_ARCHITECTURE_PLAN.md).
- *
- * Scope on purpose: this first pass covers `src/lib/**` — pure,
- * framework-free logic (pricing, coordinate parsing, customer display,
- * generic API helpers). These are the highest-value, lowest-risk tests to
- * add first: no React, no Next.js request/response mocking, no database.
- *
- * API-route tests and component tests are Phase 2/3 in the plan and need
- * more scaffolding (a test database, request/response mocks, RTL) — adding
- * them here would have made this first PR much larger without adding
- * proportional confidence.
- */
+// API/library tests run in Node; UI suites opt into jsdom per file.
 export default defineConfig({
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
+  oxc: { jsx: { runtime: "automatic" } },
   test: {
     environment: "node",
-    include: ["src/**/*.test.ts"],
+    include: ["src/**/*.test.{ts,tsx}"],
+    setupFiles: ["./tests/setup.ts"],
     coverage: {
       provider: "v8",
       reporter: ["text", "html"],
-      include: ["src/lib/**/*.ts"],
-      exclude: ["src/lib/db.ts", "src/lib/auth.ts", "**/*.test.ts"],
+      include: ["src/lib/**/*.ts", "src/hooks/**/*.{ts,tsx}", "src/components/**/*.{ts,tsx}", "src/app/api/**/route.ts"],
+      exclude: ["src/lib/db.ts", "src/lib/auth.ts", "**/*.test.{ts,tsx}"],
     },
   },
 });

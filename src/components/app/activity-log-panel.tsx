@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useApiData } from "@/hooks/use-api-data";
 import { Clock, History, Loader2, Package, RefreshCw } from "lucide-react";
 import { apiGetWithMeta, hasPermission, type AuditEntry, type AuditResponse } from "@/lib/client-api";
 import { useAuth } from "@/hooks/use-auth";
@@ -49,50 +49,17 @@ export function ActivityLogPanel({
 }) {
   const { user } = useAuth();
   const canViewLog = hasPermission(user, "audit_log.view");
-  const [entries, setEntries] = useState<AuditEntry[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Stabilize the entityTypes dependency. Callers always pass an inline
-  // array literal (e.g. <ActivityLogPanel entityTypes={["user"]} />), which
-  // creates a NEW array reference on every parent render. If we put the raw
-  // array in the useCallback deps below, `load` would be regenerated on
-  // every parent render → useEffect would re-fire → the panel would refetch
-  // → the loading skeleton/spinner would blink on every keystroke in any
-  // search input above the panel. By joining into a stable string key, we
-  // ensure `load` only changes when the CONTENT of entityTypes actually
-  // changes — not when the array reference changes.
-  const entityTypesKey = entityTypes.join(",");
-  // Keep a ref to the latest entityTypes so the async callback always reads
-  // the current value without re-triggering on identity changes.
-  const entityTypesRef = useRef(entityTypes);
-  entityTypesRef.current = entityTypes;
-
-  const load = useCallback(async () => {
-    if (!canViewLog) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const types = entityTypesRef.current;
-      const query = types.map((t) => `entityType=${encodeURIComponent(t)}`).join("&");
-      const entityQuery = entityId == null ? "" : `&entityId=${entityId}`;
-      const res = await apiGetWithMeta<AuditResponse["data"]>(
-        `/audit-logs?${query}${entityQuery}&limit=${limit}`,
-      );
-      setEntries(res.data ?? []);
-      setTotal(typeof res.meta?.total === "number" ? res.meta.total : (res.data ?? []).length);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal memuat log aktivitas.");
-    } finally {
-      setLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canViewLog, entityTypesKey, entityId, limit]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const query = entityTypes.map((type) => `entityType=${encodeURIComponent(type)}`).join("&");
+  const { data, loading, error, reload } = useApiData(
+    () => canViewLog
+      ? apiGetWithMeta<AuditResponse["data"]>(
+        `/audit-logs?${query}${entityId == null ? "" : `&entityId=${entityId}`}&limit=${limit}`,
+      )
+      : Promise.resolve(null),
+    [canViewLog, query, entityId, limit],
+  );
+  const entries = data?.data ?? [];
+  const total = typeof data?.meta?.total === "number" ? data.meta.total : entries.length;
 
   // No audit_log.view → no log panel at all (never render an empty shell).
   if (!canViewLog) return null;
@@ -109,7 +76,7 @@ export function ActivityLogPanel({
             </span>
           )}
         </div>
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={load} aria-label="Muat ulang log">
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => void reload()} aria-label="Muat ulang log">
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
         </Button>
       </div>

@@ -77,6 +77,21 @@ npm run dev
 
 ---
 
+## Quality checks
+
+```bash
+bun run lint --max-warnings 0
+bun run test
+bun run test:ui
+bun run test:api
+bun run test:regression
+bun run test:coverage
+```
+
+See [the testing guide](docs/testing.md) for test isolation, regression coverage, and known gaps. Unit tests use mocked databases/services and do not require seeded data or a running server.
+
+---
+
 ## Environment
 
 Copy the example environment file if you need to change the default configuration:

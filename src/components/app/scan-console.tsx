@@ -44,7 +44,9 @@ export function ScanConsole({ onScan, disabled, placeholder = "Arahkan QR ke kam
   const firstKeyAtRef = useRef<number | null>(null);
   const keyCountRef = useRef(0);
   const disabledRef = useRef(disabled || busy);
-  disabledRef.current = disabled || busy;
+  useEffect(() => {
+    disabledRef.current = disabled || busy;
+  }, [disabled, busy]);
 
   const stopCamera = useCallback(() => {
     if (timerRef.current) {

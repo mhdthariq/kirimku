@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   Ban,
@@ -1102,7 +1102,7 @@ function ScanArrivalPickerDialog({
     return list.filter(
       (a) => matches(q, a.masterCode, a.customerName, a.kurirName),
     );
-     
+
   }, [data, search]);
 
   const transportArrivals = useMemo(() => {
@@ -1111,7 +1111,7 @@ function ScanArrivalPickerDialog({
     return list.filter(
       (a) => matches(q, a.masterCode, a.customerName, a.originWarehouseName, a.origin, a.driverName, a.transportCode),
     );
-     
+
   }, [data, search]);
 
   const warehouses = (options?.warehouses ?? []).map((w) => ({ id: w.id, name: w.name }));
@@ -1283,9 +1283,9 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
     viewLog: hasPermission(user, "audit_log.view"),
   };
 
-  const [shipment, setShipment] = useState<(Shipment & { details: DetailShipment[]; trackingEvents: TrackingEvent[] }) | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: shipment, loading, error, reload: load } = useApiData<
+    Shipment & { details: DetailShipment[]; trackingEvents: TrackingEvent[] }
+  >(() => apiGet(`/shipments/${id}`), [id]);
 
   // Walk-in support data: warehouse list + gudang scope (only for permitted users)
   const { data: options } = useApiData<Options>(
@@ -1298,22 +1298,6 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
   );
   const [walkInTask, setWalkInTask] = useState<GudangWalkInItem | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await apiGet<Shipment & { details: DetailShipment[]; trackingEvents: TrackingEvent[] }>(`/shipments/${id}`);
-      setShipment(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal memuat shipment.");
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
 
   const [detailOpen, setDetailOpen] = useState(false);
   const [editingDetail, setEditingDetail] = useState<DetailShipment | null>(null);

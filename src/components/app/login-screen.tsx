@@ -75,7 +75,7 @@ export function LoginScreen() {
       await login(NEXT_PUBLIC_IS_DEV ? "" : corpId.trim(), username.trim(), password);
       // always land on the dashboard — the previous user's hash (e.g. a
       // transport detail the new user has no access to) must not leak
-      window.location.hash = "#/dashboard";
+      window.location.assign(new URL("#/dashboard", window.location.href).href);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login gagal.");
     } finally {
@@ -93,7 +93,7 @@ export function LoginScreen() {
       // → use whatever the user typed (Production hides the quick-fill
       // panel anyway, so this branch only runs in Dev / Preview).
       await login(NEXT_PUBLIC_IS_DEV ? "" : corpId.trim(), acc.username, acc.password);
-      window.location.hash = "#/dashboard";
+      window.location.assign(new URL("#/dashboard", window.location.href).href);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login gagal.");
     } finally {
