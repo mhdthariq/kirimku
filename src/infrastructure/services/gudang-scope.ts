@@ -34,6 +34,18 @@ export interface GudangScope {
  */
 export async function scopeForUser(user: AuthUser): Promise<GudangScope> {
   if (user.isOwner || user.permissions.includes("*")) return { unscoped: true, warehouseId: null };
+  // Users with the complete transport-planning permission set are company
+  // transport operators. They need to see transports crossing warehouse
+  // boundaries; a normal transport.view grant remains warehouse-scoped.
+  const transportOperatorPermissions = [
+    "transport.view",
+    "transport.create",
+    "transport.depart",
+    "transport.arrive",
+  ];
+  if (transportOperatorPermissions.every((permission) => user.permissions.includes(permission))) {
+    return { unscoped: true, warehouseId: null };
+  }
   // Step 2 — drivers & keneks are unscoped (see every transport they're
   // assigned to, regardless of which gudang the route endpoints belong to).
   // The `?mine=true` filter at the API layer restricts their list to their
