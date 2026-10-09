@@ -459,7 +459,7 @@ export function DeliveriesPage() {
               {detailTarget.photoUrl && (
                 <div className="mt-2">
                   {can.viewProofPhoto ? (
-                    <a href={detailTarget.photoUrl} target="_blank" rel="noreferrer" onClick={(event) => { event.preventDefault(); openDataUrlInNewTab(detailTarget.photoUrl); }} title="Lihat foto bukti serah terima">
+                    <a href={detailTarget.photoUrl} target="_blank" rel="noreferrer" onClick={(event) => { event.preventDefault(); if (detailTarget.photoUrl) openDataUrlInNewTab(detailTarget.photoUrl); }} title="Lihat foto bukti serah terima">
                       <img
                         src={detailTarget.photoUrl}
                         alt="Bukti serah terima"

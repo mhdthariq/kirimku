@@ -296,7 +296,7 @@ function TopUpDetailDialog({ topUp, onOpenChange }: { topUp: TopUpRequest | null
                 <a href={topUp.proofUrl} download={fileName} className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline">
                   <Download className="h-3.5 w-3.5" /> Unduh bukti
                 </a>
-                <a href={topUp.proofUrl} target="_blank" rel="noreferrer" onClick={(event) => { event.preventDefault(); openDataUrlInNewTab(topUp.proofUrl); }} className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline">
+                <a href={topUp.proofUrl} target="_blank" rel="noreferrer" onClick={(event) => { event.preventDefault(); if (topUp.proofUrl) openDataUrlInNewTab(topUp.proofUrl); }} className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline">
                   <ExternalLink className="h-3.5 w-3.5" /> Buka bukti dalam tab baru
                 </a>
               </div>

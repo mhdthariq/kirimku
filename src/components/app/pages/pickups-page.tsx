@@ -299,7 +299,7 @@ export function PickupsPage() {
           render: (p) =>
             p.photoUrl ? (
               can.viewProofPhoto ? (
-                <a href={p.photoUrl} target="_blank" rel="noreferrer" onClick={(event) => { event.preventDefault(); openDataUrlInNewTab(p.photoUrl); }} title="Lihat foto bukti pickup">
+                <a href={p.photoUrl} target="_blank" rel="noreferrer" onClick={(event) => { event.preventDefault(); if (p.photoUrl) openDataUrlInNewTab(p.photoUrl); }} title="Lihat foto bukti pickup">
                   <img
                     src={p.photoUrl}
                     alt={`Bukti ${p.pickupCode}`}

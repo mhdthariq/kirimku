@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000",
-    "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
+    "build": "next build && node -e \"const fs=require('fs'); fs.cpSync('.next/static','.next/standalone/.next/static',{recursive:true}); fs.cpSync('public','.next/standalone/public',{recursive:true})\"",
     "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
-    "build:preview": "PREVIEW_MODE=true NEXT_PUBLIC_PREVIEW_MODE=true NEXT_PUBLIC_RUNTIME_MODE=preview next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
+    "build:preview": "PREVIEW_MODE=true NEXT_PUBLIC_PREVIEW_MODE=true NEXT_PUBLIC_RUNTIME_MODE=preview next build && node -e \"const fs=require('fs'); fs.cpSync('.next/static','.next/standalone/.next/static',{recursive:true}); fs.cpSync('public','.next/standalone/public',{recursive:true})\"",
     "start:preview": "NODE_ENV=production PREVIEW_MODE=true bun .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "eslint .",
     "test": "vitest run",
