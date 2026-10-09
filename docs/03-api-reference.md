@@ -112,7 +112,7 @@ To restore the old "auto-seed on first request" behaviour (useful for Docker whe
 
 ## Shipment details (packages)
 
-**Revision 3 — one row per package:** `POST /shipments/{id}/details` accepts `{description, quantity (1–500), lengthCm?, widthCm?, heightCm?, actualWeightKg}` and expands `quantity N` into **N package rows**, each with a unique daily ordered `detailCode` (`DTL-YYYYMMDD-HHmmss-NNN`). Response: `{created: N, details: [...]}`. There is no per-row quantity — the grouped ("Ringkas") view in the UI is pure aggregation.
+**Revision 3 — one row per package:** `POST /shipments/{id}/details` accepts `{description, quantity (minimum 1), lengthCm?, widthCm?, heightCm?, actualWeightKg}` and expands `quantity N` into **N package rows**, each with a unique daily ordered `detailCode` (`DTL-YYYYMMDD-HHmmss-NNN`). Response: `{created: N, details: [...]}`. There is no per-row quantity — the grouped ("Ringkas") view in the UI is pure aggregation.
 
 | Method | Endpoint | Permission | Description |
 |---|---|---|---|

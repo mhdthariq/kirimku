@@ -1481,8 +1481,8 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
     if (busy) return;
     if (!editingDetail) {
       const qty = Math.round(Number(detailForm.quantity) || 0);
-      if (qty < 1 || qty > 500) {
-        toast.error("Jumlah paket harus antara 1–500.");
+      if (qty < 1) {
+        toast.error("Jumlah paket harus minimal 1.");
         return;
       }
     }
@@ -2063,7 +2063,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {!editingDetail && (
                 <Field label="Jumlah paket" htmlFor="d-qty" hint="dibuat 1 kode unik per paket">
-                  <NumberInput id="d-qty" value={detailForm.quantity} onChange={(e) => setDetailForm({ ...detailForm, quantity: e.target.value })} required disabled={busy} min={1} max={500} />
+                  <NumberInput id="d-qty" value={detailForm.quantity} onChange={(e) => setDetailForm({ ...detailForm, quantity: e.target.value })} required disabled={busy} min={1} />
                 </Field>
               )}
               <Field label="Berat aktual (kg)" htmlFor="d-weight" hint={editingDetail ? undefined : "per paket"}>

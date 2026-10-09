@@ -199,8 +199,8 @@ export async function POST(req: NextRequest) {
     }
     for (const d of details) {
       const qty = Math.round(num(d.quantity) ?? 1);
-      if (!Number.isFinite(qty) || qty < 1 || qty > 500) {
-        return fail(422, "Jumlah paket setiap detail harus antara 1–500.", { quantity: ["Jumlah paket harus antara 1–500."] });
+      if (!Number.isFinite(qty) || qty < 1) {
+        return fail(422, "Jumlah paket setiap detail harus minimal 1.", { quantity: ["Jumlah paket harus minimal 1."] });
       }
     }
 

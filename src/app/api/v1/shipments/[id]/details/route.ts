@@ -37,8 +37,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     const body = await req.json().catch(() => ({}));
     const description = requireStr(body.description, "description");
     const qty = Math.round(num(body.quantity) ?? 1);
-    if (!Number.isFinite(qty) || qty < 1 || qty > 500) {
-      return fail(422, "Jumlah paket harus antara 1–500.", { quantity: ["Jumlah paket harus antara 1–500."] });
+    if (!Number.isFinite(qty) || qty < 1) {
+      return fail(422, "Jumlah paket harus minimal 1.", { quantity: ["Jumlah paket harus minimal 1."] });
     }
 
     const codes = await nextDetailCodes(master.id, master.masterCode, qty);
