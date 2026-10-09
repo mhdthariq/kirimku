@@ -23,6 +23,7 @@ export function ProfilePage() {
   const { data, loading, reload } = useApiData<ProfileData>(() => apiGet<ProfileData>("/profile"), []);
   const [bank, setBank] = useState({ bankName: "", bankAccountName: "", bankAccountNumber: "" });
   const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
   const [pwd, setPwd] = useState({ current: "", next: "", confirm: "" });
   const [busyBank, setBusyBank] = useState(false);
   const [busyName, setBusyName] = useState(false);
@@ -38,6 +39,7 @@ export function ProfilePage() {
       bankAccountNumber: data.partner?.bank.bankAccountNumber ?? "",
     });
     setName(data.name);
+    setUsername(data.username);
   }
 
   async function onSaveBank(e: React.FormEvent) {
@@ -59,8 +61,8 @@ export function ProfilePage() {
     e.preventDefault();
     if (name.trim().length < 2) return;
     setBusyName(true);
-    const ok = await runAction(() => apiPut("/profile", { name: name.trim() }), {
-      success: "Nama berhasil diperbarui.",
+    const ok = await runAction(() => apiPut("/profile", { name: name.trim(), ...(user?.isOwner ? { username: username.trim() } : {}) }), {
+      success: "Profil berhasil diperbarui.",
     });
     if (ok) {
       reload();
@@ -167,6 +169,11 @@ export function ProfilePage() {
               <Field label="Nama Tampilan" htmlFor="pf-name">
                 <Input id="pf-name" value={name} onChange={(e) => setName(e.target.value)} disabled={busyName} />
               </Field>
+              {user?.isOwner && (
+                <Field label="Username" htmlFor="pf-username">
+                  <Input id="pf-username" value={username} onChange={(e) => setUsername(e.target.value)} disabled={busyName} autoComplete="username" />
+                </Field>
+              )}
               <SubmitButton busy={busyName} className="w-full sm:w-auto">
                 Simpan Nama
               </SubmitButton>

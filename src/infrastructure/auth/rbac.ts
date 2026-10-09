@@ -152,6 +152,12 @@ export const PERMISSIONS: { slug: string; module: string; description: string }[
 
 export const ROLE_TEMPLATES: { slug: string; name: string; description: string; permissions: string[] }[] = [
   {
+    slug: "owner",
+    name: "Owner",
+    description: "Full system access across all warehouses and modules",
+    permissions: PERMISSIONS.map((permission) => permission.slug),
+  },
+  {
     slug: "admin-kantor",
     name: "Admin Kantor",
     description: "Office administration: tariffs, invoices, payments, customers, partner finance",

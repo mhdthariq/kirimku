@@ -18,6 +18,14 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
     const data: Record<string, unknown> = {};
     let passwordChanged = false;
+    if (body.username !== undefined) {
+      if (!user.isOwner) return fail(403, "Hanya owner yang boleh mengubah username.");
+      const username = str(body.username)?.toLowerCase();
+      if (!username || !/^[a-z0-9._-]+$/.test(username)) return fail(422, "Username hanya boleh berisi huruf, angka, titik, garis bawah, atau tanda hubung.");
+      const duplicate = await db.user.findFirst({ where: { username, id: { not: existing.id } } });
+      if (duplicate) return fail(422, "Username sudah dipakai.", { username: ["Username sudah dipakai."] });
+      data.username = username;
+    }
     if (body.name !== undefined) data.name = str(body.name) ?? existing.name;
     if (body.password !== undefined && str(body.password)) {
       const password = String(body.password);

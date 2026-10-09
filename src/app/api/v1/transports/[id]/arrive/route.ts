@@ -15,7 +15,10 @@ export async function POST(req: NextRequest, { params }: Params) {
     const transport = await db.transport.findUnique({ where: { id: Number(id) }, include: { route: true, shipments: { include: { master: true } } } });
     if (!transport) return fail(404, "Transport tidak ditemukan.");
     await assertTransportScope(user, transport.route ?? { origin: null, destination: null }, transport.shipments.map((s) => s.master));
-    if (transport.status !== "DEPARTED") return fail(422, `Transport berstatus ${transport.status}, hanya DEPARTED yang bisa arrive.`);
+    if (transport.status !== "PLANNED" && transport.status !== "DEPARTED") {
+      return fail(422, `Transport berstatus ${transport.status}, hanya PLANNED atau DEPARTED yang bisa diselesaikan.`);
+    }
+    const bypassedStart = transport.status === "PLANNED";
 
     const cityIdx = await cityIndex();
     // gudang names for the tracking description ("dari Gudang A ke Gudang B")
@@ -61,7 +64,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       await syncReturnTaskForTransport(tx, transport.id, "ARRIVED");
       return result;
     });
-    await audit({ action: "status_change", entityType: "transport", entityId: transport.id, entityLabel: `${transport.transportCode} → ARRIVED`, actor: user });
+    await audit({ action: bypassedStart ? "status_change_bypass" : "status_change", entityType: "transport", entityId: transport.id, entityLabel: `${transport.transportCode} → ARRIVED${bypassedStart ? " (bypass belum berangkat)" : ""}`, actor: user });
     return ok(updated);
   });
 }

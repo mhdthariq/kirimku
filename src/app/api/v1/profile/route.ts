@@ -56,6 +56,7 @@ export async function GET(req: NextRequest) {
  * Request body (any subset is allowed — only the fields you send are
  * applied, every field is optional):
  *   - name                         (string) new display name
+ *   - username                     (string) new username (Owner only)
  *   - currentPassword              (string) required ONLY when `newPassword`
  *                                  is sent — verified against the stored hash
  *   - newPassword                  (string) new password (>= 8 chars)
@@ -75,6 +76,16 @@ export async function PUT(req: NextRequest) {
     // ----- 1. Identity (name + password) — works for EVERY user -------------
     const data: Record<string, unknown> = {};
     const auditNotes: Record<string, unknown> = {};
+
+    const newUsername = str(body.username)?.toLowerCase();
+    if (body.username !== undefined) {
+      if (!user.isOwner) return fail(403, "Hanya owner yang boleh mengubah username.");
+      if (!newUsername || !/^[a-z0-9._-]+$/.test(newUsername)) return fail(422, "Username hanya boleh berisi huruf, angka, titik, garis bawah, atau tanda hubung.");
+      const duplicate = await db.user.findFirst({ where: { username: newUsername, id: { not: user.id } } });
+      if (duplicate) return fail(422, "Username sudah dipakai.", { username: ["Username sudah dipakai."] });
+      data.username = newUsername;
+      auditNotes.username = newUsername;
+    }
 
     const newName = str(body.name);
     if (newName != null) {

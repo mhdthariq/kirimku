@@ -539,6 +539,38 @@ export async function seedOwnerOnly(): Promise<void> {
     create: { username: "owner", name: "Owner Utama", passwordHash: ownerPassword, isOwner: true, employeeId: ownerEmployee.id },
     update: {},
   });
+  const ownerRole = await db.role.findUniqueOrThrow({ where: { slug: "owner" } });
+  const ownerUser = await db.user.findUniqueOrThrow({ where: { username: "owner" } });
+  await db.userRole.upsert({
+    where: { userId_roleId: { userId: ownerUser.id, roleId: ownerRole.id } },
+    create: { userId: ownerUser.id, roleId: ownerRole.id },
+    update: {},
+  });
+}
+
+/** Create or repair only the Developer Owner account. */
+export async function seedDeveloperAccount(): Promise<void> {
+  await ensureRbac();
+  const ownerRole = await db.role.findUniqueOrThrow({ where: { slug: "owner" } });
+  const employee = await db.employee.upsert({
+    where: { employeeNumber: "EMP-000023" },
+    create: { employeeNumber: "EMP-000023", name: "Developer", position: "Developer" },
+    update: { name: "Developer", position: "Developer", isActive: true },
+  });
+  const linkedUser = await db.user.findUnique({ where: { employeeId: employee.id }, select: { username: true } });
+  if (linkedUser && linkedUser.username !== "dev") {
+    throw new Error(`EMP-000023 sudah terhubung ke user @${linkedUser.username}; akun dev tidak dibuat.`);
+  }
+  const developer = await db.user.upsert({
+    where: { username: "dev" },
+    create: { username: "dev", name: "Developer", passwordHash: hashPassword("dev123456"), isOwner: true, employeeId: employee.id, isActive: true },
+    update: { name: "Developer", passwordHash: hashPassword("dev123456"), isOwner: true, employeeId: employee.id, isActive: true },
+  });
+  await db.userRole.upsert({
+    where: { userId_roleId: { userId: developer.id, roleId: ownerRole.id } },
+    create: { userId: developer.id, roleId: ownerRole.id },
+    update: {},
+  });
 }
 
 /**
@@ -668,6 +700,12 @@ async function seedAccountsAndGudang(): Promise<{
   });
 
   const usersByHandle: Record<string, { id: number; employeeId: number | null }> = { owner: { id: (await db.user.findUniqueOrThrow({ where: { username: "owner" } })).id, employeeId: ownerEmployee.id } };
+  const ownerRole = await db.role.findUniqueOrThrow({ where: { slug: "owner" } });
+  await db.userRole.upsert({
+    where: { userId_roleId: { userId: usersByHandle.owner.id, roleId: ownerRole.id } },
+    create: { userId: usersByHandle.owner.id, roleId: ownerRole.id },
+    update: {},
+  });
   for (const s of staff) {
     // Step 2 — driver/kenek have warehouseId = null (no gudang binding).
     // Other staff have a string gudang key (Medan / Banda Aceh / …). Look
@@ -683,8 +721,8 @@ async function seedAccountsAndGudang(): Promise<{
     });
     const user = await db.user.upsert({
       where: { username: s.username },
-      create: { username: s.username, name: s.name, passwordHash: staffPassword, employeeId: employee.id },
-      update: {},
+      create: { username: s.username, name: s.name, passwordHash: s.username === "dev" ? hashPassword("dev123456") : staffPassword, employeeId: employee.id },
+      update: s.username === "dev" ? { name: s.name, passwordHash: hashPassword("dev123456"), employeeId: employee.id, isActive: true } : {},
     });
     const role = await db.role.findUniqueOrThrow({ where: { slug: s.role } });
     await db.userRole.upsert({

@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
     });
     return ok(users.map((u) => ({
       ...u,
+      isOwner: u.isOwner || u.roles.some((entry) => entry.role.slug === "owner"),
       passwordHash: undefined,
       partnerId: u.partner?.id ?? null,
       partnerType: u.partner?.type ?? null,

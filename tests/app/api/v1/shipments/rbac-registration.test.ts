@@ -11,7 +11,7 @@ import { ensureRbac, PERMISSIONS, ROLE_TEMPLATES } from "@/infrastructure/auth/r
 it("automatically registers cancelled deletion without granting it to default non-owner roles", async () => {
   const permission = PERMISSIONS.find((p) => p.slug === "shipment.delete_cancelled");
   expect(permission).toBeDefined();
-  expect(ROLE_TEMPLATES.every((role) => !role.permissions.includes("shipment.delete_cancelled"))).toBe(true);
+  expect(ROLE_TEMPLATES.filter((role) => role.slug !== "owner").every((role) => !role.permissions.includes("shipment.delete_cancelled"))).toBe(true);
   await ensureRbac();
   expect(mocks.upsert).toHaveBeenCalledWith({
     where: { slug: "shipment.delete_cancelled" }, create: permission,

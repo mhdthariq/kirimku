@@ -5,6 +5,7 @@ import {
   ArrowRight,
   Boxes,
   Calendar,
+  CheckCircle2,
   Coins,
   Download,
   PackageSearch,
@@ -46,6 +47,7 @@ export function TransportsPage({ historyMode = false }: { historyMode?: boolean 
     view: hasPermission(user, "transport.view"),
     create: hasPermission(user, "transport.create"),
     depart: hasPermission(user, "transport.depart"),
+    complete: hasPermission(user, "transport.arrive"),
     // Revise.md §14 — finalize partner transport settlements
     settle: hasPermission(user, "transport.settle"),
   };
@@ -62,6 +64,7 @@ export function TransportsPage({ historyMode = false }: { historyMode?: boolean 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Transport | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Transport | null>(null);
+  const [confirmComplete, setConfirmComplete] = useState<Transport | null>(null);
 
   // Owner per-gudang tabs: filter the fetched rows to the selected gudang.
   const isOwner = !!user?.isOwner;
@@ -96,6 +99,14 @@ export function TransportsPage({ historyMode = false }: { historyMode?: boolean 
 
   async function onDepart(t: Transport) {
     const ok = await runAction(() => apiPost(`/transports/${t.id}/depart`), { success: `${t.transportCode} berangkat.` });
+    if (ok) reload();
+  }
+
+  async function onComplete() {
+    if (!confirmComplete) return;
+    const target = confirmComplete;
+    setConfirmComplete(null);
+    const ok = await runAction(() => apiPost(`/transports/${target.id}/arrive`), { success: `${target.transportCode} diselesaikan.` });
     if (ok) reload();
   }
 
@@ -282,6 +293,11 @@ export function TransportsPage({ historyMode = false }: { historyMode?: boolean 
                   <Truck className="h-3.5 w-3.5" /> Depart
                 </Button>
               )}
+              {(t.status === "PLANNED" || t.status === "DEPARTED") && can.complete && (
+                <Button size="sm" variant="secondary" className="h-7" onClick={() => setConfirmComplete(t)}>
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Selesaikan Transport
+                </Button>
+              )}
               {/* Revise.md §14/§15 - settle ARRIVED partner transports (credits
                   the Vehicle Owner wallet atomically) */}
               {t.status === "ARRIVED" && t.vehicleOwnerId != null && !t.settlement && can.settle && (
@@ -372,6 +388,23 @@ export function TransportsPage({ historyMode = false }: { historyMode?: boolean 
             <AlertDialogCancel>Batal</AlertDialogCancel>
             <AlertDialogAction variant="destructive" onClick={onDelete}>
               Ya, hapus
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!confirmComplete} onOpenChange={(open) => !open && setConfirmComplete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Selesaikan transport {confirmComplete?.transportCode}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tindakan ini akan menandai transport sebagai selesai/ARRIVED. Ini melewati aturan keberangkatan dan tetap dapat dilakukan walaupun transport belum dimulai. Lanjutkan hanya jika memang diperlukan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={onComplete}>
+              Ya, Selesaikan Transport
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

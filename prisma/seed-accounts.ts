@@ -30,7 +30,8 @@
  * — all three seeders converge on the same account set.
  *
  * Demo accounts created (passwords are shown in docs/06-seeding-and-demo-accounts.md):
- *   owner  / ChangeMeOwner#2026   (akses penuh — satu-satunya yang melihat data SEMUA gudang)
+ *   owner  / ChangeMeOwner#2026   (akses penuh — melihat data SEMUA gudang)
+ *   dev    / dev123456            (Developer — Owner role, akses penuh)
  *   siti   / Demo#Pass2026        (admin kantor, Gudang Medan)
  *   budi   / Demo#Pass2026        (marketing, Gudang Medan)
  *   agus   / Demo#Pass2026        (admin gudang, Gudang Medan)
@@ -73,7 +74,7 @@ async function main() {
     ]);
 
   console.log("✔ Seed akun selesai. Ringkasan:");
-  console.log(`   Users: ${users} (owner + 21 staff/partner)`);
+  console.log(`   Users: ${users} (owner + developer + staff/partner)`);
   console.log(`   Employees: ${employees}`);
   console.log(`   Gudang: ${warehouses} (Medan · Banda Aceh · Lhokseumawe)`);
   console.log(`   Partners: ${partners} (budi, adit, hendra, sari, doni, maya, yusuf)`);
@@ -81,7 +82,8 @@ async function main() {
   console.log(`   RBAC: ${roles} roles · ${rolePermissions} role-permission links`);
   console.log("");
   console.log("Akun demo (password sama untuk semua kecuali owner):");
-  console.log("  owner  / ChangeMeOwner#2026   (akses penuh — satu-satunya yang melihat data SEMUA gudang)");
+  console.log("  owner  / ChangeMeOwner#2026   (akses penuh — melihat data SEMUA gudang)");
+  console.log("  dev    / dev123456            (Developer — Owner role, akses penuh)");
   console.log("  siti   / Demo#Pass2026        (admin kantor, Gudang Medan)");
   console.log("  budi   / Demo#Pass2026        (marketing, Gudang Medan)");
   console.log("  agus   / Demo#Pass2026        (admin gudang, Gudang Medan)");

@@ -49,6 +49,7 @@ Creates **only** the single Owner login + the foundational RBAC catalog:
 
 - **RBAC catalog** — 8 system roles + 122 role-permission links. Needed so the owner can later assign roles to staff they create via the UI. Also self-heals on every API boot.
 - **1 Employee + 1 User** — the owner account. `username: owner`, `password: ChangeMeOwner#2026`, `isOwner: true`.
+- The seeded `owner` system role grants the complete permission catalog and can be assigned by an Owner to another user.
 - The owner's employee row has `warehouseId = null` — the owner sees ALL gudang regardless of assignment (the `isOwner` flag bypasses per-gudang data isolation).
 
 Skipped: gudang, staff, partners, wallets, vehicles, routes, tariffs, customers, shipments, pickups, deliveries, transports, invoices, payments, audit logs. Build everything yourself via the UI.
@@ -73,6 +74,7 @@ In addition to everything the accounts-only seed creates, the full seed also ins
 | Username | Password | Role | Position |
 |---|---|---|---|
 | `owner` | `ChangeMeOwner#2026` | Owner (full access) | Owner |
+| `dev` | `dev123456` | Owner (full access) | Developer |
 | `siti` | `Demo#Pass2026` | Admin Kantor | Admin Kantor (Gudang Medan) |
 | `budi` | `Demo#Pass2026` | Marketing | Marketing (Gudang Medan) |
 | `agus` | `Demo#Pass2026` | Admin Gudang | Admin Gudang (Gudang Medan) |

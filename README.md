@@ -155,6 +155,7 @@ The seed data includes the following accounts:
 | Username | Password | Role | Scope |
 |---|---|---|---|
 | `owner` | `ChangeMeOwner#2026` | Owner | All warehouses |
+| `dev` | `dev123456` | Owner | All warehouses |
 | `siti` | `Demo#Pass2026` | Admin Kantor | Gudang Jakarta |
 | `budi` | `Demo#Pass2026` | Marketing | Gudang Jakarta |
 | `agus` | `Demo#Pass2026` | Admin Gudang | Gudang Jakarta |
@@ -290,6 +291,8 @@ The Owner can manage permissions for system roles from:
 ```text
 Access Control → Roles
 ```
+
+The Owner role can also be assigned to another user. Users with the Owner role inherit full permissions and access to all warehouses.
 
 Employees are also assigned to warehouses through:
 

@@ -91,7 +91,8 @@ export async function getAuthUser(req: NextRequest): Promise<AuthUser | null> {
     slug: ur.role.slug,
     name: ur.role.name,
   }));
-  const permissions = user.isOwner
+  const isOwner = user.isOwner || roles.some((role) => role.slug === "owner");
+  const permissions = isOwner
     ? ["*"]
     : Array.from(
         new Set(
@@ -105,7 +106,7 @@ export async function getAuthUser(req: NextRequest): Promise<AuthUser | null> {
     id: user.id,
     username: user.username,
     name: user.name,
-    isOwner: user.isOwner,
+    isOwner,
     isActive: user.isActive,
     employeeId: user.employeeId,
     warehouseId: user.employee?.warehouseId ?? null,
