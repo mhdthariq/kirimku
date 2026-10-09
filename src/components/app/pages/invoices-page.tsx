@@ -323,7 +323,7 @@ export function InvoicesPage() {
                 header: "Aksi",
                 render: (inv) => (
                   <div className="flex flex-wrap gap-1.5">
-                    <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => loadDetail(inv)} aria-label={`Lihat riwayat ${inv.invoiceNumber}`} title="Lihat riwayat pembayaran">
+                    <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => (window.location.hash = `#/invoices/${inv.id}`)} aria-label={`Lihat invoice ${inv.invoiceNumber}`} title="Lihat invoice">
                       <Eye className="h-3.5 w-3.5" />
                     </Button>
                     <Button variant="outline" size="sm" className="h-7" onClick={() => (window.location.hash = `#/invoices/${inv.id}`)}>
