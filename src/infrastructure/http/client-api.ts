@@ -860,6 +860,8 @@ export interface UserAccount {
   partnerWarehouseId?: number | null;
   partnerWarehouseName?: string | null;
   roles: { role: { id: number; name: string; slug: string } }[];
+  permissionIds?: number[];
+  directPermissions?: Permission[];
 }
 
 export interface Role {

@@ -536,10 +536,11 @@ function UsersTab({ can }: { can: { userCreate: boolean; userUpdate: boolean } }
   const { data, loading, reload } = useApiData<UserAccount[]>(() => apiGet<UserAccount[]>("/users"), []);
   const { data: employees } = useApiData<Employee[]>(() => apiGet<Employee[]>("/employees"), []);
   const { data: roles } = useApiData<Role[]>(() => apiGet<Role[]>("/roles"), []);
+  const { data: options } = useApiData<Options>(() => apiGet<Options>("/options"), []);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<UserAccount | null>(null);
-  const [form, setForm] = useState({ username: "", name: "", password: "", employeeId: "", roleIds: [] as string[] });
+  const [form, setForm] = useState({ username: "", name: "", password: "", employeeId: "", roleIds: [] as string[], permissionIds: [] as string[] });
   const [busy, setBusy] = useState(false);
   const [confirmDisable, setConfirmDisable] = useState<UserAccount | null>(null);
 
@@ -603,6 +604,7 @@ function UsersTab({ can }: { can: { userCreate: boolean; userUpdate: boolean } }
       ...(editing ? {} : { password: form.password }),
       employeeId: form.employeeId ? Number(form.employeeId) : null,
       roleIds: form.roleIds.map(Number),
+      permissionIds: form.permissionIds.map(Number),
     };
     if (editing && form.password) payload.password = form.password;
     const ok = await runAction(
@@ -634,7 +636,7 @@ function UsersTab({ can }: { can: { userCreate: boolean; userUpdate: boolean } }
         searchPlaceholder="Cari nama / username…"
         toolbar={
           can.userCreate && (
-            <Button size="sm" onClick={() => { setEditing(null); setForm({ username: "", name: "", password: "", employeeId: "", roleIds: [] }); setDialogOpen(true); }}>
+            <Button size="sm" onClick={() => { setEditing(null); setForm({ username: "", name: "", password: "", employeeId: "", roleIds: [], permissionIds: [] }); setDialogOpen(true); }}>
               <UserPlus className="h-4 w-4" /> Tambah User
             </Button>
           )
@@ -692,6 +694,7 @@ function UsersTab({ can }: { can: { userCreate: boolean; userUpdate: boolean } }
                               password: "",
                               employeeId: u.employeeId ? String(u.employeeId) : "",
                               roleIds: u.roles.map((r) => String(r.role.id)),
+                              permissionIds: (u.permissionIds ?? []).map(String),
                             });
                             setDialogOpen(true);
                           }}
@@ -778,6 +781,14 @@ function UsersTab({ can }: { can: { userCreate: boolean; userUpdate: boolean } }
                 ))}
               </div>
             </div>
+            <UserPermissionPicker
+              roles={roles ?? []}
+              permissions={(options?.permissions ?? []).map((permission) => ({ ...permission, description: permission.description ?? "" }))}
+              roleIds={form.roleIds}
+              permissionIds={form.permissionIds}
+              busy={busy}
+              onChange={(permissionIds) => setForm((f) => ({ ...f, permissionIds }))}
+            />
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} disabled={busy}>Batal</Button>
               <SubmitButton busy={busy}>{editing ? "Simpan Perubahan" : "Buat User"}</SubmitButton>
@@ -801,6 +812,68 @@ function UsersTab({ can }: { can: { userCreate: boolean; userUpdate: boolean } }
 
       <ActivityLogPanel entityTypes={["user"]} title="Log Aktivitas User" />
     </>
+  );
+}
+
+function UserPermissionPicker({
+  roles,
+  permissions,
+  roleIds,
+  permissionIds,
+  busy,
+  onChange,
+}: {
+  roles: Role[];
+  permissions: Permission[];
+  roleIds: string[];
+  permissionIds: string[];
+  busy: boolean;
+  onChange: (permissionIds: string[]) => void;
+}) {
+  const inherited = new Set(
+    roles
+      .filter((role) => roleIds.includes(String(role.id)))
+      .flatMap((role) => role.permissions.map((entry) => String(entry.permission.id))),
+  );
+  const grouped = new Map<string, Permission[]>();
+  for (const permission of permissions) {
+    if (!grouped.has(permission.module)) grouped.set(permission.module, []);
+    grouped.get(permission.module)!.push(permission);
+  }
+
+  return (
+    <div className="space-y-2">
+      <div>
+        <p className="text-sm font-medium text-foreground">Permission tambahan per user</p>
+        <p className="text-xs text-muted-foreground">Permission dari role ditandai inherited dan tetap aktif. Centang permission lain untuk menambah akses khusus user ini.</p>
+      </div>
+      <div className="max-h-56 space-y-2.5 overflow-y-auto rounded-lg border p-3">
+        {Array.from(grouped.entries()).map(([moduleName, modulePermissions]) => (
+          <div key={moduleName}>
+            <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{moduleName}</p>
+            <div className="grid gap-1 sm:grid-cols-2">
+              {modulePermissions.map((permission) => {
+                const id = String(permission.id);
+                const isInherited = inherited.has(id);
+                return (
+                  <label key={permission.id} className="flex items-center gap-2 rounded-md px-2 py-1 text-xs hover:bg-accent">
+                    <input
+                      type="checkbox"
+                      checked={isInherited || permissionIds.includes(id)}
+                      onChange={(event) => onChange(event.target.checked ? [...permissionIds, id] : permissionIds.filter((value) => value !== id))}
+                      className="h-3.5 w-3.5 accent-primary"
+                      disabled={busy || isInherited}
+                    />
+                    <span className="font-mono text-[10px]">{permission.slug}</span>
+                    {isInherited && <Badge variant="outline" className="ml-auto text-[9px]">inherited</Badge>}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

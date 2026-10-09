@@ -73,6 +73,7 @@ export async function getAuthUser(req: NextRequest): Promise<AuthUser | null> {
       user: {
         include: {
           roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } },
+          permissions: { include: { permission: true } },
           employee: { include: { warehouse: true } },
           partner: true,
         },
@@ -94,9 +95,10 @@ export async function getAuthUser(req: NextRequest): Promise<AuthUser | null> {
     ? ["*"]
     : Array.from(
         new Set(
-          user.roles.flatMap((ur) =>
-            ur.role.permissions.map((rp) => rp.permission.slug),
-          ),
+          [
+            ...user.roles.flatMap((ur) => ur.role.permissions.map((rp) => rp.permission.slug)),
+            ...user.permissions.map((up) => up.permission.slug),
+          ],
         ),
       );
   return {

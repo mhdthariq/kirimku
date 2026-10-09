@@ -101,6 +101,22 @@ export async function PUT(req: NextRequest, { params }: Params) {
       }
     }
 
+    if (Array.isArray(body.permissionIds)) {
+      const permissionIds = Array.from(new Set<number>(
+        body.permissionIds
+          .map((permissionId: unknown) => Number(permissionId))
+          .filter((permissionId: number) => Number.isSafeInteger(permissionId) && permissionId > 0),
+      ));
+      if (permissionIds.length > 0) {
+        const validPermissions = await db.permission.count({ where: { id: { in: permissionIds } } });
+        if (validPermissions !== permissionIds.length) return fail(422, "Ada permission yang tidak ditemukan.", { permissionIds: ["Permission tidak valid."] });
+      }
+      await db.userPermission.deleteMany({ where: { userId: existing.id } });
+      if (permissionIds.length > 0) {
+        await db.userPermission.createMany({ data: permissionIds.map((permissionId) => ({ userId: existing.id, permissionId })) });
+      }
+    }
+
     await audit({ action: "updated", entityType: "user", entityId: updated.id, entityLabel: updated.username, actor: user, after: { name: updated.name, roles: body.roleIds, warehouseId: body.warehouseId } });
 
     // Dedicated password-change audit entry — a clear, human-readable
@@ -123,7 +139,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     }
     const full = await db.user.findUnique({
       where: { id: updated.id },
-      include: { employee: true, roles: { include: { role: true } }, partner: { include: { warehouse: { select: { id: true, name: true } } } } },
+      include: { employee: true, roles: { include: { role: true } }, permissions: { include: { permission: true } }, partner: { include: { warehouse: { select: { id: true, name: true } } } } },
     });
     return ok({
       ...full,
@@ -132,6 +148,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
       partnerType: full?.partner?.type ?? null,
       partnerWarehouseId: full?.partner?.warehouseId ?? null,
       partnerWarehouseName: full?.partner?.warehouse?.name ?? null,
+      permissionIds: full?.permissions.map((up) => up.permissionId) ?? [],
+      directPermissions: full?.permissions.map((up) => up.permission) ?? [],
     });
   });
 }

@@ -20,6 +20,7 @@ export async function GET(req: NextRequest) {
       include: {
         employee: true,
         roles: { include: { role: true } },
+        permissions: { include: { permission: true } },
         partner: { include: { warehouse: { select: { id: true, name: true } } } },
       },
     });
@@ -31,6 +32,8 @@ export async function GET(req: NextRequest) {
       // Revise round 10 — include marketing partner's gudang alignment.
       partnerWarehouseId: u.partner?.warehouseId ?? null,
       partnerWarehouseName: u.partner?.warehouse?.name ?? null,
+      permissionIds: u.permissions.map((up) => up.permissionId),
+      directPermissions: u.permissions.map((up) => up.permission),
     })));
   });
 }
@@ -57,6 +60,11 @@ export async function POST(req: NextRequest) {
     }
 
     const roleIds = Array.isArray(body.roleIds) ? body.roleIds.map(Number).filter(Boolean) : [];
+    const permissionIds = Array.isArray(body.permissionIds) ? body.permissionIds.map(Number).filter(Boolean) : [];
+    if (permissionIds.length > 0) {
+      const validPermissions = await db.permission.count({ where: { id: { in: permissionIds } } });
+      if (validPermissions !== new Set(permissionIds).size) return fail(422, "Ada permission yang tidak ditemukan.", { permissionIds: ["Permission tidak valid."] });
+    }
     const selectedRoles = roleIds.length > 0 ? await db.role.findMany({ where: { id: { in: roleIds } }, select: { slug: true } }) : [];
     if (employeeId && selectedRoles.some((role) => role.slug === "marketing" || role.slug === "vehicle-owner")) {
       return fail(422, "Partner Marketing / Vehicle Owner tidak boleh terhubung ke employee.", { employeeId: ["Partner tidak boleh terhubung ke employee."] });
@@ -73,6 +81,9 @@ export async function POST(req: NextRequest) {
         await db.userRole.create({ data: { userId: created.id, roleId } }).catch(() => undefined);
         assignedSlugs.push(role.slug);
       }
+    }
+    if (permissionIds.length > 0) {
+      await db.userPermission.createMany({ data: permissionIds.map((permissionId) => ({ userId: created.id, permissionId })) });
     }
 
     // Revise.md — assigning a partner role provisions the partner profile +

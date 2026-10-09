@@ -49,6 +49,7 @@ model User {
     trackingEvents            TrackingEvent[]     @relation("TrackingActor")
     employee                  Employee?           @relation(fields: [employeeId], references: [id])
     roles                     UserRole[]
+    permissions               UserPermission[]
     walletTransactionsCreated WalletTransaction[] @relation("WalletTransactionCreator")
     processedWithdrawals      WithdrawalRequest[] @relation("WithdrawalProcessor")
     reviewedWithdrawals       WithdrawalRequest[] @relation("WithdrawalReviewer")
@@ -71,6 +72,7 @@ model Permission {
     module      String
     description String
     roles       RolePermission[]
+    users       UserPermission[]
 }
 
 model UserRole {
@@ -89,6 +91,15 @@ model RolePermission {
     role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
     @@id([roleId, permissionId])
+}
+
+model UserPermission {
+    userId       Int
+    permissionId Int
+    permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+    user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@id([userId, permissionId])
 }
 
 model SessionToken {

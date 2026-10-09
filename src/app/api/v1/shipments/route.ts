@@ -176,11 +176,16 @@ export async function POST(req: NextRequest) {
     // directly to the destination warehouse.
     const fulfillmentModeRaw = typeof body.fulfillmentMode === "string" ? body.fulfillmentMode.toUpperCase() : "STANDARD";
     const fulfillmentMode = fulfillmentModeRaw === "DIRECT" ? "DIRECT" : "STANDARD";
+    if (fulfillmentMode === "DIRECT" && !hasPermission(user, "shipment.create_direct")) {
+      return fail(403, "Missing permission: shipment.create_direct");
+    }
 
     // Revise.md — attribute the shipment to the Marketing partner that
     // created it (drives B2B commission + discount validation). Non-partner
     // users (owner/admin) create unattributed shipments.
     const createdByPartnerId = user.partnerType === "MARKETING" && user.partnerId ? user.partnerId : null;
+    const creatorScope = fulfillmentMode === "DIRECT" && originWarehouseId == null ? await scopeForUser(user) : null;
+    const directOriginWarehouseId = originWarehouseId ?? creatorScope?.warehouseId ?? null;
   const discountFundedBy = createdByPartnerId ? "MARKETING" : "COMPANY";
 
     // Optional inline details — quantity N expands into N package rows with unique codes
@@ -206,7 +211,7 @@ export async function POST(req: NextRequest) {
           fulfillmentMode,
           origin,
           destination,
-          originWarehouseId: originWarehouseId ?? null,
+          originWarehouseId: directOriginWarehouseId,
           destinationWarehouseId: destinationWarehouseId ?? null,
           insuranceAmount,
           penerimaName: str(body.penerimaName),
