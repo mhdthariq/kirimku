@@ -14,6 +14,7 @@ import { Field, FormSelect, SubmitButton, Textarea, formatDate, formatRupiah } f
 import { QrScanDialog, type ScanTaskInfo } from "@/components/app/qr-scan-dialog";
 import { GudangScopeBadge, GudangTabBanner, GudangTabsTriggers, gudangTabValue, parseGudangTabValue } from "@/components/app/gudang-tabs";
 import { Button } from "@/components/ui/button";
+import { openDataUrlInNewTab } from "@/presentation/open-data-url";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -458,7 +459,7 @@ export function DeliveriesPage() {
               {detailTarget.photoUrl && (
                 <div className="mt-2">
                   {can.viewProofPhoto ? (
-                    <a href={detailTarget.photoUrl} target="_blank" rel="noreferrer" title="Lihat foto bukti serah terima">
+                    <a href={detailTarget.photoUrl} target="_blank" rel="noreferrer" onClick={(event) => { event.preventDefault(); openDataUrlInNewTab(detailTarget.photoUrl); }} title="Lihat foto bukti serah terima">
                       <img
                         src={detailTarget.photoUrl}
                         alt="Bukti serah terima"

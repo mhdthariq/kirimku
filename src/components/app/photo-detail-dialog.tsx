@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { hasPermission } from "@/infrastructure/http/client-api";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { openDataUrlInNewTab } from "@/presentation/open-data-url";
 
 /**
  * Revise round 9 — Photo Detail Dialog.
@@ -74,6 +75,7 @@ export function PhotoDetailDialog({ open, onOpenChange, title, description, phot
                   href={photo.url}
                   target="_blank"
                   rel="noreferrer"
+                  onClick={(event) => { event.preventDefault(); openDataUrlInNewTab(photo.url); }}
                   title="Klik untuk membuka foto asli"
                   className="block overflow-hidden rounded-lg border bg-muted"
                 >

@@ -29,6 +29,7 @@ import { PageHeader, DataTable } from "@/components/app/data-table";
 import { StatusBadge } from "@/components/app/status-badge";
 import { Field, FormSelect, NumberInput, SubmitButton, formatRupiah, formatDate } from "@/components/app/form-parts";
 import { Button } from "@/components/ui/button";
+import { openDataUrlInNewTab } from "@/presentation/open-data-url";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -710,7 +711,7 @@ function RepairDetailDialog({ repair, onOpenChange }: { repair: VehicleRepairRow
               <div className="space-y-2 rounded-lg border border-primary/25 bg-primary/5 p-3">
                 <p className="flex items-center gap-1.5 text-xs font-semibold text-primary"><FileImage className="h-3.5 w-3.5" /> Bukti Repair</p>
                 {repair.proofUrl.startsWith("data:image/") && <img src={repair.proofUrl} alt={`Bukti ${repair.repairCode}`} className="max-h-64 w-full rounded-md border bg-white object-contain" />}
-                <a href={repair.proofUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline">
+                <a href={repair.proofUrl} target="_blank" rel="noreferrer" onClick={(event) => { event.preventDefault(); openDataUrlInNewTab(repair.proofUrl); }} className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline">
                   <ExternalLink className="h-3.5 w-3.5" /> Buka bukti dalam tab baru
                 </a>
               </div>

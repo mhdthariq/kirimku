@@ -19,6 +19,7 @@ import { StatusBadge } from "@/components/app/status-badge";
 import { Field, Input, NumberInput, SubmitButton, formatRupiah, formatDate } from "@/components/app/form-parts";
 import { ItemAuditDialog } from "@/components/app/item-audit-dialog";
 import { Button } from "@/components/ui/button";
+import { openDataUrlInNewTab } from "@/presentation/open-data-url";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -295,7 +296,7 @@ function TopUpDetailDialog({ topUp, onOpenChange }: { topUp: TopUpRequest | null
                 <a href={topUp.proofUrl} download={fileName} className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline">
                   <Download className="h-3.5 w-3.5" /> Unduh bukti
                 </a>
-                <a href={topUp.proofUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline">
+                <a href={topUp.proofUrl} target="_blank" rel="noreferrer" onClick={(event) => { event.preventDefault(); openDataUrlInNewTab(topUp.proofUrl); }} className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline">
                   <ExternalLink className="h-3.5 w-3.5" /> Buka bukti dalam tab baru
                 </a>
               </div>

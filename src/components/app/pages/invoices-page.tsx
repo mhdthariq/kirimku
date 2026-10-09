@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { InvoicePrint } from "@/components/app/invoice-print";
+import { openDataUrlInNewTab } from "@/presentation/open-data-url";
 
 interface DraftLine {
   description: string;
@@ -656,7 +657,7 @@ export function InvoicesPage() {
                           </p>
                           {s.proofUrl && (
                             s.proofUrl.startsWith("data:image/") ? (
-                              <a href={s.proofUrl} target="_blank" rel="noreferrer" className="mt-2 block w-fit" aria-label={`Lihat bukti pembayaran ${formatDate(s.settledAt, true)}`}>
+                              <a href={s.proofUrl} target="_blank" rel="noreferrer" onClick={(event) => { event.preventDefault(); if (s.proofUrl) openDataUrlInNewTab(s.proofUrl); }} className="mt-2 block w-fit" aria-label={`Lihat bukti pembayaran ${formatDate(s.settledAt, true)}`}>
                                 <img src={s.proofUrl} alt="Bukti pembayaran" className="h-16 w-24 rounded border object-cover shadow-sm hover:opacity-80" />
                               </a>
                             ) : (
@@ -664,6 +665,7 @@ export function InvoicesPage() {
                                 href={s.proofUrl}
                                 target="_blank"
                                 rel="noreferrer"
+                                onClick={(event) => { event.preventDefault(); if (s.proofUrl) openDataUrlInNewTab(s.proofUrl); }}
                                 className="mt-1 inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary hover:bg-primary/20"
                               >
                                 <Paperclip className="h-3 w-3" /> Buka bukti PDF

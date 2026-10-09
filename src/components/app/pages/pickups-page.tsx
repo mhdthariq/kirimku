@@ -14,6 +14,7 @@ import { Field, FormSelect, SubmitButton, Textarea, formatDate } from "@/compone
 import { QrScanDialog, type ScanTaskInfo } from "@/components/app/qr-scan-dialog";
 import { GudangScopeBadge, GudangTabBanner, GudangTabsTriggers, gudangTabValue, parseGudangTabValue } from "@/components/app/gudang-tabs";
 import { Button } from "@/components/ui/button";
+import { openDataUrlInNewTab } from "@/presentation/open-data-url";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -298,7 +299,7 @@ export function PickupsPage() {
           render: (p) =>
             p.photoUrl ? (
               can.viewProofPhoto ? (
-                <a href={p.photoUrl} target="_blank" rel="noreferrer" title="Lihat foto bukti pickup">
+                <a href={p.photoUrl} target="_blank" rel="noreferrer" onClick={(event) => { event.preventDefault(); openDataUrlInNewTab(p.photoUrl); }} title="Lihat foto bukti pickup">
                   <img
                     src={p.photoUrl}
                     alt={`Bukti ${p.pickupCode}`}
