@@ -324,7 +324,7 @@ export function InvoicesPage() {
                 header: "Aksi",
                 render: (inv) => (
                   <div className="flex flex-wrap gap-1.5">
-                    <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => (window.location.hash = `#/invoices/${inv.id}`)} aria-label={`Lihat invoice ${inv.invoiceNumber}`} title="Lihat invoice">
+                    <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => loadDetail(inv)} aria-label={`Lihat riwayat ${inv.invoiceNumber}`} title="Lihat riwayat pembayaran">
                       <Eye className="h-3.5 w-3.5" />
                     </Button>
                     <Button variant="outline" size="sm" className="h-7" onClick={() => (window.location.hash = `#/invoices/${inv.id}`)}>
@@ -563,7 +563,7 @@ export function InvoicesPage() {
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 {detailWithLines && <StatusBadge status={detailWithLines.status} />}
-                <Button variant="outline" size="sm" onClick={() => setPrintOpen(true)} disabled={!detailWithLines || !("lines" in detailWithLines)}>
+                <Button variant="outline" size="sm" onClick={() => detailWithLines && (window.location.hash = `#/invoices/${detailWithLines.id}`)} disabled={!detailWithLines || !("lines" in detailWithLines)}>
                   <Printer className="h-4 w-4" /> Cetak
                 </Button>
               </div>
