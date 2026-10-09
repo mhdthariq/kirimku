@@ -43,7 +43,7 @@ export async function nextDetailCode(masterId: number, masterCode: string): Prom
 export async function nextDetailCodes(masterId: number, masterCode: string, count: number): Promise<string[]> {
   void masterId;
   void masterCode;
-  const n = Math.max(1, Math.min(count, 500));
+  const n = Math.max(1, count);
   const now = new Date();
   const date = [now.getFullYear(), now.getMonth() + 1, now.getDate()]
     .map((part) => String(part).padStart(2, "0"))
