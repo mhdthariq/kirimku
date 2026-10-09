@@ -845,7 +845,6 @@ function UserPermissionPicker({
     <div className="space-y-2">
       <div>
         <p className="text-sm font-medium text-foreground">Permission tambahan per user</p>
-        <p className="text-xs text-muted-foreground">Permission dari role ditandai inherited dan tetap aktif. Centang permission lain untuk menambah akses khusus user ini.</p>
       </div>
       <div className="max-h-56 space-y-2.5 overflow-y-auto rounded-lg border p-3">
         {Array.from(grouped.entries()).map(([moduleName, modulePermissions]) => (
@@ -865,7 +864,6 @@ function UserPermissionPicker({
                       disabled={busy || isInherited}
                     />
                     <span className="font-mono text-[10px]">{permission.slug}</span>
-                    {isInherited && <Badge variant="outline" className="ml-auto text-[9px]">inherited</Badge>}
                   </label>
                 );
               })}

@@ -14,6 +14,7 @@ export const PERMISSIONS: { slug: string; module: string; description: string }[
   { slug: "shipment.view", module: "Shipments", description: "View master shipments" },
   { slug: "shipment.create", module: "Shipments", description: "Create master shipments" },
   { slug: "shipment.create_direct", module: "Shipments", description: "Create DIRECT shipments (bypass the regular warehouse flow)" },
+  { slug: "shipment.direct.manage", module: "Shipments", description: "View and manage DIRECT shipments across warehouse movement" },
   { slug: "shipment.update", module: "Shipments", description: "Update master shipments" },
   { slug: "shipment.cancel", module: "Shipments", description: "Cancel master shipments" },
   { slug: "shipment.delete", module: "Shipments", description: "Delete created master shipments" },
@@ -214,8 +215,7 @@ export const ROLE_TEMPLATES: { slug: string; name: string; description: string; 
       "transport.delivery.view", "transport.delivery.approve",
       "return-task.view", "return-task.create", "return-task.approve",
       "shipment.view", "shipment.view_tracking", "shipment.confirm_arrival", "shipment.notify_marketing",
-      "shipment.create", "shipment.update", "shipment_detail.view", "shipment_detail.create", "shipment_detail.update", "shipment_detail.delete",
-      "shipment.create_direct",
+      "shipment.create", "shipment.create_direct", "shipment.direct.manage", "shipment.update", "shipment.cancel", "shipment_detail.view", "shipment_detail.create", "shipment_detail.update", "shipment_detail.delete",
       // Admin Gudang may print resi (Owner always may via the owner bypass)
       "shipment.print_resi",
       // Revise round 8 — Admin Gudang may view proof photos (checkpoint,

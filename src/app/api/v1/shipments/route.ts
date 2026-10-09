@@ -59,7 +59,11 @@ export async function GET(req: NextRequest) {
     // per-gudang tabs can filter client-side.
     const scope = await scopeForUser(user);
     const cityIdx = await cityIndex();
-    const visible = shipments.filter((s) => inScope(shipmentGudangIds(s, cityIdx), scope));
+    const visible = shipments.filter(
+      (s) =>
+        (s.fulfillmentMode === "DIRECT" && hasPermission(user, "shipment.direct.manage")) ||
+        inScope(shipmentGudangIds(s, cityIdx), scope),
+    );
 
     // Warehouse names so the UI can show "this shipment is from Gudang X"
     // (origin branch) without a second round-trip to /options.

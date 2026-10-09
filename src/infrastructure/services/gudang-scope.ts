@@ -62,6 +62,7 @@ export async function assertShipmentScope(
   shipment: ShipmentLike & { createdByPartnerId?: number | null },
 ): Promise<void> {
   if (user.isOwner || user.permissions.includes("*")) return;
+  if (shipment.fulfillmentMode === "DIRECT" && user.permissions.includes("shipment.direct.manage")) return;
   if (user.partnerType === "MARKETING" && user.partnerId != null) {
     if (shipment.createdByPartnerId !== user.partnerId) {
       throw new HttpError(403, "Shipment ini bukan milik partner Anda.");
@@ -92,6 +93,7 @@ export async function assertTransportScope(
 
 export interface ShipmentLike {
   status: string;
+  fulfillmentMode?: string | null;
   originWarehouseId: number | null;
   destinationWarehouseId: number | null;
   arrivedWarehouseId: number | null;
