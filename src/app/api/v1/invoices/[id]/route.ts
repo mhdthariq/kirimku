@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/infrastructure/persistence/db";
-import { guard, ok, handle, fail, str, dateOrNull } from "@/composition/api-helpers";
+import { guard, ok, handle, fail, str, dateOrNull, num } from "@/composition/api-helpers";
 import { audit, diffFields } from "@/infrastructure/services/audit";
 
 type Params = { params: Promise<{ id: string }> };
@@ -19,8 +19,9 @@ export async function GET(req: NextRequest, { params }: Params) {
       },
     });
     if (!invoice) return fail(404, "Invoice tidak ditemukan.");
-    const total = invoice.lines.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0);
-    const settled = invoice.settlements.reduce((sum, s) => sum + s.amount, 0);
+    const subtotal = invoice.lines.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0);
+    const total = subtotal - invoice.discount + invoice.rounding;
+    const settled = invoice.settlements.reduce((sum, s) => sum + s.amount - s.pph, 0);
     return ok({ ...invoice, totalAmount: total, settledAmount: settled, remainingAmount: total - settled });
   });
 }
@@ -37,6 +38,12 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (body.issueDate !== undefined) data.issueDate = dateOrNull(body.issueDate);
     if (body.dueDate !== undefined) data.dueDate = dateOrNull(body.dueDate);
     if (body.notes !== undefined) data.notes = str(body.notes);
+    if (body.discount !== undefined) {
+      const discount = num(body.discount) ?? 0;
+      if (discount < 0) return fail(422, "Diskon tidak boleh negatif.", { discount: ["Diskon tidak boleh negatif."] });
+      data.discount = discount;
+    }
+    if (body.rounding !== undefined) data.rounding = num(body.rounding) ?? 0;
     const invoice = await db.invoice.update({ where: { id: existing.id }, data });
     await audit({ action: "updated", entityType: "invoice", entityId: invoice.id, entityLabel: invoice.invoiceNumber, actor: user, before: diffFields(existing, invoice as unknown as Record<string, unknown>) });
     return ok(invoice);

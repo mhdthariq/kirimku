@@ -780,6 +780,7 @@ export interface InvoiceSettlement {
   id: number;
   invoiceId: number;
   amount: number;
+  pph: number;
   method: string;
   reference: string | null;
   proofUrl: string | null;
@@ -795,6 +796,8 @@ export interface Invoice {
   customerCode: string;
   customerType: string;
   status: string;
+  discount: number;
+  rounding: number;
   issueDate: string | null;
   dueDate: string | null;
   notes: string | null;

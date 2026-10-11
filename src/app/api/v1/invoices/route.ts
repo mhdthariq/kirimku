@@ -34,8 +34,9 @@ export async function GET(req: NextRequest) {
     });
     return ok(
       invoices.map((inv) => {
-        const total = inv.lines.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0);
-        const settled = inv.settlements.reduce((sum, s) => sum + s.amount, 0);
+        const subtotal = inv.lines.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0);
+        const total = subtotal - inv.discount + inv.rounding;
+        const settled = inv.settlements.reduce((sum, s) => sum + s.amount - s.pph, 0);
         const lastPaidAt = inv.settlements.reduce<Date | null>(
           (latest, settlement) => (!latest || settlement.settledAt > latest ? settlement.settledAt : latest),
           null,
@@ -50,6 +51,8 @@ export async function GET(req: NextRequest) {
           customerCode: inv.customer.code,
           customerType: inv.customer.type,
           status: inv.status,
+          discount: inv.discount,
+          rounding: inv.rounding,
           issueDate: inv.issueDate,
           dueDate: inv.dueDate,
           notes: inv.notes,
@@ -88,6 +91,9 @@ export async function POST(req: NextRequest) {
         customerId: ["Invoice hanya untuk customer B2B."],
       });
     }
+    const discount = num(body.discount) ?? 0;
+    const rounding = num(body.rounding) ?? 0;
+    if (discount < 0) return fail(422, "Diskon tidak boleh negatif.", { discount: ["Diskon tidak boleh negatif."] });
 
     const lines = Array.isArray(body.lines) ? body.lines : [];
     const validLines = lines
@@ -141,6 +147,9 @@ export async function POST(req: NextRequest) {
         lines: ["Shipment dari beberapa Marketing partner tidak bisa digabung."],
       });
     }
+    const subtotal = resolvedLines.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0);
+    const total = subtotal - discount + rounding;
+    if (total < 0) return fail(422, "Total invoice tidak boleh negatif.", { discount: ["Diskon terlalu besar untuk subtotal invoice."] });
 
     const invoiceNumber = await nextCode("invoice", "INV-2026-", "invoiceNumber");
     let invoice;
@@ -150,6 +159,8 @@ export async function POST(req: NextRequest) {
           invoiceNumber,
           customerId,
           status: "DRAFT",
+          discount,
+          rounding,
           issueDate: dateOrNull(body.issueDate),
           dueDate: dateOrNull(body.dueDate),
           notes: str(body.notes),
@@ -174,7 +185,6 @@ export async function POST(req: NextRequest) {
     if (linkedPartnerIds.size === 1) {
       const partnerId = Array.from(linkedPartnerIds)[0]!;
       const partner = await db.partner.findUniqueOrThrow({ where: { id: partnerId } });
-      const total = resolvedLines.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0);
       const commissionAmount = Math.round(total * (partner.partnerPercent / 100) * 100) / 100;
       const commissionCode = await nextCode("marketingCommission", "COM-", "commissionCode");
       const created = await db.marketingCommission.create({

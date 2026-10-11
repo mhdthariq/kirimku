@@ -29,6 +29,8 @@ interface InvoiceForm {
   customerId: string;
   issueDate: string;
   dueDate: string;
+  discount: string;
+  rounding: string;
   notes: string;
   lines: DraftLine[];
 }
@@ -37,6 +39,8 @@ const EMPTY: InvoiceForm = {
   customerId: "",
   issueDate: new Date().toISOString().slice(0, 10),
   dueDate: "",
+  discount: "0",
+  rounding: "0",
   notes: "",
   lines: [{ description: "", quantity: "1", unitPrice: "", shipmentId: "" }],
 };
@@ -64,6 +68,7 @@ export function InvoicesPage() {
   const [settleOpen, setSettleOpen] = useState(false);
   const [settleTarget, setSettleTarget] = useState<Invoice | null>(null);
   const [settleAmount, setSettleAmount] = useState("");
+  const [settlePph, setSettlePph] = useState("");
   const [settleMethod, setSettleMethod] = useState("TRANSFER");
   const [settleRef, setSettleRef] = useState("");
   const [settleDate, setSettleDate] = useState(new Date().toISOString().slice(0, 10));
@@ -106,6 +111,8 @@ export function InvoicesPage() {
       customerId: Number(form.customerId),
       issueDate: form.issueDate || null,
       dueDate: form.dueDate || null,
+      discount: Number(form.discount) || 0,
+      rounding: Number(form.rounding) || 0,
       notes: form.notes || null,
       lines: form.lines
         .filter((l) => l.description.trim() && Number(l.unitPrice) > 0)
@@ -164,6 +171,7 @@ export function InvoicesPage() {
       () =>
         apiPost(`/invoices/${target.id}/settlements`, {
           amount,
+          pph: Number(settlePph) || 0,
           method: settleMethod,
           reference: settleRef || null,
             settledAt: settleDate || null,
@@ -181,6 +189,7 @@ export function InvoicesPage() {
       setSettleOpen(false);
       setSettleTarget(null);
       setSettleAmount("");
+      setSettlePph("");
       setSettleRef("");
       setSettleDate(new Date().toISOString().slice(0, 10));
       setSettleProof(null);
@@ -220,7 +229,8 @@ export function InvoicesPage() {
   const customerShipments = (options?.b2bShipments ?? []).filter(
     (s) => (!form.customerId || s.customerId === Number(form.customerId)) && s.invoiceLines.length === 0 && !form.lines.some((line) => line.shipmentId === String(s.id)),
   );
-  const draftLinesTotal = form.lines.reduce((sum, l) => sum + (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0), 0);
+  const draftSubtotal = form.lines.reduce((sum, l) => sum + (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0), 0);
+  const draftLinesTotal = draftSubtotal - (Number(form.discount) || 0) + (Number(form.rounding) || 0);
 
   return (
     <div className="space-y-4">
@@ -401,6 +411,15 @@ export function InvoicesPage() {
                   <Input id="inv-due" type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} disabled={busy} />
                 </Field>
               </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Diskon (Rp)" htmlFor="inv-discount" hint="Potongan nominal dari subtotal.">
+                <NumberInput id="inv-discount" min="0" value={form.discount} onChange={(e) => setForm({ ...form, discount: e.target.value })} disabled={busy} />
+              </Field>
+              <Field label="Pembulatan (Rp)" htmlFor="inv-rounding" hint="Bisa positif atau negatif, mis. 2 atau -3.">
+                <NumberInput id="inv-rounding" value={form.rounding} onChange={(e) => setForm({ ...form, rounding: e.target.value })} disabled={busy} />
+              </Field>
             </div>
 
             <div className="space-y-2">
@@ -624,6 +643,12 @@ export function InvoicesPage() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
+                <div><span className="text-muted-foreground">Subtotal</span><p className="font-semibold">{formatRupiah(detailWithLines.lines?.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0) ?? 0)}</p></div>
+                <div><span className="text-muted-foreground">Diskon</span><p className="font-semibold">- {formatRupiah(detailWithLines.discount)}</p></div>
+                <div><span className="text-muted-foreground">Pembulatan</span><p className="font-semibold">{detailWithLines.rounding >= 0 ? "+ " : "- "}{formatRupiah(Math.abs(detailWithLines.rounding))}</p></div>
+              </div>
+
               {detailWithLines.notes && <div className="rounded-lg border-l-2 border-primary bg-primary/5 px-3 py-2 text-xs"><p className="font-semibold text-primary">Catatan</p><p className="mt-0.5 text-muted-foreground">{detailWithLines.notes}</p></div>}
 
               {/* Revise.md §8 - commission panel attached to this invoice */}
@@ -655,6 +680,7 @@ export function InvoicesPage() {
                             {formatDate(s.settledAt, true)} · {s.method}
                             {s.reference && <span className="ml-1 text-xs">· {s.reference}</span>}
                           </p>
+                          <p className="text-xs text-muted-foreground">Dibayar {formatRupiah(s.amount)} · PPh {formatRupiah(s.pph)} · masuk invoice {formatRupiah(s.amount - s.pph)}</p>
                           {s.proofUrl && (
                             s.proofUrl.startsWith("data:image/") ? (
                               <a href={s.proofUrl} target="_blank" rel="noreferrer" onClick={(event) => { event.preventDefault(); if (s.proofUrl) openDataUrlInNewTab(s.proofUrl); }} className="mt-2 block w-fit" aria-label={`Lihat bukti pembayaran ${formatDate(s.settledAt, true)}`}>
@@ -698,6 +724,9 @@ export function InvoicesPage() {
           <form onSubmit={onSettle} className="space-y-4">
             <Field label="Jumlah (Rp)" htmlFor="st-amount">
               <NumberInput id="st-amount" value={settleAmount} onChange={(e) => setSettleAmount(e.target.value)} required disabled={busy} />
+            </Field>
+            <Field label="PPh (Rp)" htmlFor="st-pph" hint="Bagian pembayaran yang dicatat sebagai PPh, bukan pelunasan invoice.">
+              <NumberInput id="st-pph" min="0" value={settlePph} onChange={(e) => setSettlePph(e.target.value)} disabled={busy} />
             </Field>
             <Field label="Tanggal pembayaran" htmlFor="st-date">
               <Input id="st-date" type="date" value={settleDate} onChange={(e) => setSettleDate(e.target.value)} required disabled={busy} />

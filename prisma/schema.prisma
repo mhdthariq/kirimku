@@ -711,6 +711,8 @@ model Invoice {
     invoiceNumber String               @unique
     customerId    Int
     status        String               @default("DRAFT")
+    discount      Float                @default(0)
+    rounding      Float                @default(0)
     issueDate     DateTime?
     dueDate       DateTime?
     notes         String?
@@ -740,6 +742,7 @@ model InvoiceSettlement {
     id           Int      @id @default(autoincrement())
     invoiceId    Int
     amount       Float
+    pph          Float      @default(0)
     method       String
     reference    String?
     proofUrl     String?

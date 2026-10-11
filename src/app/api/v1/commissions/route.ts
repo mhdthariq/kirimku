@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
         invoice: {
           include: {
             customer: { select: { name: true, companyName: true } },
-            settlements: { select: { amount: true } },
+            settlements: { select: { amount: true, pph: true } },
             lines: { select: { shipmentId: true, quantity: true, unitPrice: true } },
           },
         },
@@ -31,8 +31,9 @@ export async function GET(req: NextRequest) {
     });
 
     const rows = commissions.map((c) => {
-      const settled = c.invoice.settlements.reduce((sum, s) => sum + s.amount, 0);
-      const total = c.invoice.lines.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0);
+      const settled = c.invoice.settlements.reduce((sum, s) => sum + s.amount - s.pph, 0);
+      const subtotal = c.invoice.lines.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0);
+      const total = subtotal - c.invoice.discount + c.invoice.rounding;
       return {
         id: c.id,
         commissionCode: c.commissionCode,

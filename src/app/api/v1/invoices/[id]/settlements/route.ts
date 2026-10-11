@@ -37,6 +37,8 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     const body = await req.json().catch(() => ({}));
     const amount = requireNum(body.amount, "amount", 1);
+    const pph = body.pph == null || body.pph === "" ? 0 : requireNum(body.pph, "pph", 0);
+    if (pph > amount) return fail(422, "PPh tidak boleh melebihi jumlah pembayaran.", { pph: ["PPh tidak boleh melebihi jumlah pembayaran."] });
     const method = body.method === "TRANSFER" ? "TRANSFER" : "CASH";
     const reference = str(body.reference);
     const settledAt = dateOrNull(body.settledAt) ?? new Date();
@@ -51,16 +53,18 @@ export async function POST(req: NextRequest, { params }: Params) {
       }
     }
 
-    const total = invoice.lines.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0);
-    const settled = invoice.settlements.reduce((sum, s) => sum + s.amount, 0);
+    const subtotal = invoice.lines.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0);
+    const total = subtotal - invoice.discount + invoice.rounding;
+    const settled = invoice.settlements.reduce((sum, s) => sum + s.amount - s.pph, 0);
+    const invoiceAmount = amount - pph;
     const remaining = total - settled;
-    if (amount > remaining + 0.01) {
-      return fail(422, `Jumlah settlement (Rp${amount.toLocaleString("id-ID")}) melebihi sisa tagihan (Rp${remaining.toLocaleString("id-ID")}).`, {
-        amount: ["Jumlah melebihi sisa tagihan."],
+    if (invoiceAmount > remaining + 0.01) {
+      return fail(422, `Pembayaran setelah PPh (Rp${invoiceAmount.toLocaleString("id-ID")}) melebihi sisa tagihan (Rp${remaining.toLocaleString("id-ID")}).`, {
+        amount: ["Pembayaran setelah PPh melebihi sisa tagihan."],
       });
     }
 
-    const newSettled = settled + amount;
+    const newSettled = settled + invoiceAmount;
     const becomesFullyPaid = newSettled >= total - 0.01;
     const newStatus = becomesFullyPaid ? "SETTLED" : "PARTIALLY_SETTLED";
 
@@ -68,7 +72,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     // commission ledger credit — all-or-nothing (§30 B2B Commission).
     const { settlement, commissionReleased } = await db.$transaction(async (tx) => {
       const settlement = await tx.invoiceSettlement.create({
-        data: { invoiceId: invoice.id, amount, method, reference, proofUrl, recordedById: user.id, settledAt },
+        data: { invoiceId: invoice.id, amount, pph, method, reference, proofUrl, recordedById: user.id, settledAt },
       });
       const updatedInvoice = await tx.invoice.update({ where: { id: invoice.id }, data: { status: newStatus } });
       void updatedInvoice;
@@ -122,7 +126,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     await audit({
       action: "settled", entityType: "invoice", entityId: invoice.id,
       entityLabel: `${invoice.invoiceNumber} · Rp${amount.toLocaleString("id-ID")}`, actor: user,
-      after: { status: newStatus, commissionReleased, proofAttached: !!proofUrl },
+      after: { status: newStatus, commissionReleased, proofAttached: !!proofUrl, pph },
     });
     return ok({ settlement, invoice: updated, commissionReleased });
   });
