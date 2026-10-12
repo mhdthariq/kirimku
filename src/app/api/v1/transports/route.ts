@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
     const transports = await db.transport.findMany({
       where: {
         ...(status ? { status } : {}),
-        ...(history ? { status: { in: ["ARRIVED", "CANCELLED"] } } : {}),
+        ...(history ? { status: { in: ["ARRIVED", "COMPLETED", "CANCELLED"] } } : {}),
         ...(forceMine && user.employeeId != null
           ? { OR: [{ driverId: user.employeeId }, { kenekId: user.employeeId }] }
           : forceMine

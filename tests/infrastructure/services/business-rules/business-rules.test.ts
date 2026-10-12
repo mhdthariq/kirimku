@@ -16,6 +16,7 @@ describe("Transport lifecycle locks", () => {
     expect(isTransportEditable("PLANNED")).toBe(true);
     expect(isTransportEditable("DEPARTED")).toBe(false);
     expect(isTransportEditable("ARRIVED")).toBe(false);
+    expect(isTransportEditable("COMPLETED")).toBe(false);
     expect(isTransportEditable("CANCELLED")).toBe(false);
   });
 
@@ -23,6 +24,8 @@ describe("Transport lifecycle locks", () => {
     expect(isTransportFinanciallyLocked("PLANNED")).toBe(false);
     expect(isTransportFinanciallyLocked("DEPARTED")).toBe(false);
     expect(isTransportFinanciallyLocked("ARRIVED")).toBe(true);
+    expect(isTransportFinanciallyLocked("COMPLETED")).toBe(true);
+    expect(isTransportFinanciallyLocked("COMPLETED", "PENDING")).toBe(true);
     expect(isTransportFinanciallyLocked("CANCELLED")).toBe(true);
     // settled (non-PENDING settlement status)
     expect(isTransportFinanciallyLocked("DEPARTED", "FINALIZED")).toBe(true);
@@ -41,6 +44,7 @@ describe("Transport lifecycle locks", () => {
     expect(checkTransportFinanciallyEditable("DEPARTED", "PENDING", "TRP-1")).toBeNull();
     const err = checkTransportFinanciallyEditable("ARRIVED", null, "TRP-1");
     expect(err).toContain("sudah tiba");
+    expect(checkTransportFinanciallyEditable("COMPLETED", null, "TRP-1")).toContain("sudah selesai");
     const errSettled = checkTransportFinanciallyEditable("DEPARTED", "FINALIZED", "TRP-1");
     expect(errSettled).toContain("di-settle");
   });

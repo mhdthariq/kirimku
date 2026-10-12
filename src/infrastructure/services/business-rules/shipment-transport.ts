@@ -13,7 +13,7 @@ import { db } from "@/infrastructure/persistence/db";
  *      (vehicle scheduling overlap — Phase 7). The existing crew-overlap
  *      check (transport-crew.ts) covers driver/kenek but NOT the vehicle.
  *   3. Transport lifecycle locks: only PLANNED transports are editable.
- *      DEPARTED/ARRIVED/SETTLED transports are structurally locked.
+ *      DEPARTED/ARRIVED/COMPLETED/SETTLED transports are structurally locked.
  *
  * All checks are server-side + transactional where required (the caller wraps
  * the assignment in a transaction). Informational capacity status (Phase 1)
@@ -30,7 +30,7 @@ export function isTransportEditable(status: string): boolean {
 
 /** Is the transport status one where financial data is locked? */
 export function isTransportFinanciallyLocked(status: string, settlementStatus?: string | null): boolean {
-  if (status === "ARRIVED" || status === "CANCELLED") return true;
+  if (status === "ARRIVED" || status === "COMPLETED" || status === "CANCELLED") return true;
   if (settlementStatus && settlementStatus !== "PENDING") return true;
   return false;
 }
@@ -144,7 +144,8 @@ export function checkTransportFinanciallyEditable(
   transportCode: string,
 ): string | null {
   if (isTransportFinanciallyLocked(status, settlementStatus ?? undefined)) {
-    const lockReason = status === "ARRIVED" ? "sudah tiba"
+    const lockReason = status === "COMPLETED" ? "sudah selesai"
+      : status === "ARRIVED" ? "sudah tiba"
       : status === "CANCELLED" ? "dibatalkan"
       : settlementStatus && settlementStatus !== "PENDING" ? `sudah di-settle (${settlementStatus})`
       : "terkunci";

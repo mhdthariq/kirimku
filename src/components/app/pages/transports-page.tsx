@@ -47,7 +47,8 @@ export function TransportsPage({ historyMode = false }: { historyMode?: boolean 
     view: hasPermission(user, "transport.view"),
     create: hasPermission(user, "transport.create"),
     depart: hasPermission(user, "transport.depart"),
-    complete: hasPermission(user, "transport.arrive"),
+    arrive: hasPermission(user, "transport.arrive"),
+    complete: hasPermission(user, "transport.complete"),
     // Revise.md §14 — finalize partner transport settlements
     settle: hasPermission(user, "transport.settle"),
   };
@@ -106,7 +107,8 @@ export function TransportsPage({ historyMode = false }: { historyMode?: boolean 
     if (!confirmComplete) return;
     const target = confirmComplete;
     setConfirmComplete(null);
-    const ok = await runAction(() => apiPost(`/transports/${target.id}/arrive`), { success: `${target.transportCode} diselesaikan.` });
+    const completing = target.status === "ARRIVED";
+    const ok = await runAction(() => apiPost(`/transports/${target.id}/${completing ? "complete" : "arrive"}`), { success: `${target.transportCode} ${completing ? "diselesaikan" : "ditandai tiba"}.` });
     if (ok) reload();
   }
 
@@ -164,7 +166,7 @@ export function TransportsPage({ historyMode = false }: { historyMode?: boolean 
       searchPlaceholder="Cari kode / rute / nopol…"
       toolbar={
         <div className="flex max-w-full flex-wrap items-center gap-1.5">
-          {["all", ...(historyMode ? ["ARRIVED", "CANCELLED"] : ["PLANNED", "DEPARTED", "ARRIVED"])].map((s) => (
+          {["all", ...(historyMode ? ["ARRIVED", "COMPLETED", "CANCELLED"] : ["PLANNED", "DEPARTED", "ARRIVED", "COMPLETED"])].map((s) => (
             <Button
               key={s}
               size="sm"
@@ -271,7 +273,7 @@ export function TransportsPage({ historyMode = false }: { historyMode?: boolean 
                 <p className="font-mono text-[11px] font-semibold">{t.settlement.settlementCode}</p>
                 <p className="text-[11px] text-primary">+{formatRupiah(t.settlement.ownerAmount)} ({t.settlement.ownerPercent}%)</p>
               </div>
-            ) : t.vehicleOwnerId != null && t.status === "ARRIVED" ? (
+            ) : t.vehicleOwnerId != null && ["ARRIVED", "COMPLETED"].includes(t.status) ? (
               <span className="text-[11px] font-medium text-chart-4">siap di-settle</span>
             ) : (
               <span className="text-[11px] text-muted-foreground">-</span>
@@ -293,14 +295,19 @@ export function TransportsPage({ historyMode = false }: { historyMode?: boolean 
                   <Truck className="h-3.5 w-3.5" /> Depart
                 </Button>
               )}
-              {(t.status === "PLANNED" || t.status === "DEPARTED") && can.complete && (
+              {(t.status === "PLANNED" || t.status === "DEPARTED") && can.arrive && (
                 <Button size="sm" variant="secondary" className="h-7" onClick={() => setConfirmComplete(t)}>
-                  <CheckCircle2 className="h-3.5 w-3.5" /> Selesaikan Transport
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Tandai Tiba
                 </Button>
               )}
-              {/* Revise.md §14/§15 - settle ARRIVED partner transports (credits
+              {t.status === "ARRIVED" && can.complete && (
+                <Button size="sm" variant="secondary" className="h-7" onClick={() => setConfirmComplete(t)}>
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Konfirmasi Completed
+                </Button>
+              )}
+              {/* Revise.md §14/§15 - settle ARRIVED / COMPLETED partner transports (credits
                   the Vehicle Owner wallet atomically) */}
-              {t.status === "ARRIVED" && t.vehicleOwnerId != null && !t.settlement && can.settle && (
+              {["ARRIVED", "COMPLETED"].includes(t.status) && t.vehicleOwnerId != null && !t.settlement && can.settle && (
                 <Button size="sm" variant="secondary" className="h-7" onClick={() => window.location.assign(new URL("#/settlements", window.location.href).href)}>
                   <Coins className="h-3.5 w-3.5" /> Settle
                 </Button>
@@ -396,15 +403,17 @@ export function TransportsPage({ historyMode = false }: { historyMode?: boolean 
       <AlertDialog open={!!confirmComplete} onOpenChange={(open) => !open && setConfirmComplete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Selesaikan transport {confirmComplete?.transportCode}?</AlertDialogTitle>
+            <AlertDialogTitle>{confirmComplete?.status === "ARRIVED" ? "Konfirmasi Completed" : "Tandai tiba"} transport {confirmComplete?.transportCode}?</AlertDialogTitle>
             <AlertDialogDescription>
-              Tindakan ini akan menandai transport sebagai selesai/ARRIVED. Ini melewati aturan keberangkatan dan tetap dapat dilakukan walaupun transport belum dimulai. Lanjutkan hanya jika memang diperlukan.
+              {confirmComplete?.status === "ARRIVED"
+                ? "Auditor terpisah mengonfirmasi transport ARRIVED menjadi COMPLETED setelah memeriksa perjalanan."
+                : "Tindakan ini menandai transport ARRIVED, bukan COMPLETED. Transport tetap menunggu konfirmasi auditor terpisah. Untuk transport PLANNED, tindakan ini melewati aturan keberangkatan; lanjutkan hanya jika diperlukan."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Batal</AlertDialogCancel>
             <AlertDialogAction variant="destructive" onClick={onComplete}>
-              Ya, Selesaikan Transport
+              {confirmComplete?.status === "ARRIVED" ? "Ya, Konfirmasi Completed" : "Ya, Tandai Tiba"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

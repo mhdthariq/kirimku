@@ -103,6 +103,7 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
   const [checkinOpen, setCheckinOpen] = useState(false);
   const [lifecycleBusy, setLifecycleBusy] = useState(false);
   const [confirmArrive, setConfirmArrive] = useState(false);
+  const [confirmComplete, setConfirmComplete] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [manifestPrintId, setManifestPrintId] = useState<number | null>(null);
@@ -113,6 +114,7 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
 
   const can = {
     checkin: hasPermission(user, "transport.checkin"),
+    complete: hasPermission(user, "transport.complete"),
     // Edit & Remove are available for PLANNED transports only, gated on
     // transport.create (same rule as the list page + the API).
     manage: hasPermission(user, "transport.create"),
@@ -178,14 +180,14 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
     );
   }, [transport, user]);
 
-  async function changeLifecycle(action: "depart" | "arrive") {
+  async function changeLifecycle(action: "depart" | "arrive" | "complete") {
     if (lifecycleBusy) return;
     setLifecycleBusy(true);
     const ok = await runAction(() => apiPost(`/transports/${transportId}/${action}`, {}), {
-      success: action === "depart" ? "Transport berangkat." : "Transport tiba.",
+      success: action === "depart" ? "Transport berangkat." : action === "complete" ? "Audit dikonfirmasi. Transport Completed." : "Transport tiba, menunggu audit.",
     });
     setLifecycleBusy(false);
-    if (ok) { setConfirmArrive(false); void reload(); }
+    if (ok) { setConfirmArrive(false); setConfirmComplete(false); void reload(); }
   }
 
   // checkpoints with check-in state (latest record per checkpoint)
@@ -260,6 +262,11 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={transport.status} />
+            {transport.status === "ARRIVED" && can.complete && (
+              <Button size="sm" disabled={lifecycleBusy} onClick={() => setConfirmComplete(true)}>
+                Audit & Konfirmasi Completed
+              </Button>
+            )}
             {drops?.transportMode === "MULTI_DROP" && <StatusBadge status="MULTI_DROP" label="Multi Drop" />}
             {isActivity && <StatusBadge status="ACTIVITY" label="Activity Tracking (Tanpa Checkpoint)" />}
             {isActivity && isCrew && transport.status === "PLANNED" && hasPermission(user, "transport.depart") && (
@@ -289,6 +296,19 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
           </div>
         }
       />
+
+      {transport.status === "ARRIVED" && (
+        <div role="status" className="rounded-lg border border-amber-200 bg-amber-50/60 px-3.5 py-2.5 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
+          <strong>Transport tiba — menunggu audit.</strong> Status masih ARRIVED, belum COMPLETED. Foto, shipment/paket, dan biaya operasional perlu ditinjau sebelum audit dikonfirmasi.
+        </div>
+      )}
+      {transport.status === "COMPLETED" && (
+        <div role="status" className="rounded-lg border border-emerald-200 bg-emerald-50/60 px-3.5 py-2.5 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
+          <p><strong>Transport COMPLETED — audit dikonfirmasi.</strong></p>
+          <p>Reviewer: {transport.completedByUsername ?? "-"} · Role: {transport.completedByRole ?? "-"} · Waktu: {formatDate(transport.completedAt, true)}</p>
+          <p>Approval paket dan biaya operasional tetap terpisah.</p>
+        </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-3">
         {/* 1. Transport information */}
@@ -628,7 +648,7 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Tandai transport tiba?</AlertDialogTitle>
-            <AlertDialogDescription>Perjalanan akan diselesaikan. Setelah tiba, foto aktivitas baru tidak dapat ditambahkan.</AlertDialogDescription>
+            <AlertDialogDescription>Transport akan ditandai ARRIVED dan menunggu audit, bukan COMPLETED. Setelah tiba, foto aktivitas baru tidak dapat ditambahkan.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={lifecycleBusy}>Batal</AlertDialogCancel>
@@ -636,6 +656,25 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {transport.status === "ARRIVED" && can.complete && (
+        <AlertDialog open={confirmComplete} onOpenChange={setConfirmComplete}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Konfirmasi audit transport?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Pastikan Anda telah meninjau foto bukti perjalanan, shipment/paket, dan biaya operasional. Konfirmasi ini mengubah status ARRIVED menjadi COMPLETED serta mencatat reviewer dan waktu audit. Tidak ada approval paket atau biaya operasional otomatis; approval tersebut tetap dilakukan secara terpisah.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={lifecycleBusy}>Batal</AlertDialogCancel>
+              <Button disabled={lifecycleBusy} onClick={() => void changeLifecycle("complete")}>
+                {lifecycleBusy ? "Menyimpan…" : "Ya, konfirmasi audit"}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
 
       {/* Edit - shared create/edit dialog (PLANNED transports only) */}
       <TransportFormDialog

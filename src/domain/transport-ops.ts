@@ -199,6 +199,6 @@ export function returnEndpoints(t: { origin: string | null; destination: string 
 export function returnTaskStatusForTransport(transportStatus: string): ReturnTaskStatus | null {
   if (transportStatus === "PLANNED") return "PLANNED";
   if (transportStatus === "DEPARTED") return "DEPARTED";
-  if (transportStatus === "ARRIVED") return "ARRIVED";
+  if (transportStatus === "ARRIVED" || transportStatus === "COMPLETED") return "ARRIVED";
   return null;
 }

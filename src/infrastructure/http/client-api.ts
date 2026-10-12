@@ -695,6 +695,10 @@ export interface TransportDetail {
   plannedArrivalAt: string | null;
   departedAt: string | null;
   arrivedAt: string | null;
+  completedAt?: string | null;
+  completedById?: number | null;
+  completedByUsername?: string | null;
+  completedByRole?: string | null;
   createdAt: string;
   updatedAt: string;
   vehicle: {

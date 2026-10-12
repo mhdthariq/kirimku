@@ -95,7 +95,7 @@ export async function GET(req: NextRequest) {
     ]);
 
     const unsettledArrivedTransports = await db.transport.count({
-      where: { status: "ARRIVED", vehicle: { ownerId: { not: null } }, settlement: null },
+      where: { status: { in: ["ARRIVED", "COMPLETED"] }, vehicle: { ownerId: { not: null } }, settlement: null },
     });
 
     const totalWalletBalance = partners.reduce((sum, p) => sum + (p.wallet?.balance ?? 0), 0);

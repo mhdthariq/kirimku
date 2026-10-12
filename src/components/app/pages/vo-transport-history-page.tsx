@@ -34,7 +34,7 @@ export function VOTransportHistoryPage({ initialTab = "history" }: { initialTab?
 
   const settled = rows.filter((r) => r.settlement);
   const unsettled = rows.filter(
-    (r) => !r.settlement && r.transportValue > 0 && ["ARRIVED", "DEPARTED"].includes(r.status),
+    (r) => !r.settlement && r.transportValue > 0 && ["ARRIVED", "COMPLETED", "DEPARTED"].includes(r.status),
   );
   const totalEarnings = settled.reduce((sum, r) => sum + (r.settlement?.ownerAmount ?? 0), 0);
   const totalValue = settled.reduce((sum, r) => sum + (r.settlement?.transportValue ?? 0), 0);
@@ -133,7 +133,7 @@ export function VOTransportHistoryPage({ initialTab = "history" }: { initialTab?
                       <span className="font-semibold text-emerald-600 dark:text-emerald-400">+{formatRupiah(r.settlement.ownerAmount)}</span>
                       <p className="text-[10px] font-medium text-emerald-600/80 dark:text-emerald-400/80">sudah disettle</p>
                     </div>
-                  ) : r.transportValue > 0 && ["ARRIVED", "DEPARTED"].includes(r.status) ? (
+                  ) : r.transportValue > 0 && ["ARRIVED", "COMPLETED", "DEPARTED"].includes(r.status) ? (
                     // not settled yet → YELLOW with the potential amount
                     <div>
                       <span className="font-semibold text-amber-500 dark:text-yellow-400">~{formatRupiah(estimateFor(r))}</span>

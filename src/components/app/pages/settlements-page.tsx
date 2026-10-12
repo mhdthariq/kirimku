@@ -29,7 +29,7 @@ interface SettleableTransport extends Transport {
 
 /**
  * Partner Settlements (Revise.md §33/§34) — company side:
- *  · Transport settlements: finalize ARRIVED partner-vehicle transports —
+ *  · Transport settlements: finalize ARRIVED / COMPLETED partner-vehicle transports —
  *    snapshots the profit-share split and credits the Vehicle Owner wallet
  *    atomically (§14/§15/§30).
  *  · Marketing commissions: PENDING until the B2B invoice is FULLY PAID (§8/§9)
@@ -41,7 +41,10 @@ export function SettlementsPage() {
   const canViewInvoices = hasPermission(user, "invoice.view");
 
   const { data: transports, loading, reload } = useApiData<SettleableTransport[]>(
-    () => apiGet<SettleableTransport[]>("/transports?status=ARRIVED"),
+    () => Promise.all([
+      apiGet<SettleableTransport[]>("/transports?status=ARRIVED"),
+      apiGet<SettleableTransport[]>("/transports?status=COMPLETED"),
+    ]).then((rows) => rows.flat()),
     [],
   );
   const { data: invoices, reload: reloadInvoices } = useApiData<Invoice[]>(() => apiGet<Invoice[]>("/invoices"), []);
@@ -69,12 +72,12 @@ export function SettlementsPage() {
 
         <TabsContent value="transport" className="mt-3 space-y-3">
           <p className="text-xs text-muted-foreground">
-            Transport ARRIVED dengan kendaraan partner bisa difinalisasi - nilai transport & persentase di-snapshot permanen (§37), profit share dikredit ke wallet Vehicle Owner secara atomik.
+            Transport ARRIVED atau COMPLETED dengan kendaraan partner bisa difinalisasi - nilai transport & persentase di-snapshot permanen (§37), profit share dikredit ke wallet Vehicle Owner secara atomik.
           </p>
           <DataTable
             rows={partnerArrived}
             loading={loading}
-            emptyMessage="Tidak ada transport ARRIVED milik partner yang menunggu settlement."
+            emptyMessage="Tidak ada transport ARRIVED / COMPLETED milik partner yang menunggu settlement."
             columns={[
               {
                 key: "code",

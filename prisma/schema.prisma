@@ -464,6 +464,10 @@ model Transport {
     lastLocationAt       DateTime?
     departedAt           DateTime?
     arrivedAt            DateTime?
+    completedAt          DateTime?
+    completedById        Int?
+    completedByUsername  String?
+    completedByRole      String?
     createdAt            DateTime             @default(now())
     updatedAt            DateTime             @updatedAt
     checkpointRecords    CheckpointRecord[]

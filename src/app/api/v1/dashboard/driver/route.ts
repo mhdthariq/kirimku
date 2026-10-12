@@ -173,21 +173,22 @@ export async function GET(req: NextRequest) {
         const upcoming = planned.slice(0, 1);
         const future = planned.slice(1, 6);
 
-        const completedRaw = transports.filter(
+        const historyRaw = transports.filter(
             (t) =>
-                t.status === "ARRIVED" &&
+                ["ARRIVED", "COMPLETED"].includes(t.status) &&
                 t.arrivedAt != null &&
                 t.arrivedAt >= from &&
                 t.arrivedAt <= to,
         );
-        const history = completedRaw.slice(0, 15).map(base);
+        const history = historyRaw.slice(0, 15).map(base);
 
         return ok({
             period: { from: fromStr, to: toStr },
             current,
             upcoming,
             future,
-            completedCount: completedRaw.length,
+            completedCount: historyRaw.filter((t) => t.status === "COMPLETED")
+                .length,
             history,
             totalTransportsAllTime: transports.length,
         });

@@ -147,6 +147,7 @@ describe("return task", () => {
     expect(returnTaskStatusForTransport("PLANNED")).toBe("PLANNED");
     expect(returnTaskStatusForTransport("DEPARTED")).toBe("DEPARTED");
     expect(returnTaskStatusForTransport("ARRIVED")).toBe("ARRIVED");
+    expect(returnTaskStatusForTransport("COMPLETED")).toBe("ARRIVED");
     expect(returnTaskStatusForTransport("CANCELLED")).toBeNull();
   });
 });

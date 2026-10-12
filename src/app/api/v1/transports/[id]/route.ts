@@ -118,6 +118,10 @@ export async function GET(req: NextRequest, { params }: Params) {
       plannedArrivalAt: transport.plannedArrivalAt,
       departedAt: transport.departedAt,
       arrivedAt: transport.arrivedAt,
+      completedAt: transport.completedAt,
+      completedById: transport.completedById,
+      completedByUsername: transport.completedByUsername,
+      completedByRole: transport.completedByRole,
       createdAt: transport.createdAt,
       updatedAt: transport.updatedAt,
       vehicle: {
@@ -191,7 +195,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     });
     if (!existing) return fail(404, "Transport tidak ditemukan.");
     await assertTransportScope(user, existing.route ?? { origin: null, destination: null }, existing.shipments.map((s) => s.master));
-    if (["DEPARTED", "ARRIVED"].includes(existing.status)) {
+    if (["DEPARTED", "ARRIVED", "COMPLETED"].includes(existing.status)) {
       return fail(422, `Transport dengan status ${existing.status} tidak bisa diubah.`);
     }
     const body = await req.json().catch(() => null);

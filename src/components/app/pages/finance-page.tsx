@@ -71,7 +71,7 @@ export function FinancePage() {
     <div className="space-y-4">
       <PageHeader
         title="Finance Dashboard"
-        subtitle={`${t.partnerCount} partner (${t.marketingCount} Marketing · ${t.vehicleOwnerCount} Vehicle Owner) · ${t.unsettledArrivedTransports} transport ARRIVED belum disettle`}
+        subtitle={`${t.partnerCount} partner (${t.marketingCount} Marketing · ${t.vehicleOwnerCount} Vehicle Owner) · ${t.unsettledArrivedTransports} transport ARRIVED / COMPLETED belum disettle`}
         icon={<LayoutDashboard className="h-5 w-5" />}
         actions={
           <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-2">

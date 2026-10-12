@@ -53,6 +53,7 @@ export const PERMISSIONS: { slug: string; module: string; description: string }[
   { slug: "transport.create", module: "Transports", description: "Create/plan transports" },
   { slug: "transport.depart", module: "Transports", description: "Mark transport departed" },
   { slug: "transport.arrive", module: "Transports", description: "Mark transport arrived (admin override - arrival is normally auto-detected at the destination checkpoint)" },
+  { slug: "transport.complete", module: "Transports", description: "Audit and complete an arrived transport" },
   { slug: "transport.checkin", module: "Transports", description: "Checkpoint selfie check-in with GPS validation (driver/kenek)" },
   // Transport operational expenses (BBM / Parkir / Makan / Bongkar) — many per transport
   { slug: "transport.expense.view", module: "Transports", description: "View transport operational expenses" },

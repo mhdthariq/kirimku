@@ -29,8 +29,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     const existing = await db.transportSettlement.findUnique({ where: { transportId: transport.id } });
     if (existing) return fail(422, `Transport ini sudah disettle (${existing.settlementCode}).`);
 
-    if (transport.status !== "ARRIVED") {
-      return fail(422, `Transport berstatus ${transport.status} belum bisa disettle - harus ARRIVED.`);
+    if (!["ARRIVED", "COMPLETED"].includes(transport.status)) {
+      return fail(422, `Transport berstatus ${transport.status} belum bisa disettle - harus ARRIVED atau COMPLETED.`);
     }
     if (!transport.vehicle.owner) {
       return fail(422, "Kendaraan ini milik perusahaan (bukan Vehicle Owner) - tidak ada profit share yang perlu dibayarkan.");
