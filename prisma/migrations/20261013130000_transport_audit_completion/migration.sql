@@ -1,8 +1,8 @@
 ALTER TABLE "Transport"
-  ADD COLUMN "completedAt" TIMESTAMP(3),
-  ADD COLUMN "completedById" INTEGER,
-  ADD COLUMN "completedByUsername" TEXT,
-  ADD COLUMN "completedByRole" TEXT;
+  ADD COLUMN IF NOT EXISTS "completedAt" TIMESTAMP(3),
+  ADD COLUMN IF NOT EXISTS "completedById" INTEGER,
+  ADD COLUMN IF NOT EXISTS "completedByUsername" TEXT,
+  ADD COLUMN IF NOT EXISTS "completedByRole" TEXT;
 
 INSERT INTO "Permission" ("slug", "module", "description")
 VALUES ('transport.complete', 'Transports', 'Audit and complete an arrived transport')
