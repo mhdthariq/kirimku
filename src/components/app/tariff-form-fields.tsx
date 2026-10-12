@@ -5,7 +5,8 @@ import { tariffFieldVisibility, type TariffFormState, type TariffTab } from "@/p
 import type { PricingMethod } from "@/infrastructure/http/client-api";
 
 const METHOD_OPTIONS: { value: PricingMethod; label: string }[] = [
-  { value: "PER_KG", label: "Per kg" },
+  { value: "PER_KG", label: "Per kg (aktual / volumetrik)" },
+  { value: "PER_KG_SIMPLE", label: "Per kg (berat aktual saja)" },
   { value: "PER_KOLI", label: "Per koli" },
   { value: "PER_CUBIC", label: "Per cubic (m³)" },
 ];
@@ -38,6 +39,7 @@ export function TariffFormFields({
   idPrefix?: string;
 }) {
   const v = tariffFieldVisibility(tab, form.pricingMethod);
+  const methodOptions = tab === "b2b" ? METHOD_OPTIONS.filter((option) => option.value !== "PER_KG_SIMPLE") : METHOD_OPTIONS;
   const set = (patch: Partial<TariffFormState>) => setForm({ ...form, ...patch });
 
   return (
@@ -67,7 +69,7 @@ export function TariffFormFields({
 
       {v.showMethodChoice && !hideMethodChoice && (
         <Field label="Metode Harga" htmlFor={`${idPrefix}-method`} hint="Pilih satu: /kg, /koli, atau /cubic." className="sm:col-span-2">
-          <FormSelect value={form.pricingMethod} onValueChange={(value) => set({ pricingMethod: value as PricingMethod })} options={METHOD_OPTIONS} disabled={busy} />
+          <FormSelect value={form.pricingMethod} onValueChange={(value) => set({ pricingMethod: value as PricingMethod })} options={methodOptions} disabled={busy} />
         </Field>
       )}
 
@@ -107,7 +109,7 @@ export function TariffFormFields({
           <NumberInput id={`${idPrefix}-min`} value={form.minChargeableKg} onChange={(e) => set({ minChargeableKg: e.target.value })} disabled={busy} />
         </Field>
       )}
-      {/* Volumetric rules — B2C /kg only */}
+      {/* Volumetric rules — B2C /kg only; promo methods omit them. */}
       {v.showKgRules && (
         <>
           <Field label="Multiplier (kg/m³)" htmlFor={`${idPrefix}-multiplier`} hint="volumetrik = L×W×H/1.000.000 × ini">

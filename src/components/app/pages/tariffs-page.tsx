@@ -19,7 +19,8 @@ import { customerPrimaryName } from "@/presentation/customer-display";
 import { toast } from "sonner";
 
 const PRICING_METHOD_LABEL: Record<string, string> = {
-  PER_KG: "/ kg",
+  PER_KG: "/ kg (aktual / volumetrik)",
+  PER_KG_SIMPLE: "/ kg (aktual)",
   PER_KOLI: "/ koli",
   PER_CUBIC: "/ m³ (cubic)",
 };
@@ -144,7 +145,7 @@ export function TariffsPage() {
     key: "rate",
     header: "Tarif",
     render: (t: Tariff) => {
-      const method = t.customerType === "b2b" ? (t.pricingMethod ?? "PER_KG") : "PER_KG";
+      const method = t.pricingMethod ?? "PER_KG";
       const rate = method === "PER_KOLI" ? t.ratePerKoli ?? 0 : method === "PER_CUBIC" ? t.ratePerCubic ?? 0 : t.ratePerKg;
       return (
         <span className="font-semibold">
@@ -158,9 +159,10 @@ export function TariffsPage() {
     header: "Aturan",
     hideOnMobile: true,
     render: (t: Tariff) => {
-      const method = t.customerType === "b2b" ? (t.pricingMethod ?? "PER_KG") : "PER_KG";
+      const method = t.pricingMethod ?? "PER_KG";
       if (method === "PER_KOLI") return <span className="text-xs text-muted-foreground">min {formatNumber(t.minChargeableKoli ?? 1, 0)} koli / shipment</span>;
       if (method === "PER_CUBIC") return <span className="text-xs text-muted-foreground">min {formatNumber(t.minChargeableM3 ?? 0, 3)} m³ / shipment</span>;
+      if (method === "PER_KG_SIMPLE") return <span className="text-xs text-muted-foreground">min {formatNumber(t.minChargeableKg)} kg · berat aktual × tarif/kg</span>;
       if (t.customerType === "b2b") return <span className="text-xs text-muted-foreground">min {formatNumber(t.minChargeableKg)} kg · berat yang diinput × tarif/kg</span>;
       return (
         <span className="text-xs text-muted-foreground">
@@ -196,7 +198,7 @@ export function TariffsPage() {
     <div className="space-y-4">
       <PageHeader
         title="Tarif"
-        subtitle="B2C selalu /kg. B2B terikat ke satu customer dan bisa /kg, /koli, atau /cubic (m³)."
+        subtitle="B2C berbagi tarif tanpa customer dan bisa /kg, /koli, atau /cubic (m³). B2B terikat ke satu customer."
         icon={<Tag className="h-5 w-5" />}
         actions={
           can.create && (
@@ -249,7 +251,7 @@ export function TariffsPage() {
             <DialogDescription>
               {dialogTab === "b2b"
                 ? "Tarif B2B terikat ke satu customer - hanya customer itu yang melihatnya saat membuat shipment."
-                : "Tarif B2C selalu per kg. Koridor yang sama boleh punya beberapa tarif selama namanya berbeda."}
+                : "Tarif B2C bisa memakai kg volumetrik, kg aktual, koli, atau volume. Koridor yang sama boleh punya beberapa tarif selama namanya berbeda."}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={onSubmit} className="space-y-4">

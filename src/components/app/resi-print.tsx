@@ -284,20 +284,16 @@ export function ResiPrint({
   const invoiceNumber =
     shipment.invoiceLines?.[0]?.invoice.invoiceNumber ?? null;
 
-  // Fix, 2026-09-28 — B2B chooses ONE pricing method (/kg, /koli, /cubic)
+  // Each tariff chooses ONE pricing method (/kg, /koli, /cubic)
   // per tariff; the Master Resi must mark which one and only show the
   // stat cells that are actually relevant to it (see resiStatVisibility's
   // doc comment for the exact rule). Prefer the snapshot taken when the
   // shipment was priced (`shipment.pricingMethod`); fall back to the
   // selected tariff's method for a B2B shipment printed before pricing
   // has run yet, so the mark is correct from the moment the resi exists,
-  // not just after "Hitung Harga". B2C is always /kg and unaffected.
-  const effectivePricingMethod: PricingMethod = isB2B
-    ? shipment.pricingMethod ?? shipment.tariff?.pricingMethod ?? "PER_KG"
-    : "PER_KG";
-  const { showWeight: showWeightStats, showVolume: showVolumeStats } = isB2B
-    ? resiStatVisibility(effectivePricingMethod)
-    : { showWeight: true, showVolume: true };
+  // not just after "Hitung Harga".
+  const effectivePricingMethod: PricingMethod = shipment.pricingMethod ?? shipment.tariff?.pricingMethod ?? "PER_KG";
+  const { showWeight: showWeightStats, showVolume: showVolumeStats } = resiStatVisibility(effectivePricingMethod);
 
   const statCells: { key: string; label: string; value: string; unit: string }[] = [
     { key: "jumlah", label: "Jumlah", value: String(totalPackages), unit: "pcs" },

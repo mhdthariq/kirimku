@@ -954,14 +954,14 @@ async function runSeed(): Promise<void> {
   // 2026-09-29 — reflects the B2B tariff-model change: B2B tariffs are now
   // tied to ONE specific customer (customerId) and each corridor can have
   // several tariffs as long as their `name` differs. B2C stays exactly like
-  // before — generic (no customerId), always /kg. To demo all 3 B2B pricing
+  // before — generic (no customerId), /kg. To demo all 3 B2B pricing
   // methods (§ Tariff.pricingMethod), the two demo B2B customers get:
   //   - PT Maju Bersama (Medan → Banda Aceh): TWO tariffs, "Reguler" (/kg,
   //     used by the existing MKT-000002/000005 demo shipments) and
   //     "Kolian" (/koli) — same corridor, different name, different method.
   //   - CV Sinar Jaya (Medan → Lhokseumawe): "Cubic" (/cubic, m³-based).
   const tariffDefs = [
-    // B2C — generic, /kg only, unchanged behavior.
+    // B2C — generic, with the existing regular /kg tariff.
     { name: "Reguler", origin: "Medan", destination: "Banda Aceh", customerType: "b2c" as const, customerId: null, pricingMethod: "PER_KG" as const, ratePerKg: 9500, volumetricMultiplier: 250 },
     { name: "Reguler", origin: "Medan", destination: "Lhokseumawe", customerType: "b2c" as const, customerId: null, pricingMethod: "PER_KG" as const, ratePerKg: 6500, volumetricMultiplier: 250 },
     // B2B — tied to a specific customer.

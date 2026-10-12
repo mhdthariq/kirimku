@@ -50,7 +50,7 @@ export function emptyTariffForm(today: string = new Date().toISOString().slice(0
 }
 
 export interface TariffFieldVisibility {
-  /** Multiplier, rounding mode and rounding unit — B2C /kg only. */
+  /** Multiplier, rounding mode and rounding unit — only /kg tariffs. */
   showKgRules: boolean;
   /** Min kg — every /kg tariff (B2C and B2B). */
   showMinKg: boolean;
@@ -59,28 +59,30 @@ export interface TariffFieldVisibility {
   showRatePerCubic: boolean;
   showMinKoli: boolean;
   showMinM3: boolean;
-  /** B2B only — B2C is always /kg, so no method choice. */
+  /** B2C can choose volumetric /kg, actual /kg, /koli, or /cubic. */
   showMethodChoice: boolean;
   showCustomer: boolean;
 }
 
 /**
  * Which fields make sense for a tariff. Min kg applies to every /kg tariff;
- * Multiplier, Pembulatan and Satuan are B2C only. B2B /kg bills the weight
- * the user entered (at least Min kg) × the rate, and /koli and /cubic never
- * look at weight at all.
+ * Multiplier, Pembulatan and Satuan apply to /kg tariffs. B2B /kg bills the
+ * weight the user entered (at least Min kg) × the rate, while B2C PER_KG
+ * keeps volumetric pricing and PER_KG_SIMPLE uses actual weight only.
+ * /koli and /cubic never look at weight at all.
  */
 export function tariffFieldVisibility(tab: TariffTab, method: PricingMethod): TariffFieldVisibility {
-  const effective: PricingMethod = tab === "b2b" ? method : "PER_KG";
+  const effective = method;
+  const isKg = effective === "PER_KG" || effective === "PER_KG_SIMPLE";
   return {
-    showKgRules: tab === "b2c",
-    showMinKg: effective === "PER_KG",
-    showRatePerKg: effective === "PER_KG",
+    showKgRules: effective === "PER_KG" && tab === "b2c",
+    showMinKg: isKg,
+    showRatePerKg: isKg,
     showRatePerKoli: effective === "PER_KOLI",
     showRatePerCubic: effective === "PER_CUBIC",
     showMinKoli: effective === "PER_KOLI",
     showMinM3: effective === "PER_CUBIC",
-    showMethodChoice: tab === "b2b",
+    showMethodChoice: true,
     showCustomer: tab === "b2b",
   };
 }
@@ -89,10 +91,10 @@ const num = (v: string): number => Number(v);
 
 /** Build the API payload. Fields a method doesn't use are sent as safe defaults. */
 export function buildTariffPayload(tab: TariffTab, form: TariffFormState) {
-  const method: PricingMethod = tab === "b2b" ? form.pricingMethod : "PER_KG";
-  const isKg = method === "PER_KG";
-  // Multiplier / rounding: B2C /kg only. Min kg: any /kg tariff.
-  const usesKgRules = tab === "b2c";
+  const method = form.pricingMethod;
+  const isKg = method === "PER_KG" || method === "PER_KG_SIMPLE";
+  // Multiplier / rounding: B2C volumetric /kg only. Min kg: both kg modes.
+  const usesKgRules = tab === "b2c" && isKg;
   return {
     name: form.name.trim() || null,
     origin: form.origin.trim(),
@@ -119,8 +121,8 @@ export function buildTariffPayload(tab: TariffTab, form: TariffFormState) {
 export function validateTariffForm(tab: TariffTab, form: TariffFormState): string | null {
   if (!form.origin.trim() || !form.destination.trim()) return "Kota asal dan tujuan wajib diisi.";
   if (tab === "b2b" && !form.customerId) return "Pilih customer B2B untuk tarif ini.";
-  const method = tab === "b2b" ? form.pricingMethod : "PER_KG";
-  if (method === "PER_KG" && !(num(form.ratePerKg) > 0)) return "Tarif per kg wajib diisi.";
+  const method = form.pricingMethod;
+  if ((method === "PER_KG" || method === "PER_KG_SIMPLE") && !(num(form.ratePerKg) > 0)) return "Tarif per kg wajib diisi.";
   if (method === "PER_KOLI" && !(num(form.ratePerKoli) > 0)) return "Tarif per koli wajib diisi.";
   if (method === "PER_CUBIC" && !(num(form.ratePerCubic) > 0)) return "Tarif per m³ wajib diisi.";
   return null;
@@ -186,7 +188,7 @@ export function tariffToForm(t: {
     origin: t.origin,
     destination: t.destination,
     customerId: b2b && t.customerId != null ? String(t.customerId) : "",
-    pricingMethod: b2b ? t.pricingMethod ?? "PER_KG" : "PER_KG",
+    pricingMethod: t.pricingMethod ?? "PER_KG",
     ratePerKg: String(t.ratePerKg),
     ratePerKoli: t.ratePerKoli != null ? String(t.ratePerKoli) : "",
     ratePerCubic: t.ratePerCubic != null ? String(t.ratePerCubic) : "",

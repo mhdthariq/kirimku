@@ -209,8 +209,8 @@ export interface PricingPreview {
   volumetricKg: number;
   chargeableKg: number;
   estimatedPrice: number | null;
-  /** B2B pricing method actually used ("PER_KG" | "PER_KOLI" | "PER_CUBIC"). */
-  method?: "PER_KG" | "PER_KOLI" | "PER_CUBIC";
+  /** Pricing method actually used. */
+  method?: PricingMethod;
   ratePerKoli?: number | null;
   ratePerCubic?: number | null;
   totalVolumeM3?: number;
@@ -264,7 +264,7 @@ export interface Shipment {
   paymentSummary?: PaymentSummary;
   chargeableWeightKg: number | null;
   ratePerKg: number | null;
-  /** Snapshot of the pricing method used ("PER_KG" | "PER_KOLI" | "PER_CUBIC"); null on legacy rows = PER_KG. */
+  /** Snapshot of the pricing method used; null on legacy rows = PER_KG. */
   pricingMethod?: PricingMethod | null;
   chargeableKoli?: number | null;
   chargeableVolumeM3?: number | null;
@@ -735,10 +735,9 @@ export interface CheckinResponse {
   message: string;
 }
 
-/** B2B pricing method — every tariff bills by ONE of these. B2C tariffs are
- *  always "PER_KG" (enforced server-side). Picking a tariff at shipment
- *  creation is how the operator picks the method. */
-export type PricingMethod = "PER_KG" | "PER_KOLI" | "PER_CUBIC";
+/** Every tariff bills by ONE of these. Picking a tariff at shipment creation
+ * is how the operator picks the method. */
+export type PricingMethod = "PER_KG" | "PER_KG_SIMPLE" | "PER_KOLI" | "PER_CUBIC";
 
 export interface Tariff {
   id: number;

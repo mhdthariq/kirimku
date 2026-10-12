@@ -139,8 +139,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       },
     });
 
-    // Method-aware audit description — B2B tariffs may bill /kg, /koli, or
-    // /cubic (m³); B2C tariffs are always /kg.
+    // Method-aware audit description — tariffs may bill /kg, /koli, or
+    // /cubic (m³).
     const priceDescription =
       r.method === "PER_KOLI"
         ? `Harga dihitung: ${r.chargeableKoli.toFixed(0)} koli × Rp${r.rateApplied.toLocaleString("id-ID")}/koli = Rp${r.price.toLocaleString("id-ID")}`

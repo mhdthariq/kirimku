@@ -19,8 +19,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (body.customerType !== undefined) data.customerType = body.customerType === "b2b" || body.customerType === "b2c" ? body.customerType : null;
 
     // Resolve the effective customerType (after this update) and pricing
-    // method together — B2C / generic tariffs are ALWAYS forced to PER_KG
-    // server-side, regardless of what the client sends.
+    // method together. B2C tariffs may use any pricing method but never a
+    // customer relation.
     const effectiveCustomerType = (data.customerType as string | null | undefined) !== undefined ? (data.customerType as string | null) : existing.customerType;
     if (effectiveCustomerType !== "b2b") {
       data.customerId = null;
@@ -32,16 +32,16 @@ export async function PUT(req: NextRequest, { params }: Params) {
       }
       data.customerId = customer.id;
     }
-    const requestedMethod = body.pricingMethod === "PER_KOLI" || body.pricingMethod === "PER_CUBIC" ? body.pricingMethod : body.pricingMethod === "PER_KG" ? "PER_KG" : undefined;
+    const requestedMethod = body.pricingMethod === "PER_KG_SIMPLE" || body.pricingMethod === "PER_KOLI" || body.pricingMethod === "PER_CUBIC" ? body.pricingMethod : body.pricingMethod === "PER_KG" ? "PER_KG" : undefined;
+    if (requestedMethod === "PER_KG_SIMPLE" && effectiveCustomerType === "b2b") {
+      return fail(422, "Metode kg aktual hanya tersedia untuk tarif B2C.", { pricingMethod: ["Pilih metode harga B2B yang tersedia."] });
+    }
     if (requestedMethod !== undefined) {
-      data.pricingMethod = effectiveCustomerType === "b2b" ? requestedMethod : "PER_KG";
-    } else if (effectiveCustomerType !== "b2b" && existing.pricingMethod !== "PER_KG") {
-      // customerType changed away from b2b — fall back to /kg automatically.
-      data.pricingMethod = "PER_KG";
+      data.pricingMethod = requestedMethod;
     }
     const finalMethod = (data.pricingMethod as string | undefined) ?? existing.pricingMethod;
 
-    if (body.ratePerKg !== undefined) data.ratePerKg = finalMethod === "PER_KG" ? requireNum(body.ratePerKg, "ratePerKg", 1) : num(body.ratePerKg) ?? existing.ratePerKg;
+    if (body.ratePerKg !== undefined) data.ratePerKg = (finalMethod === "PER_KG" || finalMethod === "PER_KG_SIMPLE") ? requireNum(body.ratePerKg, "ratePerKg", 1) : num(body.ratePerKg) ?? existing.ratePerKg;
     if (body.ratePerKoli !== undefined) data.ratePerKoli = num(body.ratePerKoli);
     if (body.ratePerCubic !== undefined) data.ratePerCubic = num(body.ratePerCubic);
     if (body.minChargeableKoli !== undefined) data.minChargeableKoli = num(body.minChargeableKoli) ?? existing.minChargeableKoli;

@@ -13,9 +13,16 @@ import {
 const form = (over = {}) => ({ ...emptyTariffForm("2026-09-28"), origin: "Medan", destination: "Jakarta", ...over });
 
 describe("tariffFieldVisibility", () => {
-  it("B2C: /kg only — kg rules shown, no method choice, no customer", () => {
-    const v = tariffFieldVisibility("b2c", "PER_KOLI"); // method ignored for B2C
-    expect(v).toMatchObject({ showKgRules: true, showRatePerKg: true, showMethodChoice: false, showCustomer: false, showRatePerKoli: false });
+  it("B2C /kg shows kg rules and allows method choice without customer", () => {
+    const v = tariffFieldVisibility("b2c", "PER_KG");
+    expect(v).toMatchObject({ showKgRules: true, showRatePerKg: true, showMethodChoice: true, showCustomer: false, showRatePerKoli: false });
+  });
+  it("B2C /koli and /cubic show their own rate fields", () => {
+    expect(tariffFieldVisibility("b2c", "PER_KOLI")).toMatchObject({ showKgRules: false, showRatePerKoli: true, showMinKoli: true, showRatePerKg: false });
+    expect(tariffFieldVisibility("b2c", "PER_CUBIC")).toMatchObject({ showKgRules: false, showRatePerCubic: true, showMinM3: true, showRatePerKg: false });
+  });
+  it("B2C actual kg shows kg fields without volumetric rules", () => {
+    expect(tariffFieldVisibility("b2c", "PER_KG_SIMPLE")).toMatchObject({ showKgRules: false, showMinKg: true, showRatePerKg: true, showRatePerKoli: false });
   });
   it("B2B /kg: rate + Min kg only — NO Multiplier / Pembulatan / Satuan", () => {
     expect(tariffFieldVisibility("b2b", "PER_KG")).toMatchObject({ showKgRules: false, showMinKg: true, showRatePerKg: true, showMethodChoice: true, showCustomer: true });
@@ -47,9 +54,17 @@ describe("buildTariffPayload", () => {
     const p = buildTariffPayload("b2b", form({ customerId: "7", pricingMethod: "PER_KG", ratePerKg: "8000", minChargeableKg: "5", volumetricMultiplier: "400", roundingMode: "NEAREST", roundingUnitKg: "2" }));
     expect(p).toMatchObject({ pricingMethod: "PER_KG", ratePerKg: 8000, minChargeableKg: 5, volumetricMultiplier: 250, roundingMode: "UP", roundingUnitKg: 0.5 });
   });
-  it("B2C is always /kg, has no customer, keeps kg rules", () => {
-    const p = buildTariffPayload("b2c", form({ customerId: "7", pricingMethod: "PER_KOLI", ratePerKg: "4500", minChargeableKg: "3" }));
-    expect(p).toMatchObject({ customerType: "b2c", customerId: null, pricingMethod: "PER_KG", ratePerKg: 4500, minChargeableKg: 3 });
+  it("B2C /koli has no customer relation and sends koli pricing", () => {
+    const p = buildTariffPayload("b2c", form({ customerId: "7", pricingMethod: "PER_KOLI", ratePerKoli: "25000", minChargeableKoli: "2" }));
+    expect(p).toMatchObject({ customerType: "b2c", customerId: null, pricingMethod: "PER_KOLI", ratePerKg: 0, ratePerKoli: 25000, minChargeableKoli: 2, minChargeableKg: 1 });
+  });
+  it("B2C /cubic sends cubic pricing without customer relation", () => {
+    const p = buildTariffPayload("b2c", form({ customerId: "7", pricingMethod: "PER_CUBIC", ratePerCubic: "850000", minChargeableM3: "0.2" }));
+    expect(p).toMatchObject({ customerType: "b2c", customerId: null, pricingMethod: "PER_CUBIC", ratePerCubic: 850000, minChargeableM3: 0.2, ratePerKg: 0 });
+  });
+  it("B2C actual kg sends its distinct method without customer relation", () => {
+    const p = buildTariffPayload("b2c", form({ customerId: "7", pricingMethod: "PER_KG_SIMPLE", ratePerKg: "4500", minChargeableKg: "3" }));
+    expect(p).toMatchObject({ customerType: "b2c", customerId: null, pricingMethod: "PER_KG_SIMPLE", ratePerKg: 4500, minChargeableKg: 3, volumetricMultiplier: 250 });
   });
   it("trims the name and turns blank into null", () => {
     expect(buildTariffPayload("b2c", form({ name: "  Express ", ratePerKg: "1" })).name).toBe("Express");

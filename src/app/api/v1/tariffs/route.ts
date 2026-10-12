@@ -62,10 +62,10 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // B2B pricing method — /kg (default), /koli, or /cubic (m³). B2C (and
-    // generic "semua tipe") tariffs are ALWAYS forced to PER_KG server-side,
-    // regardless of what the client sends — B2C never uses /koli or /cubic.
-    const pricingMethodRaw = customerType === "b2b" && (body.pricingMethod === "PER_KOLI" || body.pricingMethod === "PER_CUBIC")
+    // B2C supports volumetric /kg, actual /kg, /koli, or /cubic. B2B keeps
+    // its existing /kg, /koli, and /cubic methods. B2C tariffs remain shared
+    // by type and never receive a customer relation.
+    const pricingMethodRaw = (body.pricingMethod === "PER_KG_SIMPLE" && customerType === "b2c") || body.pricingMethod === "PER_KOLI" || body.pricingMethod === "PER_CUBIC" || body.pricingMethod === "PER_KG"
       ? body.pricingMethod
       : "PER_KG";
     if (pricingMethodRaw === "PER_KOLI" && !(num(body.ratePerKoli) && num(body.ratePerKoli)! > 0)) {
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
         destination,
         customerType,
         customerId,
-        ratePerKg: pricingMethodRaw === "PER_KG" ? requireNum(body.ratePerKg, "ratePerKg", 1) : num(body.ratePerKg) ?? 0,
+        ratePerKg: pricingMethodRaw === "PER_KG" || pricingMethodRaw === "PER_KG_SIMPLE" ? requireNum(body.ratePerKg, "ratePerKg", 1) : num(body.ratePerKg) ?? 0,
         minChargeableKg: num(body.minChargeableKg) ?? 1,
         volumetricMultiplier: num(body.volumetricMultiplier) ?? 250,
         roundingMode: body.roundingMode === "NEAREST" ? "NEAREST" : "UP",

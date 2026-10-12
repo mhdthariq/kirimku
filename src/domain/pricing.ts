@@ -16,11 +16,13 @@
  * the tariff's minChargeableKg, then rounded UP (default) / NEAREST to the
  * tariff's rounding unit. Price = chargeable kg × rate per kg.
  *
- * B2B pricing methods — every tariff carries ONE pricing method:
- *   - PER_KG    B2C (always this method): the formula above, unchanged.
- *               B2B /kg is SIMPLE: price = max(total weight entered by the
+ * Pricing methods — every tariff carries ONE pricing method:
+ *   - PER_KG    B2C compares actual and volumetric weight. B2B /kg is SIMPLE: price =
+ *               max(total weight entered by the
  *               user, minChargeableKg) × ratePerKg. No volumetric multiplier
  *               and no rounding — only the minimum kg still applies.
+ *   - PER_KG_SIMPLE B2C bills actual weight only, with the same minimum kg
+ *               rule and no volumetric multiplier or rounding.
  *   - PER_KOLI  price = max(package count, minChargeableKoli) × ratePerKoli.
  *   - PER_CUBIC price = max(total volume m³, minChargeableM3) × ratePerCubic.
  * Picking a tariff at shipment-creation time IS picking the method — the
@@ -30,10 +32,11 @@
 
 export const DEFAULT_VOLUMETRIC_MULTIPLIER = 250;
 
-export type PricingMethod = "PER_KG" | "PER_KOLI" | "PER_CUBIC";
+export type PricingMethod = "PER_KG" | "PER_KG_SIMPLE" | "PER_KOLI" | "PER_CUBIC";
 
 export function normalizePricingMethod(value: unknown): PricingMethod {
-  return value === "PER_KOLI" || value === "PER_CUBIC" ? value : "PER_KG";
+  if (value === "PER_KG_SIMPLE" || value === "PER_KOLI" || value === "PER_CUBIC") return value;
+  return "PER_KG";
 }
 
 export interface PricedDetailInput {
@@ -52,15 +55,14 @@ export interface TariffLike {
   volumetricMultiplier: number;
   roundingMode: string;
   roundingUnitKg: number;
-  /** B2B pricing method. Defaults to "PER_KG" when absent (legacy tariffs /
-   *  B2C tariffs — B2C never uses anything else). */
+  /** Pricing method. Defaults to "PER_KG" when absent on legacy tariffs. */
   pricingMethod?: string | null;
   ratePerKoli?: number | null;
   ratePerCubic?: number | null;
   minChargeableKoli?: number | null;
   minChargeableM3?: number | null;
   /** "b2b" | "b2c" | null. A B2B /kg tariff uses the simple actual-weight
-   *  calculation (see computePricing). */
+   *  calculation; B2C uses PER_KG_SIMPLE for that behavior. */
   customerType?: string | null;
 }
 
@@ -98,8 +100,7 @@ export interface PricingResult {
   chargeableVolumeM3: number;
   /** The rate actually applied (ratePerKg / ratePerKoli / ratePerCubic). */
   rateApplied: number;
-  /** True for B2B /kg: billed on the weight the user entered (floored at the
-   *  tariff's Min kg) — no volumetric weight or rounding. UIs hide those rows. */
+  /** True for actual-weight-only billing (B2B /kg or B2C PER_KG_SIMPLE). */
   simpleKg: boolean;
 }
 
@@ -115,7 +116,7 @@ export function computePricing(details: PricedDetailInput[], tariff: TariffLike)
   const method = normalizePricingMethod(tariff.pricingMethod);
   // B2B /kg: bill the weight the user entered, floored at Min kg — the
   // volumetric multiplier and rounding do not apply.
-  const simpleKg = method === "PER_KG" && tariff.customerType === "b2b";
+  const simpleKg = method === "PER_KG_SIMPLE" || (method === "PER_KG" && tariff.customerType === "b2b");
 
   let chargeableKg = simpleKg ? Math.max(actualKg, tariff.minChargeableKg) : actualKg;
   if (!simpleKg) {

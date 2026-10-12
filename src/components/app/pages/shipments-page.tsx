@@ -387,16 +387,16 @@ function ShipmentList() {
       return startsAt <= now && endsAt >= now;
     })
     .map((t) => {
-      // B2B tariffs may bill /kg, /koli, or /cubic (m³) - show the method +
+      // Tariffs may bill /kg, /koli, or /cubic (m³) - show the method +
       // matching rate right in the label so the operator picks the right
       // one for this shipment (kg → /kg, koli → /koli, cubic → /cubic).
-      const method = t.customerType === "b2b" ? t.pricingMethod ?? "PER_KG" : "PER_KG";
+      const method = t.pricingMethod ?? "PER_KG";
       const rateLabel =
         method === "PER_KOLI"
           ? `Rp${formatNumber(t.ratePerKoli ?? 0, 0)}/koli`
           : method === "PER_CUBIC"
             ? `Rp${formatNumber(t.ratePerCubic ?? 0, 0)}/m³`
-            : `Rp${formatNumber(t.ratePerKg, 0)}/kg`;
+            : `Rp${formatNumber(t.ratePerKg, 0)}/kg${method === "PER_KG_SIMPLE" ? " (aktual)" : " (aktual/volumetrik)"}`;
       return {
         value: String(t.id),
         label: `${tariffLabel(t)} · ${t.customerType ? t.customerType.toUpperCase() : "SEMUA"} · ${rateLabel}`,
@@ -1546,7 +1546,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
   const pricing = shipment.pricingPreview ?? null;
   const actualWeight = pricing?.actualKg ?? shipment.details.reduce((sum, d) => sum + d.actualWeightKg, 0);
   const volumetric = pricing?.volumetricKg ?? 0;
-  // B2B tariffs may bill /kg, /koli, or /cubic (m³) - use whichever method
+  // Tariffs may bill actual/volumetric kg, actual kg, koli, or cubic - use whichever method
   // was actually applied (snapshot on the shipment once priced, otherwise
   // the live preview) so this card never assumes /kg.
   const pricingMethod = shipment.pricingMethod ?? pricing?.method ?? "PER_KG";
@@ -1694,9 +1694,9 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
           <CardContent className="space-y-2.5">
             <Row label="Total paket" value={`${shipment.details.length} paket`} />
             <Row label="Total volume" value={`${(shipment.totals?.totalVolumeM3 ?? 0).toFixed(3)} m³`} />
-            {pricingMethod === "PER_KG" && (pricing?.simpleKg ?? shipment.customer?.type === "b2b") && (
+            {(pricingMethod === "PER_KG_SIMPLE" || (pricingMethod === "PER_KG" && (pricing?.simpleKg ?? shipment.customer?.type === "b2b"))) && (
               <>
-                {/* B2B /kg: billed on the weight entered — no volumetric / min / rounding */}
+                {/* Actual-weight tariffs: no volumetric weight or rounding */}
                 <Row label="Berat (yang diinput)" value={`${formatNumber(actualWeight, 2)} kg`} />
                 <Row
                   label={`Berat ditagih${pricing?.minChargeableKg ? ` (min ${formatNumber(pricing.minChargeableKg)} kg)` : ""}`}

@@ -125,6 +125,20 @@ describe("computePricing — B2B /kg is simple (entered weight × rate)", () => 
   });
 });
 
+describe("computePricing — B2C actual kg mode", () => {
+  it("ignores volumetric weight but still applies the minimum kg", () => {
+    const r = computePricing(
+      [detail({ actualWeightKg: 2, lengthCm: 100, widthCm: 100, heightCm: 100 })],
+      tariff({ customerType: "b2c", pricingMethod: "PER_KG_SIMPLE", ratePerKg: 4500, minChargeableKg: 3 }),
+    );
+    expect(r.method).toBe("PER_KG_SIMPLE");
+    expect(r.simpleKg).toBe(true);
+    expect(r.volumetricKg).toBe(250);
+    expect(r.chargeableKg).toBe(3);
+    expect(r.price).toBe(3 * 4500);
+  });
+});
+
 describe("computePricing — PER_KOLI (B2B)", () => {
   it("charges per package (koli), ignoring weight/volume entirely", () => {
     const details = [detail({ actualWeightKg: 999 }), detail({ actualWeightKg: 0.001 })]; // weight shouldn't matter
