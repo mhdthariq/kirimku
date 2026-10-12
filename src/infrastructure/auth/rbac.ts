@@ -59,6 +59,7 @@ export const PERMISSIONS: { slug: string; module: string; description: string }[
   { slug: "transport.expense.create", module: "Transports", description: "Add transport operational expenses" },
   { slug: "transport.expense.update", module: "Transports", description: "Edit transport operational expenses" },
   { slug: "transport.expense.delete", module: "Transports", description: "Delete transport operational expenses" },
+  { slug: "transport.expense.approve", module: "Transports", description: "Approve pending transport operational expenses" },
   // Multi drop delivery approval (destination admin accepts the dropped resi)
   { slug: "transport.delivery.view", module: "Transports", description: "View dropped resi awaiting delivery approval" },
   { slug: "transport.delivery.approve", module: "Transports", description: "Approve delivery of dropped resi / of the whole transport" },
@@ -172,10 +173,16 @@ export const ROLE_TEMPLATES: { slug: string; name: string; description: string; 
       "wallet.topup.view", "wallet.topup.cancel",
       "wallet.withdrawal.view", "wallet.withdrawal.review", "wallet.withdrawal.process",
       "partner.view", "transport.settle",
-      "transport.expense.view", "return-task.view",
+      "transport.view", "transport.expense.view", "transport.expense.approve", "return-task.view",
       "repair.view", "repair.create", "repair.update", "repair.delete",
       "financial.report.view",
     ],
+  },
+  {
+    slug: "admin-finance",
+    name: "Admin Finance",
+    description: "Review and approve transport operational expenses",
+    permissions: ["transport.view", "transport.expense.view", "transport.expense.approve"],
   },
   {
     slug: "marketing",

@@ -28,7 +28,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { apiDelete, apiGet, hasPermission, type Transport, type TransportDetail, type TransportDropsBoard } from "@/infrastructure/http/client-api";
+import { apiDelete, apiGet, apiPost, hasPermission, type Transport, type TransportDetail, type TransportDropsBoard } from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader } from "@/components/app/data-table";
 import { StatusBadge } from "@/components/app/status-badge";
@@ -36,6 +36,8 @@ import { formatDate, formatNumber, formatRupiah } from "@/components/app/form-pa
 import { CheckpointCheckinDialog } from "@/components/app/checkpoint-checkin-dialog";
 import { TransportFormDialog } from "@/components/app/transport-form-dialog";
 import { TransportDropsPanel } from "@/components/app/transport-drops-panel";
+import { TransportActivitiesPanel } from "@/components/app/transport-activities-panel";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TransportExpensesPanel } from "@/components/app/transport-expenses-panel";
 import { CapacityStatusCard } from "@/components/app/capacity-status-card";
 import { TransportManifestPrint } from "@/components/app/transport-manifest-print";
@@ -76,7 +78,7 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string;
  * Transport detail (Revision Part K):
  * 1. transport information  2. current location map  3. checkpoint check-in
  * info (photo evidence)  4. shipments with aggregate totals (Part L).
- * Part N: there is deliberately NO manual "Arrived" button — arrival is
+ * Checkpoint mode: arrival is
  * auto-detected when the crew checks in inside the final checkpoint's radius.
  * Checking in at the first checkpoint of a PLANNED transport automatically
  * marks it DEPARTED.
@@ -92,11 +94,15 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
     () => apiGet<TransportDetail>(`/transports/${transportId}`),
     [transportId],
   );
-  const { data: drops } = useApiData<TransportDropsBoard>(
-    () => apiGet<TransportDropsBoard>(`/transports/${transportId}/drops`),
-    [transportId],
+  const { data: drops } = useApiData<TransportDropsBoard | null>(
+    () => !transport || transport.trackingMode === "ACTIVITY"
+      ? Promise.resolve(null)
+      : apiGet<TransportDropsBoard>(`/transports/${transportId}/drops`),
+    [transportId, transport?.id, transport?.trackingMode],
   );
   const [checkinOpen, setCheckinOpen] = useState(false);
+  const [lifecycleBusy, setLifecycleBusy] = useState(false);
+  const [confirmArrive, setConfirmArrive] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [manifestPrintId, setManifestPrintId] = useState<number | null>(null);
@@ -133,6 +139,8 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
           id: transport.id,
           transportCode: transport.transportCode,
           status: transport.status,
+          trackingMode: transport.trackingMode,
+          transportMode: transport.transportMode,
           routeId: transport.routeId,
           routeName: transport.routeName,
           vehicleId: transport.vehicle.id,
@@ -169,6 +177,16 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
       (transport.kenek?.id != null && transport.kenek.id === meEmployee)
     );
   }, [transport, user]);
+
+  async function changeLifecycle(action: "depart" | "arrive") {
+    if (lifecycleBusy) return;
+    setLifecycleBusy(true);
+    const ok = await runAction(() => apiPost(`/transports/${transportId}/${action}`, {}), {
+      success: action === "depart" ? "Transport berangkat." : "Transport tiba.",
+    });
+    setLifecycleBusy(false);
+    if (ok) { setConfirmArrive(false); void reload(); }
+  }
 
   // checkpoints with check-in state (latest record per checkpoint)
   const mapCheckpoints: TransportMapCheckpoint[] = useMemo(() => {
@@ -212,13 +230,17 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
     );
   }
 
+  const isActivity = transport.trackingMode === "ACTIVITY";
+  const assignedCrew = user?.employeeId != null && (transport.driver?.id === user.employeeId || transport.kenek?.id === user.employeeId);
+  const driverFocused = isActivity && !!user?.roles.some((role) => role.slug === "driver" || role.slug === "kenek");
+  const canAddActivity = can.checkin && assignedCrew && ["PLANNED", "DEPARTED"].includes(transport.status);
   const checkedInCount = mapCheckpoints.filter((c) => c.checkedIn).length;
   const allCheckedIn = mapCheckpoints.length > 0 && checkedInCount === mapCheckpoints.length;
   const pendingCheckpoints = mapCheckpoints.filter((c) => !c.checkedIn);
   // Check-in is available while the trip is PLANNED (the FIRST check-in
   // auto-departs it) or DEPARTED — ARRIVED/CANCELLED trips are closed.
   const canCheckinNow =
-    can.checkin && isCrew && (transport.status === "PLANNED" || transport.status === "DEPARTED") && pendingCheckpoints.length > 0;
+    !isActivity && can.checkin && isCrew && (transport.status === "PLANNED" || transport.status === "DEPARTED") && pendingCheckpoints.length > 0;
 
   // Vehicle Owners arrive from their own Transport History page — send them
   // back there instead of the staff transports list.
@@ -239,6 +261,13 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={transport.status} />
             {drops?.transportMode === "MULTI_DROP" && <StatusBadge status="MULTI_DROP" label="Multi Drop" />}
+            {isActivity && <StatusBadge status="ACTIVITY" label="Activity Tracking (Tanpa Checkpoint)" />}
+            {isActivity && isCrew && transport.status === "PLANNED" && hasPermission(user, "transport.depart") && (
+              <Button size="sm" disabled={lifecycleBusy} onClick={() => void changeLifecycle("depart")}>Berangkat</Button>
+            )}
+            {isActivity && isCrew && transport.status === "DEPARTED" && hasPermission(user, "transport.arrive") && (
+              <Button size="sm" disabled={lifecycleBusy} onClick={() => setConfirmArrive(true)}>Tandai Tiba</Button>
+            )}
             {canCheckinNow && (
               <Button size="sm" onClick={() => setCheckinOpen(true)}>
                 <Camera className="h-3.5 w-3.5" /> Check-in Checkpoint
@@ -263,7 +292,7 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
 
       <div className="grid gap-4 lg:grid-cols-3">
         {/* 1. Transport information */}
-        <Card>
+        <Card className={driverFocused ? "lg:col-span-3" : undefined}>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
               <Info className="h-4 w-4 text-primary" /> Informasi Transport
@@ -283,7 +312,7 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
         </Card>
 
         {/* 2. Current location map */}
-        <Card className="lg:col-span-2">
+        {!driverFocused && <Card className="lg:col-span-2">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center justify-between gap-2 text-base">
               <span className="flex items-center gap-2">
@@ -292,7 +321,7 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
               <span className="text-xs font-normal text-muted-foreground">
                 {transport.currentLatitude != null
                   ? `Posisi terakhir: ${formatDate(transport.lastLocationAt, true)}`
-                  : "Belum ada posisi tercatat (menunggu check-in)"}
+                  : isActivity ? "Belum ada posisi tercatat (menunggu aktivitas)" : "Belum ada posisi tercatat (menunggu check-in)"}
               </span>
             </CardTitle>
           </CardHeader>
@@ -307,9 +336,19 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
               checkins={transport.checkpointRecords.map((r) => ({ latitude: r.latitude, longitude: r.longitude, recordedAt: r.recordedAt }))}
             />
           </CardContent>
-        </Card>
+        </Card>}
       </div>
 
+      <Tabs key={transport.id} defaultValue={isActivity ? "activity" : "checkpoints"}>
+        <TabsList>
+          <TabsTrigger value={isActivity ? "activity" : "checkpoints"}>{isActivity ? "Activity" : "Checkpoint"}</TabsTrigger>
+          {can.expenseView && <TabsTrigger value="expenses">Biaya Operasional</TabsTrigger>}
+        </TabsList>
+        <TabsContent value={isActivity ? "activity" : "checkpoints"}>
+      {isActivity ? (
+        <TransportActivitiesPanel key={transport.id} transportId={transport.id} canCreate={canAddActivity} onChanged={reload} />
+      ) : (
+      <>
       {/* 3. Check-in information per checkpoint */}
       <Card>
         <CardHeader className="pb-2">
@@ -419,28 +458,29 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
         </CardContent>
       </Card>
 
+      </>
+      )}
+        </TabsContent>
+        {can.expenseView && (
+          <TabsContent value="expenses">
+            <TransportExpensesPanel transportId={transport.id} canCreate={can.expenseCreate} canUpdate={can.expenseUpdate} canDelete={can.expenseDelete} />
+          </TabsContent>
+        )}
+      </Tabs>
+
       {/* 3b. Multi drop board, delivery approval and return task. Re-mounted
           (key) whenever a check-in or status change happens so it refetches. */}
-      <TransportDropsPanel
+      {!driverFocused && <TransportDropsPanel
         key={`drops:${transport.status}:${transport.checkpointRecords.length}`}
         transportId={transport.id}
         isCrew={isCrew}
         can={{ assign: can.manage, drop: can.drop, approve: can.approve, createReturn: can.createReturn }}
         onChanged={reload}
-      />
+      />}
 
-      {/* 3c. Operational expenses: BBM / Parkir / Makan / Bongkar (multi transaction) */}
-      {can.expenseView && (
-        <TransportExpensesPanel
-          transportId={transport.id}
-          canCreate={can.expenseCreate}
-          canUpdate={can.expenseUpdate}
-          canDelete={can.expenseDelete}
-        />
-      )}
 
       {/* 3d. Vehicle capacity status (Capacity Round) — informational, never blocks. */}
-      {transport.capacity && (
+      {!driverFocused && transport.capacity && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -459,7 +499,7 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
       )}
 
       {/* 4. Shipments in transport + totals (Parts K/L) */}
-      <Card>
+      {!driverFocused && <Card>
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-base">
             <Package className="h-4 w-4 text-primary" /> Shipment dalam Transport
@@ -567,7 +607,7 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
             </div>
           )}
         </CardContent>
-      </Card>
+      </Card>}
 
       {transport.status === "ARRIVED" && allCheckedIn && (
         <p className="rounded-lg border border-emerald-200 bg-emerald-50/60 px-3.5 py-2.5 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
@@ -575,14 +615,27 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
         </p>
       )}
 
-      <CheckpointCheckinDialog
+      {!isActivity && <CheckpointCheckinDialog
         open={checkinOpen}
         onOpenChange={setCheckinOpen}
         transportId={transport.id}
         transportCode={transport.transportCode}
         checkpoints={mapCheckpoints}
         onDone={reload}
-      />
+      />}
+
+      <AlertDialog open={confirmArrive} onOpenChange={setConfirmArrive}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tandai transport tiba?</AlertDialogTitle>
+            <AlertDialogDescription>Perjalanan akan diselesaikan. Setelah tiba, foto aktivitas baru tidak dapat ditambahkan.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={lifecycleBusy}>Batal</AlertDialogCancel>
+            <Button disabled={lifecycleBusy} onClick={() => void changeLifecycle("arrive")}>{lifecycleBusy ? "Menyimpan…" : "Ya, tandai tiba"}</Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Edit - shared create/edit dialog (PLANNED transports only) */}
       <TransportFormDialog

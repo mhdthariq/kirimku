@@ -10,6 +10,9 @@ import { checkVehicleAvailable } from "@/infrastructure/services/business-rules/
 import { assertTransportScope } from "@/infrastructure/services/gudang-scope";
 import { crewAssignmentMessage, findActiveCrewAssignment } from "@/infrastructure/services/transport-crew";
 
+import { parseTrackingMode } from "@/shared/activity-tracking";
+import { normalizeTransportMode } from "@/domain/transport-ops";
+
 type Params = { params: Promise<{ id: string }> };
 
 /**
@@ -99,11 +102,16 @@ export async function GET(req: NextRequest, { params }: Params) {
       id: transport.id,
       transportCode: transport.transportCode,
       status: transport.status,
+      trackingMode: transport.trackingMode,
+      transportMode: transport.transportMode,
       routeId: transport.routeId,
       routeName: transport.route?.name ?? null,
       routeOrigin: transport.route?.origin ?? null,
       routeDestination: transport.route?.destination ?? null,
-      checkpoints: transport.route?.checkpoints ?? [],
+      checkpoints:
+        transport.trackingMode === "ACTIVITY"
+          ? []
+          : transport.route?.checkpoints ?? [],
       origin: transport.origin ?? transport.route?.origin ?? null,
       destination: transport.destination ?? transport.route?.destination ?? null,
       plannedDepartureAt: transport.plannedDepartureAt,
@@ -186,8 +194,43 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (["DEPARTED", "ARRIVED"].includes(existing.status)) {
       return fail(422, `Transport dengan status ${existing.status} tidak bisa diubah.`);
     }
-    const body = await req.json().catch(() => ({}));
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object" || Array.isArray(body))
+      return fail(422, "Payload transport tidak valid.");
     const data: Record<string, unknown> = {};
+    const trackingMode = parseTrackingMode(
+      body.trackingMode === undefined
+        ? existing.trackingMode
+        : body.trackingMode,
+    );
+    if (!trackingMode) return fail(422, "Mode tracking tidak valid.");
+    const transportMode = normalizeTransportMode(
+      body.transportMode === undefined
+        ? existing.transportMode
+        : body.transportMode,
+    );
+    if (trackingMode === "ACTIVITY" && transportMode === "MULTI_DROP")
+      return fail(422, "Activity tracking tidak mendukung MULTI_DROP.");
+    if (
+      body.trackingMode !== undefined &&
+      trackingMode !== existing.trackingMode
+    ) {
+      const [activities, checkins] = await Promise.all([
+        db.transportActivity.count({
+          where: { transportId: existing.id },
+        }),
+        db.checkpointRecord.count({
+          where: { transportId: existing.id },
+        }),
+      ]);
+      if (activities || checkins)
+        return fail(
+          422,
+          "Mode tracking tidak bisa diubah setelah bukti tracking dicatat.",
+        );
+    }
+    data.trackingMode = trackingMode;
+    data.transportMode = transportMode;
     if (body.routeId !== undefined) data.routeId = num(body.routeId);
     if (body.vehicleId !== undefined) data.vehicleId = num(body.vehicleId);
     if (body.driverId !== undefined) data.driverId = num(body.driverId);
@@ -223,6 +266,19 @@ export async function PUT(req: NextRequest, { params }: Params) {
         routeId: ["Rute wajib dipilih."],
       });
     }
+
+    const route = await db.route.findUnique({
+      where: { id: routeId },
+      include: { checkpoints: true },
+    });
+    if (!route) return fail(422, "Rute tidak ditemukan.");
+    if (trackingMode === "CHECKPOINT" && route.checkpoints.length < 3)
+      return fail(422, "Rute harus memiliki minimal 3 checkpoint.");
+    await assertTransportScope(
+      user,
+      route,
+      existing.shipments.map((s) => s.master),
+    );
 
     const driverId = (data.driverId as number | null | undefined) ?? existing.driverId;
     const kenekId = (data.kenekId as number | null | undefined) ?? existing.kenekId;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import {
@@ -82,6 +82,19 @@ interface DriverDashboardData {
   note?: string;
 }
 
+export function selectDriverTransport(data: Pick<DriverDashboardData, "current" | "upcoming" | "future">) {
+  if (data.current?.status === "DEPARTED") return data.current;
+  return [...data.upcoming, ...data.future]
+    .filter((t) => t.status === "PLANNED")
+    .sort((a, b) => {
+      const time = (t: DriverTransportSummary) => {
+        const value = t.plannedDepartureAt ? Date.parse(t.plannedDepartureAt) : NaN;
+        return Number.isFinite(value) ? value : Number.MAX_SAFE_INTEGER;
+      };
+      return time(a) - time(b) || a.id - b.id;
+    })[0] ?? null;
+}
+
 function todayStr() {
   const d = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -138,10 +151,16 @@ export function DriverDashboard() {
   const [to, setTo] = useState(todayStr());
   const [checkinOpen, setCheckinOpen] = useState(false);
 
-  const { data, loading, reload } = useApiData<DriverDashboardData>(
+  const { data, loading, error, reload } = useApiData<DriverDashboardData>(
     () => apiGet<DriverDashboardData>(`/dashboard/driver?from=${from}&to=${to}`),
     [from, to],
   );
+
+  useEffect(() => {
+    if (loading || error || !data) return;
+    const target = selectDriverTransport(data);
+    if (target) window.location.replace(`#/transports/${target.id}`);
+  }, [data, loading, error]);
 
   const greeting = new Date().getHours() < 12 ? "Selamat pagi" : new Date().getHours() < 18 ? "Selamat siang" : "Selamat malam";
 
@@ -161,6 +180,15 @@ export function DriverDashboard() {
       },
     ];
   }, [data?.current]);
+
+  if (!loading && error) {
+    return (
+      <div role="alert" className="space-y-3">
+        <p>Gagal memuat transport yang ditugaskan: {error}</p>
+        <Button onClick={() => void reload()}>Coba lagi</Button>
+      </div>
+    );
+  }
 
   if (loading || !data) {
     return (

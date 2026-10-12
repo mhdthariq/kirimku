@@ -27,12 +27,13 @@ interface TransportForm {
   plannedArrivalAt: string; // datetime-local
   /** DIRECT (default) or MULTI_DROP — set at creation only */
   transportMode: "DIRECT" | "MULTI_DROP";
+  trackingMode: "CHECKPOINT" | "ACTIVITY";
   shipmentIds: number[];
 }
 
 const EMPTY: TransportForm = {
   routeId: "", vehicleId: "", driverId: "", kenekId: "",
-  origin: "", destination: "", plannedDepartureAt: "", plannedArrivalAt: "", transportMode: "DIRECT",
+  origin: "", destination: "", plannedDepartureAt: "", plannedArrivalAt: "", transportMode: "DIRECT", trackingMode: "CHECKPOINT",
   shipmentIds: [],
 };
 
@@ -89,6 +90,7 @@ function TransportFormSession({
         plannedArrivalAt: toLocalInput(editing.plannedArrivalAt ? new Date(editing.plannedArrivalAt) : null),
         shipmentIds: [],
         transportMode: editing.transportMode ?? "DIRECT",
+        trackingMode: editing.trackingMode ?? "CHECKPOINT",
     };
 
   });
@@ -197,6 +199,10 @@ function TransportFormSession({
       toast.error("Rencana Tiba tidak boleh lebih awal dari Rencana Berangkat.");
       return;
     }
+    if (form.trackingMode === "ACTIVITY" && form.transportMode === "MULTI_DROP") {
+      toast.error("Activity Tracking tidak mendukung Multi Drop.");
+      return;
+    }
     setBusy(true);
     const payload: Record<string, unknown> = {
       routeId: Number(form.routeId),
@@ -209,7 +215,10 @@ function TransportFormSession({
     if (form.driverId) payload.driverId = Number(form.driverId);
     if (form.kenekId) payload.kenekId = Number(form.kenekId);
     if (!editing && form.shipmentIds.length > 0) payload.shipmentIds = form.shipmentIds;
-    if (!editing) payload.transportMode = form.transportMode;
+    if (!editing) {
+      payload.transportMode = form.transportMode;
+      payload.trackingMode = form.trackingMode;
+    }
     const ok = await runAction(
       () => (editing ? apiPut(`/transports/${editing.id}`, payload) : apiPost("/transports", payload)),
       { success: editing ? "Transport diperbarui." : "Transport direncanakan." },
@@ -256,12 +265,25 @@ function TransportFormSession({
               <Field label="Mode Transport" htmlFor="t-mode" hint="Multi Drop: tiap resi bisa turun di checkpoint berbeda" className="sm:col-span-2">
                 <FormSelect
                   value={form.transportMode}
-                  onValueChange={(v) => setForm({ ...form, transportMode: v as "DIRECT" | "MULTI_DROP" })}
+                  onValueChange={(v) => setForm({ ...form, transportMode: v as "DIRECT" | "MULTI_DROP", trackingMode: v === "MULTI_DROP" ? "CHECKPOINT" : form.trackingMode })}
                   options={[
                     { value: "DIRECT", label: "Direct - satu tujuan akhir" },
                     { value: "MULTI_DROP", label: "Multi Drop - banyak titik turun" },
                   ]}
                   disabled={busy}
+                />
+              </Field>
+            )}
+            {!editing && (
+              <Field label="Mode Tracking" htmlFor="t-tracking" hint="Activity menggunakan foto kamera dan GPS, tanpa checkpoint." className="sm:col-span-2">
+                <FormSelect
+                  value={form.trackingMode}
+                  onValueChange={(v) => setForm({ ...form, trackingMode: v as "CHECKPOINT" | "ACTIVITY" })}
+                  options={[
+                    { value: "CHECKPOINT", label: "Checkpoint Tracking" },
+                    ...(form.transportMode === "MULTI_DROP" ? [] : [{ value: "ACTIVITY", label: "Activity Tracking (Tanpa Checkpoint)" }]),
+                  ]}
+                  disabled={busy || form.transportMode === "MULTI_DROP"}
                 />
               </Field>
             )}

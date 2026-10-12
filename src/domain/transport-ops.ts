@@ -39,19 +39,33 @@ export function validateExpense(input: ExpenseInput): string | null {
   return null;
 }
 
+export interface ExpenseLocation {
+  latitude: number;
+  longitude: number;
+  locationAccuracy: number;
+}
+
+/** GPS must be actual finite numbers, never coerced from null, strings or booleans. */
+export function validateExpenseLocation(input: { latitude?: unknown; longitude?: unknown; locationAccuracy?: unknown }): string | null {
+  if (typeof input.latitude !== "number" || !Number.isFinite(input.latitude) || Math.abs(input.latitude) > 90) return "GPS latitude wajib valid (-90 sampai 90).";
+  if (typeof input.longitude !== "number" || !Number.isFinite(input.longitude) || Math.abs(input.longitude) > 180) return "GPS longitude wajib valid (-180 sampai 180).";
+  if (typeof input.locationAccuracy !== "number" || !Number.isFinite(input.locationAccuracy) || input.locationAccuracy < 0) return "Akurasi GPS wajib valid dan tidak negatif.";
+  return null;
+}
+
 export interface ExpenseSummary {
   byType: Record<ExpenseType, { count: number; total: number }>;
   count: number;
   total: number;
 }
 
-/** Totals per type + grand total. Any number of rows per type is fine (multi transaction). */
-export function summarizeExpenses(rows: { type: string; amount: number }[]): ExpenseSummary {
+/** Approved totals only; rows without status are legacy expense projections. */
+export function summarizeExpenses(rows: { type: string; amount: number; status?: string }[]): ExpenseSummary {
   const byType = Object.fromEntries(EXPENSE_TYPES.map((t) => [t, { count: 0, total: 0 }])) as ExpenseSummary["byType"];
   let count = 0;
   let total = 0;
   for (const r of rows) {
-    if (!isExpenseType(r.type)) continue;
+    if (!isExpenseType(r.type) || (r.status !== undefined && r.status !== "APPROVED")) continue;
     byType[r.type].count += 1;
     byType[r.type].total += r.amount;
     count += 1;

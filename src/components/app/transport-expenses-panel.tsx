@@ -3,9 +3,10 @@
 import { useMemo, useRef, useState } from "react";
 import { Camera, Fuel, HandCoins, ParkingCircle, Pencil, Plus, Trash2, Utensils, Wallet, X } from "lucide-react";
 import { toast } from "sonner";
-import { apiDelete, apiGet, apiPost, apiPut, type TransportExpenseRow } from "@/infrastructure/http/client-api";
+import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type TransportExpenseRow as BaseExpenseRow } from "@/infrastructure/http/client-api";
+import { useAuth } from "@/hooks/use-auth";
 import { runAction, useApiData } from "@/hooks/use-api-data";
-import { EXPENSE_LABEL, EXPENSE_TYPES, summarizeExpenses, validateExpense, type ExpenseType } from "@/domain/transport-ops";
+import { EXPENSE_LABEL, EXPENSE_TYPES, summarizeExpenses, validateExpense, validateExpenseLocation, type ExpenseLocation, type ExpenseType } from "@/domain/transport-ops";
 import { fileToCompressedJpeg } from "@/presentation/image-file";
 import { Field, FormSelect, Input, NumberInput, SubmitButton, formatDate, formatRupiah } from "@/components/app/form-parts";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,43 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 const ICON: Record<ExpenseType, typeof Fuel> = { BBM: Fuel, PARKIR: ParkingCircle, MAKAN: Utensils, BONGKAR: HandCoins };
+
+type TransportExpenseRow = BaseExpenseRow & {
+  status: string;
+  latitude: number | null;
+  longitude: number | null;
+  locationAccuracy: number | null;
+  approvedAt: string | null;
+  approvedById: number | null;
+  approvedByUsername: string | null;
+  approvedByRole: string | null;
+};
+
+function captureLocation(): Promise<ExpenseLocation> {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation)
+      return reject(new Error("GPS tidak tersedia di perangkat ini."));
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const location = {
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          locationAccuracy: coords.accuracy,
+        };
+        const problem = validateExpenseLocation(location);
+        if (problem) reject(new Error(problem));
+        else resolve(location);
+      },
+      () =>
+        reject(
+          new Error(
+            "GPS gagal diperoleh. Izinkan akses lokasi dan coba lagi (HTTPS diperlukan).",
+          ),
+        ),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+    );
+  });
+}
 
 interface FormState {
   type: ExpenseType;
@@ -34,12 +72,16 @@ export function TransportExpensesPanel({
   canCreate,
   canUpdate,
   canDelete,
+  canApprove: approvePermission,
 }: {
   transportId: number;
   canCreate: boolean;
   canUpdate: boolean;
   canDelete: boolean;
+  canApprove?: boolean;
 }) {
+  const { user } = useAuth();
+  const canApprove = approvePermission ?? hasPermission(user, "transport.expense.approve");
   const { data, loading, reload } = useApiData<TransportExpenseRow[]>(() => apiGet<TransportExpenseRow[]>(`/transports/${transportId}/expenses`), [transportId]);
   const rows = useMemo(() => data ?? [], [data]);
   const summary = useMemo(() => summarizeExpenses(rows), [rows]);
@@ -48,6 +90,8 @@ export function TransportExpensesPanel({
   const [editing, setEditing] = useState<TransportExpenseRow | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY);
   const [busy, setBusy] = useState(false);
+  const [approvingId, setApprovingId] = useState<number | null>(null);
+  const submitting = useRef(false);
   const [confirmDelete, setConfirmDelete] = useState<TransportExpenseRow | null>(null);
   const [viewPhoto, setViewPhoto] = useState<{ title: string; src: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -77,18 +121,37 @@ export function TransportExpensesPanel({
     e.preventDefault();
     const problem = validateExpense({ type: form.type, amount: form.amount });
     if (problem) return toast.error(problem);
+    if (submitting.current) return;
+    submitting.current = true;
     setBusy(true);
-    const payload: Record<string, unknown> = { type: form.type, amount: Number(form.amount), description: form.description.trim() || null };
-    if (form.photo) payload.photo = form.photo;
-    if (editing && form.removePhoto) payload.removePhoto = true;
-    const ok = await runAction(
-      () => (editing ? apiPut(`/transports/${transportId}/expenses/${editing.id}`, payload) : apiPost(`/transports/${transportId}/expenses`, payload)),
-      { success: editing ? "Biaya diperbarui." : "Biaya ditambahkan." },
-    );
-    setBusy(false);
-    if (ok) {
-      setDialogOpen(false);
-      reload();
+    try {
+      const location = await captureLocation();
+      const payload: Record<string, unknown> = { type: form.type, amount: Number(form.amount), description: form.description.trim() || null, ...location };
+      if (form.photo) payload.photo = form.photo;
+      if (editing && form.removePhoto) payload.removePhoto = true;
+      const ok = await runAction(
+        () => (editing ? apiPut(`/transports/${transportId}/expenses/${editing.id}`, payload) : apiPost(`/transports/${transportId}/expenses`, payload)),
+        { success: editing ? "Biaya diperbarui." : "Biaya ditambahkan." },
+      );
+      if (ok) {
+        setDialogOpen(false);
+        reload();
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Lokasi GPS gagal diperoleh.");
+    } finally {
+      submitting.current = false;
+      setBusy(false);
+    }
+  }
+
+  async function onApprove(row: TransportExpenseRow) {
+    if (approvingId != null) return;
+    setApprovingId(row.id);
+    try {
+      if (await runAction(() => apiPost(`/transports/${transportId}/expenses/${row.id}/approve`), { success: "Biaya disetujui." })) reload();
+    } finally {
+      setApprovingId(null);
     }
   }
 
@@ -118,7 +181,7 @@ export function TransportExpensesPanel({
             <Wallet className="h-4 w-4 text-primary" /> Biaya Operasional
           </span>
           <span className="flex items-center gap-3">
-            <span className="text-sm font-semibold">{formatRupiah(summary.total)}</span>
+            <span className="text-sm font-semibold">{formatRupiah(summary.total)} (disetujui)</span>
             {canCreate && (
               <Button size="sm" onClick={() => openCreate()}>
                 <Plus className="h-3.5 w-3.5" /> Tambah Biaya
@@ -163,18 +226,62 @@ export function TransportExpensesPanel({
                       <span className="font-mono">{r.expenseCode}</span> · {formatDate(r.createdAt, true)}
                       {r.description ? ` · ${r.description}` : ""}
                     </p>
+                    <span className="inline-block rounded border px-1.5 py-0.5 text-xs">
+                      {r.status === "APPROVED"
+                        ? "Approved"
+                        : "Pending"}
+                    </span>
+                    {r.status === "APPROVED" && (
+                      <p className="text-xs text-muted-foreground">
+                        {r.approvedByUsername
+                          ? `Approve by ${r.approvedByUsername}(${r.approvedByRole ?? "—"})`
+                          : "Biaya lama (migrasi); penyetuju tidak tercatat."}
+                        {r.approvedAt
+                          ? ` · ${formatDate(r.approvedAt, true)}`
+                          : ""}
+                      </p>
+                    )}
+                    {typeof r.latitude === "number" &&
+                      typeof r.longitude === "number" &&
+                      Number.isFinite(r.latitude) &&
+                      Number.isFinite(r.longitude) && (
+                        <a
+                          className="block text-xs text-primary underline"
+                          href={`https://www.google.com/maps?q=${r.latitude},${r.longitude}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {r.latitude.toFixed(6)},{" "}
+                          {r.longitude.toFixed(6)}
+                          {r.locationAccuracy != null
+                            ? ` (±${r.locationAccuracy.toFixed(0)} m)`
+                            : ""}
+                        </a>
+                      )}
                   </div>
+                  {canApprove && r.status === "PENDING" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={approvingId != null}
+                      onClick={() => onApprove(r)}
+                    >
+                      {approvingId === r.id
+                        ? "Menyetujui…"
+                        : "Approve"}
+                    </Button>
+                  )}
                   {r.hasPhoto && (
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => showPhoto(r)} aria-label="Lihat foto bukti">
                       <Camera className="h-4 w-4" />
                     </Button>
                   )}
-                  {canUpdate && (
+                  {canUpdate && r.status === "PENDING" && (
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(r)} aria-label="Edit biaya">
                       <Pencil className="h-4 w-4" />
                     </Button>
                   )}
-                  {canDelete && (
+                  {canDelete && r.status === "PENDING" && (
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setConfirmDelete(r)} aria-label="Hapus biaya">
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -190,7 +297,7 @@ export function TransportExpensesPanel({
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{editing ? "Edit Biaya" : "Tambah Biaya"}</DialogTitle>
-            <DialogDescription>Satu transport boleh punya banyak biaya untuk tiap jenis. Foto bukti opsional.</DialogDescription>
+            <DialogDescription>Satu transport boleh punya banyak biaya untuk tiap jenis. Foto bukti opsional. GPS saat ini wajib diambil saat menyimpan. Biaya baru menunggu persetujuan.</DialogDescription>
           </DialogHeader>
           <form onSubmit={onSubmit} className="space-y-4">
             <Field label="Jenis Biaya" htmlFor="x-type">
@@ -209,7 +316,7 @@ export function TransportExpensesPanel({
             </Field>
             <Field label="Foto Bukti" htmlFor="x-photo" hint="Opsional">
               <div className="space-y-2">
-                <input ref={fileRef} id="x-photo" type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onPickPhoto(e.target.files?.[0])} />
+                <input ref={fileRef} id="x-photo" type="file" accept="image/*" className="hidden" onChange={(e) => onPickPhoto(e.target.files?.[0])} />
                 {form.photo ? (
                   <div className="relative w-fit">
                     <img src={form.photo} alt="Bukti biaya" className="max-h-40 rounded-md border" />

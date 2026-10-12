@@ -530,10 +530,42 @@ export interface Route {
 }
 
 /** One operational expense of a transport (BBM / Parkir / Makan / Bongkar). */
+export type TrackingMode = "CHECKPOINT" | "ACTIVITY";
+
+export interface TransportActivityRow {
+  id: number;
+  transportId: number;
+  photoUrl: string;
+  latitude: number;
+  longitude: number;
+  locationAccuracy: number | null;
+  capturedAt: string;
+  recordedAt: string;
+  recordedById: number | null;
+  recordedByUsername: string | null;
+}
+
+export interface TransportActivityInput {
+  photo: string;
+  latitude: number;
+  longitude: number;
+  locationAccuracy?: number | null;
+  capturedAt: string;
+}
+
 export interface TransportExpenseRow {
   id: number;
   expenseCode: string;
   transportId: number;
+  status?: "PENDING" | "APPROVED";
+  latitude?: number | null;
+  longitude?: number | null;
+  locationAccuracy?: number | null;
+  approvedAt?: string | null;
+  approvedById?: number | null;
+  approvedByUsername?: string | null;
+  approvedByRole?: string | null;
+  photoUrl?: string | null;
   type: "BONGKAR" | "PARKIR" | "MAKAN" | "BBM";
   amount: number;
   description: string | null;
@@ -589,6 +621,7 @@ export interface ReturnTaskRow {
 }
 
 export interface Transport {
+  trackingMode?: TrackingMode;
   id: number;
   transportCode: string;
   status: string;
@@ -646,6 +679,8 @@ export interface Transport {
 
 /** Transport detail (GET /transports/{id}) — Revision Part K. */
 export interface TransportDetail {
+  trackingMode?: TrackingMode;
+  transportMode?: "DIRECT" | "MULTI_DROP";
   id: number;
   transportCode: string;
   status: string;

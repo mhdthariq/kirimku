@@ -3,6 +3,7 @@ import { db } from "@/infrastructure/persistence/db";
 import { guard, ok, handle, fail, str, num, dateOrNull } from "@/composition/api-helpers";
 import { audit } from "@/infrastructure/services/audit";
 import { nextCode } from "@/infrastructure/services/code-generator";
+import { parseTrackingMode } from "@/shared/activity-tracking";
 import { normalizeTransportMode } from "@/domain/transport-ops";
 import { cityIndex, inScope, scopeForUser, transportGudangIds } from "@/infrastructure/services/gudang-scope";
 import { aggregateTransport, detailAggregates, isExecutorOnly, transportLoadFromAggregates } from "@/infrastructure/services/transport-totals";
@@ -94,9 +95,14 @@ export async function GET(req: NextRequest) {
           id: t.id,
           transportCode: t.transportCode,
           status: t.status,
+          trackingMode: t.trackingMode,
+          transportMode: t.transportMode,
           routeId: t.routeId,
           routeName: t.route?.name ?? null,
-          routeCheckpoints: t.route?.checkpoints ?? [],
+          routeCheckpoints:
+            t.trackingMode === "ACTIVITY"
+              ? []
+              : t.route?.checkpoints ?? [],
           vehicleId: t.vehicleId,
           vehicleNumber: t.vehicle.vehicleNumber,
           vehicleName: t.vehicle.name,
@@ -161,7 +167,14 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   return handle(req, async () => {
     const user = await guard(req, "transport.create");
-    const body = await req.json().catch(() => ({}));
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object" || Array.isArray(body))
+      return fail(422, "Payload transport tidak valid.");
+    const trackingMode = parseTrackingMode(body.trackingMode);
+    if (!trackingMode) return fail(422, "Mode tracking tidak valid.");
+    const transportMode = normalizeTransportMode(body.transportMode);
+    if (trackingMode === "ACTIVITY" && transportMode === "MULTI_DROP")
+      return fail(422, "Activity tracking tidak mendukung MULTI_DROP.");
     const routeId = num(body.routeId);
     const vehicleId = num(body.vehicleId);
     if (!routeId) return fail(422, "Rute wajib dipilih.", { routeId: ["Rute wajib dipilih."] });
@@ -169,7 +182,7 @@ export async function POST(req: NextRequest) {
 
     const route = await db.route.findUnique({ where: { id: routeId }, include: { checkpoints: true } });
     if (!route) return fail(422, "Rute tidak ditemukan.", { routeId: ["Rute tidak ditemukan."] });
-    if (route.checkpoints.length < 3) {
+    if (trackingMode === "CHECKPOINT" &&route.checkpoints.length < 3) {
       return fail(422, `Rute harus memiliki minimal 3 checkpoint (saat ini: ${route.checkpoints.length}).`);
     }
     const vehicle = await db.vehicle.findUnique({ where: { id: vehicleId } });
@@ -259,7 +272,8 @@ export async function POST(req: NextRequest) {
           plannedDepartureAt,
           plannedArrivalAt,
           status: "PLANNED",
-          transportMode: normalizeTransportMode(body.transportMode),
+          transportMode,
+          trackingMode,
         },
       });
       if (shipments.length > 0) {
@@ -314,8 +328,14 @@ export async function POST(req: NextRequest) {
       action: "created", entityType: "transport", entityId: transport.id, entityLabel: transport.transportCode, actor: user,
       after: {
         route: route.name, vehicle: vehicle.vehicleNumber, shipments: shipments.length,
-        origin, destination, plannedDepartureAt, plannedArrivalAt,
-        driverId: driverId ?? null, kenekId: kenekId ?? null,
+        trackingMode,
+        transportMode,
+        origin,
+        destination,
+        plannedDepartureAt,
+        plannedArrivalAt,
+        driverId: driverId ?? null,
+        kenekId: kenekId ?? null,
       },
     });
     return ok(transport);

@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { db } from "@/infrastructure/persistence/db";
 import { guard, ok, handle, fail, str } from "@/composition/api-helpers";
 import { audit } from "@/infrastructure/services/audit";
-import { validateExpense } from "@/domain/transport-ops";
+import { validateExpense, validateExpenseLocation } from "@/domain/transport-ops";
 import { assertTransportAccess, parseOptionalPhoto } from "@/infrastructure/services/transport-ops-server";
 
 type Params = { params: Promise<{ id: string; expenseId: string }> };
@@ -37,11 +37,17 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (!expense) return fail(404, "Biaya tidak ditemukan.");
     await assertTransportAccess(user, expense.transport);
 
-    const body = await req.json().catch(() => ({}));
+    if (expense.status !== "PENDING") return fail(409, "Biaya yang sudah disetujui tidak dapat diubah.");
+    const parsed = await req.json().catch(() => null);
+    const body = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
     const problem = validateExpense({ type: body.type ?? expense.type, amount: body.amount ?? expense.amount });
     if (problem) return fail(422, problem, { type: [problem] });
 
-    const data: Record<string, unknown> = {};
+    const locationProblem = validateExpenseLocation(body);
+    if (locationProblem) return fail(422, locationProblem, { location: [locationProblem] });
+    const data: Record<string, unknown> = {
+      latitude: body.latitude, longitude: body.longitude, locationAccuracy: body.locationAccuracy,
+    };
     if (body.type !== undefined) data.type = String(body.type);
     if (body.amount !== undefined) data.amount = Number(body.amount);
     if (body.description !== undefined) data.description = str(body.description);
@@ -52,15 +58,18 @@ export async function PUT(req: NextRequest, { params }: Params) {
       data.photoUrl = photo.photoUrl;
     }
 
-    const updated = await db.transportExpense.update({ where: { id: expense.id }, data });
+    const result = await db.transportExpense.updateMany({ where: { id: expense.id, transportId: expense.transportId, status: "PENDING" }, data });
+    if (result.count !== 1) return fail(409, "Biaya telah disetujui atau dihapus. Muat ulang data.");
+    const updated = await db.transportExpense.findUnique({ where: { id: expense.id } });
+    if (!updated) return fail(409, "Biaya telah dihapus. Muat ulang data.");
     await audit({
       action: "update",
       entityType: "transport_expense",
       entityId: updated.id,
       entityLabel: `${expense.transport.transportCode} · ${updated.type}`,
       actor: user,
-      before: { type: expense.type, amount: expense.amount },
-      after: { type: updated.type, amount: updated.amount },
+      before: { type: expense.type, amount: expense.amount, latitude: expense.latitude, longitude: expense.longitude, locationAccuracy: expense.locationAccuracy },
+      after: { ...data },
     });
     const { photoUrl, ...rest } = updated;
     return ok({ ...rest, hasPhoto: photoUrl != null });
@@ -74,7 +83,9 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     const expense = await load(id, expenseId);
     if (!expense) return fail(404, "Biaya tidak ditemukan.");
     await assertTransportAccess(user, expense.transport);
-    await db.transportExpense.delete({ where: { id: expense.id } });
+    if (expense.status !== "PENDING") return fail(409, "Biaya yang sudah disetujui tidak dapat dihapus.");
+    const result = await db.transportExpense.deleteMany({ where: { id: expense.id, transportId: expense.transportId, status: "PENDING" } });
+    if (result.count !== 1) return fail(409, "Biaya telah disetujui atau dihapus. Muat ulang data.");
     await audit({
       action: "delete",
       entityType: "transport_expense",

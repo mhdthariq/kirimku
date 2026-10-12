@@ -42,6 +42,11 @@ export async function POST(req: NextRequest, { params }: Params) {
       },
     });
     if (!transport) return fail(404, "Transport tidak ditemukan.");
+    if (transport.trackingMode === "ACTIVITY")
+      return fail(
+        422,
+        "Gunakan activity tracking untuk transport ini, bukan checkpoint check-in.",
+      );
 
     // ---- assignment enforcement (driver / kenek / owner only) --------------
     if (!user.isOwner && !user.permissions.includes("*")) {

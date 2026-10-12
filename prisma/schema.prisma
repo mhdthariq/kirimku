@@ -454,6 +454,7 @@ model Transport {
     /// "MULTI_DROP" (each resi gets its own drop checkpoint). NOTE: this is the
     /// TRANSPORT mode, unrelated to MasterShipment.fulfillmentMode = "DIRECT".
     transportMode        String               @default("DIRECT")
+    trackingMode         String               @default("CHECKPOINT")
     origin               String?
     destination          String?
     plannedDepartureAt   DateTime?
@@ -473,6 +474,7 @@ model Transport {
     settlement           TransportSettlement?
     shipments            TransportShipment[]
     expenses             TransportExpense[]
+    activities           TransportActivity[]
     /// Delivery approval of the WHOLE transport (all resi approved). Null until then.
     deliveryApprovedAt   DateTime?
     deliveryApprovedById Int?
@@ -508,21 +510,45 @@ model TransportShipment {
 /// Operational cost of a transport. A transport can have many of each type
 /// (several BBM fill-ups, several parking receipts...). Photo proof is optional.
 model TransportExpense {
-    id          Int       @id @default(autoincrement())
-    expenseCode String    @unique
-    transportId Int
+    id                 Int       @id @default(autoincrement())
+    expenseCode        String    @unique
+    transportId        Int
     /// BONGKAR | PARKIR | MAKAN | BBM
-    type        String
-    amount      Float
-    description String?
-    photoUrl    String?
-    createdById Int?
-    createdAt   DateTime  @default(now())
-    updatedAt   DateTime  @updatedAt
-    transport   Transport @relation(fields: [transportId], references: [id], onDelete: Cascade)
+    type               String
+    amount             Float
+    description        String?
+    photoUrl           String?
+    createdById        Int?
+    latitude           Float?
+    longitude          Float?
+    locationAccuracy   Float?
+    status             String    @default("PENDING")
+    approvedAt         DateTime?
+    approvedById       Int?
+    approvedByUsername String?
+    approvedByRole     String?
+    createdAt          DateTime  @default(now())
+    updatedAt          DateTime  @updatedAt
+    transport          Transport @relation(fields: [transportId], references: [id], onDelete: Cascade)
 
     @@index([transportId])
     @@index([transportId, type])
+}
+
+model TransportActivity {
+    id                 Int       @id @default(autoincrement())
+    transportId        Int
+    photoUrl           String
+    latitude           Float
+    longitude          Float
+    locationAccuracy   Float?
+    capturedAt         DateTime
+    recordedAt         DateTime  @default(now())
+    recordedById       Int?
+    recordedByUsername String?
+    transport          Transport @relation(fields: [transportId], references: [id], onDelete: Cascade)
+
+    @@index([transportId, capturedAt])
 }
 
 /// "Resi Tugas Balik" — an empty vehicle going back after all its resi were
@@ -742,7 +768,7 @@ model InvoiceSettlement {
     id           Int      @id @default(autoincrement())
     invoiceId    Int
     amount       Float
-    pph          Float      @default(0)
+    pph          Float    @default(0)
     method       String
     reference    String?
     proofUrl     String?

@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
 import { db } from "@/infrastructure/persistence/db";
-import { guard, ok, handle, fail, num, str } from "@/composition/api-helpers";
+import { guard, ok, handle, fail, str } from "@/composition/api-helpers";
 import { audit } from "@/infrastructure/services/audit";
 import { nextCode } from "@/infrastructure/services/code-generator";
-import { summarizeExpenses, validateExpense } from "@/domain/transport-ops";
+import { summarizeExpenses, validateExpense, validateExpenseLocation } from "@/domain/transport-ops";
 import { assertTransportAccess, parseOptionalPhoto } from "@/infrastructure/services/transport-ops-server";
 
 type Params = { params: Promise<{ id: string }> };
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest, { params }: Params) {
   });
 }
 
-/** POST /transports/:id/expenses — { type, amount, description?, photo? } (photo optional). */
+/** POST — type, amount and GPS required; description and receipt photo optional. */
 export async function POST(req: NextRequest, { params }: Params) {
   return handle(req, async () => {
     const user = await guard(req, "transport.expense.create");
@@ -42,9 +42,12 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (!transport) return fail(404, "Transport tidak ditemukan.");
     await assertTransportAccess(user, transport);
 
-    const body = await req.json().catch(() => ({}));
+    const parsed = await req.json().catch(() => null);
+    const body = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
     const problem = validateExpense({ type: body.type, amount: body.amount });
     if (problem) return fail(422, problem, { type: [problem] });
+    const locationProblem = validateExpenseLocation(body);
+    if (locationProblem) return fail(422, locationProblem, { location: [locationProblem] });
     const photo = parseOptionalPhoto(body.photo);
     if (photo.error) return fail(422, photo.error, { photo: [photo.error] });
 
@@ -58,6 +61,10 @@ export async function POST(req: NextRequest, { params }: Params) {
         description: str(body.description),
         photoUrl: photo.photoUrl,
         createdById: user.id,
+        latitude: body.latitude,
+        longitude: body.longitude,
+        locationAccuracy: body.locationAccuracy,
+        status: "PENDING",
       },
     });
     await audit({
@@ -66,7 +73,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       entityId: created.id,
       entityLabel: `${transport.transportCode} · ${created.type} Rp${created.amount.toLocaleString("id-ID")}`,
       actor: user,
-      after: { type: created.type, amount: created.amount, hasPhoto: photo.photoUrl != null },
+      after: { type: created.type, amount: created.amount, hasPhoto: photo.photoUrl != null, status: created.status, latitude: created.latitude, longitude: created.longitude, locationAccuracy: created.locationAccuracy },
     });
     const { photoUrl, ...rest } = created;
     return ok({ ...rest, hasPhoto: photoUrl != null });

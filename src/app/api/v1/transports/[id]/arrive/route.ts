@@ -1,10 +1,10 @@
 import { NextRequest } from "next/server";
 import { db } from "@/infrastructure/persistence/db";
-import { guard, ok, handle, fail } from "@/composition/api-helpers";
+import { guard, ok, handle, fail, HttpError } from "@/composition/api-helpers";
 import { audit } from "@/infrastructure/services/audit";
 import { shipmentDestinationGudangIds, cityIndex } from "@/infrastructure/services/gudang-scope";
-import { assertTransportScope } from "@/infrastructure/services/gudang-scope";
-import { syncReturnTaskForTransport } from "@/infrastructure/services/transport-ops-server";
+import { nextCode } from "@/infrastructure/services/code-generator";
+import { assertTransportAccess, syncReturnTaskForTransport } from "@/infrastructure/services/transport-ops-server";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -14,7 +14,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     const { id } = await params;
     const transport = await db.transport.findUnique({ where: { id: Number(id) }, include: { route: true, shipments: { include: { master: true } } } });
     if (!transport) return fail(404, "Transport tidak ditemukan.");
-    await assertTransportScope(user, transport.route ?? { origin: null, destination: null }, transport.shipments.map((s) => s.master));
+    await assertTransportAccess(user, transport);
+    if (transport.trackingMode === "ACTIVITY" && transport.status !== "DEPARTED") return fail(422, "Transport ACTIVITY harus berangkat sebelum diselesaikan.");
     if (transport.status !== "PLANNED" && transport.status !== "DEPARTED") {
       return fail(422, `Transport berstatus ${transport.status}, hanya PLANNED atau DEPARTED yang bisa diselesaikan.`);
     }
@@ -32,12 +33,58 @@ export async function POST(req: NextRequest, { params }: Params) {
     const destGudangName = whName(transport.shipments[0]?.master.destinationWarehouseId) ?? whNameByCity(transport.destination) ?? whNameByCity(transport.route?.destination);
 
     const updated = await db.$transaction(async (tx) => {
+      const active = await tx.transport.updateMany({
+        where: { id: transport.id, status: transport.status, trackingMode: transport.trackingMode, driverId: transport.driverId, kenekId: transport.kenekId },
+        data: { updatedAt: new Date() },
+      });
+      if (!active.count) throw new HttpError(409, "Transport berubah; muat ulang sebelum menyelesaikan.");
       const result = await tx.transport.update({ where: { id: transport.id }, data: { status: "ARRIVED", arrivedAt: new Date() } });
       for (const s of transport.shipments) {
         // Multi drop: resi already unloaded at an earlier checkpoint were handled by the drop step.
         if (s.dropStatus !== "LOADED" && s.dropStatus !== "AT_DROP_POINT") continue;
         const destIds = shipmentDestinationGudangIds(s.master, cityIdx);
         const arrivedWarehouseId = s.master.destinationWarehouseId ?? destIds[0] ?? null;
+        if (
+          transport.trackingMode === "ACTIVITY" &&
+          (s.master.fulfillmentMode ?? "STANDARD") === "DIRECT"
+        ) {
+          await tx.masterShipment.update({
+            where: { id: s.shipmentId },
+            data: {
+              status: "ARRIVED_AT_GUDANG",
+              arrivedWarehouseId,
+              destReceivedAt: new Date(),
+            },
+          });
+          const delivery = await tx.delivery.findFirst({
+            where: { masterId: s.shipmentId },
+            select: { id: true },
+          });
+          if (!delivery && transport.driverId != null) {
+            await tx.delivery.create({
+              data: {
+                deliveryCode: await nextCode(
+                  "delivery",
+                  "DLV-2026-",
+                  "deliveryCode",
+                ),
+                masterId: s.shipmentId,
+                kurirId: transport.driverId,
+                status: "ASSIGNED",
+                notes: `Auto-assigned dari transport ${transport.transportCode} (ACTIVITY - DIRECT)`,
+              },
+            });
+          }
+          await tx.trackingEvent.create({
+            data: {
+              masterId: s.shipmentId,
+              event: "ARRIVED_AT_GUDANG",
+              description: `Transport ${transport.transportCode} tiba di tujuan`,
+              actorId: user.id,
+            },
+          });
+          continue;
+        }
         if (s.master.status === "IN_TRANSPORT") {
           // The transport reached the destination gudang (admin override of the
           // final-checkpoint check-in). "Arrived at {Gudang}" only happens
