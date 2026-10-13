@@ -280,8 +280,18 @@ export interface Shipment {
   createdAt: string;
   invoiceLines?: { invoice: { id: number; invoiceNumber: string; status: string } }[];
   details?: DetailShipment[];
+  documents?: ShipmentDocument[];
   _count?: { details: number; pickups: number; deliveries: number; payments: number };
   trackingEvents?: { id: number; event: string; description: string | null; occurredAt: string; actor?: { name: string } | null }[];
+}
+
+export interface ShipmentDocument {
+  id: number;
+  masterId: number;
+  fileName: string;
+  mimeType: string;
+  dataUrl: string;
+  createdAt: string;
 }
 
 export interface ShipmentTotals {

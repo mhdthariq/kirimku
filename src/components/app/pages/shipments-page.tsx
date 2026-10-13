@@ -13,6 +13,8 @@ import {
   Route as RouteIcon,
   ScanLine,
   Send,
+  FileText,
+  Paperclip,
   Trash2,
   Truck,
   UserCheck,
@@ -35,6 +37,7 @@ import {
   type GudangWorkspace,
   type Options,
   type Shipment,
+  type ShipmentDocument,
   type TrackingEvent,
 } from "@/infrastructure/http/client-api";
 import { customerDisplayParts, customerPrimaryName } from "@/presentation/customer-display";
@@ -56,6 +59,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/shared/utils";
+import { openDataUrlInNewTab } from "@/presentation/open-data-url";
 
 interface ShipmentForm {
   customerId: string;
@@ -1297,6 +1301,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
     printResi: hasPermission(user, "shipment.print_resi"),
     // Bottom "Log Aktivitas Shipment Ini" panel — only for audit_log.view holders.
     viewLog: hasPermission(user, "audit_log.view"),
+    editPricing: hasPermission(user, "shipment.update"),
   };
 
   const { data: shipment, loading, error, reload: load } = useApiData<
@@ -1330,6 +1335,14 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
   const [penerimaForm, setPenerimaForm] = useState({ name: "", address: "", contact: "" });
   const [pengirimOpen, setPengirimOpen] = useState(false);
   const [pengirimForm, setPengirimForm] = useState({ name: "", phone: "", email: "", address: "" });
+  const [pricingOpen, setPricingOpen] = useState(false);
+  const [pricingForm, setPricingForm] = useState({ discountAmount: "", insuranceAmount: "" });
+  const [documents, setDocuments] = useState<ShipmentDocument[]>([]);
+  const [documentError, setDocumentError] = useState("");
+
+  useEffect(() => {
+    if (shipment) void apiGet<ShipmentDocument[]>(`/shipments/${id}/documents`).then((value) => setDocuments(Array.isArray(value) ? value : [])).catch(() => setDocumentError("Dokumen gagal dimuat."));
+  }, [shipment, id]);
 
   // deep link #/shipments/{id}?print=1 — open the resi print preview
   // (only for users holding the print-resi permission)
@@ -1368,6 +1381,73 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
 
   async function refresh() {
     await load();
+  }
+
+  async function loadDocuments() {
+    try {
+      const value = await apiGet<ShipmentDocument[]>(`/shipments/${id}/documents`);
+      setDocuments(Array.isArray(value) ? value : []);
+    } catch {
+      setDocumentError("Dokumen gagal dimuat.");
+    }
+  }
+
+  function openPricingEdit() {
+    setPricingForm({ discountAmount: String(shipment!.discountAmount ?? 0), insuranceAmount: String(shipment!.insuranceAmount ?? 0) });
+    setPricingOpen(true);
+  }
+
+  async function onPricingSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    const discountAmount = Number(pricingForm.discountAmount) || 0;
+    const insuranceAmount = Number(pricingForm.insuranceAmount) || 0;
+    if (discountAmount < 0 || insuranceAmount < 0) {
+      toast.error("Discount dan asuransi tidak boleh negatif.");
+      return;
+    }
+    setBusy(true);
+    const saved = shipment!.priceAmount != null
+      ? await runAction(() => apiPost(`/shipments/${shipment!.id}/price`, { discountAmount, insuranceAmount }), { success: "Discount dan asuransi disimpan; harga dihitung ulang." })
+      : await runAction(() => apiPut(`/shipments/${shipment!.id}`, { insuranceAmount, discountAmount }), { success: "Discount dan asuransi disimpan." });
+    setBusy(false);
+    if (saved) {
+      setPricingOpen(false);
+      refresh();
+    }
+  }
+
+  function readDocument(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("Dokumen tidak dapat dibaca."));
+      reader.onerror = () => reject(new Error("Dokumen tidak dapat dibaca."));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function onDocumentChange(file: File | undefined) {
+    setDocumentError("");
+    if (!file) return;
+    if (!["application/pdf", "image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setDocumentError("Pilih file PDF, JPG, PNG, atau WebP.");
+      return;
+    }
+    if (file.size > 8_000_000) {
+      setDocumentError("Ukuran dokumen maksimal 8 MB.");
+      return;
+    }
+    try {
+      const dataUrl = await readDocument(file);
+      const created = await runAction(() => apiPost<ShipmentDocument>(`/shipments/${shipment!.id}/documents`, { fileName: file.name, mimeType: file.type, dataUrl }), { success: "Dokumen diunggah." });
+      if (created) await loadDocuments();
+    } catch (error) {
+      setDocumentError(error instanceof Error ? error.message : "Dokumen gagal diunggah.");
+    }
+  }
+
+  async function removeDocument(document: ShipmentDocument) {
+    const removed = await runAction(() => apiDelete(`/shipments/${shipment!.id}/documents/${document.id}`), { success: "Dokumen dihapus." });
+    if (removed) await loadDocuments();
   }
 
   async function submitForPickup() {
@@ -1687,9 +1767,16 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
         {/* Pricing summary */}
         <Card className="lg:col-span-1">
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Calculator className="h-4 w-4 text-primary" /> Ringkasan Harga
-            </CardTitle>
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Calculator className="h-4 w-4 text-primary" /> Ringkasan Harga
+              </CardTitle>
+              {shipment.status === "CREATED" && can.editPricing && (
+                <Button size="sm" variant="ghost" className="h-7" onClick={openPricingEdit}>
+                  <Pencil className="h-3.5 w-3.5" /> Edit
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="space-y-2.5">
             <Row label="Total paket" value={`${shipment.details.length} paket`} />
@@ -2037,6 +2124,53 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <FileText className="h-4 w-4 text-primary" /> Dokumen Bukti ({documents.length})
+            </CardTitle>
+            {can.update && shipment.status !== "CANCELLED" && (
+              <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md border bg-background px-3 text-sm font-medium hover:bg-accent">
+                <Paperclip className="h-4 w-4" /> Upload PDF / Foto
+                <input
+                  type="file"
+                  accept="application/pdf,image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(event) => void onDocumentChange(event.target.files?.[0])}
+                  disabled={busy}
+                />
+              </label>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {documents.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Belum ada dokumen bukti untuk shipment ini.</p>
+          ) : (
+            <div className="divide-y rounded-lg border">
+              {documents.map((document) => (
+                <div key={document.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5">
+                  <button type="button" className="flex min-w-0 items-center gap-2 text-left text-sm text-primary hover:underline" onClick={() => openDataUrlInNewTab(document.dataUrl)}>
+                    <FileText className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{document.fileName}</span>
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-muted-foreground">{formatDate(document.createdAt, true)}</span>
+                    {can.update && (
+                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => void removeDocument(document)} aria-label={`Hapus dokumen ${document.fileName}`}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {documentError && <p className="mt-2 text-xs text-destructive">{documentError}</p>}
+        </CardContent>
+      </Card>
+
       {/* Log Aktivitas - only rendered for audit_log.view holders (hidden for
            Marketing & other roles that cannot read the audit trail). */}
       {can.viewLog && (
@@ -2232,6 +2366,27 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
                 Batal
               </Button>
               <SubmitButton busy={busy}>Simpan Pengirim</SubmitButton>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={pricingOpen} onOpenChange={setPricingOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Discount &amp; Asuransi</DialogTitle>
+            <DialogDescription>Discount akan dihitung ulang dari harga shipment saat ini. Persentasenya dibuat otomatis oleh sistem.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={onPricingSubmit} className="space-y-4">
+            <Field label={shipment.discountFundedBy === "MARKETING" ? "Discount Marketing (Rupiah)" : "Discount Perusahaan (Rupiah)"} htmlFor="pe-discount">
+              <NumberInput id="pe-discount" min={0} value={pricingForm.discountAmount} onChange={(event) => setPricingForm({ ...pricingForm, discountAmount: event.target.value })} disabled={busy} />
+            </Field>
+            <Field label="Asuransi (Rupiah)" htmlFor="pe-insurance">
+              <NumberInput id="pe-insurance" min={0} value={pricingForm.insuranceAmount} onChange={(event) => setPricingForm({ ...pricingForm, insuranceAmount: event.target.value })} disabled={busy} />
+            </Field>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setPricingOpen(false)} disabled={busy}>Batal</Button>
+              <SubmitButton busy={busy}>Simpan</SubmitButton>
             </DialogFooter>
           </form>
         </DialogContent>

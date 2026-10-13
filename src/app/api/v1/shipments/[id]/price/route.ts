@@ -41,6 +41,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     const body = await req.json().catch(() => ({}));
     const overrideTariffId = num(body.tariffId);
+    const insuranceAmount = body.insuranceAmount === undefined ? null : Math.max(0, num(body.insuranceAmount) ?? 0);
 
     const tariff = overrideTariffId
       ? await db.tariff.findFirst({
@@ -136,6 +137,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         discountAmount,
         discountPercentage,
         finalPriceAmount,
+        ...(insuranceAmount == null ? {} : { insuranceAmount }),
       },
     });
 

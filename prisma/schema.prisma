@@ -311,8 +311,21 @@ model MasterShipment {
     tariff                 Tariff?             @relation(fields: [tariffId], references: [id])
     payments               Payment[]
     pickups                Pickup[]
+    documents              ShipmentDocument[]
     trackingEvents         TrackingEvent[]
     transportItems         TransportShipment[]
+}
+
+model ShipmentDocument {
+    id         Int            @id @default(autoincrement())
+    masterId   Int
+    fileName   String
+    mimeType   String
+    dataUrl    String
+    createdAt  DateTime       @default(now())
+    master     MasterShipment @relation(fields: [masterId], references: [id], onDelete: Cascade)
+
+    @@index([masterId, createdAt])
 }
 
 model DetailShipment {
