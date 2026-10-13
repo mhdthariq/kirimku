@@ -101,9 +101,12 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Revise.md §6 — Marketing enters the discount as an AMOUNT in Rupiah.
-    // The percentage is always derived by the system, never typed manually.
-    const discountAmount = Math.max(0, num(body.discountAmount) ?? 0);
+    const discountType = body.discountType === "PERCENTAGE" ? "PERCENTAGE" : "AMOUNT";
+    const discountPercentageInput = num(body.discountPercentage);
+    if (discountType === "PERCENTAGE" && (discountPercentageInput == null || discountPercentageInput < 0 || discountPercentageInput > 100)) {
+      return fail(422, "Persentase discount harus antara 0% dan 100%.", { discountPercentage: ["Masukkan persentase antara 0 dan 100."] });
+    }
+    const discountAmount = discountType === "PERCENTAGE" ? 0 : Math.max(0, num(body.discountAmount) ?? 0);
     const insuranceAmount = Math.max(0, num(body.insuranceAmount) ?? 0);
 
     // Route comes from the tariff dropdown (Kota Asal/Tujuan no longer typed by hand).
@@ -232,6 +235,7 @@ export async function POST(req: NextRequest) {
           pengirimEmail: str(body.pengirimEmail) ?? customer.email ?? null,
           pengirimAddress: str(body.pengirimAddress) ?? customer.address ?? null,
           discountAmount,
+          discountPercentage: discountType === "PERCENTAGE" && (discountPercentageInput ?? 0) > 0 ? discountPercentageInput : null,
           discountFundedBy,
           createdByPartnerId,
         },

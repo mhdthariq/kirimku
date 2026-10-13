@@ -83,7 +83,17 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (body.originWarehouseId !== undefined) data.originWarehouseId = body.originWarehouseId ? Number(body.originWarehouseId) : null;
     if (body.destinationWarehouseId !== undefined) data.destinationWarehouseId = body.destinationWarehouseId ? Number(body.destinationWarehouseId) : null;
     if (body.insuranceAmount !== undefined) data.insuranceAmount = Math.max(0, num(body.insuranceAmount) ?? 0);
-    if (body.discountAmount !== undefined) data.discountAmount = Math.max(0, num(body.discountAmount) ?? 0);
+    if (body.discountType === "PERCENTAGE") {
+      const discountPercentage = num(body.discountPercentage);
+      if (discountPercentage == null || discountPercentage < 0 || discountPercentage > 100) {
+        return fail(422, "Persentase discount harus antara 0% dan 100%.", { discountPercentage: ["Masukkan persentase antara 0 dan 100."] });
+      }
+      data.discountAmount = 0;
+      data.discountPercentage = discountPercentage > 0 ? discountPercentage : null;
+    } else if (body.discountAmount !== undefined) {
+      data.discountAmount = Math.max(0, num(body.discountAmount) ?? 0);
+      data.discountPercentage = null;
+    }
     // Penerima (recipient) — printed on both resi types
     if (body.penerimaName !== undefined) data.penerimaName = str(body.penerimaName);
     if (body.penerimaAddress !== undefined) data.penerimaAddress = str(body.penerimaAddress);

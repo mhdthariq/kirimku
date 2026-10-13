@@ -79,7 +79,9 @@ interface ShipmentForm {
   pengirimPhone: string;
   pengirimEmail: string;
   pengirimAddress: string;
+  discountType: "AMOUNT" | "PERCENTAGE";
   discountAmount: string;
+  discountPercentage: string;
   insuranceAmount: string;
 }
 
@@ -110,7 +112,9 @@ const EMPTY_SHIPMENT: ShipmentForm = {
   pengirimPhone: "",
   pengirimEmail: "",
   pengirimAddress: "",
+  discountType: "AMOUNT",
   discountAmount: "",
+  discountPercentage: "",
   insuranceAmount: "",
 };
 const EMPTY_DETAIL: DetailForm = { description: "", quantity: "1", lengthCm: "", widthCm: "", heightCm: "", volumeM3: "", actualWeightKg: "" };
@@ -284,8 +288,9 @@ function ShipmentList() {
       // Revise round 8 — Fulfillment Mode (STANDARD / DIRECT).
       fulfillmentMode: form.fulfillmentMode,
       penerimaName: form.penerimaName || null,
-      // Revise.md §6 — discount entered as AMOUNT; % derived by the backend
-      discountAmount: form.discountAmount ? Number(form.discountAmount) : 0,
+      discountType: form.discountType,
+      discountAmount: form.discountType === "AMOUNT" && form.discountAmount ? Number(form.discountAmount) : 0,
+      discountPercentage: form.discountType === "PERCENTAGE" && form.discountPercentage ? Number(form.discountPercentage) : 0,
       insuranceAmount: form.insuranceAmount ? Number(form.insuranceAmount) : 0,
       penerimaAddress: form.penerimaAddress || null,
       penerimaContact: form.penerimaContact || null,
@@ -838,27 +843,37 @@ function ShipmentList() {
                   <b>Mode DIRECT</b> - shipment tidak melalui gudang. Driver akan pickup langsung di lokasi pengirim dan mengantar langsung ke penerima. Pastikan alamat Pengirim & Penerima diisi dengan lengkap.
                 </div>
               )}
-              {/* Discount is entered in Rupiah; the backend derives its percentage. */}
+              {/* Discount may be entered as a rupiah amount or a percentage. */}
               {canAddDiscount && (
-                <Field
-                  label={discountIsMarketingFunded ? "Discount Marketing (Rupiah)" : "Discount Perusahaan (Rupiah)"}
-                  htmlFor="s-discount"
-                  className="sm:col-span-2"
-                  hint={
-                    discountIsMarketingFunded
-                      ? "Dipotong dari profit sharing Marketing; maksimal sebesar bagian Marketing. Persentase dihitung otomatis dari harga."
-                      : "Dipotong dari profit perusahaan; persentase dihitung otomatis dari harga."
-                  }
-                >
-                  <NumberInput
-                    id="s-discount"
-                    value={form.discountAmount}
-                    onChange={(e) => setForm({ ...form, discountAmount: e.target.value })}
-                    placeholder="mis. 5000 (opsional)"
-                    min={0}
-                    disabled={busy}
-                  />
-                </Field>
+                <div className="sm:col-span-2 grid gap-4 sm:grid-cols-2">
+                  <Field label="Jenis Discount" htmlFor="s-discount-type">
+                    <select
+                      id="s-discount-type"
+                      value={form.discountType}
+                      onChange={(e) => setForm({ ...form, discountType: e.target.value as ShipmentForm["discountType"] })}
+                      disabled={busy}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    >
+                      <option value="AMOUNT">Nominal Rupiah</option>
+                      <option value="PERCENTAGE">Persentase (%)</option>
+                    </select>
+                  </Field>
+                  <Field
+                    label={form.discountType === "PERCENTAGE" ? "Discount (%)" : discountIsMarketingFunded ? "Discount Marketing (Rupiah)" : "Discount Perusahaan (Rupiah)"}
+                    htmlFor="s-discount"
+                    hint={form.discountType === "PERCENTAGE" ? "Masukkan 0 sampai 100. 100% membuat total customer menjadi Rp0." : "Discount boleh sama dengan total harga untuk membuat total customer menjadi Rp0."}
+                  >
+                    <NumberInput
+                      id="s-discount"
+                      value={form.discountType === "PERCENTAGE" ? form.discountPercentage : form.discountAmount}
+                      onChange={(e) => setForm({ ...form, [form.discountType === "PERCENTAGE" ? "discountPercentage" : "discountAmount"]: e.target.value })}
+                      placeholder={form.discountType === "PERCENTAGE" ? "mis. 10 (opsional)" : "mis. 20000 (opsional)"}
+                      min={0}
+                      max={form.discountType === "PERCENTAGE" ? 100 : undefined}
+                      disabled={busy}
+                    />
+                  </Field>
+                </div>
               )}
               <Field
                 label="Asuransi (Rupiah)"
@@ -1336,7 +1351,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
   const [pengirimOpen, setPengirimOpen] = useState(false);
   const [pengirimForm, setPengirimForm] = useState({ name: "", phone: "", email: "", address: "" });
   const [pricingOpen, setPricingOpen] = useState(false);
-  const [pricingForm, setPricingForm] = useState({ discountAmount: "", insuranceAmount: "" });
+  const [pricingForm, setPricingForm] = useState({ discountType: "AMOUNT" as "AMOUNT" | "PERCENTAGE", discountAmount: "", discountPercentage: "", insuranceAmount: "" });
   const [documents, setDocuments] = useState<ShipmentDocument[]>([]);
   const [documentError, setDocumentError] = useState("");
 
@@ -1393,22 +1408,31 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
   }
 
   function openPricingEdit() {
-    setPricingForm({ discountAmount: String(shipment!.discountAmount ?? 0), insuranceAmount: String(shipment!.insuranceAmount ?? 0) });
+    setPricingForm({
+      discountType: "AMOUNT",
+      discountAmount: String(shipment!.discountAmount ?? 0),
+      discountPercentage: "",
+      insuranceAmount: String(shipment!.insuranceAmount ?? 0),
+    });
     setPricingOpen(true);
   }
 
   async function onPricingSubmit(event: React.FormEvent) {
     event.preventDefault();
     const discountAmount = Number(pricingForm.discountAmount) || 0;
+    const discountPercentage = Number(pricingForm.discountPercentage) || 0;
     const insuranceAmount = Number(pricingForm.insuranceAmount) || 0;
-    if (discountAmount < 0 || insuranceAmount < 0) {
-      toast.error("Discount dan asuransi tidak boleh negatif.");
+    if (discountAmount < 0 || discountPercentage < 0 || discountPercentage > 100 || insuranceAmount < 0) {
+      toast.error("Discount harus valid dan persentase harus antara 0% dan 100%.");
       return;
     }
+    const discountPayload = pricingForm.discountType === "PERCENTAGE"
+      ? { discountType: "PERCENTAGE", discountPercentage, discountAmount: 0 }
+      : { discountType: "AMOUNT", discountAmount, discountPercentage: 0 };
     setBusy(true);
     const saved = shipment!.priceAmount != null
-      ? await runAction(() => apiPost(`/shipments/${shipment!.id}/price`, { discountAmount, insuranceAmount }), { success: "Discount dan asuransi disimpan; harga dihitung ulang." })
-      : await runAction(() => apiPut(`/shipments/${shipment!.id}`, { insuranceAmount, discountAmount }), { success: "Discount dan asuransi disimpan." });
+      ? await runAction(() => apiPost(`/shipments/${shipment!.id}/price`, { ...discountPayload, insuranceAmount }), { success: "Discount dan asuransi disimpan; harga dihitung ulang." })
+      : await runAction(() => apiPut(`/shipments/${shipment!.id}`, { ...discountPayload, insuranceAmount }), { success: "Discount dan asuransi disimpan." });
     setBusy(false);
     if (saved) {
       setPricingOpen(false);
@@ -2378,8 +2402,31 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
             <DialogDescription>Discount akan dihitung ulang dari harga shipment saat ini. Persentasenya dibuat otomatis oleh sistem.</DialogDescription>
           </DialogHeader>
           <form onSubmit={onPricingSubmit} className="space-y-4">
-            <Field label={shipment.discountFundedBy === "MARKETING" ? "Discount Marketing (Rupiah)" : "Discount Perusahaan (Rupiah)"} htmlFor="pe-discount">
-              <NumberInput id="pe-discount" min={0} value={pricingForm.discountAmount} onChange={(event) => setPricingForm({ ...pricingForm, discountAmount: event.target.value })} disabled={busy} />
+            <Field label="Jenis Discount" htmlFor="pe-discount-type">
+              <select
+                id="pe-discount-type"
+                value={pricingForm.discountType}
+                onChange={(event) => setPricingForm({ ...pricingForm, discountType: event.target.value as "AMOUNT" | "PERCENTAGE" })}
+                disabled={busy}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="AMOUNT">Nominal Rupiah</option>
+                <option value="PERCENTAGE">Persentase (%)</option>
+              </select>
+            </Field>
+            <Field
+              label={pricingForm.discountType === "PERCENTAGE" ? "Discount (%)" : shipment.discountFundedBy === "MARKETING" ? "Discount Marketing (Rupiah)" : "Discount Perusahaan (Rupiah)"}
+              htmlFor="pe-discount"
+              hint={pricingForm.discountType === "PERCENTAGE" ? "100% membuat total customer menjadi Rp0." : "Discount boleh sama dengan total harga untuk membuat total customer menjadi Rp0."}
+            >
+              <NumberInput
+                id="pe-discount"
+                min={0}
+                max={pricingForm.discountType === "PERCENTAGE" ? 100 : undefined}
+                value={pricingForm.discountType === "PERCENTAGE" ? pricingForm.discountPercentage : pricingForm.discountAmount}
+                onChange={(event) => setPricingForm({ ...pricingForm, [pricingForm.discountType === "PERCENTAGE" ? "discountPercentage" : "discountAmount"]: event.target.value })}
+                disabled={busy}
+              />
             </Field>
             <Field label="Asuransi (Rupiah)" htmlFor="pe-insurance">
               <NumberInput id="pe-insurance" min={0} value={pricingForm.insuranceAmount} onChange={(event) => setPricingForm({ ...pricingForm, insuranceAmount: event.target.value })} disabled={busy} />

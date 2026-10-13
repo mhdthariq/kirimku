@@ -59,16 +59,28 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     const r = computePricing(master.details, tariff);
 
+    const percentageInput = body.discountType === "PERCENTAGE" ? num(body.discountPercentage) : null;
+    if (body.discountType === "PERCENTAGE" && (percentageInput == null || percentageInput < 0 || percentageInput > 100)) {
+      return fail(422, "Persentase discount harus antara 0% dan 100%.", { discountPercentage: ["Masukkan persentase antara 0 dan 100."] });
+    }
     // Marketing discounts are absorbed by the partner share; company-funded
-    // discounts reduce company profit. Both must remain below the original price.
-    let discountAmount = num(body.discountAmount) ?? master.discountAmount ?? 0;
+    // discounts reduce company profit. An exact full-price discount is valid.
+    let discountAmount = percentageInput != null
+      ? (r.price * percentageInput) / 100
+      : body.discountAmount !== undefined
+        ? num(body.discountAmount) ?? 0
+        : master.discountAmount > 0
+          ? master.discountAmount
+          : master.discountPercentage != null
+            ? (r.price * master.discountPercentage) / 100
+            : 0;
     if (discountAmount < 0) discountAmount = 0;
     const partner = master.createdByPartnerId
       ? await db.partner.findUnique({ where: { id: master.createdByPartnerId } })
       : null;
     if (discountAmount > 0) {
-      if (discountAmount >= r.price) {
-        return fail(422, `Discount (Rp${discountAmount.toLocaleString("id-ID")}) harus lebih kecil dari harga shipment (Rp${r.price.toLocaleString("id-ID")}).`, {
+      if (discountAmount > r.price + 0.001) {
+        return fail(422, `Discount (Rp${discountAmount.toLocaleString("id-ID")}) tidak boleh melebihi harga shipment (Rp${r.price.toLocaleString("id-ID")}).`, {
           discountAmount: ["Discount melebihi harga shipment."],
         });
       }
@@ -85,7 +97,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
     // Auto-derived percentage (§6): discount% = discountAmount / price × 100
     const discountPercentage = discountAmount > 0 ? Math.round((discountAmount / r.price) * 10000) / 100 : null;
-    const finalPriceAmount = Math.round((r.price - discountAmount) * 100) / 100;
+    const finalPriceAmount = Math.max(0, Math.round((r.price - discountAmount) * 100) / 100);
 
     // Marketing wallet coverage rule — when a Marketing partner opens (prices)
     // a B2C shipment, their wallet must hold at least the COMPANY's share of
