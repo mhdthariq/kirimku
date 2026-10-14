@@ -210,7 +210,7 @@ Resi print — when the ResiPrint portal is open, only it is printed
 (1 Resi Shipment + N Resi Detail stickers, one per page).
 --------------------------------------------------------------------------- */
 @media print {
-  body > *:not(#resi-print-portal):not(#invoice-print-portal) {
+  body > *:not(#resi-print-portal):not(#invoice-print-portal):not(#manifest-print-portal) {
     display: none !important;
   }
   #resi-print-portal {

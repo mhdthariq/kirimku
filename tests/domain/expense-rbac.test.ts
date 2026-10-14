@@ -20,6 +20,18 @@ describe("expense approval default permissions", () => {
             expect(role?.permissions).toContain("transport.expense.approve");
         },
     );
+    it("grants Admin Kantor expense creation by default", () => {
+        expect(
+            ROLE_TEMPLATES.find((role) => role.slug === "admin-kantor")
+                ?.permissions,
+        ).toContain("transport.expense.create");
+    });
+    it("keeps Admin Finance approval-only", () => {
+        expect(
+            ROLE_TEMPLATES.find((role) => role.slug === "admin-finance")
+                ?.permissions,
+        ).not.toContain("transport.expense.create");
+    });
     it.each(["driver", "kenek", "admin-gudang", "marketing", "vehicle-owner"])(
         "does not grant %s approval by default",
         (slug) => {

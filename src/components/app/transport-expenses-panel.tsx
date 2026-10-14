@@ -69,18 +69,23 @@ const EMPTY: FormState = { type: "BBM", amount: "", description: "", photo: "", 
  */
 export function TransportExpensesPanel({
   transportId,
-  canCreate,
-  canUpdate,
+  canCreate: createPermission,
+  canUpdate: updatePermission,
+  transportStatus,
   canDelete,
   canApprove: approvePermission,
 }: {
   transportId: number;
+  transportStatus?: string;
   canCreate: boolean;
   canUpdate: boolean;
   canDelete: boolean;
   canApprove?: boolean;
 }) {
   const { user } = useAuth();
+  const completed = transportStatus === "COMPLETED";
+  const canCreate = createPermission && !completed;
+  const canUpdate = updatePermission && !completed;
   const canApprove = approvePermission ?? hasPermission(user, "transport.expense.approve");
   const { data, loading, reload } = useApiData<TransportExpenseRow[]>(() => apiGet<TransportExpenseRow[]>(`/transports/${transportId}/expenses`), [transportId]);
   const rows = useMemo(() => data ?? [], [data]);
@@ -119,6 +124,7 @@ export function TransportExpensesPanel({
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (completed) return toast.error("Transport sudah COMPLETED. Biaya operasional dan foto tidak dapat ditambahkan atau diubah.");
     const problem = validateExpense({ type: form.type, amount: form.amount });
     if (problem) return toast.error(problem);
     if (submitting.current) return;
@@ -181,7 +187,7 @@ export function TransportExpensesPanel({
             <Wallet className="h-4 w-4 text-primary" /> Biaya Operasional
           </span>
           <span className="flex items-center gap-3">
-            <span className="text-sm font-semibold">{formatRupiah(summary.total)} (disetujui)</span>
+            <span className="text-sm font-semibold">{formatRupiah(summary.total)} (total biaya disetujui)</span>
             {canCreate && (
               <Button size="sm" onClick={() => openCreate()}>
                 <Plus className="h-3.5 w-3.5" /> Tambah Biaya
@@ -191,6 +197,11 @@ export function TransportExpensesPanel({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        <p className="text-xs text-muted-foreground">
+          {completed
+            ? "Transport sudah COMPLETED. Penambahan biaya dan unggah foto ditutup; approval biaya tetap terpisah."
+            : "Approval berlaku per biaya, bukan untuk seluruh transport. Biaya baru tetap dapat ditambahkan sampai transport COMPLETED."}
+        </p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {EXPENSE_TYPES.map((t) => {
             const Icon = ICON[t];

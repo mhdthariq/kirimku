@@ -24,7 +24,7 @@ import { PUT as update, DELETE as remove } from "@/app/api/v1/transports/[id]/ex
 import { POST as approve } from "@/app/api/v1/transports/[id]/expenses/[expenseId]/approve/route";
 
 const actor = { id: 7, username: "finance.andi", isOwner: false, roles: [{ id: 2, slug: "admin-finance", name: "Admin Finance" }], permissions: [] };
-const transport = { id: 10, transportCode: "TR-10", route: null, shipments: [] };
+const transport = { id: 10, transportCode: "TR-10", status: "ARRIVED", route: null, shipments: [] };
 const gps = { latitude: -6.2, longitude: 106.8, locationAccuracy: 5 };
 const expense = { id: 12, expenseCode: "EXP-12", transportId: 10, type: "BBM", amount: 100, status: "PENDING", photoUrl: null, ...gps, transport };
 const body = { type: "BBM", amount: 100, ...gps };
@@ -54,6 +54,53 @@ describe("expense API approval and GPS", () => {
     expect((await response.json()).data.hasPhoto).toBe(false);
     expect(m.audit).toHaveBeenCalledWith(expect.objectContaining({ action: "create", after: expect.objectContaining(gps) }));
   });
+    it.each([false, true])(
+        "blocks creation and receipt changes after completion (Owner: %s)",
+        async (isOwner) => {
+            m.auth.mockResolvedValue({ ...actor, isOwner });
+            const completed = { ...transport, status: "COMPLETED" };
+            m.transport.mockResolvedValue(completed);
+            m.find.mockResolvedValue({ ...expense, transport: completed });
+            expect((await create(req(), params())).status).toBe(409);
+            expect(
+                (
+                    await update(
+                        req({ ...body, photo: "data:image/jpeg;base64,YQ==" }),
+                        params(),
+                    )
+                ).status,
+            ).toBe(409);
+            expect(m.create).not.toHaveBeenCalled();
+            expect(m.updateMany).not.toHaveBeenCalled();
+            expect(m.audit).not.toHaveBeenCalled();
+        },
+    );
+    it.each(["PLANNED", "DEPARTED", "ARRIVED"])(
+        "allows new pending expenses despite prior approvals in %s",
+        async (status) => {
+            m.transport.mockResolvedValue({
+                ...transport,
+                status,
+                deliveryApprovedAt: new Date(),
+            });
+            m.list.mockResolvedValue([{ ...expense, status: "APPROVED" }]);
+            expect((await create(req(), params())).status).toBe(200);
+            expect(m.permission).toHaveBeenCalledWith(
+                actor,
+                "transport.expense.create",
+            );
+            expect(m.create).toHaveBeenCalledWith({
+                data: expect.objectContaining({ status: "PENDING" }),
+            });
+        },
+    );
+    it("still allows per-expense approval after transport completion", async () => {
+        m.find.mockResolvedValue({
+            ...expense,
+            transport: { ...transport, status: "COMPLETED" },
+        });
+        expect((await approve(req(), params())).status).toBe(200);
+    });
   it("updates only pending rows with GPS, ignoring client approval metadata", async () => {
     expect((await update(req({ ...body, amount: 200, status: "APPROVED", approvedByUsername: "forged" }), params())).status).toBe(200);
     expect(m.updateMany).toHaveBeenCalledWith({ where: { id: 12, transportId: 10, status: "PENDING" }, data: { ...gps, type: "BBM", amount: 200 } });
