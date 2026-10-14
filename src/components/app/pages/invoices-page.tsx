@@ -1,10 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Eye, Paperclip, Plus, Printer, Receipt, Send, Trash2, Wallet } from "lucide-react";
+import { Edit, Eye, Paperclip, Plus, Printer, Receipt, Send, Trash2, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
-import { apiDelete, apiGet, apiPost, hasPermission, type Invoice, type InvoiceLine, type InvoiceSettlement, type Options } from "@/infrastructure/http/client-api";
+import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type Invoice, type InvoiceLine, type InvoiceSettlement, type Options } from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
@@ -60,6 +60,7 @@ export function InvoicesPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [createOpen, setCreateOpen] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [form, setForm] = useState<InvoiceForm>(EMPTY);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<Invoice | null>(null);
@@ -100,8 +101,29 @@ export function InvoicesPage() {
   }
 
   function openCreate() {
+    setEditingInvoice(null);
     setForm({ ...EMPTY, lines: [{ description: "", quantity: "1", unitPrice: "", shipmentId: "" }] });
     setCreateOpen(true);
+  }
+
+  async function openEdit(inv: Invoice) {
+    try {
+      const full = await apiGet<Invoice & { lines: InvoiceLine[] }>(`/invoices/${inv.id}`);
+      if (full.status !== "DRAFT") return;
+      setEditingInvoice(full);
+      setForm({
+        customerId: String(full.customerId),
+        issueDate: full.issueDate?.slice(0, 10) ?? "",
+        dueDate: full.dueDate?.slice(0, 10) ?? "",
+        discount: String(full.discount),
+        rounding: String(full.rounding),
+        notes: full.notes ?? "",
+        lines: full.lines.map((line) => ({ description: line.description, quantity: String(line.quantity), unitPrice: String(line.unitPrice), shipmentId: line.shipmentId ? String(line.shipmentId) : "" })),
+      });
+      setCreateOpen(true);
+    } catch {
+      toast.error("Gagal memuat invoice untuk diedit.");
+    }
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -125,10 +147,14 @@ export function InvoicesPage() {
           shipmentId: l.shipmentId ? Number(l.shipmentId) : null,
         })),
     };
-    const ok = await runAction(() => apiPost("/invoices", payload), { success: "Invoice draft dibuat - komisi Marketing (bila ada) otomatis terlacak PENDING." });
+    const ok = await runAction(
+      () => (editingInvoice ? apiPut(`/invoices/${editingInvoice.id}`, payload) : apiPost("/invoices", payload)),
+      { success: editingInvoice ? "Invoice draft diperbarui." : "Invoice draft dibuat - komisi Marketing (bila ada) otomatis terlacak PENDING." },
+    );
     setBusy(false);
     if (ok) {
       setCreateOpen(false);
+      setEditingInvoice(null);
       reload();
     }
   }
@@ -345,6 +371,11 @@ export function InvoicesPage() {
                         <Send className="h-3.5 w-3.5" /> Kirim
                       </Button>
                     )}
+                    {inv.status === "DRAFT" && can.update && (
+                      <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => openEdit(inv)} aria-label={`Edit invoice ${inv.invoiceNumber}`} title="Edit invoice">
+                        <Edit className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                     {(inv.status === "SENT" || inv.status === "PARTIALLY_SETTLED") && can.settle && (
                       <Button
                         size="sm"
@@ -383,8 +414,8 @@ export function InvoicesPage() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Buat Invoice (Draft)</DialogTitle>
-            <DialogDescription>Pilih customer B2B lalu isi baris item. Baris item bisa ditambah/dihapus selama status DRAFT.</DialogDescription>
+            <DialogTitle>{editingInvoice ? `Edit Invoice ${editingInvoice.invoiceNumber}` : "Buat Invoice (Draft)"}</DialogTitle>
+            <DialogDescription>Invoice hanya dapat diedit selama status DRAFT.</DialogDescription>
           </DialogHeader>
           <form onSubmit={onSubmit} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
@@ -400,7 +431,7 @@ export function InvoicesPage() {
                   }
                   placeholder={customerOptions.length ? "Pilih customer…" : "Belum ada customer B2B"}
                   options={customerOptions}
-                  disabled={busy || customerOptions.length === 0}
+                  disabled={busy || !!editingInvoice || customerOptions.length === 0}
                 />
               </Field>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

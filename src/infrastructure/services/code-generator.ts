@@ -1,10 +1,6 @@
 import { db } from "@/infrastructure/persistence/db";
 
-/**
- * Compute the next sequential code by scanning the max numeric suffix of
- * existing codes. Robust against seeded/gapped sequences (unlike count()+1
- * which collides when codes don't start at 1 or contain gaps).
- */
+/** Compute the first unused sequential code for a prefix. */
 export async function nextCode(
   model: "pickup" | "transport" | "delivery" | "invoice" | "masterShipment" | "detailShipment" | "warehouse" | "customer" | "employee" | "topUpRequest" | "withdrawalRequest" | "vehicleRepair" | "transportSettlement" | "marketingCommission" | "transportExpense" | "returnTask",
   prefix: string,
@@ -15,18 +11,14 @@ export async function nextCode(
     select: { [field]: true },
   }).then((list: Record<string, string>[]) => list.map((r) => ({ code: String(r[field]) })));
 
-  let max = 0;
+  const used = new Set<number>();
   for (const row of rows) {
+    if (!row.code.startsWith(prefix)) continue;
     const match = row.code.match(/(\d+)\s*$/);
-    if (match) max = Math.max(max, Number(match[1]));
+    if (match) used.add(Number(match[1]));
   }
-  const key = `${model}:${field}:${prefix}`;
-  const sequence = await db.codeSequence.upsert({
-    where: { key },
-    create: { key, nextValue: Math.max(max + 2, fallbackStart + 1) },
-    update: { nextValue: { increment: 1 } },
-  });
-  const seq = sequence.nextValue - 1;
+  let seq = fallbackStart;
+  while (used.has(seq)) seq += 1;
   return `${prefix}${String(seq).padStart(6, "0")}`;
 }
 
