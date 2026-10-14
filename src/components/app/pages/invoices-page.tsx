@@ -577,15 +577,19 @@ export function InvoicesPage() {
                   onClick={() => {
                     setForm((current) => ({
                       ...current,
-                      lines: [
-                        ...current.lines,
-                        {
+                      lines: (() => {
+                        const shipmentLine = {
                           description: `${shipment.masterCode} - pengiriman ${shipment.origin} → ${shipment.destination}`,
                           quantity: "1",
                           unitPrice: String(shipment.priceAmount ?? ""),
                           shipmentId: String(shipment.id),
-                        },
-                      ],
+                        };
+                        const emptyLineIndex = current.lines.findIndex(
+                          (line) => !line.description.trim() && !line.unitPrice.trim() && !line.shipmentId,
+                        );
+                        if (emptyLineIndex === -1) return [...current.lines, shipmentLine];
+                        return current.lines.map((line, index) => (index === emptyLineIndex ? shipmentLine : line));
+                      })(),
                     }));
                     setShipmentPickerOpen(false);
                   }}
