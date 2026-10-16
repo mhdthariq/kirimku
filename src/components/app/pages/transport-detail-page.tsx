@@ -127,6 +127,8 @@ export function TransportDetailPage({ transportId, initialTab }: { transportId: 
     expenseDelete: hasPermission(user, "transport.expense.delete"),
   };
 
+  const canAccessExpenses = can.expenseView || can.expenseCreate || can.expenseUpdate;
+
   async function onDelete() {
     setConfirmDelete(false);
     const ok = await runAction(() => apiDelete(`/transports/${transportId}`), { success: "Transport dihapus." });
@@ -372,10 +374,10 @@ export function TransportDetailPage({ transportId, initialTab }: { transportId: 
         </Card>}
       </div>
 
-      <Tabs key={transport.id} defaultValue={initialTab === "expenses" && can.expenseView ? "expenses" : isActivity ? "activity" : "checkpoints"} className="min-w-0">
+      <Tabs key={transport.id} defaultValue={initialTab === "expenses" && canAccessExpenses ? "expenses" : isActivity ? "activity" : "checkpoints"} className="min-w-0">
         <TabsList className="h-auto min-h-11 rounded-xl p-1">
           <TabsTrigger value={isActivity ? "activity" : "checkpoints"}>{isActivity ? "Activity" : "Checkpoint"}</TabsTrigger>
-          {can.expenseView && <TabsTrigger value="expenses">Biaya Operasional</TabsTrigger>}
+          {canAccessExpenses && <TabsTrigger value="expenses">Biaya Operasional</TabsTrigger>}
         </TabsList>
         <TabsContent value={isActivity ? "activity" : "checkpoints"}>
       {isActivity ? (
@@ -494,9 +496,9 @@ export function TransportDetailPage({ transportId, initialTab }: { transportId: 
       </>
       )}
         </TabsContent>
-        {can.expenseView && (
+        {canAccessExpenses && (
           <TabsContent value="expenses">
-            <TransportExpensesPanel transportId={transport.id} transportStatus={transport.status} canCreate={can.expenseCreate} canUpdate={can.expenseUpdate} canDelete={can.expenseDelete} />
+            <TransportExpensesPanel transportId={transport.id} transportStatus={transport.status} canView={can.expenseView} canCreate={can.expenseCreate} canUpdate={can.expenseUpdate} canDelete={can.expenseDelete} />
           </TabsContent>
         )}
       </Tabs>
