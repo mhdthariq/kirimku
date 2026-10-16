@@ -80,6 +80,8 @@ export function FormSelect({
   options,
   disabled,
   required,
+  id,
+  ariaLabel,
 }: {
   value: string;
   onValueChange: (value: string) => void;
@@ -87,15 +89,17 @@ export function FormSelect({
   options: { value: string; label: string }[];
   disabled?: boolean;
   required?: boolean;
+  id?: string;
+  ariaLabel?: string;
 }) {
   return (
     <Select value={value} onValueChange={onValueChange} disabled={disabled} required={required}>
-      <SelectTrigger className="w-full">
+      <SelectTrigger id={id} aria-label={ariaLabel} className="w-full min-w-0 max-w-full [&_[data-slot=select-value]]:min-w-0 [&_[data-slot=select-value]]:truncate">
         <SelectValue placeholder={placeholder ?? "Pilih…"} />
       </SelectTrigger>
-      <SelectContent>
+      <SelectContent className="max-w-[calc(100vw-2rem)]">
         {options.map((o) => (
-          <SelectItem key={o.value} value={o.value}>
+          <SelectItem key={o.value} value={o.value} className="min-w-0 whitespace-normal break-words">
             {o.label}
           </SelectItem>
         ))}

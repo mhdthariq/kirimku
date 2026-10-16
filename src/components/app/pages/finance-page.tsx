@@ -8,6 +8,7 @@ import { useApiData } from "@/hooks/use-api-data";
 import { StatusBadge } from "@/components/app/status-badge";
 import { formatRupiah, formatDate } from "@/components/app/form-parts";
 import { DashboardHeading, DashboardMetric, DashboardSectionTitle, DashboardError } from "@/components/app/dashboard-ui";
+import { OperationalExpensesPanel } from "@/components/app/operational-expense-report";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/shared/utils";
 
@@ -74,6 +75,8 @@ export function FinancePage() {
         <div className="mt-5 hidden min-w-0 overflow-x-auto xl:block"><table className="w-full text-left text-sm"><thead><tr className="border-b text-[10px] uppercase tracking-wider text-muted-foreground">{["Tanggal", "Invoice / Customer", "Jumlah", "Status", "Bukti"].map(label => <th key={label} className="px-3 pb-3 font-semibold first:pl-0">{label}</th>)}</tr></thead><tbody>{ip.recent.map(s => <tr key={s.id} className="border-b last:border-0"><td className="py-4 pr-3 text-xs text-muted-foreground">{formatDate(s.settledAt, true)}</td><td className="max-w-60 px-3 py-4"><p className="break-all font-mono text-xs font-semibold">{s.invoiceNumber}</p><p className="mt-1 break-words text-xs text-muted-foreground">{s.customerName}</p></td><td className="whitespace-nowrap px-3 py-4 font-semibold tabular-nums">{formatRupiah(s.amount)}</td><td className="px-3 py-4"><StatusBadge status={s.invoiceStatus} /></td><td className="px-3 py-4"><ProofBadge hasProof={s.hasProof} /></td></tr>)}</tbody></table></div>
       </>}
     </section>}
+
+    <OperationalExpensesPanel />
 
     <section className="space-y-4" aria-label="Antrean keuangan"><DashboardSectionTitle title="Antrean & aktivitas" description="Tinjau pengajuan partner dan aktivitas operasional terbaru." /><div className="grid min-w-0 gap-4 xl:grid-cols-2">
       <PendingSection title="Top Up Menunggu" icon={<Receipt className="h-4 w-4" />} href={link("#/topups", "wallet.topup.view")} items={data.pending.topUps.map(x => ({ id: x.id, left: `${x.partnerName} · ${x.requestCode}`, right: formatRupiah(x.amount), status: x.status, date: x.createdAt }))} />

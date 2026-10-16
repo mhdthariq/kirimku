@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { db } from "@/infrastructure/persistence/db";
 import { guard, ok, handle, fail, requireStr, str, requireNum, num, dateOrNull } from "@/composition/api-helpers";
 import { audit } from "@/infrastructure/services/audit";
+import { invoiceBankSnapshot } from "@/infrastructure/services/invoice-bank-account";
 import { nextCode } from "@/infrastructure/services/code-generator";
 
 export async function GET(req: NextRequest) {
@@ -92,6 +93,7 @@ export async function POST(req: NextRequest) {
         customerId: ["Invoice hanya untuk customer B2B."],
       });
     }
+    const bankSnapshot = await invoiceBankSnapshot(body.bankAccountId);
     const discount = num(body.discount) ?? 0;
     const rounding = num(body.rounding) ?? 0;
     if (discount < 0) return fail(422, "Diskon tidak boleh negatif.", { discount: ["Diskon tidak boleh negatif."] });
@@ -158,6 +160,7 @@ export async function POST(req: NextRequest) {
       invoice = await db.invoice.create({
         data: {
           invoiceNumber,
+          ...bankSnapshot,
           customerId,
           status: "DRAFT",
           discount,

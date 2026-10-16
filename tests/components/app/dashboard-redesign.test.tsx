@@ -49,6 +49,11 @@ const finance: FinanceSummary = {
   ] },
   monthlyLedger: [4, 5, 6, 7, 8, 9].map((month, i) => ({ month: `2026-${String(month).padStart(2, "0")}`, byType: { TOPUP: (i + 1) * 15_000_000, WITHDRAWAL: -(i + 1) * 8_000_000, COMMISSION: 12_000_000, TRANSPORT_PROFIT_SHARE: 30_000_000, REPAIR_DEDUCTION: -1_000_000 } })),
 };
+const operatingCosts = {
+  approvedTotal: 500_000, pendingTotal: 100_000, count: 2, pages: 1, page: 1, pageSize: 25,
+  byType: [{ type: "ANGKUT", label: "Biaya Angkut", approved: 500_000, pending: 100_000, count: 2 }],
+  rows: [{ id: 1, expenseCode: "EXP-000001", type: "ANGKUT", amount: 500_000, status: "APPROVED", description: "Biaya angkut muatan", createdAt: date, transport: { id: 10, transportCode: "TR-000010", origin: "Medan", destination: "Jakarta" } }],
+};
 function fixture(name: string) {
   const dir = process.env.DASHBOARD_QA_DIR;
   if (!dir) return;
@@ -59,7 +64,7 @@ function fixture(name: string) {
 beforeEach(() => {
   vi.clearAllMocks();
   m.user = { name: "Andi Pratama", isOwner: true, permissions: [] };
-  m.get.mockImplementation(async (url: string) => url.startsWith("/dashboard") ? dashboard : url === "/finance/summary" ? finance : { buckets: [], total: 0 });
+  m.get.mockImplementation(async (url: string) => url.startsWith("/dashboard") ? dashboard : url === "/finance/summary" ? finance : url.startsWith("/finance/operational-expenses") ? operatingCosts : { buckets: [], total: 0 });
 });
 
 describe("dashboard redesign", () => {
@@ -108,11 +113,13 @@ describe("dashboard redesign", () => {
     expect(screen.getByRole("link", { name: /Kelola partner/ })).toHaveAttribute("href", "#/partners");
     expect(screen.getByText("Pergerakan dana")).toBeInTheDocument();
     expect(screen.getByText("Ledger 6 Bulan Terakhir")).toBeInTheDocument();
+    await screen.findByRole("region", { name: "Laporan biaya operasional" });
     fixture("finance-populated");
   });
   it("shows useful empty states for a new finance dashboard", async () => {
     const totals = Object.fromEntries(Object.keys(finance.totals).map(key => [key, 0]));
-    m.get.mockResolvedValue({ ...finance, totals, pending: { topUps: [], withdrawals: [], repairs: [], commissions: [] }, partners: [], monthlyLedger: [], invoicePayments: { realized: 0, settledTotal: 0, partialTotal: 0, recent: [], byMonth: [] } });
+    const emptyFinance = { ...finance, totals, pending: { topUps: [], withdrawals: [], repairs: [], commissions: [] }, partners: [], monthlyLedger: [], invoicePayments: { realized: 0, settledTotal: 0, partialTotal: 0, recent: [], byMonth: [] } };
+    m.get.mockImplementation(async (url: string) => url === "/finance/summary" ? emptyFinance : { ...operatingCosts, approvedTotal: 0, pendingTotal: 0, byType: [], rows: [] });
     render(<FinancePage />);
     await screen.findByText("Belum ada pembayaran invoice.");
     expect(screen.getByText("Belum ada partner terdaftar.")).toBeInTheDocument();

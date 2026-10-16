@@ -22,6 +22,7 @@ import {
   Warehouse,
 } from "lucide-react";
 import { toast } from "sonner";
+import { ShipmentTransportExpenses } from "@/components/app/operational-expense-report";
 import { useAuth } from "@/hooks/use-auth";
 import {
   apiDelete,
@@ -2194,6 +2195,8 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
           {documentError && <p className="mt-2 text-xs text-destructive">{documentError}</p>}
         </CardContent>
       </Card>
+
+      {hasPermission(user, "transport.expense.view") && <ShipmentTransportExpenses shipmentId={id} />}
 
       {/* Log Aktivitas - only rendered for audit_log.view holders (hidden for
            Marketing & other roles that cannot read the audit trail). */}

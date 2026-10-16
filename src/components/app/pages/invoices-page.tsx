@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Edit, Eye, Paperclip, Plus, Printer, Receipt, Send, Trash2, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
-import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type Invoice, type InvoiceLine, type InvoiceSettlement, type Options } from "@/infrastructure/http/client-api";
+import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type BankAccount, type Invoice, type InvoiceLine, type InvoiceSettlement, type Options } from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { InvoicePaymentAccount } from "@/components/app/invoice-payment-account";
 import { InvoicePrint } from "@/components/app/invoice-print";
 import { openDataUrlInNewTab } from "@/presentation/open-data-url";
 
@@ -26,6 +27,7 @@ interface DraftLine {
 }
 
 interface InvoiceForm {
+  bankAccountId: string;
   customerId: string;
   issueDate: string;
   dueDate: string;
@@ -36,6 +38,7 @@ interface InvoiceForm {
 }
 
 const EMPTY: InvoiceForm = {
+  bankAccountId: "",
   customerId: "",
   issueDate: new Date().toISOString().slice(0, 10),
   dueDate: "",
@@ -59,6 +62,7 @@ export function InvoicesPage() {
 
   const { data, loading, reload } = useApiData<Invoice[]>(() => apiGet<Invoice[]>("/invoices"), []);
   const { data: options } = useApiData<Options>(() => apiGet<Options>("/options"), []);
+  const { data: bankAccounts } = useApiData<BankAccount[]>(() => can.create || can.update ? apiGet<BankAccount[]>("/bank-accounts?active=true") : Promise.resolve([]), [can.create, can.update]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [createOpen, setCreateOpen] = useState(false);
@@ -116,6 +120,7 @@ export function InvoicesPage() {
       if (full.status !== "DRAFT") return;
       setEditingInvoice(full);
       setForm({
+        bankAccountId: full.bankAccountId ? String(full.bankAccountId) : "",
         customerId: String(full.customerId),
         issueDate: full.issueDate?.slice(0, 10) ?? "",
         dueDate: full.dueDate?.slice(0, 10) ?? "",
@@ -134,6 +139,7 @@ export function InvoicesPage() {
     e.preventDefault();
     setBusy(true);
     const payload = {
+      bankAccountId: form.bankAccountId ? Number(form.bankAccountId) : null,
       customerId: Number(form.customerId),
       issueDate: form.issueDate || null,
       dueDate: form.dueDate || null,
@@ -292,6 +298,11 @@ export function InvoicesPage() {
   const customerShipments = (options?.b2bShipments ?? []).filter(
     (s) => (!form.customerId || s.customerId === Number(form.customerId)) && s.invoiceLines.length === 0 && !form.lines.some((line) => line.shipmentId === String(s.id)),
   );
+  const bankOptions = [
+    { value: "none", label: "Tanpa rekening pembayaran" },
+    ...(bankAccounts ?? []).map(account => ({ value: String(account.id), label: `${account.bankName} · ${account.accountNumber} · ${account.accountName}` })),
+  ];
+  if (editingInvoice?.bankAccountId && !(bankAccounts ?? []).some(account => account.id === editingInvoice.bankAccountId)) bankOptions.push({ value: String(editingInvoice.bankAccountId), label: `${editingInvoice.paymentBankName ?? "Rekening tersimpan"} · ${editingInvoice.paymentAccountNumber ?? ""} (tersimpan)` });
   const draftSubtotal = form.lines.reduce((sum, l) => sum + (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0), 0);
   const draftLinesTotal = draftSubtotal - (Number(form.discount) || 0) + (Number(form.rounding) || 0);
 
@@ -498,6 +509,7 @@ export function InvoicesPage() {
               <Field label="Pembulatan (Rp)" htmlFor="inv-rounding" hint="Bisa positif atau negatif, mis. 2 atau -3.">
                 <NumberInput id="inv-rounding" value={form.rounding} onChange={(e) => setForm({ ...form, rounding: e.target.value })} disabled={busy} />
               </Field>
+              <div className="min-w-0 sm:col-span-2"><Field label="Rekening pembayaran" htmlFor="inv-bank" hint="Invoice hanya menampilkan Bank, No. Rekening, dan Nama Rekening."><FormSelect id="inv-bank" value={form.bankAccountId || "none"} onValueChange={value => setForm({ ...form, bankAccountId: value === "none" ? "" : value })} options={bankOptions} disabled={busy} /></Field></div>
             </div>
 
             <div className="space-y-2">
@@ -732,6 +744,8 @@ export function InvoicesPage() {
               </div>
 
               <p className="rounded-lg bg-muted/50 px-3 py-2 text-sm">PPh (termasuk pembayaran): <b>{formatRupiah(detailWithLines.pphAmount ?? detailWithLines.settlements?.reduce((sum, s) => sum + s.pph, 0) ?? 0)}</b></p>
+
+              <InvoicePaymentAccount invoice={detailWithLines} />
 
               {detailWithLines.notes && <div className="rounded-lg border-l-2 border-primary bg-primary/5 px-3 py-2 text-xs"><p className="font-semibold text-primary">Catatan</p><p className="mt-0.5 text-muted-foreground">{detailWithLines.notes}</p></div>}
 

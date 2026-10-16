@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
-const ICON: Record<ExpenseType, typeof Fuel> = { BBM: Fuel, PARKIR: ParkingCircle, MAKAN: Utensils, BONGKAR: HandCoins };
+const ICON: Record<ExpenseType, typeof Fuel> = { BBM: Fuel, PARKIR: ParkingCircle, MAKAN: Utensils, BONGKAR: HandCoins, ANGKUT: HandCoins };
 
 type TransportExpenseRow = BaseExpenseRow & {
   status: string;
@@ -186,7 +186,7 @@ export function TransportExpensesPanel({
           <span className="flex items-center gap-2">
             <Wallet className="h-4 w-4 text-primary" /> Biaya Operasional
           </span>
-          <span className="flex items-center gap-3">
+          <span className="flex min-w-0 flex-wrap items-center gap-3">
             <span className="text-sm font-semibold">{formatRupiah(summary.total)} (total biaya disetujui)</span>
             {canCreate && (
               <Button size="sm" onClick={() => openCreate()}>
@@ -202,7 +202,7 @@ export function TransportExpensesPanel({
             ? "Transport sudah COMPLETED. Penambahan biaya dan unggah foto ditutup; approval biaya tetap terpisah."
             : "Approval berlaku per biaya, bukan untuk seluruh transport. Biaya baru tetap dapat ditambahkan sampai transport COMPLETED."}
         </p>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2 xl:grid-cols-5">
           {EXPENSE_TYPES.map((t) => {
             const Icon = ICON[t];
             const s = summary.byType[t];
@@ -211,7 +211,7 @@ export function TransportExpensesPanel({
                 <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Icon className="h-3.5 w-3.5" /> {EXPENSE_LABEL[t]}
                 </p>
-                <p className="mt-1 text-sm font-semibold">{formatRupiah(s.total)}</p>
+                <p className="mt-1 break-all text-sm font-semibold">{formatRupiah(s.total)}</p>
                 <p className="text-[11px] text-muted-foreground">{s.count} transaksi</p>
               </div>
             );
@@ -227,13 +227,13 @@ export function TransportExpensesPanel({
             {rows.map((r) => {
               const Icon = ICON[r.type];
               return (
-                <div key={r.id} className="flex items-center gap-3 px-3 py-2.5">
+                <div key={r.id} className="flex min-w-0 flex-wrap items-start gap-3 px-3 py-3 sm:items-center">
                   <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">
+                    <p className="break-words text-sm font-medium">
                       {EXPENSE_LABEL[r.type]} · {formatRupiah(r.amount)}
                     </p>
-                    <p className="truncate text-xs text-muted-foreground">
+                    <p className="break-words text-xs text-muted-foreground">
                       <span className="font-mono">{r.expenseCode}</span> · {formatDate(r.createdAt, true)}
                       {r.description ? ` · ${r.description}` : ""}
                     </p>

@@ -55,7 +55,7 @@ describe("activity transport detail", () => {
     expect(screen.queryByText("Penurunan & Approval Resi")).not.toBeInTheDocument();
     expect(screen.queryByText("Shipment dalam Transport")).not.toBeInTheDocument();
     expect(screen.getByText("Informasi Transport")).toBeInTheDocument();
-    expect(screen.getByText("BK-1")).toBeInTheDocument();
+    expect(screen.getAllByText("BK-1").length).toBeGreaterThan(0);
     const user = userEvent.setup();
     await user.click(screen.getByRole("tab", { name: "Biaya Operasional" }));
     expect(await screen.findByText("Expense approval panel")).toBeInTheDocument();

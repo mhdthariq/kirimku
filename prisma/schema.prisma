@@ -530,7 +530,7 @@ model TransportExpense {
     id                 Int       @id @default(autoincrement())
     expenseCode        String    @unique
     transportId        Int
-    /// BONGKAR | PARKIR | MAKAN | BBM
+    /// BONGKAR | PARKIR | MAKAN | BBM | ANGKUT
     type               String
     amount             Float
     description        String?
@@ -759,12 +759,28 @@ model Invoice {
     issueDate     DateTime?
     dueDate       DateTime?
     notes         String?
+    bankAccountId Int?
+    paymentBankName String?
+    paymentAccountNumber String?
+    paymentAccountName String?
     createdAt     DateTime             @default(now())
     updatedAt     DateTime             @updatedAt
     customer      Customer             @relation(fields: [customerId], references: [id])
     lines         InvoiceLine[]
     settlements   InvoiceSettlement[]
     commission    MarketingCommission?
+    bankAccount   BankAccount? @relation(fields: [bankAccountId], references: [id], onDelete: SetNull)
+}
+
+model BankAccount {
+    id            Int @id @default(autoincrement())
+    bankName      String
+    accountNumber String
+    accountName   String
+    isActive      Boolean @default(true)
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @updatedAt
+    invoices      Invoice[]
 }
 
 model InvoiceLine {

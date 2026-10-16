@@ -234,6 +234,15 @@
 .dashboard-text-link:hover {
   text-decoration: underline;
 }
+.transport-detail > header {
+  flex-direction: column;
+  align-items: stretch;
+}
+.transport-actions > button {
+  min-height: 40px;
+  max-width: 100%;
+  white-space: normal;
+}
 @media (min-width: 640px) {
   .dashboard-workspace [data-slot="card-header"],
   .dashboard-workspace [data-slot="card-content"] {
@@ -317,7 +326,7 @@
   .a4-sheet thead { display: table-header-group; }
   .a4-sheet tfoot { display: table-footer-group; }
   .a4-sheet tr, .a4-sheet img, .a4-sheet footer,
-  .invoice-totals, .invoice-parties {
+  .invoice-totals, .invoice-parties, .invoice-payment-account {
     break-inside: avoid;
   }
   .invoice-sheet header { flex-direction: row; }

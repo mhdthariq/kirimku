@@ -576,7 +576,7 @@ export interface TransportExpenseRow {
   approvedByUsername?: string | null;
   approvedByRole?: string | null;
   photoUrl?: string | null;
-  type: "BONGKAR" | "PARKIR" | "MAKAN" | "BBM";
+  type: "BONGKAR" | "PARKIR" | "MAKAN" | "BBM" | "ANGKUT";
   amount: number;
   description: string | null;
   hasPhoto: boolean;
@@ -835,7 +835,40 @@ export interface InvoiceSettlement {
   settledAt: string;
 }
 
+export interface OperationalExpenseRecord {
+  id: number;
+  expenseCode: string;
+  type: string;
+  amount: number;
+  description: string | null;
+  status: string;
+  createdAt: string;
+  transport: { id: number; transportCode: string; origin: string | null; destination: string | null };
+}
+export interface OperationalExpenseReport {
+  approvedTotal: number;
+  pendingTotal: number;
+  byType: { type: string; label: string; approved: number; pending: number; count: number }[];
+  rows: OperationalExpenseRecord[];
+  count: number;
+  page: number;
+  pageSize: number;
+  pages: number;
+}
+
+export interface BankAccount {
+  id: number;
+  bankName: string;
+  accountNumber: string;
+  accountName: string;
+  isActive: boolean;
+}
+
 export interface Invoice {
+  bankAccountId?: number | null;
+  paymentBankName?: string | null;
+  paymentAccountNumber?: string | null;
+  paymentAccountName?: string | null;
   id: number;
   invoiceNumber: string;
   customerId: number;

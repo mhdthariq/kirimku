@@ -29,6 +29,8 @@ import { B2BCommissionsPage } from "@/components/app/pages/b2b-commissions-page"
 import { MyVehiclesPage } from "@/components/app/pages/my-vehicles-page";
 import { VOTransportHistoryPage } from "@/components/app/pages/vo-transport-history-page";
 import { RepairsPage } from "@/components/app/pages/repairs-page";
+import { BankAccountsPage } from "@/components/app/pages/bank-accounts-page";
+import { OperationalExpensesPage } from "@/components/app/pages/operational-expenses-page";
 import { FinancePage } from "@/components/app/pages/finance-page";
 import { TopUpManagementPage } from "@/components/app/pages/topups-page";
 import { WithdrawalManagementPage } from "@/components/app/pages/withdrawals-page";
@@ -103,7 +105,7 @@ function RouterInner({ segments, query }: { segments: string[]; query: URLSearch
         if (segments[1] && segments[2] === "manifest") {
           return <TransportManifestPrint key={segments[1]} transportId={Number(segments[1])} onClose={() => (window.location.hash = `#/transports/${segments[1]}`)} />;
         }
-        return segments[1] ? <TransportDetailPage transportId={Number(segments[1])} /> : <TransportsPage />;
+        return segments[1] ? <TransportDetailPage transportId={Number(segments[1])} initialTab={query.get("tab") ?? undefined} /> : <TransportsPage />;
       case "transport-history":
         // Revision Part V — driver/kenek transport history view
         return <TransportsPage historyMode />;
@@ -143,6 +145,10 @@ function RouterInner({ segments, query }: { segments: string[]; query: URLSearch
         return <B2BCommissionsPage />;
       case "repairs":
         return <RepairsPage />;
+      case "bank-accounts":
+        return <BankAccountsPage />;
+      case "operational-expenses":
+        return <OperationalExpensesPage />;
       case "finance":
         return <FinancePage />;
       case "topups":

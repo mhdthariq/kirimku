@@ -30,6 +30,7 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { apiDelete, apiGet, apiPost, hasPermission, type Transport, type TransportDetail, type TransportDropsBoard } from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
+import { DashboardHeading, DashboardMetric } from "@/components/app/dashboard-ui";
 import { PageHeader } from "@/components/app/data-table";
 import { StatusBadge } from "@/components/app/status-badge";
 import { formatDate, formatNumber, formatRupiah } from "@/components/app/form-parts";
@@ -67,7 +68,7 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string;
       <span className="mt-0.5 text-muted-foreground">{icon}</span>
       <div className="min-w-0 flex-1">
         <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-        <p className="truncate text-sm font-medium text-foreground">{value ?? "-"}</p>
+        <p className="break-words text-sm font-medium leading-relaxed text-foreground">{value ?? "-"}</p>
       </div>
     </div>
   );
@@ -82,7 +83,7 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string;
  * Checking in at the first checkpoint of a PLANNED transport automatically
  * marks it DEPARTED.
  */
-export function TransportDetailPage({ transportId }: { transportId: number }) {
+export function TransportDetailPage({ transportId, initialTab }: { transportId: number; initialTab?: string }) {
   const { user } = useAuth();
   // Revise round 8 — Proof photo viewing is permission-gated. Only Admin
   // Gudang + Owner see the actual checkpoint photo thumbnails; other roles
@@ -210,7 +211,7 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
   if (loading) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-10 w-72" />
+        <Skeleton className="h-10 w-full max-w-72" />
         <div className="grid gap-4 lg:grid-cols-3">
           <Skeleton className="h-64 rounded-xl lg:col-span-1" />
           <Skeleton className="h-64 rounded-xl lg:col-span-2" />
@@ -248,17 +249,17 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
   const backLabel = user?.partnerType === "VEHICLE_OWNER" ? "Riwayat transport saya" : "Semua transport";
 
   return (
-    <div className="space-y-4">
+    <div className="dashboard-workspace transport-detail mx-auto min-w-0 max-w-[1600px] space-y-6 sm:space-y-8">
       <Button variant="ghost" size="sm" onClick={() => (window.location.hash = backHref)} className="-ml-2">
         <ArrowLeft className="h-4 w-4" /> {backLabel}
       </Button>
 
-      <PageHeader
+      <DashboardHeading
+        eyebrow="Detail transport"
         title={transport.transportCode}
-        subtitle={`${transport.origin ?? "?"} → ${transport.destination ?? "?"} · ${transport.routeName ?? "tanpa rute"}`}
-        icon={<Route className="h-5 w-5" />}
+        description={`${transport.origin ?? "?"} → ${transport.destination ?? "?"} · ${transport.routeName ?? "tanpa rute"}`}
         actions={
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="transport-actions flex max-w-full flex-wrap items-center gap-2">
             <StatusBadge status={transport.status} />
             {transport.status === "ARRIVED" && can.complete && (
               <Button size="sm" disabled={lifecycleBusy} onClick={() => setConfirmComplete(true)}>
@@ -295,6 +296,20 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
         }
       />
 
+      <section className="relative overflow-hidden rounded-2xl bg-emerald-950 p-5 text-white sm:p-7" aria-label="Ringkasan perjalanan">
+        <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full border-[40px] border-emerald-400/10" />
+        <div className="relative grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+          <div className="min-w-0"><p className="text-xs font-medium text-emerald-200">Koridor perjalanan</p><div className="mt-4 grid min-w-0 grid-cols-[minmax(0,1fr)_24px_minmax(0,1fr)] items-start gap-3"><div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-emerald-100/60">Asal</p><p className="mt-1 break-words text-lg font-semibold sm:text-2xl">{transport.origin ?? "—"}</p></div><Route className="mt-5 h-5 w-5 text-emerald-300" /><div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-emerald-100/60">Tujuan</p><p className="mt-1 break-words text-lg font-semibold sm:text-2xl">{transport.destination ?? "—"}</p></div></div><p className="mt-4 break-words text-xs text-emerald-100/75">{isActivity ? "Activity tracking" : `${checkedInCount}/${mapCheckpoints.length} checkpoint ter-check-in`} · {formatNumber(transport.shipmentCount, 0)} shipment</p></div>
+          <div className="grid min-w-0 gap-4 rounded-xl bg-white/5 p-4 sm:grid-cols-2"><div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-emerald-100/60">Kendaraan</p><p className="mt-1 break-words text-sm font-semibold">{transport.vehicle.vehicleNumber}</p>{transport.vehicle.name && <p className="mt-1 break-words text-xs text-emerald-100/75">{transport.vehicle.name}</p>}</div><div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-emerald-100/60">Driver</p><p className="mt-1 break-words text-sm font-semibold">{transport.driver?.name ?? "Belum ditugaskan"}</p>{transport.kenek?.name && <p className="mt-1 break-words text-xs text-emerald-100/75">Kenek: {transport.kenek.name}</p>}</div></div>
+        </div>
+      </section>
+      {!driverFocused && <div className="grid min-w-0 grid-cols-2 gap-3 xl:grid-cols-4">
+        <DashboardMetric label="Shipment" value={formatNumber(transport.shipmentCount, 0)} hint={`${formatNumber(transport.totalKoli ?? transport.shipments.reduce((sum, row) => sum + row.packages, 0), 0)} paket`} icon={<Boxes />} />
+        <DashboardMetric label="Total Berat" value={`${formatNumber(transport.totalWeightKg, 1)} KG`} hint={transport.totalActualWeightKg != null ? `Aktual ${formatNumber(transport.totalActualWeightKg, 1)} KG` : undefined} icon={<Scale />} tone="blue" />
+        <DashboardMetric label="Total Volume" value={`${formatNumber(transport.totalVolumeM3, 2)} M³`} icon={<PackageSearch />} tone="violet" />
+        <DashboardMetric label="Total Price" value={formatRupiah(transport.totalPrice)} icon={<Coins />} tone="amber" />
+      </div>}
+
       {transport.status === "ARRIVED" && (
         <div role="status" className="rounded-lg border border-amber-200 bg-amber-50/60 px-3.5 py-2.5 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
           <strong>Transport tiba — menunggu audit.</strong> Status masih ARRIVED, belum COMPLETED. Foto, shipment/paket, dan biaya operasional perlu ditinjau sebelum audit dikonfirmasi.
@@ -308,15 +323,15 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.3fr)]">
         {/* 1. Transport information */}
-        <Card className={driverFocused ? "lg:col-span-3" : undefined}>
+        <Card className={driverFocused ? "xl:col-span-2" : undefined}>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
               <Info className="h-4 w-4 text-primary" /> Informasi Transport
             </CardTitle>
           </CardHeader>
-          <CardContent className="divide-y divide-border/60">
+          <CardContent className="grid min-w-0 gap-x-6 gap-y-2 sm:grid-cols-2 xl:grid-cols-1">
             <InfoRow icon={<Route className="h-4 w-4" />} label="Rute" value={transport.routeName ?? "-"} />
             <InfoRow icon={<MapPin className="h-4 w-4" />} label="Koridor" value={`${transport.origin ?? "?"} → ${transport.destination ?? "?"}`} />
             <InfoRow icon={<Calendar className="h-4 w-4" />} label="Rencana berangkat" value={formatDate(transport.plannedDepartureAt, true)} />
@@ -330,9 +345,9 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
         </Card>
 
         {/* 2. Current location map */}
-        {!driverFocused && <Card className="lg:col-span-2">
+        {!driverFocused && <Card className="min-w-0">
           <CardHeader className="pb-2">
-            <CardTitle className="flex items-center justify-between gap-2 text-base">
+            <CardTitle className="flex min-w-0 flex-wrap items-center justify-between gap-3 text-base">
               <span className="flex items-center gap-2">
                 <MapPin className="h-4 w-4 text-primary" /> Posisi & Rute
               </span>
@@ -357,8 +372,8 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
         </Card>}
       </div>
 
-      <Tabs key={transport.id} defaultValue={isActivity ? "activity" : "checkpoints"}>
-        <TabsList>
+      <Tabs key={transport.id} defaultValue={initialTab === "expenses" && can.expenseView ? "expenses" : isActivity ? "activity" : "checkpoints"} className="min-w-0">
+        <TabsList className="h-auto min-h-11 rounded-xl p-1">
           <TabsTrigger value={isActivity ? "activity" : "checkpoints"}>{isActivity ? "Activity" : "Checkpoint"}</TabsTrigger>
           {can.expenseView && <TabsTrigger value="expenses">Biaya Operasional</TabsTrigger>}
         </TabsList>
@@ -370,7 +385,7 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
       {/* 3. Check-in information per checkpoint */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center justify-between gap-2 text-base">
+          <CardTitle className="flex min-w-0 flex-wrap items-center justify-between gap-3 text-base">
             <span className="flex items-center gap-2">
               <Camera className="h-4 w-4 text-primary" /> Check-in Checkpoint
             </span>
@@ -385,18 +400,18 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
           {mapCheckpoints.length === 0 ? (
             <p className="py-4 text-center text-sm text-muted-foreground">Rute belum memiliki checkpoint.</p>
           ) : (
-            <div className="grid gap-2.5 md:grid-cols-2">
+            <div className="grid min-w-0 gap-3 xl:grid-cols-2">
               {mapCheckpoints.map((c) => {
                 const records = transport.checkpointRecords.filter((r) => r.checkpointId === c.id);
                 return (
                   <div key={c.id} className={`rounded-xl border p-3.5 ${c.checkedIn ? "border-emerald-300/70 dark:border-emerald-900" : ""}`}>
-                    <div className="flex items-start justify-between gap-2">
+                    <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
                           <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
                             {c.sequence}
                           </span>
-                          <span className="truncate">{c.name}</span>
+                          <span className="break-words">{c.name}</span>
                         </p>
                         <p className="mt-1 text-[11px] text-muted-foreground">
                           Radius {formatNumber(c.radiusMeters / 1000, 2)} KM · <span className="font-mono">{c.latitude.toFixed(5)}, {c.longitude.toFixed(5)}</span>
@@ -524,49 +539,16 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* aggregate totals */}
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-            <div className="rounded-xl border bg-muted/40 p-3">
-              <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                <Boxes className="h-3.5 w-3.5" /> Shipment
-              </p>
-              <p className="mt-1 text-xl font-bold text-foreground">{formatNumber(transport.shipmentCount, 0)}</p>
-            </div>
-            <div className="rounded-xl border bg-muted/40 p-3">
-              <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                <Scale className="h-3.5 w-3.5" /> Total Berat
-              </p>
-              <p className="mt-1 text-xl font-bold text-foreground">{formatNumber(transport.totalWeightKg, 1)} <span className="text-xs font-medium text-muted-foreground">KG</span></p>
-              {transport.totalActualWeightKg != null && (
-                <p className="text-[10px] text-muted-foreground">Aktual: {formatNumber(transport.totalActualWeightKg, 1)} KG</p>
-              )}
-            </div>
-            <div className="rounded-xl border bg-muted/40 p-3">
-              <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                <PackageSearch className="h-3.5 w-3.5" /> Total Volume
-              </p>
-              <p className="mt-1 text-xl font-bold text-foreground">{formatNumber(transport.totalVolumeM3, 2)} <span className="text-xs font-medium text-muted-foreground">M³</span></p>
-              {transport.totalKoli != null && (
-                <p className="text-[10px] text-muted-foreground">Koli: {formatNumber(transport.totalKoli, 0)}</p>
-              )}
-            </div>
-            <div className="rounded-xl border bg-muted/40 p-3">
-              <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                <Coins className="h-3.5 w-3.5" /> Total Price
-              </p>
-              <p className="mt-1 text-xl font-bold text-foreground">
-                {transport.totalPrice != null ? formatRupiah(transport.totalPrice) : "-"}
-              </p>
-            </div>
+          <div className="space-y-3 xl:hidden">
+            {transport.shipments.map(shipment => <article key={shipment.id} className="min-w-0 space-y-3 rounded-xl border p-4"><div className="flex flex-wrap items-center justify-between gap-2"><a className="break-all font-mono text-xs font-semibold text-primary" href={`/#/shipments/${shipment.id}`}>{shipment.masterCode}</a><StatusBadge status={shipment.status} /></div><p className="break-words text-sm font-medium">{shipment.customerName ?? "—"}</p>{shipment.penerimaName && <p className="break-words text-xs text-muted-foreground">Penerima: {shipment.penerimaName}</p>}<p className="break-words text-xs text-muted-foreground">Tujuan: {shipment.destination}</p><dl className="grid grid-cols-2 gap-3 rounded-lg bg-muted/30 p-3 text-xs"><div><dt className="text-muted-foreground">Paket</dt><dd className="mt-1 font-semibold">{formatNumber(shipment.packages, 0)}</dd></div><div><dt className="text-muted-foreground">Berat</dt><dd className="mt-1 break-words font-semibold">{formatNumber(shipment.weightKg, 1)} KG</dd></div><div><dt className="text-muted-foreground">Volume</dt><dd className="mt-1 break-words font-semibold">{formatNumber(shipment.volumeM3, 3)} M³</dd></div><div><dt className="text-muted-foreground">Harga</dt><dd className="mt-1 break-all font-semibold">{formatRupiah(shipment.priceAmount)}</dd></div></dl></article>)}
           </div>
-
           {/* shipments table */}
           {transport.shipments.length === 0 ? (
             <p className="rounded-lg border border-dashed px-3.5 py-4 text-center text-sm text-muted-foreground">
               Belum ada shipment yang dimuat ke transport ini.
             </p>
           ) : (
-            <div className="overflow-x-auto rounded-xl border">
+            <div className="hidden min-w-0 overflow-x-auto rounded-xl border xl:block">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/50 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">

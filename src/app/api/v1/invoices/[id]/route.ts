@@ -3,6 +3,8 @@ import { db } from "@/infrastructure/persistence/db";
 import { guard, ok, handle, fail, str, dateOrNull, num } from "@/composition/api-helpers";
 import { audit, diffFields } from "@/infrastructure/services/audit";
 
+import { invoiceBankSnapshot } from "@/infrastructure/services/invoice-bank-account";
+
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(req: NextRequest, { params }: Params) {
@@ -35,6 +37,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (existing.status !== "DRAFT") return fail(422, "Hanya invoice DRAFT yang bisa diubah.");
     const body = await req.json().catch(() => ({}));
     const data: Record<string, unknown> = {};
+    if (body.bankAccountId !== undefined && body.bankAccountId !== existing.bankAccountId) Object.assign(data, await invoiceBankSnapshot(body.bankAccountId));
     if (body.issueDate !== undefined) data.issueDate = dateOrNull(body.issueDate);
     if (body.dueDate !== undefined) data.dueDate = dateOrNull(body.dueDate);
     if (body.notes !== undefined) data.notes = str(body.notes);

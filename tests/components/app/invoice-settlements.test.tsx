@@ -29,7 +29,7 @@ const invoice = {
 beforeEach(() => {
   vi.clearAllMocks();
   m.permissions = ["invoice.view", "invoice.settlement.update", "invoice.settlement.delete"];
-  m.get.mockImplementation(async (path: string) => path === "/invoices" ? [invoice] : path === "/invoices/1" ? invoice : {});
+  m.get.mockImplementation(async (path: string) => path === "/invoices" ? [invoice] : path === "/invoices/1" ? invoice : path.startsWith("/bank-accounts") ? [] : {});
   m.put.mockResolvedValue({});
   m.remove.mockResolvedValue({});
 });

@@ -11,7 +11,7 @@
  */
 
 // ---------------------------------------------------------------- expenses --
-export const EXPENSE_TYPES = ["BONGKAR", "PARKIR", "MAKAN", "BBM"] as const;
+export const EXPENSE_TYPES = ["BONGKAR", "PARKIR", "MAKAN", "BBM", "ANGKUT"] as const;
 export type ExpenseType = (typeof EXPENSE_TYPES)[number];
 
 export const EXPENSE_LABEL: Record<ExpenseType, string> = {
@@ -19,6 +19,7 @@ export const EXPENSE_LABEL: Record<ExpenseType, string> = {
   PARKIR: "Biaya Parkir",
   MAKAN: "Uang Makan",
   BBM: "Biaya BBM",
+  ANGKUT: "Biaya Angkut",
 };
 
 export function isExpenseType(value: unknown): value is ExpenseType {
