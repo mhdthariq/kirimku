@@ -191,86 +191,98 @@
   animation: pulse-dot 2s ease-in-out infinite;
 }
 
-/* Physical paper proportions used by the on-screen print previews. */
-.invoice-sheet {
+/* A4 preview includes the same 12mm margins as the printed page. */
+.a4-sheet {
   box-sizing: border-box;
-  width: min(100%, 210mm);
-  max-width: 210mm;
+  width: 210mm;
+  max-width: 100%;
   min-height: 297mm;
+  padding: 12mm;
+  background: #fff;
+  color: #171717;
+  overflow-wrap: anywhere;
 }
-.thermal-sheet {
+.resi-sheet {
   box-sizing: border-box;
-  width: min(100%, 100mm);
+  width: 100mm;
+  min-width: 100mm;
   max-width: 100mm;
-  min-height: 150mm;
+  height: 100mm;
+  min-height: 100mm;
+  max-height: 100mm;
+  border: 1px solid #000;
+  flex-shrink: 0;
 }
 
-/* ---------------------------------------------------------------------------
-Resi print — when the ResiPrint portal is open, only it is printed
-(1 Resi Shipment + N Resi Detail stickers, one per page).
---------------------------------------------------------------------------- */
 @media print {
-  body > *:not(#resi-print-portal):not(#invoice-print-portal):not(#manifest-print-portal) {
-    display: none !important;
-  }
-  #resi-print-portal {
-    position: static !important;
-    inset: auto !important;
-    overflow: visible !important;
-    background: #ffffff !important;
-  }
-  #resi-print-portal > div:first-child {
-    display: none !important; /* hide the preview toolbar */
-  }
-  #resi-print-portal > div:last-child {
-    padding: 0 !important;
-  }
-  #invoice-print-portal {
-    position: static !important;
-    inset: auto !important;
-    overflow: visible !important;
-    background: #ffffff !important;
-  }
-  #invoice-print-portal > div:first-child {
-    display: none !important;
-  }
-  .invoice-sheet {
-    page: invoice-page;
-    margin: 0 auto !important;
-    max-width: none !important;
-    width: 100% !important;
-    box-shadow: none !important;
-  }
-  .invoice-sheet thead {
-    display: table-header-group;
-  }
-  .invoice-sheet tr {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-  .resi-sheet {
-    page: thermal-page;
-    width: 100% !important;
-    max-width: none !important;
-    margin: 0 !important;
-    break-after: page;
-    page-break-after: always;
-    box-shadow: none !important;
-    border: 1px solid #d4d4d4 !important;
-  }
-  .resi-sheet:last-child {
-    break-after: auto;
-    page-break-after: auto;
-  }
   @page {
-    margin: 12mm;
-  }
-  @page invoice-page {
     size: A4 portrait;
     margin: 12mm;
   }
-  @page thermal-page {
-    size: 100mm 150mm;
+  @page shipment-label {
+    size: 100mm 100mm;
     margin: 0;
   }
+  html, body {
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+    color: #171717 !important;
+    color-scheme: light;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  body:has([data-print-portal]) > *:not([data-print-portal]) {
+    display: none !important;
+  }
+  [data-print-portal] {
+    position: static !important;
+    inset: auto !important;
+    width: auto !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+  [data-print-toolbar] {
+    display: none !important;
+  }
+  .a4-sheet {
+    width: 100% !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+  }
+  .a4-sheet thead { display: table-header-group; }
+  .a4-sheet tfoot { display: table-footer-group; }
+  .a4-sheet tr, .a4-sheet img, .a4-sheet footer,
+  .invoice-totals, .invoice-parties {
+    break-inside: avoid;
+  }
+  .invoice-sheet header { flex-direction: row; }
+  .invoice-parties { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 160px; }
+  .invoice-items { overflow: visible !important; }
+  .invoice-items table { min-width: 0 !important; table-layout: fixed; }
+  #resi-print-portal { page: shipment-label; }
+  #resi-print-portal > .print-content { padding: 0 !important; }
+  .resi-sheet {
+    page: shipment-label;
+    margin: 0 !important;
+    break-inside: avoid;
+    break-after: page;
+    box-shadow: none !important;
+  }
+  .resi-sheet:last-child { break-after: auto; }
+  .resi-sheet img { image-rendering: pixelated; }
 }

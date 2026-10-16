@@ -96,11 +96,10 @@ describe("manifest print document", () => {
     apiGet.mockResolvedValue(transport);
     render(<TransportManifestPrint transportId={1} onClose={vi.fn()} />);
     await screen.findByText("Manifest Transport / Surat Jalan");
-    const styles = document.querySelector("#manifest-print-portal")?.previousElementSibling?.textContent;
-    expect(styles).toContain("@page manifest-page { size: A4 portrait; margin: 12mm; }");
-    expect(styles).toContain("page: manifest-page;");
-    expect(styles).toContain("width: 100% !important");
+    expect(document.querySelector(".manifest-sheet")).toHaveClass("a4-sheet");
+    expect(document.querySelector("#manifest-print-portal")).toHaveAttribute("data-print-portal");
     const globalCss = readFileSync("src/app/globals.css", "utf8");
-    expect(globalCss).toContain("body > *:not(#resi-print-portal):not(#invoice-print-portal):not(#manifest-print-portal)");
+    expect(globalCss).toContain("size: A4 portrait;");
+    expect(globalCss).toContain("body:has([data-print-portal]) > *:not([data-print-portal])");
   });
 });

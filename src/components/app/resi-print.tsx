@@ -86,42 +86,7 @@ function buildPrintByLabel(user: ReturnType<typeof useAuth>["user"]): string | n
   return `${accountName} (${roleLabel})`;
 }
 
-/**
- * Print format:
- * - Exactly 100mm x 100mm per sheet, no more, no less
- * - QR Code only (no barcode — QR survives smudges better)
- * - One master resi per page
- * - One package label per page
- * - Pure black/white only (thermal-safe, no gray tints, no shadows)
- * - Pengirim (sender) shown on both the master resi AND every package label
- * - 2px solid black borders — survive 203 DPI thermal rendering
- * - Larger QR codes (~70px) — scan reliably even after paper crumples
- *
- * Height budget @ 96 CSS px/inch (100mm ≈ 378px):
- *
- *   MASTER RESI:
- *     36 (header) + 86 (resi+QR) + 32 (route) + 78 (sender/receiver)
- *     + 44 (stats) + 16 (B2B pricing-method mark, B2B only) + 24 (price,
- *     optional) + 24 (insurance, optional) + 34 (warehouse) + flex (footer)
- *     = 334px fixed without optionals (B2C, or B2B before pricing) →
- *       44px+ footer room
- *     = 350px fixed for B2B without price/insurance optionals →
- *       28px+ footer room
- *     = 398px fixed for a B2B shipment with BOTH price AND insurance shown
- *       → exceeds the 378px sheet height by ~20px in this one combination;
- *       the footer (flex-1, min-h-0) shrinks to absorb it, down to fully
- *       hidden in the worst case — the resi number/QR/route/stats/price,
- *       the parts that matter operationally, are never affected, only the
- *       "printed at/by" footer trivia in this specific worst case
- *
- *   PACKAGE LABEL:
- *     36 (header) + 86 (code+QR) + 24 (master ref)
- *     + 78 (sender/receiver, side by side — same layout as the Master Resi)
- *     + 40 (address) + 40 (stats)
- *     + 14 (B2B pricing-method mark, B2B only) + flex (description+footer)
- *     = 304px fixed (B2C, or B2B before pricing) → 74px+ for description/footer
- *     = 318px fixed for B2B → 60px+ for description/footer
- */
+/** Shipment resi and package labels print on separate 100 × 100 mm pages. */
 export function ResiPrint({
   shipment,
   onClose,
@@ -321,18 +286,18 @@ export function ResiPrint({
   const sheets = (
     <>
       {/* ============================================================
-          MASTER RESI - 100mm × 100mm
+          MASTER RESI - 100 × 100 mm
           Every section is flex-col with explicit fixed heights so the
-          sheet always totals exactly 100mm regardless of how long the
+          label keeps enough room for its contents regardless of how long the
           underlying data is. Long fields truncate (truncate class) to
           one line so a section's height never depends on content. The
           footer flex-1 absorbs whatever is left.
           ============================================================ */}
 
-      <section className="resi-sheet mx-auto flex h-[100mm] w-[100mm] flex-col overflow-hidden bg-white text-black">
-        {/* Header - fixed 36px. 2px bottom border so the header line
+      <section className="resi-sheet mx-auto flex flex-col overflow-hidden bg-white text-black">
+        {/* Header - fixed 32px. 2px bottom border so the header line
             survives 203 DPI thermal printing. */}
-        <header className="flex h-9 flex-none items-center justify-between gap-2 border-b-2 border-black px-3">
+        <header className="flex h-8 flex-none items-center justify-between gap-2 border-b-2 border-black px-3">
           <div className="min-w-0">
             <p className="truncate text-[12px] font-extrabold uppercase leading-none tracking-[0.04em]">
               {company}
@@ -352,9 +317,9 @@ export function ResiPrint({
           </div>
         </header>
 
-        {/* Resi Number + QR - fixed 86px. QR is 70×70 so the thermal
+        {/* Resi Number + QR - fixed 80px. QR is 70×70 so the thermal
             printer renders enough modules for reliable scanning. */}
-        <div className="h-21.5 flex-none border-b border-black">
+        <div className="h-20 flex-none border-b border-black">
           <div className="grid h-full grid-cols-[1fr_78px]">
             <div className="flex min-w-0 flex-col justify-center overflow-hidden border-r border-black px-3">
               <SmallCaps>Nomor Resi</SmallCaps>
@@ -419,9 +384,9 @@ export function ResiPrint({
           </div>
         </div>
 
-        {/* Sender / Receiver - fixed 78px. Two equal columns with name,
+        {/* Sender / Receiver - fixed 72px. Two equal columns with name,
             contact, and address. Address truncates to 2 lines. */}
-        <div className="h-19.5 flex-none grid grid-cols-2 border-b border-black">
+        <div className="h-18 flex-none grid grid-cols-2 border-b border-black">
           <div className="flex min-w-0 flex-col justify-center gap-0.5 overflow-hidden border-r border-black px-3">
             <SmallCaps>Pengirim</SmallCaps>
 
@@ -457,14 +422,14 @@ export function ResiPrint({
           </div>
         </div>
 
-        {/* Shipment Stats - fixed 44px. Jumlah (colly count) always shows;
+        {/* Shipment Stats - fixed 40px. Jumlah (colly count) always shows;
             weight/volume cells are shown only when relevant to how this
             B2B shipment is actually billed (resiStatVisibility) — B2C
             always shows all 4 cells, unchanged. Column count adapts to
             how many cells are visible so they stay evenly spaced. */}
         <div
           className={cn(
-            "h-11 flex-none grid border-b border-black",
+            "h-10 flex-none grid border-b border-black",
             statCells.length === 1 && "grid-cols-1",
             statCells.length === 2 && "grid-cols-2",
             statCells.length === 3 && "grid-cols-3",
@@ -505,7 +470,7 @@ export function ResiPrint({
             di samping harga karena penagihan ke perusahaan dilakukan via invoice,
             bukan via pembayaran per resi. Pembayaran B2C ditanggung Marketing. */}
         {shipment.priceAmount != null && (
-          <div className="flex h-6 flex-none items-center justify-between border-b border-black px-3">
+          <div className="flex h-5 flex-none items-center justify-between border-b border-black px-3">
             <SmallCaps>Nilai Pengiriman</SmallCaps>
             <div className="flex items-baseline gap-2 min-w-0">
               {isB2B && invoiceNumber && (
@@ -521,7 +486,7 @@ export function ResiPrint({
         )}
 
         {shipment.insuranceAmount > 0 && (
-          <div className="flex h-6 flex-none items-center justify-between border-b border-black px-3">
+          <div className="flex h-5 flex-none items-center justify-between border-b border-black px-3">
             <SmallCaps>Asuransi</SmallCaps>
             <p className="text-[9px] font-extrabold leading-none">
               {formatRupiah(shipment.insuranceAmount)}
@@ -548,7 +513,7 @@ export function ResiPrint({
         </div>
 
         {/* Footer - flex-1, absorbs whatever height is left so the
-            sheet always totals exactly 100mm. Includes handling
+            label keeps enough room for its contents. Includes handling
             instructions, signature lines, print timestamp, and the
             account name + role of the staff who triggered the print. */}
         <footer className="flex min-h-0 flex-1 flex-col justify-between gap-1 overflow-hidden px-3 py-2 text-[8px] leading-tight text-black">
@@ -569,7 +534,7 @@ export function ResiPrint({
       </section>
 
       {/* ============================================================
-          PACKAGE LABELS - 100mm × 100mm
+          PACKAGE LABELS - 100 × 100 mm
           Same fixed-height-per-section approach as the master resi.
           QR is bumped to 70×70 too - package labels get scanned more
           often (at every checkpoint) so the larger module size pays
@@ -588,7 +553,7 @@ export function ResiPrint({
         return (
           <section
             key={d.id}
-            className="resi-sheet mx-auto flex h-[100mm] w-[100mm] flex-col overflow-hidden bg-white text-black"
+            className="resi-sheet mx-auto flex flex-col overflow-hidden bg-white text-black"
           >
             {/* Header - fixed 36px. Same 2px bottom border as the master
                 resi so the visual style is consistent across all
@@ -799,7 +764,7 @@ export function ResiPrint({
             )}
 
             {/* Description - flex-1, fills the remaining space so the
-                sheet always totals exactly 100mm. Dashed rule on top
+                label keeps enough room for its contents. Dashed rule on top
                 is solid black (not gray) so it reproduces on thermal
                 paper. Includes a "scan at operation point" reminder. */}
             <footer className="flex min-h-0 flex-1 flex-col justify-between gap-1 overflow-hidden border-t border-dashed border-black px-3 py-2 text-[7px] leading-tight text-black">
@@ -855,143 +820,20 @@ export function ResiPrint({
 
   return createPortal(
     <>
-      {/* ============================================================
-          PRINT STYLES
-          @page is set to exactly 100mm x 100mm with zero margin. The
-          sheet itself carries its own w-[100mm]/h-[100mm] sizing via
-          Tailwind so screen preview and print always agree - there is
-          no separate "print-only" size rule left to drift out of sync.
-
-          Thermal-printer compatibility:
-          - All colors forced to pure black/white via filter:
-            grayscale(1) contrast(100) - eliminates any anti-aliased
-            gray edges the browser might produce.
-          - print-color-adjust: exact on every element so Chrome's
-            "save as PDF" and the OS print dialog both keep the
-            borders and backgrounds.
-          - No box-shadows or transparent overlays survive into print.
-          ============================================================ */}
-
-      <style jsx global>{`
-        @page {
-          size: 100mm 100mm;
-          margin: 0;
-        }
-
-        @media print {
-          html,
-          body {
-            width: 100mm;
-            margin: 0 !important;
-            padding: 0 !important;
-            background: white !important;
-          }
-
-          body * {
-            visibility: hidden;
-          }
-
-          #resi-print-portal,
-          #resi-print-portal * {
-            visibility: visible;
-          }
-
-          #resi-print-portal {
-            position: static !important;
-            width: 100mm !important;
-            min-width: 100mm !important;
-            max-width: 100mm !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            overflow: visible !important;
-            background: white !important;
-          }
-
-          #resi-print-portal > .print-toolbar {
-            display: none !important;
-          }
-
-          #resi-print-portal > .print-content {
-            display: block !important;
-            width: 100mm !important;
-            margin: 0 !important;
-            padding: 0 !important;
-          }
-
-          .resi-sheet {
-            width: 100mm !important;
-            height: 100mm !important;
-            min-width: 100mm !important;
-            max-width: 100mm !important;
-            min-height: 100mm !important;
-            max-height: 100mm !important;
-
-            margin: 0 !important;
-            padding: 0 !important;
-
-            page-break-after: always;
-            break-after: page;
-            page-break-inside: avoid;
-            break-inside: avoid;
-
-            overflow: hidden !important;
-            box-sizing: border-box !important;
-
-            /* Force pure black/white — no anti-aliased gray edges from
-               the browser's own rendering getting sent to the printer.
-               Critical for thermal heads that dither grays into noise. */
-            filter: grayscale(1) contrast(100);
-
-            /* Ensure every border + background is preserved by Chrome's
-               "Save as PDF" and by the OS print dialog. Without this,
-               some browsers strip 1px borders when downscaling to the
-               printer's DPI. */
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-            color-adjust: exact !important;
-          }
-
-          .resi-sheet * {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-            color-adjust: exact !important;
-          }
-
-          .resi-sheet:last-child {
-            page-break-after: auto;
-            break-after: auto;
-          }
-
-          img {
-            print-color-adjust: exact;
-            -webkit-print-color-adjust: exact;
-            /* Render QR codes crisply at the printer's native DPI
-               instead of letting the browser smooth-scale them. */
-            image-rendering: pixelated;
-            image-rendering: crisp-edges;
-          }
-        }
-
-        @media screen {
-          .resi-sheet {
-            box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
-          }
-        }
-      `}</style>
-
       <div
         id="resi-print-portal"
+        data-print-portal
         className="fixed inset-0 z-80 overflow-y-auto bg-neutral-200 dark:bg-neutral-900"
       >
         {/* Screen toolbar */}
-        <div className="print-toolbar sticky top-0 z-10 flex flex-col gap-3 border-b bg-white px-4 py-3 shadow-sm dark:bg-neutral-800 sm:flex-row sm:items-center sm:justify-between">
+        <div data-print-toolbar className="print-toolbar sticky top-0 z-10 flex flex-col gap-3 border-b bg-white px-4 py-3 shadow-sm dark:bg-neutral-800 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <p className="text-sm font-bold text-foreground">
               Pratinjau Cetak Resi - {resiNumber}
             </p>
 
             <p className="text-xs text-muted-foreground">
-              QR Code only • Ukuran 100 × 100 mm • Thermal printer ready • 1 Master Resi +{" "}
+              100 × 100 mm • 1 label per halaman • 1 Master Resi +{" "}
               {totalPackages} Package Label
             </p>
 
