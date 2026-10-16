@@ -27,7 +27,7 @@ export function CapacityTrendChart({ days = 14 }: { days?: number }) {
   return (
     <Card className="overflow-hidden border-l-4 border-l-indigo-400/40">
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
           <CardTitle className="flex items-center gap-2 text-base">
             <span className="rounded-lg bg-indigo-500/10 p-1.5 text-indigo-500"><History className="h-4 w-4" /></span>
             Tren Perubahan Kapasitas

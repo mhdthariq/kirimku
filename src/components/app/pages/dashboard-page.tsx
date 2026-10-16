@@ -1,30 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
 import {
-  AlertCircle,
   ArrowRight,
   Banknote,
-  Bell,
   Boxes,
   ClipboardList,
   Coins,
   History,
   Landmark,
   Package,
-  PackageSearch,
   Receipt,
   Route,
-  Scale,
   Truck,
   Users,
   CarFront,
   Warehouse,
   Wallet,
   CheckCircle2,
-  XCircle,
-  Wrench,
   TrendingUp,
   ArrowDownCircle,
   ArrowUpCircle,
@@ -33,13 +26,13 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { apiGet, hasPermission, type DashboardData, type DashboardApprovalItem, type GudangDashboardWorkspace, type MarketingDashboardSnapshot } from "@/infrastructure/http/client-api";
 import { useApiData } from "@/hooks/use-api-data";
-import { PageHeader } from "@/components/app/data-table";
 import { DatePeriodFilter } from "@/components/app/date-period-filter";
 import { StatusBadge } from "@/components/app/status-badge";
 import { formatDate, formatNumber, formatRupiah } from "@/components/app/form-parts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/shared/utils";
+import { DashboardHeading, DashboardMetric, DashboardSectionTitle, DashboardError } from "@/components/app/dashboard-ui";
 import { FleetCapacityWidget } from "@/components/app/capacity-status-card";
 import { CapacityTrendChart } from "@/components/app/capacity-trend-chart";
 
@@ -114,16 +107,18 @@ export function DashboardPage() {
   const [from, setFrom] = useState(todayStr());
   const [to, setTo] = useState(todayStr());
 
-  const { data, loading } = useApiData<DashboardData>(
+  const { data, loading, error, reload } = useApiData<DashboardData>(
     () => apiGet<DashboardData>(`/dashboard?from=${from}&to=${to}`),
     [from, to],
   );
 
-  if (loading || !data) {
+  if (error) return <DashboardError message={error} onRetry={() => { void reload(); }} />;
+
+  if (!data) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-10 w-72" />
+        <Skeleton className="h-10 w-full max-w-64" />
+        <Skeleton className="h-10 w-full max-w-72" />
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[0, 1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-28 rounded-xl" />
@@ -169,9 +164,9 @@ export function DashboardPage() {
         empty="Tidak ada top up yang menunggu verifikasi."
         renderItem={(it) => (
           <div className="rounded-lg border px-3 py-2">
-            <div className="flex items-center justify-between gap-2">
-              <span className="font-mono text-xs font-semibold text-foreground">{it.requestCode}</span>
-              <span className="text-sm font-bold text-foreground">{formatRupiah(it.amount)}</span>
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+              <span className="break-all font-mono text-xs font-semibold text-foreground">{it.requestCode}</span>
+              <span className="break-all text-sm font-bold text-foreground">{formatRupiah(it.amount)}</span>
             </div>
             <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
               {it.partnerName} · {formatDate(it.submittedAt ?? it.createdAt, true)}
@@ -198,9 +193,9 @@ export function DashboardPage() {
         empty="Tidak ada withdrawal yang menunggu review."
         renderItem={(it) => (
           <div className="rounded-lg border px-3 py-2">
-            <div className="flex items-center justify-between gap-2">
-              <span className="font-mono text-xs font-semibold text-foreground">{it.requestCode}</span>
-              <span className="text-sm font-bold text-foreground">{formatRupiah(it.amount)}</span>
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+              <span className="break-all font-mono text-xs font-semibold text-foreground">{it.requestCode}</span>
+              <span className="break-all text-sm font-bold text-foreground">{formatRupiah(it.amount)}</span>
             </div>
             <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
               {it.partnerName} · {it.bankName} {it.bankAccountNumber}
@@ -223,9 +218,9 @@ export function DashboardPage() {
         empty="Tidak ada pembayaran yang menunggu verifikasi pada periode ini."
         renderItem={(it) => (
           <div className="rounded-lg border px-3 py-2">
-            <div className="flex items-center justify-between gap-2">
-              <span className="font-mono text-xs font-semibold text-foreground">{it.masterCode}</span>
-              <span className="text-sm font-bold text-foreground">{formatRupiah(it.amount)}</span>
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+              <span className="break-all font-mono text-xs font-semibold text-foreground">{it.masterCode}</span>
+              <span className="break-all text-sm font-bold text-foreground">{formatRupiah(it.amount)}</span>
             </div>
             <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
               {it.customerName} · {it.method} · oleh {it.recordedByName}
@@ -247,9 +242,9 @@ export function DashboardPage() {
         empty="Tidak ada komisi yang menunggu (semua invoice B2B sudah LUNAS)."
         renderItem={(it) => (
           <div className="rounded-lg border px-3 py-2">
-            <div className="flex items-center justify-between gap-2">
-              <span className="font-mono text-xs font-semibold text-foreground">{it.commissionCode}</span>
-              <span className="text-sm font-bold text-foreground">{formatRupiah(it.amount)}</span>
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+              <span className="break-all font-mono text-xs font-semibold text-foreground">{it.commissionCode}</span>
+              <span className="break-all text-sm font-bold text-foreground">{formatRupiah(it.amount)}</span>
             </div>
             <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
               {it.partnerName} · Invoice {it.invoiceNumber} ({it.invoiceStatus})
@@ -279,40 +274,41 @@ export function DashboardPage() {
   const maxStatus = Math.max(1, ...Object.values(data.statusCounts ?? {}));
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <PageHeader
-          title={`${greeting}, ${user?.name.split(" ")[0]}`}
-          subtitle={`${roleLabel[data.role]} · ${formatDate(from)} → ${formatDate(to)} (${data.period.days} hari)`}
-        />
-        <DatePeriodFilter from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t); }} />
-      </div>
+    <div className="dashboard-workspace mx-auto min-w-0 max-w-[1600px] space-y-6 sm:space-y-8">
+      <DashboardHeading
+        eyebrow="Dashboard operasional"
+        title={`${greeting}, ${user?.name?.split(" ")[0] ?? "Anda"}`}
+        description={`${roleLabel[data.role]} · Pantau pengiriman, armada, dan aktivitas bisnis Anda.`}
+        actions={<DatePeriodFilter from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t); }} className="dashboard-period" />}
+      />
+      <section className="relative overflow-hidden rounded-2xl bg-emerald-950 p-5 text-white sm:p-7">
+        <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-24 h-72 w-72 rounded-full border-[40px] border-emerald-400/10" />
+        <div className="relative flex flex-col justify-between gap-6 md:flex-row md:items-end">
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-emerald-200">Ringkasan operasional</p>
+            <p className="mt-2 text-xl font-semibold tracking-tight sm:text-2xl">Semua aktivitas, dalam satu tampilan.</p>
+            <p className="mt-2 text-xs leading-relaxed text-emerald-100/75">{formatDate(from)} — {formatDate(to)} · {data.period.days} hari{loading ? " · Memperbarui…" : ""}</p>
+          </div>
+          <div className="flex flex-wrap gap-x-8 gap-y-4">
+            {stats[0] && <div><p className="text-3xl font-semibold tabular-nums">{formatNumber(stats[0].value ?? 0, 0)}</p><p className="mt-1 text-xs text-emerald-100/75">{stats[0].label}</p></div>}
+            {approvalCards.length > 0 && <div className="border-l border-white/15 pl-8"><p className="text-3xl font-semibold tabular-nums">{formatNumber(totalApprovals, 0)}</p><p className="mt-1 text-xs text-emerald-100/75">Menunggu tindakan</p></div>}
+          </div>
+        </div>
+      </section>
+
+      {stats.length > 0 && <section className="space-y-4" aria-label="Ringkasan operasional">
+        <DashboardSectionTitle title="Sekilas operasional" description="Angka penting untuk membantu Anda menentukan langkah berikutnya." />
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+          {stats.map((stat, index) => <DashboardMetric key={stat.label} label={stat.label} value={formatNumber(stat.value ?? 0, 0)} icon={<stat.icon />} href={stat.href} tone={(["emerald", "blue", "amber", "violet"] as const)[index % 4]} />)}
+        </div>
+      </section>}
 
       {/* 1. APPROVAL QUEUE - top priority (only if user has any approval permission) */}
       {approvalCards.length > 0 && (
         <>
-          {totalApprovals > 0 && (
-            <Card className="border-amber-300/60 bg-amber-50/40 dark:border-amber-900/60 dark:bg-amber-950/20">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <span className="relative inline-flex">
-                    <Bell className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                    {totalApprovals > 0 && (
-                      <span className="absolute -right-1 -top-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
-                        {totalApprovals}
-                      </span>
-                    )}
-                  </span>
-                  Perlu Approval Anda
-                </CardTitle>
-                <p className="text-xs text-muted-foreground">
-                  Tinjau pengajuan dan komisi yang siap dirilis.
-                </p>
-              </CardHeader>
-            </Card>
-          )}
+          <DashboardSectionTitle title="Perlu perhatian Anda" description={totalApprovals > 0 ? `${totalApprovals} pengajuan menunggu ditinjau. Buka antrean untuk melanjutkan.` : "Semua antrean persetujuan sudah tertangani."} action={<span className="rounded-full bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-700 dark:text-amber-300">{totalApprovals} menunggu</span>} />
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
             {approvalCards}
           </div>
         </>
@@ -323,33 +319,6 @@ export function DashboardPage() {
         <MarketingOverview snapshot={data.marketing} />
       )}
 
-      {/* 3. Operational stat cards */}
-      {stats.length > 0 && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {stats.map((stat, i) => (
-            <motion.a
-              key={stat.label}
-              href={stat.href}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.04 }}
-            >
-              <Card className="h-full transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md">
-                <CardContent className="flex items-start justify-between p-4">
-                  <div>
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{stat.label}</p>
-                    <p className="mt-1.5 text-2xl font-bold text-foreground">{formatNumber(stat.value ?? 0, 0)}</p>
-                  </div>
-                  <div className="rounded-lg bg-primary/10 p-2 text-primary">
-                    <stat.icon className="h-5 w-5" />
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.a>
-          ))}
-        </div>
-      )}
-
       {/* 4. Gudang workspace - Admin Gudang / Staff Gudang scan queue */}
       {data.gudang && (data.role === "admin-gudang" || data.role === "staff-gudang") && (
         <GudangScanQueue workspace={data.gudang} />
@@ -358,21 +327,21 @@ export function DashboardPage() {
       {/* 3b. Fleet capacity widget + capacity-config change trend
             (Capacity Round). Informational, non-blocking. Owner/admin only. */}
       {(data.role === "owner" || data.role === "admin-kantor") && (
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid gap-4 xl:grid-cols-2">
           {data.capacitySummary && (
-            <div className="lg:col-span-2">
+            <div className="min-w-0">
               <FleetCapacityWidget summary={data.capacitySummary} />
             </div>
           )}
-          <CapacityTrendChart days={14} />
+          {can("vehicle.view") && <CapacityTrendChart days={14} />}
         </div>
       )}
 
       {/* 5. Operational details (filtered by period) - owner / admin-kantor only */}
       {(data.role === "owner" || data.role === "admin-kantor") && (
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid gap-4 xl:grid-cols-3">
           {/* Shipment lifecycle funnel */}
-          <Card className="lg:col-span-2">
+          <Card className="xl:col-span-2">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">
                 Status Shipment
@@ -380,29 +349,21 @@ export function DashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-end gap-2 overflow-x-auto pb-2 sm:gap-3">
+              <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
                 {LIFECYCLE.map((status) => {
                   const count = data.statusCounts?.[status] ?? 0;
-                  const height = Math.max(4, Math.round((count / maxStatus) * 96));
-                  return (
-                    <a key={status} href="#/shipments" className="group flex min-w-16 flex-1 flex-col items-center gap-1.5">
-                      <span className="text-xs font-bold text-foreground">{count}</span>
-                      <div
-                        className="w-full rounded-t-md bg-primary/80 transition-all group-hover:bg-primary"
-                        style={{ height }}
-                        aria-label={`${status}: ${count}`}
-                      />
-                      <StatusBadge status={status} className="scale-90" />
-                    </a>
-                  );
+                  return <a key={status} href="#/shipments" className="group min-w-0 rounded-lg focus-visible:outline-2 focus-visible:outline-primary">
+                    <div className="mb-2 flex min-w-0 items-center justify-between gap-2"><StatusBadge status={status} /><span className="text-sm font-semibold tabular-nums">{formatNumber(count, 0)}</span></div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary/80 transition-colors group-hover:bg-primary" style={{ width: `${(count / maxStatus) * 100}%` }} /></div>
+                  </a>;
                 })}
               </div>
               {can("payment.view") && (
-                <div className="mt-4 flex items-center justify-between rounded-lg bg-muted/60 px-3.5 py-2.5">
+                <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-muted/60 px-3.5 py-2.5">
                   <span className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                     <Coins className="h-4 w-4 text-primary" /> Pembayaran terverifikasi (periode)
                   </span>
-                  <span className="text-sm font-bold text-foreground">{formatRupiah(data.revenueVerified)}</span>
+                  <span className="break-all text-sm font-bold text-foreground">{formatRupiah(data.revenueVerified)}</span>
                 </div>
               )}
             </CardContent>
@@ -420,7 +381,7 @@ export function DashboardPage() {
               <CardContent className="flex-1">
                 <ul className="space-y-2.5">
                   {(data.recentAudit ?? []).slice(0, 6).map((entry) => (
-                    <li key={entry.id} className="flex items-start justify-between gap-2 text-sm">
+                    <li key={entry.id} className="flex flex-col gap-1.5 border-b border-border/50 pb-3 text-sm last:border-0 last:pb-0">
                       <div className="min-w-0">
                         <p className="truncate font-medium text-foreground">{entry.entityLabel ?? entry.entityType}</p>
                         <p className="text-[11px] text-muted-foreground">
@@ -447,7 +408,7 @@ export function DashboardPage() {
       {can("shipment.view") && (data.role === "owner" || data.role === "admin-kantor" || data.role === "marketing") && (
         <Card>
           <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <CardTitle className="text-base">
                 Shipment Terbaru
                 <span className="ml-2 text-xs font-normal text-muted-foreground">Periode {formatDate(from)} → {formatDate(to)}</span>
@@ -465,13 +426,13 @@ export function DashboardPage() {
                   href={`#/shipments/${s.id}`}
                   className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3.5 py-2.5 transition hover:border-primary/40 hover:bg-accent/50"
                 >
-                  <div className="flex min-w-0 items-center gap-3">
+                  <div className="min-w-0 flex-1">
                     <span className="font-mono text-sm font-semibold text-foreground">{s.masterCode}</span>
-                    <span className="hidden text-sm text-muted-foreground sm:block">
+                    <span className="mt-1 block break-words text-xs leading-relaxed text-muted-foreground">
                       {s.customerName} · {s.origin} → {s.destination}
                     </span>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-3">
                     <span className="hidden text-[11px] text-muted-foreground md:block">{formatDate(s.createdAt)}</span>
                     <StatusBadge status={s.status} />
                   </div>
@@ -498,7 +459,7 @@ function MarketingOverview({ snapshot }: { snapshot: MarketingDashboardSnapshot 
   return (
     <div className="space-y-4">
       {/* Wallet + commission cards */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <WalletStatCard
           label="Saldo Tersedia"
           value={formatRupiah(snapshot.wallet.available)}
@@ -533,7 +494,7 @@ function MarketingOverview({ snapshot }: { snapshot: MarketingDashboardSnapshot 
         {/* Recent commissions */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center justify-between text-base">
+            <CardTitle className="flex flex-wrap items-center justify-between gap-3 text-base">
               <span className="flex items-center gap-2">
                 <Coins className="h-4 w-4 text-primary" /> Komisi B2B Terbaru
               </span>
@@ -550,15 +511,15 @@ function MarketingOverview({ snapshot }: { snapshot: MarketingDashboardSnapshot 
             ) : (
               <ul className="space-y-2">
                 {snapshot.recentCommissions.slice(0, 5).map((c) => (
-                  <li key={c.id} className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2">
+                  <li key={c.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border px-3 py-3">
                     <div className="min-w-0">
-                      <p className="font-mono text-xs font-semibold text-foreground">{c.commissionCode}</p>
+                      <p className="break-all font-mono text-xs font-semibold text-foreground">{c.commissionCode}</p>
                       <p className="truncate text-[11px] text-muted-foreground">
                         {c.customerName} · Invoice {c.invoiceNumber}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-foreground">{formatRupiah(c.amount)}</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="break-all text-sm font-bold text-foreground">{formatRupiah(c.amount)}</span>
                       <StatusBadge status={c.status} />
                     </div>
                   </li>
@@ -571,7 +532,7 @@ function MarketingOverview({ snapshot }: { snapshot: MarketingDashboardSnapshot 
         {/* Recent wallet transactions */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center justify-between text-base">
+            <CardTitle className="flex flex-wrap items-center justify-between gap-3 text-base">
               <span className="flex items-center gap-2">
                 <History className="h-4 w-4 text-primary" /> Transaksi Wallet Terakhir
               </span>
@@ -588,7 +549,7 @@ function MarketingOverview({ snapshot }: { snapshot: MarketingDashboardSnapshot 
             ) : (
               <ul className="space-y-2">
                 {snapshot.recentTransactions.slice(0, 5).map((t) => (
-                  <li key={t.id} className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2">
+                  <li key={t.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border px-3 py-3">
                     <div className="flex min-w-0 items-center gap-2.5">
                       <span className={cn("rounded-md p-1.5", t.direction === "CREDIT" ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive")}>
                         {t.direction === "CREDIT" ? <ArrowDownCircle className="h-3.5 w-3.5" /> : <ArrowUpCircle className="h-3.5 w-3.5" />}
@@ -628,16 +589,7 @@ function WalletStatCard({
   icon: React.ReactNode;
   accent?: string;
 }) {
-  return (
-    <div className="rounded-xl border bg-card p-4">
-      <div className="flex items-center justify-between">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-        <span className="text-muted-foreground">{icon}</span>
-      </div>
-      <p className={cn("mt-1 text-lg font-bold sm:text-xl", accent)}>{value}</p>
-      {hint && <p className="mt-0.5 text-[10px] text-muted-foreground">{hint}</p>}
-    </div>
-  );
+  return <DashboardMetric label={label} value={value} hint={hint} icon={icon} tone={accent?.includes("amber") ? "amber" : accent?.includes("violet") ? "violet" : "emerald"} />;
 }
 
 // ---------------------------------------------------------------------------
@@ -679,7 +631,7 @@ function GudangScanQueue({ workspace }: { workspace: GudangDashboardWorkspace })
         {/* Pickup arrivals - kurir brought back packages */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center justify-between text-base">
+            <CardTitle className="flex flex-wrap items-center justify-between gap-3 text-base">
               <span className="flex items-center gap-2">
                 <Truck className="h-4 w-4 text-amber-600 dark:text-amber-400" /> Antrian Scan Pickup
               </span>
@@ -725,7 +677,7 @@ function GudangScanQueue({ workspace }: { workspace: GudangDashboardWorkspace })
         {/* Transport arrivals - from another gudang */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center justify-between text-base">
+            <CardTitle className="flex flex-wrap items-center justify-between gap-3 text-base">
               <span className="flex items-center gap-2">
                 <Route className="h-4 w-4 text-violet-600 dark:text-violet-400" /> Tiba dari Gudang Lain
               </span>
@@ -792,8 +744,8 @@ function GudangScanQueue({ workspace }: { workspace: GudangDashboardWorkspace })
                       href={`#/shipments/${s.id}`}
                       className="block rounded-lg border px-3 py-2 transition hover:border-primary/40 hover:bg-accent/50"
                     >
-                      <p className="flex items-center justify-between gap-2">
-                        <span className="font-mono text-xs font-semibold text-foreground">{s.masterCode}</span>
+                      <p className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                        <span className="break-all font-mono text-xs font-semibold text-foreground">{s.masterCode}</span>
                         <StatusBadge status={s.status} />
                       </p>
                       <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
@@ -827,21 +779,21 @@ function GudangScanQueue({ workspace }: { workspace: GudangDashboardWorkspace })
                     href="/gudang"
                     className="rounded-xl border bg-card p-3.5 transition hover:border-primary/40 hover:bg-accent/50"
                   >
-                    <p className="flex items-center justify-between gap-2">
+                    <p className="flex min-w-0 flex-wrap items-center justify-between gap-2">
                       <span className="truncate text-sm font-semibold text-foreground">{w.warehouseName}</span>
                       <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{w.city ?? "-"}</span>
                     </p>
                     <div className="mt-2 grid grid-cols-3 gap-1 text-center">
                       <div className="rounded-md bg-muted/60 px-1 py-1.5">
-                        <p className="text-sm font-bold text-foreground">{w.heldShipments}</p>
+                        <p className="break-all text-sm font-bold text-foreground">{w.heldShipments}</p>
                         <p className="text-[9px] uppercase tracking-wide text-muted-foreground">Shipment</p>
                       </div>
                       <div className="rounded-md bg-muted/60 px-1 py-1.5">
-                        <p className="text-sm font-bold text-foreground">{formatNumber(w.heldPackages, 0)}</p>
+                        <p className="break-all text-sm font-bold text-foreground">{formatNumber(w.heldPackages, 0)}</p>
                         <p className="text-[9px] uppercase tracking-wide text-muted-foreground">Paket</p>
                       </div>
                       <div className="rounded-md bg-muted/60 px-1 py-1.5">
-                        <p className="text-sm font-bold text-foreground">{formatNumber(w.heldWeightKg, 0)}</p>
+                        <p className="break-all text-sm font-bold text-foreground">{formatNumber(w.heldWeightKg, 0)}</p>
                         <p className="text-[9px] uppercase tracking-wide text-muted-foreground">kg</p>
                       </div>
                     </div>

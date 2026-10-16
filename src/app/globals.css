@@ -191,6 +191,56 @@
   animation: pulse-dot 2s ease-in-out infinite;
 }
 
+/* Dashboard cards share a visual rhythm without changing forms or printouts. */
+.dashboard-workspace {
+  overflow-wrap: anywhere;
+}
+.dashboard-workspace > *,
+.dashboard-workspace [data-slot="card-title"] {
+  min-width: 0;
+}
+.dashboard-workspace [data-slot="card"] {
+  border-radius: 1rem;
+  gap: 1rem;
+  padding-block: 1.25rem;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.025);
+}
+.dashboard-workspace [data-slot="card-header"],
+.dashboard-workspace [data-slot="card-content"] {
+  padding-inline: 1rem;
+}
+.dashboard-workspace [data-slot="card-title"] {
+  line-height: 1.5;
+}
+.dashboard-period {
+  max-width: 100%;
+}
+.dashboard-period > button {
+  min-height: 40px;
+}
+.dashboard-period > button:last-child {
+  min-width: 0;
+  max-width: 100%;
+}
+.dashboard-text-link {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--primary);
+}
+.dashboard-text-link:hover {
+  text-decoration: underline;
+}
+@media (min-width: 640px) {
+  .dashboard-workspace [data-slot="card-header"],
+  .dashboard-workspace [data-slot="card-content"] {
+    padding-inline: 1.5rem;
+  }
+}
+
 /* A4 preview includes the same 12mm margins as the printed page. */
 .a4-sheet {
   box-sizing: border-box;
