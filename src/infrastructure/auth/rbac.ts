@@ -177,7 +177,7 @@ export const ROLE_TEMPLATES: { slug: string; name: string; description: string; 
       "wallet.topup.view", "wallet.topup.cancel",
       "wallet.withdrawal.view", "wallet.withdrawal.review", "wallet.withdrawal.process",
       "partner.view", "transport.settle",
-      "transport.view", "transport.expense.view", "transport.expense.approve", "return-task.view",
+      "transport.view", "transport.expense.view", "transport.expense.create", "transport.expense.approve", "return-task.view",
       "repair.view", "repair.create", "repair.update", "repair.delete",
       "financial.report.view",
     ],
@@ -325,12 +325,11 @@ const rbacReadyFor = new Set<string>();
 export async function ensureRbac(): Promise<void> {
   const key = tenantKey();
   if (rbacReadyFor.has(key)) return;
-  const existingCount = await db.permission.count();
-  // Re-apply system role templates whenever the permission catalog changes
-  // (e.g. new scan permissions shipped with an app update) so seeded roles
-  // stay aligned with code. Owner edits made in between persist across
-  // ordinary restarts — only a catalog change re-applies templates.
-  const catalogChanged = existingCount !== PERMISSIONS.length;
+  const existingPermissions = await db.permission.findMany();
+  const existingSlugs = new Set(existingPermissions.map((permission) => permission.slug));
+  const catalogSlugs = new Set(PERMISSIONS.map((permission) => permission.slug));
+  const newSlugs = new Set([...catalogSlugs].filter((slug) => !existingSlugs.has(slug)));
+  const catalogChanged = newSlugs.size > 0 || existingPermissions.some((permission) => !catalogSlugs.has(permission.slug));
   if (catalogChanged) {
     for (const p of PERMISSIONS) {
       await db.permission.upsert({
@@ -341,28 +340,25 @@ export async function ensureRbac(): Promise<void> {
     }
     // prune permissions removed from the catalog (e.g. the obsolete
     // warehouse.scope_own — gudang scoping is now universal for every
-    // non-owner role) so the count check stays in sync
+    // non-owner role) so the catalog stays in sync
     const keep = PERMISSIONS.map((p) => p.slug);
     await db.rolePermission.deleteMany({ where: { permission: { slug: { notIn: keep } } } });
     await db.permission.deleteMany({ where: { slug: { notIn: keep } } });
   }
-  const roleCount = await db.role.count();
   const systemRoles = await db.role.findMany({
     where: { slug: { in: ROLE_TEMPLATES.map((template) => template.slug) } },
-    include: { permissions: { include: { permission: true } } },
   });
-  const rolesNeedSync = ROLE_TEMPLATES.some((template) => {
-    const role = systemRoles.find((candidate) => candidate.slug === template.slug);
-    if (!role) return true;
-    const actual = new Set(role.permissions.map((entry) => entry.permission.slug));
-    const expected = new Set(template.permissions);
-    return actual.size !== expected.size || [...expected].some((permission) => !actual.has(permission));
-  });
+  const existingRoleSlugs = new Set(systemRoles.map((role) => role.slug));
 
-  if (roleCount < ROLE_TEMPLATES.length || catalogChanged || rolesNeedSync) {
+  if (catalogChanged || ROLE_TEMPLATES.some((template) => !existingRoleSlugs.has(template.slug))) {
     const allPermissions = await db.permission.findMany();
     const bySlug = new Map(allPermissions.map((p) => [p.slug, p.id]));
     for (const template of ROLE_TEMPLATES) {
+      const isNewRole = !existingRoleSlugs.has(template.slug);
+      // Existing grants and absent grants (Owner revocations) are authoritative.
+      // Template changes to old permissions require a focused data migration.
+      const defaults = template.permissions.filter((slug) => isNewRole || newSlugs.has(slug));
+      if (!isNewRole && defaults.length === 0) continue;
       const role = await db.role.upsert({
         where: { slug: template.slug },
         create: {
@@ -371,14 +367,15 @@ export async function ensureRbac(): Promise<void> {
           description: template.description,
           isSystem: true,
         },
-        update: { name: template.name, description: template.description },
+        update: {},
       });
-      const permissionIds = template.permissions
+      const permissionIds = defaults
         .map((slug) => bySlug.get(slug))
         .filter((id): id is number => id != null)
         .map((permissionId) => ({ roleId: role.id, permissionId }));
-      await db.rolePermission.deleteMany({ where: { roleId: role.id } });
-      await db.rolePermission.createMany({ data: permissionIds });
+      if (permissionIds.length > 0) {
+        await db.rolePermission.createMany({ data: permissionIds, skipDuplicates: true });
+      }
     }
   }
   rbacReadyFor.add(key);

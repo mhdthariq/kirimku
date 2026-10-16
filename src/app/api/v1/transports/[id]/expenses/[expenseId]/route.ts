@@ -37,6 +37,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (!expense) return fail(404, "Biaya tidak ditemukan.");
     await assertTransportAccess(user, expense.transport);
 
+    if (expense.transport.status === "COMPLETED") return fail(409, "Transport sudah COMPLETED. Biaya operasional dan foto tidak dapat diubah.");
     if (expense.status !== "PENDING") return fail(409, "Biaya yang sudah disetujui tidak dapat diubah.");
     const parsed = await req.json().catch(() => null);
     const body = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};

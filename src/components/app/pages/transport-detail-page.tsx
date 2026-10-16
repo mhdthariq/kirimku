@@ -40,7 +40,6 @@ import { TransportActivitiesPanel } from "@/components/app/transport-activities-
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TransportExpensesPanel } from "@/components/app/transport-expenses-panel";
 import { CapacityStatusCard } from "@/components/app/capacity-status-card";
-import { TransportManifestPrint } from "@/components/app/transport-manifest-print";
 import { PhotoDetailDialog, type PhotoDetail } from "@/components/app/photo-detail-dialog";
 import type { TransportMapCheckpoint } from "@/components/app/transport-map";
 import { Button } from "@/components/ui/button";
@@ -106,7 +105,6 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
   const [confirmComplete, setConfirmComplete] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [manifestPrintId, setManifestPrintId] = useState<number | null>(null);
   // Revise round 9 — checkpoint photos dialog state. When the user clicks a
   // checkpoint record photo, we open the PhotoDetailDialog with all records
   // for that checkpoint so they can browse them at full size.
@@ -290,7 +288,7 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
                 <XCircle className="h-3.5 w-3.5" /> Hapus
               </Button>
             )}
-            <Button size="sm" variant="outline" onClick={() => setManifestPrintId(transport.id)}>
+            <Button size="sm" variant="outline" onClick={() => { window.location.hash = `#/transports/${transport.id}/manifest`; }}>
               <Printer className="h-3.5 w-3.5" /> Cetak Manifest
             </Button>
           </div>
@@ -483,7 +481,7 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
         </TabsContent>
         {can.expenseView && (
           <TabsContent value="expenses">
-            <TransportExpensesPanel transportId={transport.id} canCreate={can.expenseCreate} canUpdate={can.expenseUpdate} canDelete={can.expenseDelete} />
+            <TransportExpensesPanel transportId={transport.id} transportStatus={transport.status} canCreate={can.expenseCreate} canUpdate={can.expenseUpdate} canDelete={can.expenseDelete} />
           </TabsContent>
         )}
       </Tabs>
@@ -713,9 +711,6 @@ export function TransportDetailPage({ transportId }: { transportId: number }) {
         photos={photoRecords ?? []}
       />
 
-      {/* Capacity Round — printable A4 transport manifest (surat jalan) with
-          vehicle + crew + capacity status + shipment list + signatures. */}
-      <TransportManifestPrint transportId={manifestPrintId} onClose={() => setManifestPrintId(null)} />
     </div>
   );
 }

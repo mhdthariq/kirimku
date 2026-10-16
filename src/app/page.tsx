@@ -15,6 +15,7 @@ import { VehicleOwnerDashboard } from "@/components/app/pages/vo-dashboard-page"
 import { ShipmentsPage } from "@/components/app/pages/shipments-page";
 import { TransportsPage } from "@/components/app/pages/transports-page";
 import { TransportDetailPage } from "@/components/app/pages/transport-detail-page";
+import { TransportManifestPrint } from "@/components/app/transport-manifest-print";
 import { VehiclesPage } from "@/components/app/pages/vehicles-page";
 import { FleetCapacityPage } from "@/components/app/pages/fleet-capacity-page";
 import { RoutesPage } from "@/components/app/pages/routes-page";
@@ -98,7 +99,10 @@ function RouterInner({ segments, query }: { segments: string[]; query: URLSearch
         // Migrated to a real route (app/(dashboard)/deliveries/page.tsx).
         return null;
       case "transports":
-        // #/transports — list; #/transports/{id} — detail (Revision Part K)
+        // #/transports/{id}/manifest — dedicated print preview, like invoices.
+        if (segments[1] && segments[2] === "manifest") {
+          return <TransportManifestPrint key={segments[1]} transportId={Number(segments[1])} onClose={() => (window.location.hash = `#/transports/${segments[1]}`)} />;
+        }
         return segments[1] ? <TransportDetailPage transportId={Number(segments[1])} /> : <TransportsPage />;
       case "transport-history":
         // Revision Part V — driver/kenek transport history view

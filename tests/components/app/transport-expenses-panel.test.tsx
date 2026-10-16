@@ -174,6 +174,55 @@ describe("expense panel GPS and approval", () => {
             screen.queryByRole("button", { name: "Approve" }),
         ).not.toBeInTheDocument();
     });
+    it("keeps creation available when all existing expenses are approved", async () => {
+        m.rows = [{ ...pending, status: "APPROVED" }];
+        render(<TransportExpensesPanel {...props} transportStatus="ARRIVED" />);
+        expect(
+            screen.getByText(/Approval berlaku per biaya/),
+        ).toBeInTheDocument();
+        await submitExpense();
+        expect(m.post).toHaveBeenCalledWith(
+            "/transports/10/expenses",
+            expect.any(Object),
+        );
+    });
+    it("blocks creation and editing on completed transports but keeps approval available", () => {
+        m.rows = [pending];
+        render(
+            <TransportExpensesPanel {...props} transportStatus="COMPLETED" />,
+        );
+        expect(
+            screen.queryByRole("button", { name: /Tambah Biaya/ }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole("button", { name: "Edit biaya" }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.getByRole("button", { name: "Approve" }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(/Penambahan biaya dan unggah foto ditutup/),
+        ).toBeInTheDocument();
+    });
+    it("blocks an already-open form if transport completes before submit", async () => {
+        const view = render(
+            <TransportExpensesPanel {...props} transportStatus="ARRIVED" />,
+        );
+        fireEvent.click(screen.getByRole("button", { name: /Tambah Biaya/ }));
+        fireEvent.change(screen.getByLabelText("Nominal (Rp)"), {
+            target: { value: "100" },
+        });
+        view.rerender(
+            <TransportExpensesPanel {...props} transportStatus="COMPLETED" />,
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Tambah" }));
+        await act(async () => {});
+        expect(m.post).not.toHaveBeenCalled();
+        expect(m.gps).not.toHaveBeenCalled();
+        expect(m.error).toHaveBeenCalledWith(
+            expect.stringContaining("COMPLETED"),
+        );
+    });
     it("captures new GPS on edit rather than reusing stored coordinates", async () => {
         m.rows = [pending];
         render(<TransportExpensesPanel {...props} />);

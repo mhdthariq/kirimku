@@ -41,6 +41,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const transport = await loadTransport(id);
     if (!transport) return fail(404, "Transport tidak ditemukan.");
     await assertTransportAccess(user, transport);
+    if (transport.status === "COMPLETED") return fail(409, "Transport sudah COMPLETED. Biaya operasional tidak dapat ditambahkan.");
 
     const parsed = await req.json().catch(() => null);
     const body = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};

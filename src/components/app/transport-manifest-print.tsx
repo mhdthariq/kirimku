@@ -21,8 +21,8 @@ interface TransportManifestPrintProps {
  * with per-shipment weight/volume/koli/price. Triggered from the transport
  * detail page's "Cetak Manifest" button.
  *
- * Print pattern mirrors ResiPrint / InvoicePrint: a portal with a preview
- * toolbar + a `@media print` block that hides everything else.
+ * Opened on its own hash route, like InvoiceDetailPage, with a printable
+ * portal and an A4 preview.
  */
 export function TransportManifestPrint({ transportId, onClose }: TransportManifestPrintProps) {
   const { user } = useAuth();
@@ -40,7 +40,6 @@ export function TransportManifestPrint({ transportId, onClose }: TransportManife
       return () => clearTimeout(t);
     }
     let cancelled = false;
-    let settled = false;
     const timer = setTimeout(() => {
       if (cancelled) return;
       setReady(false);
@@ -51,7 +50,6 @@ export function TransportManifestPrint({ transportId, onClose }: TransportManife
     ])
       .then(([t, drops]) => {
         if (cancelled) return;
-        settled = true;
         clearTimeout(timer);
         setTransport(t);
         setTransportMode(drops?.transportMode ?? null);
@@ -59,7 +57,6 @@ export function TransportManifestPrint({ transportId, onClose }: TransportManife
       })
       .catch(() => {
         if (cancelled) return;
-        settled = true;
         clearTimeout(timer);
         setReady(true);
       });
@@ -69,7 +66,14 @@ export function TransportManifestPrint({ transportId, onClose }: TransportManife
     };
   }, [transportId]);
 
-  if (transportId == null) return null;
+  useEffect(() => {
+    if (!transport) return;
+    const previousTitle = document.title;
+    document.title = `Manifest ${transport.transportCode}`;
+    return () => { document.title = previousTitle; };
+  }, [transport]);
+
+  if (transportId == null || typeof document === "undefined") return null;
 
   function doPrint() {
     // Fire-and-forget audit log (mirrors the resi print-log pattern) — logs
@@ -97,20 +101,23 @@ export function TransportManifestPrint({ transportId, onClose }: TransportManife
   return createPortal(
     <>
       <style jsx global>{`
-        @page { size: A4; margin: 12mm; }
+        @page manifest-page { size: A4 portrait; margin: 12mm; }
+        .manifest-sheet { box-sizing: border-box; width: min(100%, 210mm); max-width: 210mm; min-height: 297mm; }
         @media print {
           html, body { background: #ffffff !important; }
           body > *:not(#manifest-print-portal) { display: none !important; }
           #manifest-print-portal { position: static !important; inset: auto !important; overflow: visible !important; background: #ffffff !important; }
           #manifest-print-portal > .manifest-toolbar { display: none !important; }
-          #manifest-print-portal > .manifest-sheet { box-shadow: none !important; border: none !important; padding: 0 !important; }
+          #manifest-print-portal > .manifest-sheet { page: manifest-page; width: 100% !important; max-width: none !important; min-height: 0 !important; margin: 0 !important; box-shadow: none !important; border: none !important; padding: 0 !important; }
+          .manifest-sheet thead { display: table-header-group; }
+          .manifest-sheet tr { break-inside: avoid; }
         }
       `}</style>
-      <div id="manifest-print-portal" className="fixed inset-0 z-[100] overflow-y-auto bg-black/50 p-4 print:bg-white print:p-0">
+      <div id="manifest-print-portal" className="fixed inset-0 z-[100] overflow-y-auto bg-neutral-200 p-4 dark:bg-neutral-900 print:bg-white print:p-0">
         <div className="manifest-toolbar mx-auto mb-3 flex max-w-205 items-center justify-between print:hidden">
-          <p className="text-sm font-semibold text-white">Pratinjau Manifest Transport</p>
+          <p className="text-sm font-semibold text-foreground">Pratinjau Manifest Transport</p>
           <div className="flex gap-2">
-            <Button size="sm" onClick={doPrint} disabled={!ready}>
+            <Button size="sm" onClick={doPrint} disabled={!ready || !transport}>
               <Printer className="h-3.5 w-3.5" /> Cetak / Simpan PDF
             </Button>
             <Button size="sm" variant="outline" onClick={onClose}>
