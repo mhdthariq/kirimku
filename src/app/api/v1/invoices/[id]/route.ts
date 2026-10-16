@@ -21,8 +21,8 @@ export async function GET(req: NextRequest, { params }: Params) {
     if (!invoice) return fail(404, "Invoice tidak ditemukan.");
     const subtotal = invoice.lines.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0);
     const total = subtotal - invoice.discount + invoice.rounding;
-    const settled = invoice.settlements.reduce((sum, s) => sum + s.amount - s.pph, 0);
-    return ok({ ...invoice, totalAmount: total, settledAmount: settled, remainingAmount: total - settled });
+    const settled = invoice.settlements.reduce((sum, s) => sum + s.amount, 0);
+    return ok({ ...invoice, totalAmount: total, pphAmount: invoice.settlements.reduce((sum, s) => sum + s.pph, 0), settledAmount: settled, remainingAmount: total - settled });
   });
 }
 

@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
       invoices.map((inv) => {
         const subtotal = inv.lines.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0);
         const total = subtotal - inv.discount + inv.rounding;
-        const settled = inv.settlements.reduce((sum, s) => sum + s.amount - s.pph, 0);
+        const settled = inv.settlements.reduce((sum, s) => sum + s.amount, 0);
         const lastPaidAt = inv.settlements.reduce<Date | null>(
           (latest, settlement) => (!latest || settlement.settledAt > latest ? settlement.settledAt : latest),
           null,
@@ -59,6 +59,7 @@ export async function GET(req: NextRequest) {
           linesCount: inv.lines.length,
           totalAmount: total,
           settledAmount: settled,
+          pphAmount: inv.settlements.reduce((sum, s) => sum + s.pph, 0),
           remainingAmount: total - settled,
           lastPaidAt,
           isOverdue,

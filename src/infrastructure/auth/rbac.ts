@@ -98,6 +98,8 @@ export const PERMISSIONS: { slug: string; module: string; description: string }[
   { slug: "invoice.create", module: "Invoices", description: "Create invoices" },
   { slug: "invoice.update", module: "Invoices", description: "Update invoices" },
   { slug: "invoice.send", module: "Invoices", description: "Send/finalize invoices" },
+  { slug: "invoice.settlement.update", module: "Invoices", description: "Edit invoice settlements" },
+  { slug: "invoice.settlement.delete", module: "Invoices", description: "Delete invoice settlements" },
   // Access control
   { slug: "employee.view", module: "Access", description: "View employees" },
   { slug: "employee.create", module: "Access", description: "Create employees" },
@@ -169,6 +171,7 @@ export const ROLE_TEMPLATES: { slug: string; name: string; description: string; 
       "tariff.view", "tariff.create", "tariff.update",
       "payment.view", "payment.record", "payment.verify", "payment.unpaid.view", "wallet.topup.create",
       "invoice.view", "invoice.create", "invoice.update", "invoice.send",
+      "invoice.settlement.update", "invoice.settlement.delete",
       "audit_log.view",
       // Top Up menu — Admin Kantor creates top-ups with proof, Owner verifies
       "wallet.topup.view", "wallet.topup.cancel",

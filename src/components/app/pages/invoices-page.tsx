@@ -53,6 +53,8 @@ export function InvoicesPage() {
     update: hasPermission(user, "invoice.update"),
     send: hasPermission(user, "invoice.send"),
     settle: hasPermission(user, "payment.verify"),
+    editSettlement: hasPermission(user, "invoice.settlement.update"),
+    deleteSettlement: hasPermission(user, "invoice.settlement.delete"),
   };
 
   const { data, loading, reload } = useApiData<Invoice[]>(() => apiGet<Invoice[]>("/invoices"), []);
@@ -68,6 +70,8 @@ export function InvoicesPage() {
   const [detail, setDetail] = useState<Invoice | null>(null);
   const [settleOpen, setSettleOpen] = useState(false);
   const [settleTarget, setSettleTarget] = useState<Invoice | null>(null);
+  const [editingSettlement, setEditingSettlement] = useState<InvoiceSettlement | null>(null);
+  const [deletingSettlement, setDeletingSettlement] = useState<InvoiceSettlement | null>(null);
   const [settleAmount, setSettleAmount] = useState("");
   const [settlePph, setSettlePph] = useState("");
   const [settleMethod, setSettleMethod] = useState("TRANSFER");
@@ -188,32 +192,38 @@ export function InvoicesPage() {
       return;
     }
     const amount = Number(settleAmount);
+    const pph = Number(settlePph || 0);
     if (!Number.isFinite(amount) || amount <= 0) {
       toast.error("Jumlah settlement harus lebih dari 0.");
       return;
     }
+    if (!Number.isFinite(pph) || pph < 0 || pph > amount) {
+      toast.error("PPh harus antara 0 dan jumlah pembayaran.");
+      return;
+    }
+    if (amount > target.remainingAmount + (editingSettlement?.amount ?? 0) + 0.01) {
+      toast.error("Pembayaran melebihi sisa tagihan.");
+      return;
+    }
     setBusy(true);
+    const payload = {
+      amount, pph, method: settleMethod, reference: settleRef || null,
+      settledAt: editingSettlement && settleDate === editingSettlement.settledAt.slice(0, 10) ? editingSettlement.settledAt : settleDate || null,
+      proofUrl: settleProof?.dataUrl ?? null,
+    };
     const ok = await runAction(
-      () =>
-        apiPost(`/invoices/${target.id}/settlements`, {
-          amount,
-          pph: Number(settlePph) || 0,
-          method: settleMethod,
-          reference: settleRef || null,
-            settledAt: settleDate || null,
-          proofUrl: settleProof?.dataUrl ?? null,
-        }),
+      () => editingSettlement
+        ? apiPut(`/invoices/${target.id}/settlements/${editingSettlement.id}`, payload)
+        : apiPost(`/invoices/${target.id}/settlements`, payload),
       {
-        success:
-          amount >= (target.remainingAmount ?? 0) - 0.01 && target.commission
-            ? "Pelunasan dicatat. Komisi Marketing masuk ke saldo."
-            : "Pembayaran dicatat. Komisi menunggu pelunasan penuh.",
+        success: editingSettlement ? "Settlement diperbarui. Total invoice dihitung ulang." : "Pembayaran dicatat. PPh termasuk dalam jumlah pembayaran.",
       },
     );
     setBusy(false);
     if (ok) {
       setSettleOpen(false);
       setSettleTarget(null);
+      setEditingSettlement(null);
       setSettleAmount("");
       setSettlePph("");
       setSettleRef("");
@@ -223,6 +233,33 @@ export function InvoicesPage() {
       reload();
       // Refresh the detail dialog if it's open on this same invoice.
       if (detail && detail.id === target.id) loadDetail(target);
+    }
+  }
+
+  function openSettlementEdit(settlement: InvoiceSettlement) {
+    if (!detail) return;
+    setSettleTarget(detail);
+    setEditingSettlement(settlement);
+    setSettleAmount(String(settlement.amount));
+    setSettlePph(String(settlement.pph));
+    setSettleMethod(settlement.method);
+    setSettleRef(settlement.reference ?? "");
+    setSettleDate(settlement.settledAt.slice(0, 10));
+    setSettleProof(settlement.proofUrl ? { name: "Bukti tersimpan", type: settlement.proofUrl.startsWith("data:image/") ? "image/" : "application/pdf", dataUrl: settlement.proofUrl } : null);
+    setSettleProofError("");
+    setSettleOpen(true);
+  }
+
+  async function onDeleteSettlement() {
+    if (!deletingSettlement || !detail) return;
+    const target = detail;
+    setBusy(true);
+    const ok = await runAction(() => apiDelete(`/invoices/${target.id}/settlements/${deletingSettlement.id}`), { success: "Settlement dihapus. Total invoice dihitung ulang." });
+    setBusy(false);
+    if (ok) {
+      setDeletingSettlement(null);
+      reload();
+      await loadDetail(target);
     }
   }
 
@@ -329,6 +366,11 @@ export function InvoicesPage() {
                 ),
               },
               {
+                key: "pph",
+                header: "PPh",
+                render: (inv) => <span className="text-xs">{formatRupiah(inv.pphAmount ?? 0)}</span>,
+              },
+              {
                 key: "lastPaid",
                 header: "Last Paid",
                 hideOnMobile: true,
@@ -386,6 +428,11 @@ export function InvoicesPage() {
                           // settle action doesn't depend on the async detail
                           // fetch (which previously caused silent no-ops).
                           setSettleTarget(inv);
+                          setEditingSettlement(null);
+                          setSettlePph("");
+                          setSettleMethod("TRANSFER");
+                          setSettleRef("");
+                          setSettleProof(null);
                           setSettleAmount(String(Math.round(inv.remainingAmount)));
                           setSettleDate(new Date().toISOString().slice(0, 10));
                           setSettleOpen(true);
@@ -684,6 +731,8 @@ export function InvoicesPage() {
                 <div><span className="text-muted-foreground">Pembulatan</span><p className="font-semibold">{detailWithLines.rounding >= 0 ? "+ " : "- "}{formatRupiah(Math.abs(detailWithLines.rounding))}</p></div>
               </div>
 
+              <p className="rounded-lg bg-muted/50 px-3 py-2 text-sm">PPh (termasuk pembayaran): <b>{formatRupiah(detailWithLines.pphAmount ?? detailWithLines.settlements?.reduce((sum, s) => sum + s.pph, 0) ?? 0)}</b></p>
+
               {detailWithLines.notes && <div className="rounded-lg border-l-2 border-primary bg-primary/5 px-3 py-2 text-xs"><p className="font-semibold text-primary">Catatan</p><p className="mt-0.5 text-muted-foreground">{detailWithLines.notes}</p></div>}
 
               {/* Revise.md §8 - commission panel attached to this invoice */}
@@ -715,7 +764,7 @@ export function InvoicesPage() {
                             {formatDate(s.settledAt, true)} · {s.method}
                             {s.reference && <span className="ml-1 text-xs">· {s.reference}</span>}
                           </p>
-                          <p className="text-xs text-muted-foreground">Dibayar {formatRupiah(s.amount)} · PPh {formatRupiah(s.pph)} · masuk invoice {formatRupiah(s.amount - s.pph)}</p>
+                          <p className="text-xs text-muted-foreground">Dibayar {formatRupiah(s.amount)} · PPh (termasuk pembayaran) {formatRupiah(s.pph)} · masuk invoice {formatRupiah(s.amount)}</p>
                           {s.proofUrl && (
                             s.proofUrl.startsWith("data:image/") ? (
                               <a href={s.proofUrl} target="_blank" rel="noreferrer" onClick={(event) => { event.preventDefault(); if (s.proofUrl) openDataUrlInNewTab(s.proofUrl); }} className="mt-2 block w-fit" aria-label={`Lihat bukti pembayaran ${formatDate(s.settledAt, true)}`}>
@@ -734,7 +783,11 @@ export function InvoicesPage() {
                             )
                           )}
                         </div>
-                        <span className="font-semibold">{formatRupiah(s.amount)}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold">{formatRupiah(s.amount)}</span>
+                          {detailWithLines.status !== "CANCELLED" && can.editSettlement && <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => openSettlementEdit(s)}><Edit className="h-3 w-3" /> Edit</Button>}
+                          {detailWithLines.status !== "CANCELLED" && can.deleteSettlement && <Button type="button" size="sm" variant="destructive" disabled={busy} onClick={() => setDeletingSettlement(s)}><Trash2 className="h-3 w-3" /> Hapus</Button>}
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -751,16 +804,16 @@ export function InvoicesPage() {
       <Dialog open={settleOpen} onOpenChange={(open) => { setSettleOpen(open); if (!open) { setSettleProof(null); setSettleProofError(""); } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Settle {settleTarget?.invoiceNumber ?? detailWithLines?.invoiceNumber ?? ""}</DialogTitle>
+            <DialogTitle>{editingSettlement ? "Edit Settlement" : "Settle"} {settleTarget?.invoiceNumber ?? detailWithLines?.invoiceNumber ?? ""}</DialogTitle>
             <DialogDescription>
-              Sisa tagihan: {formatRupiah(settleTarget?.remainingAmount ?? detailWithLines?.remainingAmount ?? 0)}. Jumlah tidak boleh melebihi sisa.
+              Sisa tagihan: {formatRupiah((settleTarget?.remainingAmount ?? detailWithLines?.remainingAmount ?? 0) + (editingSettlement?.amount ?? 0))}. PPh termasuk dalam pembayaran dan tidak mengurangi pelunasan.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={onSettle} className="space-y-4">
-            <Field label="Jumlah (Rp)" htmlFor="st-amount">
+            <Field label="Jumlah Transfer / Cash (Rp)" htmlFor="st-amount">
               <NumberInput id="st-amount" value={settleAmount} onChange={(e) => setSettleAmount(e.target.value)} required disabled={busy} />
             </Field>
-            <Field label="PPh (Rp)" htmlFor="st-pph" hint="Bagian pembayaran yang dicatat sebagai PPh, bukan pelunasan invoice.">
+            <Field label="PPh (Rp)" htmlFor="st-pph" hint="Informasi PPh yang sudah termasuk dalam jumlah pembayaran. Tidak mengurangi pelunasan invoice.">
               <NumberInput id="st-pph" min="0" value={settlePph} onChange={(e) => setSettlePph(e.target.value)} disabled={busy} />
             </Field>
             <Field label="Tanggal pembayaran" htmlFor="st-date">
@@ -813,11 +866,24 @@ export function InvoicesPage() {
               <Button type="button" variant="outline" onClick={() => setSettleOpen(false)} disabled={busy}>
                 Batal
               </Button>
-              <SubmitButton busy={busy}>Catat Settlement</SubmitButton>
+              <SubmitButton busy={busy}>{editingSettlement ? "Simpan Perubahan" : "Catat Settlement"}</SubmitButton>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deletingSettlement} onOpenChange={(open) => !open && !busy && setDeletingSettlement(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus settlement {formatRupiah(deletingSettlement?.amount ?? 0)}?</AlertDialogTitle>
+            <AlertDialogDescription>Total pembayaran dan status invoice akan dihitung ulang. Komisi yang sudah dirilis akan dikoreksi bila invoice kembali belum lunas.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Batal</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" disabled={busy} onClick={(event) => { event.preventDefault(); void onDeleteSettlement(); }}>Ya, hapus settlement</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={!!confirmDelete} onOpenChange={(open) => !open && setConfirmDelete(null)}>
         <AlertDialogContent>

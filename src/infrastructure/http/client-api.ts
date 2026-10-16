@@ -852,6 +852,7 @@ export interface Invoice {
   linesCount: number;
   totalAmount: number;
   settledAmount: number;
+  pphAmount?: number;
   remainingAmount: number;
   lastPaidAt: string | null;
   isOverdue: boolean;

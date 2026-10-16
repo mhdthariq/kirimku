@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
     });
 
     const rows = commissions.map((c) => {
-      const settled = c.invoice.settlements.reduce((sum, s) => sum + s.amount - s.pph, 0);
+      const settled = c.invoice.settlements.reduce((sum, s) => sum + s.amount, 0);
       const subtotal = c.invoice.lines.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0);
       const total = subtotal - c.invoice.discount + c.invoice.rounding;
       return {
