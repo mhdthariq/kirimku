@@ -5,7 +5,7 @@ import { currentCompanyName } from "@/infrastructure/persistence/tenant-context"
 export async function GET(req: NextRequest) {
   return handle(req, async () => {
     const user = await guard(req);
-    const company = { name: currentCompanyName() ?? process.env.NEXT_PUBLIC_COMPANY_NAME ?? "KirimKu Logistics" };
+    const company = { name: currentCompanyName() ?? process.env.NEXT_PUBLIC_COMPANY_NAME ?? "NovaLogistik" };
     return ok({ ...user, company });
   });
 }
