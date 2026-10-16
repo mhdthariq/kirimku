@@ -64,6 +64,8 @@ export function DataTable<T extends { id: number | string }>({
   onSearchChange,
   searchPlaceholder = "Cari…",
   toolbar,
+  renderCard,
+  desktopBreakpoint = "md",
 }: {
   columns: Column<T>[];
   rows: T[];
@@ -74,6 +76,9 @@ export function DataTable<T extends { id: number | string }>({
   onSearchChange?: (value: string) => void;
   searchPlaceholder?: string;
   toolbar?: React.ReactNode;
+  /** Optional purpose-built card layout for information-rich records. */
+  renderCard?: (row: T) => React.ReactNode;
+  desktopBreakpoint?: "md" | "xl";
 }) {
   return (
     <div className="space-y-3">
@@ -92,7 +97,7 @@ export function DataTable<T extends { id: number | string }>({
           ) : (
             <div />
           )}
-          {toolbar && <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">{toolbar}</div>}
+          {toolbar && <div className={cn("flex min-w-0 max-w-full flex-wrap items-center gap-2", !onSearchChange && "w-full")}>{toolbar}</div>}
         </div>
       )}
 
@@ -110,7 +115,7 @@ export function DataTable<T extends { id: number | string }>({
       ) : (
         <>
           {/* Desktop: table */}
-          <div className="hidden overflow-x-auto rounded-xl border bg-card md:block">
+          <div className={cn("hidden min-w-0 overflow-x-auto rounded-xl border bg-card", desktopBreakpoint === "xl" ? "xl:block" : "md:block")}>
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/50 text-left">
@@ -142,8 +147,9 @@ export function DataTable<T extends { id: number | string }>({
           </div>
 
           {/* Mobile: cards */}
-          <div className="space-y-2.5 md:hidden">
+          <div className={cn(renderCard ? "grid min-w-0 gap-4 md:grid-cols-2" : "space-y-2.5", desktopBreakpoint === "xl" ? "xl:hidden" : "md:hidden")}>
             {rows.map((row) => {
+              if (renderCard) return <div key={row.id} className="min-w-0">{renderCard(row)}</div>;
               const primary = columns.find((c) => c.primary);
               const rest = columns.filter((c) => !c.primary && !c.hideOnMobile);
               return (

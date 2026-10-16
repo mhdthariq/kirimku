@@ -66,7 +66,7 @@ describe("transport list completion actions", () => {
   it.each([false, true])("filters completed rows in historyMode=%s", async (historyMode) => {
     render(<TransportsPage historyMode={historyMode} />);
     await screen.findByTestId("trip-3");
-    fireEvent.click(screen.getByRole("button", { name: "COMPLETED" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Selesai/ }));
     expect(screen.getByTestId("trip-3")).toBeInTheDocument();
     expect(screen.queryByTestId("trip-2")).not.toBeInTheDocument();
     expect(screen.queryByTestId("trip-1")).not.toBeInTheDocument();
