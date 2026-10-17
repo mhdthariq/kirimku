@@ -10,7 +10,8 @@ import { nextCode } from "@/infrastructure/services/code-generator";
  *   - Company (repair.create) submits a repair cost for a partner-owned
  *     vehicle with proof. The record is VERIFIED immediately — no approval
  *     workflow — and the REPAIR_DEDUCTION is debited from the Vehicle Owner
- *     wallet atomically in the same DB transaction.
+ *     wallet atomically in the same DB transaction. Company-owned vehicles
+ *     are verified with no partner wallet deduction.
  *   - Every mutation writes a RepairActionLog entry (CREATED / UPDATED /
  *     DELETED) so the Vehicle Owner can audit the full history.
  *   - Vehicle Owner (repair.view_own) sees only their own-vehicle repairs
@@ -53,7 +54,7 @@ export async function GET(req: NextRequest) {
 
 /**
  * POST /api/v1/repairs — company creates a repair record. Authorized users
- * (repair.create) create FINAL records: status VERIFIED + wallet deduction
+ * (repair.create) create FINAL records: status VERIFIED + partner-only wallet deduction
  * happen atomically at creation. A RepairActionLog entry (CREATED) is
  * written in the same transaction so the Vehicle Owner always knows who
  * created what and when.
@@ -77,9 +78,6 @@ export async function POST(req: NextRequest) {
 
     const vehicle = await db.vehicle.findUnique({ where: { id: vehicleId }, include: { owner: true } });
     if (!vehicle) return fail(404, "Kendaraan tidak ditemukan.");
-    if (!vehicle.owner) {
-      return fail(422, "Kendaraan ini milik perusahaan - tidak ada Vehicle Owner yang bisa dibebani repair.");
-    }
     if (relatedTransportId) {
       const transport = await db.transport.findUnique({ where: { id: relatedTransportId } });
       if (!transport || transport.vehicleId !== vehicleId) {
@@ -89,14 +87,14 @@ export async function POST(req: NextRequest) {
 
     const repairCode = await nextCode("vehicleRepair", "REP-", "repairCode");
 
-    // One atomic transaction: repair row (VERIFIED) + REPAIR_DEDUCTION
-    // ledger + balance update + action log — all or nothing (§30).
+    // Ownership is snapshotted on the repair; only partner repairs create a
+    // ledger entry. Record, optional deduction and log are atomic (§30).
     const repair = await db.$transaction(async (tx) => {
       const created = await tx.vehicleRepair.create({
         data: {
           repairCode,
           vehicleId,
-          ownerId: vehicle.owner!.id,
+          ownerId: vehicle.ownerId,
           description,
           amount,
           repairDate,
@@ -109,19 +107,23 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      const ledgerId = await appendRepairLedger(tx, {
-        partnerId: created.ownerId,
-        direction: "DEBIT",
-        amount,
-        businessRef: `REP-${created.id}`,
-        description: `Deduction repair ${repairCode} - ${description}`,
-        repairId: created.id,
-        createdById: user.id,
+      let ledgerId: number | null = null;
+      if (created.ownerId != null) {
+        ledgerId = await appendRepairLedger(tx, {
+          partnerId: created.ownerId,
+          direction: "DEBIT",
+          amount,
+          businessRef: `REP-${created.id}`,
+          description: `Deduction repair ${repairCode} - ${description}`,
+          repairId: created.id,
+          createdById: user.id,
       });
+
+      }
 
       const withLedger = await tx.vehicleRepair.update({
         where: { id: created.id },
-        data: { walletTransactionId: ledgerId, deductedAmount: amount, verifiedAt: new Date() },
+        data: { walletTransactionId: ledgerId, deductedAmount: created.ownerId != null ? amount : 0, verifiedAt: new Date() },
         include: { vehicle: { select: { vehicleNumber: true } }, owner: { include: { user: { select: { name: true } } } } },
       });
 
@@ -131,7 +133,9 @@ export async function POST(req: NextRequest) {
         ownerId: created.ownerId,
         vehicleNumber: vehicle.vehicleNumber,
         action: "CREATED",
-        detail: `Repair ${repairCode} dibuat dan langsung terverifikasi - deduction ${formatIDR(amount)} dari wallet Vehicle Owner.`,
+        detail: created.ownerId != null
+          ? `Repair ${repairCode} dibuat dan langsung terverifikasi - deduction ${formatIDR(amount)} dari wallet Vehicle Owner.`
+          : `Repair ${repairCode} kendaraan perusahaan dibuat dan langsung terverifikasi - tanpa deduction wallet partner.`,
         amount,
         actor: user,
       });
@@ -143,7 +147,7 @@ export async function POST(req: NextRequest) {
       vehicle: vehicle.vehicleNumber,
       amount,
       status: "VERIFIED",
-      immediatelyDeducted: true,
+      immediatelyDeducted: repair.ownerId != null,
     });
     return ok(repair);
   });

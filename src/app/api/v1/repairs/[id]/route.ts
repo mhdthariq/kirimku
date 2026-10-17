@@ -76,10 +76,10 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const amountDelta = Math.round((amount - repair.amount) * 100) / 100;
 
     const updated = await db.$transaction(async (tx) => {
-      let deductedAmount = repair.deductedAmount;
+      let deductedAmount = repair.ownerId != null ? repair.deductedAmount : 0;
 
       // Wallet adjustment when the amount changes — append-only ledger rows.
-      if (amountDelta > 0) {
+      if (repair.ownerId != null && amountDelta > 0) {
         await appendRepairLedger(tx, {
           partnerId: repair.ownerId,
           direction: "DEBIT",
@@ -90,7 +90,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
           createdById: user.id,
         });
         deductedAmount = Math.round((deductedAmount + amountDelta) * 100) / 100;
-      } else if (amountDelta < 0) {
+      } else if (repair.ownerId != null && amountDelta < 0) {
         await appendRepairLedger(tx, {
           partnerId: repair.ownerId,
           direction: "CREDIT",
@@ -127,7 +127,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
         ownerId: repair.ownerId,
         vehicleNumber: repair.vehicle.vehicleNumber,
         action: "UPDATED",
-        detail: `Repair ${repair.repairCode} diubah oleh ${user.name}${changedSummary ? ` - field: ${changedSummary}` : ""}${amountDelta !== 0 ? ` · wallet disesuaikan ${amountDelta > 0 ? "+" : ""}${formatIDR(amountDelta)}` : ""}.`,
+        detail: `Repair ${repair.repairCode} diubah oleh ${user.name}${changedSummary ? ` - field: ${changedSummary}` : ""}${repair.ownerId != null && amountDelta !== 0 ? ` · wallet disesuaikan ${amountDelta > 0 ? "+" : ""}${formatIDR(amountDelta)}` : ""}.`,
         changes,
         amount,
         actor: user,
@@ -138,7 +138,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
     await financeAudit(user, "updated", "repair", repair.id, repair.repairCode, {
       changes,
-      walletAdjustment: amountDelta,
+      walletAdjustment: repair.ownerId != null ? amountDelta : 0,
     });
     return ok(updated);
   });
@@ -165,7 +165,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 
     await db.$transaction(async (tx) => {
       // Refund whatever was actually deducted from the owner wallet.
-      if (repair.deductedAmount > 0) {
+      if (repair.ownerId != null && repair.deductedAmount > 0) {
         await appendRepairLedger(tx, {
           partnerId: repair.ownerId,
           direction: "CREDIT",
@@ -184,7 +184,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
         ownerId: repair.ownerId,
         vehicleNumber: repair.vehicle.vehicleNumber,
         action: "DELETED",
-        detail: `Repair ${repair.repairCode} (${repair.description} - ${formatIDR(repair.amount)}) dihapus oleh ${user.name}${repair.deductedAmount > 0 ? ` · deduction ${formatIDR(repair.deductedAmount)} dikembalikan ke wallet` : ""}.`,
+        detail: `Repair ${repair.repairCode} (${repair.description} - ${formatIDR(repair.amount)}) dihapus oleh ${user.name}${repair.ownerId != null && repair.deductedAmount > 0 ? ` · deduction ${formatIDR(repair.deductedAmount)} dikembalikan ke wallet` : ""}.`,
         amount: repair.amount,
         actor: user,
       });
@@ -195,7 +195,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     await financeAudit(user, "deleted", "repair", repair.id, repair.repairCode, {
       vehicle: repair.vehicle.vehicleNumber,
       amount: repair.amount,
-      refunded: repair.deductedAmount,
+      refunded: repair.ownerId != null ? repair.deductedAmount : 0,
     });
     return ok({ id: repair.id, deleted: true });
   });

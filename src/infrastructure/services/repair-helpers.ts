@@ -4,6 +4,8 @@ import type { AuthUser } from "@/infrastructure/auth/auth";
 
 /**
  * Repair helpers — simplified repair flow:
+ * Company repairs have no partner owner and never touch wallet accounting.
+ * For partner repairs:
  *   · create  = immediately VERIFIED + REPAIR_DEDUCTION debited atomically
  *   · update  = wallet auto-adjusted (extra debit / partial refund) + log
  *   · delete  = full refund of the net deducted amount + log
@@ -87,7 +89,7 @@ export async function logRepairAction(
   input: {
     repairId: number;
     repairCode: string;
-    ownerId: number;
+    ownerId: number | null;
     vehicleNumber: string;
     action: "CREATED" | "UPDATED" | "DELETED";
     detail: string;

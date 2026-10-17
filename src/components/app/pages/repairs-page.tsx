@@ -21,6 +21,7 @@ import {
   apiPut,
   apiDelete,
   hasPermission,
+  type Vehicle,
   type VehicleRepairRow,
   type RepairActionLogRow,
 } from "@/infrastructure/http/client-api";
@@ -58,7 +59,8 @@ import { cn } from "@/shared/utils";
  *    vehicles. No approval buttons — creating a repair no longer needs the
  *    owner's confirmation.
  *  · Company (repair.view/create/update/delete) → full management: create is
- *    immediately VERIFIED (wallet deducted atomically); records can be
+ *    immediately VERIFIED (partner wallet deducted atomically; company
+ *    repairs have no wallet accounting); records can be
  *    edited (wallet auto-adjusted) or deleted (deduction refunded).
  *
  * TWO LOGS are always visible:
@@ -84,16 +86,11 @@ export function RepairsPage() {
   const [detail, setDetail] = useState<VehicleRepairRow | null>(null);
   const [logVersion, setLogVersion] = useState(0);
 
-  // Company users need the vehicle list for the create/edit forms.
-  const { data: vehicles } = useApiData<{ id: number; vehicleNumber: string; owner?: { id: number } | null }[]>(
-    () => (canCreate || canEdit ? apiGet("/vehicles") : Promise.resolve([])),
-    [canCreate, canEdit],
+  // Repair creators need only vehicle choices, not vehicle-management access.
+  const { data: vehicles, loading: vehiclesLoading, error: vehiclesError, reload: reloadVehicles } = useApiData<Pick<Vehicle, "id" | "vehicleNumber" | "ownerId">[]>(
+    () => (canCreate ? apiGet("/repairs/vehicles") : Promise.resolve([])),
+    [canCreate],
   );
-  // Only partner-owned vehicles are eligible (repairs deduct from the Vehicle
-  // Owner's profit — company vehicles have no owner to charge).
-  const vehicleOptions = (vehicles ?? [])
-    .filter((v) => v.owner != null)
-    .map((v) => ({ value: String(v.id), label: v.vehicleNumber }));
 
   const rows = useMemo(() => data ?? [], [data]);
 
@@ -104,7 +101,9 @@ export function RepairsPage() {
 
   async function onDelete(repair: VehicleRepairRow) {
     const ok = await runAction(() => apiDelete(`/repairs/${repair.id}`), {
-      success: `Repair ${repair.repairCode} dihapus - deduction ${formatRupiah(repair.deductedAmount)} dikembalikan ke wallet Vehicle Owner. Tercatat di log aksi.`,
+      success: repair.ownerId == null
+        ? `Repair perusahaan ${repair.repairCode} dihapus tanpa perubahan wallet partner. Tercatat di log aksi.`
+        : `Repair ${repair.repairCode} dihapus - deduction ${formatRupiah(repair.deductedAmount)} dikembalikan ke wallet Vehicle Owner. Tercatat di log aksi.`,
     });
     if (ok) {
       setDeleteTarget(null);
@@ -123,7 +122,7 @@ export function RepairsPage() {
         subtitle={
           isVehicleOwner
             ? "Biaya repair untuk kendaraan Anda - setiap pembuatan, perubahan, dan penghapusan record tercatat di log aksi."
-            : "Record repair langsung TERVERIFIKASI dan wallet Vehicle Owner langsung didebit saat dibuat. Semua aksi tercatat di log."
+            : "Record repair langsung TERVERIFIKASI. Wallet Vehicle Owner hanya didebit untuk kendaraan partner. Semua aksi tercatat di log."
         }
         icon={<Wrench className="h-5 w-5" />}
         actions={
@@ -170,10 +169,10 @@ export function RepairsPage() {
                   </div>
                 ),
               },
-              { key: "amount", header: "Biaya (Deducted)", render: (r) => (
+              { key: "amount", header: "Biaya", render: (r) => (
                 <div>
                   <span className="font-semibold text-destructive">{formatRupiah(r.amount)}</span>
-                  <p className="text-[10px] text-muted-foreground">dari wallet owner</p>
+                  <p className="text-[10px] text-muted-foreground">{r.ownerId == null ? "Ditanggung perusahaan" : "dari wallet owner"}</p>
                 </div>
               ) },
               { key: "status", header: "Status", render: (r) => <StatusBadge status={r.status} /> },
@@ -184,7 +183,7 @@ export function RepairsPage() {
                       key: "owner",
                       header: "Vehicle Owner",
                       hideOnMobile: true,
-                      render: (r: VehicleRepairRow) => <span className="text-sm">{r.owner?.user?.name ?? "-"}</span>,
+                      render: (r: VehicleRepairRow) => <span className="text-sm">{r.owner?.user?.name ?? "Perusahaan"}</span>,
                     } as const,
                   ]),
               {
@@ -221,7 +220,10 @@ export function RepairsPage() {
       <CreateRepairDialog
         key={createOpen ? "open" : "closed"}
         open={createOpen}
-        vehicleOptions={vehicleOptions}
+        vehicles={vehicles ?? []}
+        vehiclesLoading={vehiclesLoading}
+        vehiclesError={vehiclesError}
+        onRetryVehicles={reloadVehicles}
         onOpenChange={setCreateOpen}
         onDone={refreshAll}
       />
@@ -240,8 +242,10 @@ export function RepairsPage() {
             <AlertDialogTitle>Hapus repair {deleteTarget?.repairCode}?</AlertDialogTitle>
             <AlertDialogDescription>
               Record {deleteTarget?.repairCode} ({deleteTarget?.description} - {formatRupiah(deleteTarget?.amount ?? 0)}) akan dihapus dan
-              deduction {formatRupiah(deleteTarget?.deductedAmount ?? 0)} dikembalikan ke wallet Vehicle Owner.
-              Vehicle Owner tetap bisa melihat bekas record ini di log aksi (dibuat → dihapus).
+              {deleteTarget?.ownerId != null
+                ? ` deduction ${formatRupiah(deleteTarget.deductedAmount)} dikembalikan ke wallet Vehicle Owner.`
+                : " tanpa perubahan wallet partner."}
+              Riwayat record tetap tercatat di log aksi (dibuat → dihapus).
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -473,97 +477,235 @@ function ProofField({
 }
 
 function CreateRepairDialog({
-  open,
-  onOpenChange,
-  onDone,
-  vehicleOptions,
+    open,
+    onOpenChange,
+    onDone,
+    vehicles,
+    vehiclesLoading,
+    vehiclesError,
+    onRetryVehicles,
 }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onDone: () => void;
-  vehicleOptions: { value: string; label: string }[];
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onDone: () => void;
+    vehicles: Pick<Vehicle, "id" | "vehicleNumber" | "ownerId">[];
+    vehiclesLoading: boolean;
+    vehiclesError: string | null;
+    onRetryVehicles: () => void;
 }) {
-  const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState<RepairFormState>(EMPTY_FORM);
-  const { proof, proofError, onProofChange, setProof, setProofError } = useProofUpload();
+    const [busy, setBusy] = useState(false);
+    const [form, setForm] = useState<RepairFormState>(EMPTY_FORM);
+    const [vehicleType, setVehicleType] = useState("partner");
+    const vehicleOptions = vehicles
+        .filter((vehicle) =>
+            vehicleType === "partner"
+                ? vehicle.ownerId != null
+                : vehicle.ownerId == null,
+        )
+        .map((vehicle) => ({
+            value: String(vehicle.id),
+            label: vehicle.vehicleNumber,
+        }));
+    const canSubmitVehicle =
+        !vehiclesLoading &&
+        !vehiclesError &&
+        vehicleOptions.some((option) => option.value === form.vehicleId);
+    const { proof, proofError, onProofChange, setProof, setProofError } =
+        useProofUpload();
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    const ok = await runAction(
-      () =>
-        apiPost("/repairs", {
-          vehicleId: Number(form.vehicleId),
-          description: form.description,
-          amount: Number(form.amount),
-          repairDate: form.repairDate || null,
-          workshopVendor: form.workshopVendor || null,
-          notes: form.notes || null,
-          proofUrl: proof?.dataUrl,
-        }),
-      { success: "Repair tercatat & langsung TERVERIFIKASI - wallet Vehicle Owner didebit. Tercatat di log aksi." },
-    );
-    if (ok) {
-      setForm(EMPTY_FORM);
-      setProof(null);
-      setProofError("");
-      onOpenChange(false);
-      onDone();
+    async function onSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        if (!canSubmitVehicle || !proof || busy) return;
+        setBusy(true);
+        const ok = await runAction(
+            () =>
+                apiPost("/repairs", {
+                    vehicleId: Number(form.vehicleId),
+                    description: form.description,
+                    amount: Number(form.amount),
+                    repairDate: form.repairDate || null,
+                    workshopVendor: form.workshopVendor || null,
+                    notes: form.notes || null,
+                    proofUrl: proof?.dataUrl,
+                }),
+            {
+                success:
+                    vehicleType === "company"
+                        ? "Repair perusahaan tercatat & TERVERIFIKASI tanpa potongan wallet partner."
+                        : "Repair tercatat & langsung TERVERIFIKASI - wallet Vehicle Owner didebit. Tercatat di log aksi.",
+            },
+        );
+        if (ok) {
+            setForm(EMPTY_FORM);
+            setProof(null);
+            setProofError("");
+            onOpenChange(false);
+            onDone();
+        }
+        setBusy(false);
     }
-    setBusy(false);
-  }
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Catat Repair / Maintenance</DialogTitle>
-          <DialogDescription>
-            Record langsung TERVERIFIKASI dan wallet Vehicle Owner langsung didebit saat disimpan - tanpa alur approval.
-            Bukti (nota/invoice) wajib dilampirkan. Vehicle Owner melihat semua ini lewat log aksi.
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={onSubmit} className="space-y-3">
-          <Field label="Kendaraan">
-            <FormSelect
-              value={form.vehicleId}
-              onValueChange={(value) => setForm({ ...form, vehicleId: value })}
-              placeholder="Pilih kendaraan…"
-              options={vehicleOptions}
-              required
-            />
-          </Field>
-          <Field label="Deskripsi Repair">
-            <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="mis. Ganti oli + servis rem" rows={2} required />
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Biaya (Rupiah)">
-              <NumberInput value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} min={1} required />
-            </Field>
-            <Field label="Tanggal Repair">
-              <input
-                type="date"
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
-                value={form.repairDate}
-                onChange={(e) => setForm({ ...form, repairDate: e.target.value })}
-              />
-            </Field>
-          </div>
-          <Field label="Bengkel / Vendor">
-            <Textarea value={form.workshopVendor} onChange={(e) => setForm({ ...form, workshopVendor: e.target.value })} rows={1} />
-          </Field>
-          <Field label="Catatan">
-            <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} />
-          </Field>
-          <ProofField proof={proof} proofError={proofError} onProofChange={onProofChange} />
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Batal</Button>
-            <SubmitButton busy={busy} disabled={!proof}>Simpan & Verifikasi</SubmitButton>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>Catat Repair / Maintenance</DialogTitle>
+                    <DialogDescription>
+                        Record langsung TERVERIFIKASI tanpa alur approval.
+                        Bukti (nota/invoice) wajib dilampirkan. Potongan wallet
+                        hanya berlaku untuk kendaraan partner. Semua aksi tercatat di log.
+                    </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={onSubmit} className="space-y-3">
+                    <Tabs
+                        value={vehicleType}
+                        onValueChange={(value) => {
+                            setVehicleType(value);
+                            setForm((current) => ({
+                                ...current,
+                                vehicleId: "",
+                            }));
+                        }}
+                    >
+                        <TabsList aria-label="Kepemilikan kendaraan">
+                            <TabsTrigger value="company">
+                                Kendaraan Perusahaan
+                            </TabsTrigger>
+                            <TabsTrigger value="partner">
+                                Kendaraan Partner
+                            </TabsTrigger>
+                        </TabsList>
+                        <TabsContent value={vehicleType}>
+                            <p className="text-sm text-muted-foreground">
+                                {vehicleType === "company"
+                                    ? "Biaya repair ditanggung perusahaan, tanpa potongan wallet partner."
+                                    : "Biaya repair dipotong dari wallet Vehicle Owner saat disimpan."}
+                            </p>
+                        </TabsContent>
+                    </Tabs>
+                    {vehiclesLoading ? (
+                        <p role="status">Memuat kendaraan…</p>
+                    ) : vehiclesError ? (
+                        <div role="alert" className="space-y-2">
+                            <p>Gagal memuat kendaraan: {vehiclesError}</p>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={onRetryVehicles}
+                            >
+                                Coba lagi
+                            </Button>
+                        </div>
+                    ) : vehicleOptions.length === 0 ? (
+                        <p role="status">
+                            Belum ada kendaraan{" "}
+                            {vehicleType === "company"
+                                ? "perusahaan"
+                                : "partner"}
+                            .
+                        </p>
+                    ) : null}
+                    <Field label="Kendaraan" htmlFor="repair-vehicle">
+                        <FormSelect
+                            id="repair-vehicle"
+                            value={form.vehicleId}
+                            onValueChange={(value) =>
+                                setForm({ ...form, vehicleId: value })
+                            }
+                            placeholder="Pilih kendaraan…"
+                            options={vehicleOptions}
+                            disabled={
+                                vehiclesLoading ||
+                                !!vehiclesError ||
+                                vehicleOptions.length === 0
+                            }
+                            required
+                        />
+                    </Field>
+                    <Field label="Deskripsi Repair">
+                        <Textarea
+                            value={form.description}
+                            onChange={(e) =>
+                                setForm({
+                                    ...form,
+                                    description: e.target.value,
+                                })
+                            }
+                            placeholder="mis. Ganti oli + servis rem"
+                            rows={2}
+                            required
+                        />
+                    </Field>
+                    <div className="grid grid-cols-2 gap-3">
+                        <Field label="Biaya (Rupiah)">
+                            <NumberInput
+                                value={form.amount}
+                                onChange={(e) =>
+                                    setForm({ ...form, amount: e.target.value })
+                                }
+                                min={1}
+                                required
+                            />
+                        </Field>
+                        <Field label="Tanggal Repair">
+                            <input
+                                type="date"
+                                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
+                                value={form.repairDate}
+                                onChange={(e) =>
+                                    setForm({
+                                        ...form,
+                                        repairDate: e.target.value,
+                                    })
+                                }
+                            />
+                        </Field>
+                    </div>
+                    <Field label="Bengkel / Vendor">
+                        <Textarea
+                            value={form.workshopVendor}
+                            onChange={(e) =>
+                                setForm({
+                                    ...form,
+                                    workshopVendor: e.target.value,
+                                })
+                            }
+                            rows={1}
+                        />
+                    </Field>
+                    <Field label="Catatan">
+                        <Textarea
+                            value={form.notes}
+                            onChange={(e) =>
+                                setForm({ ...form, notes: e.target.value })
+                            }
+                            rows={2}
+                        />
+                    </Field>
+                    <ProofField
+                        proof={proof}
+                        proofError={proofError}
+                        onProofChange={onProofChange}
+                    />
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => onOpenChange(false)}
+                        >
+                            Batal
+                        </Button>
+                        <SubmitButton
+                            busy={busy}
+                            disabled={!proof || !canSubmitVehicle}
+                        >
+                            Simpan & Verifikasi
+                        </SubmitButton>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
 }
 
 function EditRepairDialog({
@@ -609,7 +751,9 @@ function EditRepairDialog({
           notes: form.notes || null,
           proofUrl: proof?.dataUrl ?? null,
         }),
-      { success: `Repair ${repair.repairCode} diperbarui - perubahan & penyesuaian wallet tercatat di log aksi.` },
+      { success: repair.ownerId == null
+        ? `Repair perusahaan ${repair.repairCode} diperbarui tanpa perubahan wallet partner.`
+        : `Repair ${repair.repairCode} diperbarui - perubahan & penyesuaian wallet tercatat di log aksi.` },
     );
     if (ok) {
       setInitialized(null);
@@ -626,8 +770,11 @@ function EditRepairDialog({
         <DialogHeader>
           <DialogTitle>Edit Repair {repair.repairCode}</DialogTitle>
           <DialogDescription>
-            Perubahan tercatat di log aksi (field apa yang berubah, siapa, kapan). Jika biaya berubah, wallet Vehicle
-            Owner otomatis disesuaikan: selisih ditambahkan atau dikembalikan. Kendaraan tidak bisa diganti - hapus
+            Perubahan tercatat di log aksi (field apa yang berubah, siapa, kapan).
+            {repair.ownerId == null
+              ? " Biaya ditanggung perusahaan tanpa perubahan wallet partner."
+              : " Jika biaya berubah, wallet Vehicle Owner otomatis disesuaikan: selisih ditambahkan atau dikembalikan."}
+            Kendaraan tidak bisa diganti - hapus
             record dan buat ulang jika salah kendaraan.
           </DialogDescription>
         </DialogHeader>
@@ -686,7 +833,8 @@ function RepairDetailDialog({ repair, onOpenChange }: { repair: VehicleRepairRow
         <DialogHeader>
           <DialogTitle>{repair.repairCode} · {repair.vehicle.vehicleNumber}</DialogTitle>
           <DialogDescription>
-            {repair.description} - {formatRupiah(repair.amount)} (terdeduct dari wallet Vehicle Owner)
+            {repair.description} - {formatRupiah(repair.amount)}
+            {repair.ownerId == null ? " (ditanggung perusahaan)" : " (terdeduct dari wallet Vehicle Owner)"}
           </DialogDescription>
         </DialogHeader>
         {/* Tabs keep the dialog clean: data repair di tab pertama, riwayat
@@ -704,7 +852,7 @@ function RepairDetailDialog({ repair, onOpenChange }: { repair: VehicleRepairRow
               <DetailItem label="Bengkel" value={repair.workshopVendor ?? "-"} />
               <DetailItem label="Tanggal Repair" value={formatDate(repair.repairDate)} />
               <DetailItem label="Dibuat" value={formatDate(repair.createdAt, true)} />
-              <DetailItem label="Status" value="Terverifikasi & Terdeduct" />
+              <DetailItem label="Status" value={repair.ownerId == null ? "Terverifikasi · Ditanggung perusahaan" : "Terverifikasi & Terdeduct"} />
             </div>
             {repair.notes && <DetailItem label="Catatan" value={repair.notes} />}
             {repair.proofUrl && (

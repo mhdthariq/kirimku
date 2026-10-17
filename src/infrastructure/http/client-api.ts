@@ -1399,7 +1399,7 @@ export interface VehicleRepairRow {
   id: number;
   repairCode: string;
   vehicleId: number;
-  ownerId: number;
+  ownerId: number | null;
   description: string;
   amount: number;
   repairDate: string;
@@ -1425,7 +1425,7 @@ export interface RepairActionLogRow {
   id: number;
   repairId: number;
   repairCode: string;
-  ownerId: number;
+  ownerId: number | null;
   vehicleNumber: string;
   action: "CREATED" | "UPDATED" | "DELETED";
   detail: string | null;

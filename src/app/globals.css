@@ -4,344 +4,432 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --color-success: var(--success);
-  --color-success-foreground: var(--success-foreground);
-  --color-warning: var(--warning);
-  --color-warning-foreground: var(--warning-foreground);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --font-sans: var(--font-geist-sans);
+    --font-mono: var(--font-geist-mono);
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-success: var(--success);
+    --color-success-foreground: var(--success-foreground);
+    --color-warning: var(--warning);
+    --color-warning-foreground: var(--warning-foreground);
+    --radius-sm: calc(var(--radius) - 4px);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) + 4px);
 }
 
 :root {
-  color-scheme: light;
-  --radius: 0.625rem;
-  --background: oklch(0.984 0.003 170);
-  --foreground: oklch(0.216 0.02 165);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.216 0.02 165);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.216 0.02 165);
-  --primary: oklch(0.508 0.11 163);
-  --primary-foreground: oklch(0.985 0.005 163);
-  --secondary: oklch(0.955 0.015 165);
-  --secondary-foreground: oklch(0.3 0.03 163);
-  --muted: oklch(0.955 0.008 168);
-  --muted-foreground: oklch(0.53 0.02 165);
-  --accent: oklch(0.94 0.03 165);
-  --accent-foreground: oklch(0.3 0.04 163);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.912 0.012 165);
-  --input: oklch(0.912 0.012 165);
-  --ring: oklch(0.508 0.11 163);
-  --chart-1: oklch(0.508 0.11 163);
-  --chart-2: oklch(0.627 0.17 149);
-  --chart-3: oklch(0.7 0.13 178);
-  --chart-4: oklch(0.769 0.15 85);
-  --chart-5: oklch(0.704 0.19 22);
-  --success: oklch(0.596 0.145 163);
-  --success-foreground: oklch(0.985 0.005 163);
-  --warning: oklch(0.666 0.15 80);
-  --warning-foreground: oklch(0.27 0.05 80);
-  --sidebar: oklch(0.985 0.004 168);
-  --sidebar-foreground: oklch(0.216 0.02 165);
-  --sidebar-primary: oklch(0.508 0.11 163);
-  --sidebar-primary-foreground: oklch(0.985 0.005 163);
-  --sidebar-accent: oklch(0.94 0.03 165);
-  --sidebar-accent-foreground: oklch(0.3 0.04 163);
-  --sidebar-border: oklch(0.912 0.012 165);
-  --sidebar-ring: oklch(0.508 0.11 163);
+    color-scheme: light;
+    --radius: 0.625rem;
+    --background: oklch(0.984 0.003 170);
+    --foreground: oklch(0.216 0.02 165);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.216 0.02 165);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.216 0.02 165);
+    --primary: oklch(0.508 0.11 163);
+    --primary-foreground: oklch(0.985 0.005 163);
+    --secondary: oklch(0.955 0.015 165);
+    --secondary-foreground: oklch(0.3 0.03 163);
+    --muted: oklch(0.955 0.008 168);
+    --muted-foreground: oklch(0.53 0.02 165);
+    --accent: oklch(0.94 0.03 165);
+    --accent-foreground: oklch(0.3 0.04 163);
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: oklch(0.912 0.012 165);
+    --input: oklch(0.912 0.012 165);
+    --ring: oklch(0.508 0.11 163);
+    --chart-1: oklch(0.508 0.11 163);
+    --chart-2: oklch(0.627 0.17 149);
+    --chart-3: oklch(0.7 0.13 178);
+    --chart-4: oklch(0.769 0.15 85);
+    --chart-5: oklch(0.704 0.19 22);
+    --success: oklch(0.596 0.145 163);
+    --success-foreground: oklch(0.985 0.005 163);
+    --warning: oklch(0.666 0.15 80);
+    --warning-foreground: oklch(0.27 0.05 80);
+    --sidebar: oklch(0.985 0.004 168);
+    --sidebar-foreground: oklch(0.216 0.02 165);
+    --sidebar-primary: oklch(0.508 0.11 163);
+    --sidebar-primary-foreground: oklch(0.985 0.005 163);
+    --sidebar-accent: oklch(0.94 0.03 165);
+    --sidebar-accent-foreground: oklch(0.3 0.04 163);
+    --sidebar-border: oklch(0.912 0.012 165);
+    --sidebar-ring: oklch(0.508 0.11 163);
 }
 
 .dark {
-  color-scheme: dark;
-  --background: oklch(0.184 0.015 170);
-  --foreground: oklch(0.95 0.008 165);
-  --card: oklch(0.228 0.017 170);
-  --card-foreground: oklch(0.95 0.008 165);
-  --popover: oklch(0.228 0.017 170);
-  --popover-foreground: oklch(0.95 0.008 165);
-  --primary: oklch(0.772 0.13 162);
-  --primary-foreground: oklch(0.184 0.03 165);
-  --secondary: oklch(0.28 0.02 168);
-  --secondary-foreground: oklch(0.95 0.008 165);
-  --muted: oklch(0.28 0.015 168);
-  --muted-foreground: oklch(0.68 0.015 165);
-  --accent: oklch(0.30 0.03 165);
-  --accent-foreground: oklch(0.95 0.008 165);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 16%);
-  --ring: oklch(0.772 0.13 162);
-  --chart-1: oklch(0.772 0.13 162);
-  --chart-2: oklch(0.66 0.17 149);
-  --chart-3: oklch(0.72 0.12 178);
-  --chart-4: oklch(0.79 0.15 85);
-  --chart-5: oklch(0.70 0.18 22);
-  --success: oklch(0.66 0.15 162);
-  --success-foreground: oklch(0.16 0.03 165);
-  --warning: oklch(0.75 0.14 80);
-  --warning-foreground: oklch(0.25 0.05 80);
-  --sidebar: oklch(0.21 0.016 170);
-  --sidebar-foreground: oklch(0.95 0.008 165);
-  --sidebar-primary: oklch(0.772 0.13 162);
-  --sidebar-primary-foreground: oklch(0.184 0.03 165);
-  --sidebar-accent: oklch(0.30 0.03 165);
-  --sidebar-accent-foreground: oklch(0.95 0.008 165);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.772 0.13 162);
+    color-scheme: dark;
+    --background: oklch(0.184 0.015 170);
+    --foreground: oklch(0.95 0.008 165);
+    --card: oklch(0.228 0.017 170);
+    --card-foreground: oklch(0.95 0.008 165);
+    --popover: oklch(0.228 0.017 170);
+    --popover-foreground: oklch(0.95 0.008 165);
+    --primary: oklch(0.772 0.13 162);
+    --primary-foreground: oklch(0.184 0.03 165);
+    --secondary: oklch(0.28 0.02 168);
+    --secondary-foreground: oklch(0.95 0.008 165);
+    --muted: oklch(0.28 0.015 168);
+    --muted-foreground: oklch(0.68 0.015 165);
+    --accent: oklch(0.3 0.03 165);
+    --accent-foreground: oklch(0.95 0.008 165);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: oklch(1 0 0 / 12%);
+    --input: oklch(1 0 0 / 16%);
+    --ring: oklch(0.772 0.13 162);
+    --chart-1: oklch(0.772 0.13 162);
+    --chart-2: oklch(0.66 0.17 149);
+    --chart-3: oklch(0.72 0.12 178);
+    --chart-4: oklch(0.79 0.15 85);
+    --chart-5: oklch(0.7 0.18 22);
+    --success: oklch(0.66 0.15 162);
+    --success-foreground: oklch(0.16 0.03 165);
+    --warning: oklch(0.75 0.14 80);
+    --warning-foreground: oklch(0.25 0.05 80);
+    --sidebar: oklch(0.21 0.016 170);
+    --sidebar-foreground: oklch(0.95 0.008 165);
+    --sidebar-primary: oklch(0.772 0.13 162);
+    --sidebar-primary-foreground: oklch(0.184 0.03 165);
+    --sidebar-accent: oklch(0.3 0.03 165);
+    --sidebar-accent-foreground: oklch(0.95 0.008 165);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.772 0.13 162);
 }
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  select,
-  select option,
-  select optgroup {
-    background-color: var(--popover);
-    color: var(--popover-foreground);
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
+    * {
+        @apply border-border outline-ring/50;
+    }
+    select,
+    select option,
+    select optgroup {
+        background-color: var(--popover);
+        color: var(--popover-foreground);
+    }
+    body {
+        @apply bg-background text-foreground;
+    }
 }
 
 /* Slim, themed scrollbars */
 * {
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in oklch, var(--muted-foreground) 35%, transparent) transparent;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(
+            in oklch,
+            var(--muted-foreground) 35%,
+            transparent
+        )
+        transparent;
 }
 *::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+    width: 8px;
+    height: 8px;
 }
 *::-webkit-scrollbar-thumb {
-  background: color-mix(in oklch, var(--muted-foreground) 35%, transparent);
-  border-radius: 8px;
+    background: color-mix(in oklch, var(--muted-foreground) 35%, transparent);
+    border-radius: 8px;
 }
 *::-webkit-scrollbar-track {
-  background: transparent;
+    background: transparent;
 }
 
 /* Leaflet dark-mode tiles + controls */
 .dark .leaflet-tile {
-  filter: brightness(0.72) saturate(0.85) contrast(0.95);
+    filter: brightness(0.72) saturate(0.85) contrast(0.95);
 }
 .dark .leaflet-control-zoom a {
-  background: oklch(0.228 0.017 170);
-  color: oklch(0.95 0.008 165);
-  border-color: oklch(1 0 0 / 12%);
+    background: oklch(0.228 0.017 170);
+    color: oklch(0.95 0.008 165);
+    border-color: oklch(1 0 0 / 12%);
 }
 .dark .leaflet-control-zoom a:hover {
-  background: oklch(0.3 0.03 165);
+    background: oklch(0.3 0.03 165);
 }
 .dark .leaflet-control-attribution {
-  background: oklch(0.228 0.017 170 / 85%);
-  color: oklch(0.68 0.015 165);
+    background: oklch(0.228 0.017 170 / 85%);
+    color: oklch(0.68 0.015 165);
 }
 .dark .leaflet-control-attribution a {
-  color: oklch(0.772 0.13 162);
+    color: oklch(0.772 0.13 162);
 }
 .leaflet-container {
-  font: inherit;
-  z-index: 0;
+    font: inherit;
+    z-index: 0;
 }
 
 /* Status dot pulse for in-transit */
 @keyframes pulse-dot {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.45; }
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.45;
+    }
 }
 .pulse-dot {
-  animation: pulse-dot 2s ease-in-out infinite;
+    animation: pulse-dot 2s ease-in-out infinite;
 }
 
 /* Dashboard cards share a visual rhythm without changing forms or printouts. */
 .dashboard-workspace {
-  overflow-wrap: anywhere;
+    overflow-wrap: anywhere;
 }
 .dashboard-workspace > *,
 .dashboard-workspace [data-slot="card-title"] {
-  min-width: 0;
+    min-width: 0;
 }
 .dashboard-workspace [data-slot="card"] {
-  border-radius: 1rem;
-  gap: 1rem;
-  padding-block: 1.25rem;
-  box-shadow: 0 2px 6px rgb(0 0 0 / 0.025);
+    border-radius: 1rem;
+    gap: 1rem;
+    padding-block: 1.25rem;
+    box-shadow: 0 2px 6px rgb(0 0 0 / 0.025);
 }
 .dashboard-workspace [data-slot="card-header"],
 .dashboard-workspace [data-slot="card-content"] {
-  padding-inline: 1rem;
+    padding-inline: 1rem;
 }
 .dashboard-workspace [data-slot="card-title"] {
-  line-height: 1.5;
+    line-height: 1.5;
 }
 .dashboard-period {
-  max-width: 100%;
+    max-width: 100%;
 }
 .dashboard-period > button {
-  min-height: 40px;
+    min-height: 40px;
 }
 .dashboard-period > button:last-child {
-  min-width: 0;
-  max-width: 100%;
+    min-width: 0;
+    max-width: 100%;
 }
 .dashboard-text-link {
-  display: inline-flex;
-  min-height: 40px;
-  align-items: center;
-  gap: 0.375rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--primary);
+    display: inline-flex;
+    min-height: 40px;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--primary);
 }
 .dashboard-text-link:hover {
-  text-decoration: underline;
+    text-decoration: underline;
 }
 .transport-detail > header {
-  flex-direction: column;
-  align-items: stretch;
+    flex-direction: column;
+    align-items: stretch;
 }
 .transport-actions > button {
-  min-height: 40px;
-  max-width: 100%;
-  white-space: normal;
+    min-height: 40px;
+    max-width: 100%;
+    white-space: normal;
 }
 @media (min-width: 640px) {
-  .dashboard-workspace [data-slot="card-header"],
-  .dashboard-workspace [data-slot="card-content"] {
-    padding-inline: 1.5rem;
-  }
+    .dashboard-workspace [data-slot="card-header"],
+    .dashboard-workspace [data-slot="card-content"] {
+        padding-inline: 1.5rem;
+    }
 }
 
 /* A4 preview includes the same 12mm margins as the printed page. */
 .a4-sheet {
-  box-sizing: border-box;
-  width: 210mm;
-  max-width: 100%;
-  min-height: 297mm;
-  padding: 12mm;
-  background: #fff;
-  color: #171717;
-  overflow-wrap: anywhere;
+    box-sizing: border-box;
+    width: 210mm;
+    max-width: 100%;
+    min-height: 297mm;
+    padding: 12mm;
+    background: #fff;
+    color: #171717;
+    overflow-wrap: anywhere;
+}
+.invoice-sheet {
+    display: flex;
+    flex-direction: column;
+}
+.invoice-summary .invoice-payment-account {
+    margin-top: 0;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+}
+.invoice-summary .invoice-payment-account h3 {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+}
+.invoice-summary .invoice-payment-account dl {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.75rem;
+}
+.invoice-print-footer {
+    margin-top: auto;
+}
+.invoice-sheet > .invoice-print-footer {
+    padding-top: 3mm;
+}
+.invoice-sheet > .invoice-notes,
+.invoice-sheet > .invoice-summary {
+    margin-bottom: 8mm;
 }
 .resi-sheet {
-  box-sizing: border-box;
-  width: 100mm;
-  min-width: 100mm;
-  max-width: 100mm;
-  height: 100mm;
-  min-height: 100mm;
-  max-height: 100mm;
-  border: 1px solid #000;
-  flex-shrink: 0;
+    box-sizing: border-box;
+    width: 100mm;
+    min-width: 100mm;
+    max-width: 100mm;
+    height: 100mm;
+    min-height: 100mm;
+    max-height: 100mm;
+    border: 1px solid #000;
+    flex-shrink: 0;
 }
 
 @media print {
-  @page {
-    size: A4 portrait;
-    margin: 12mm;
-  }
-  @page shipment-label {
-    size: 100mm 100mm;
-    margin: 0;
-  }
-  html, body {
-    width: auto !important;
-    height: auto !important;
-    min-height: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    overflow: visible !important;
-    background: #fff !important;
-    color: #171717 !important;
-    color-scheme: light;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-  body:has([data-print-portal]) > *:not([data-print-portal]) {
-    display: none !important;
-  }
-  [data-print-portal] {
-    position: static !important;
-    inset: auto !important;
-    width: auto !important;
-    height: auto !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    overflow: visible !important;
-    background: #fff !important;
-  }
-  [data-print-toolbar] {
-    display: none !important;
-  }
-  .a4-sheet {
-    width: 100% !important;
-    max-width: none !important;
-    min-height: 0 !important;
-    height: auto !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    border: none !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    overflow: visible !important;
-  }
-  .a4-sheet thead { display: table-header-group; }
-  .a4-sheet tfoot { display: table-footer-group; }
-  .a4-sheet tr, .a4-sheet img, .a4-sheet footer,
-  .invoice-totals, .invoice-parties, .invoice-payment-account {
-    break-inside: avoid;
-  }
-  .invoice-sheet header { flex-direction: row; }
-  .invoice-parties { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 160px; }
-  .invoice-items { overflow: visible !important; }
-  .invoice-items table { min-width: 0 !important; table-layout: fixed; }
-  #resi-print-portal { page: shipment-label; }
-  #resi-print-portal > .print-content { padding: 0 !important; }
-  .resi-sheet {
-    page: shipment-label;
-    margin: 0 !important;
-    break-inside: avoid;
-    break-after: page;
-    box-shadow: none !important;
-  }
-  .resi-sheet:last-child { break-after: auto; }
-  .resi-sheet img { image-rendering: pixelated; }
+    @page {
+        size: A4 portrait;
+        margin: 12mm;
+    }
+    @page invoice {
+        size: A4 portrait;
+        margin: 12mm 12mm 28mm;
+    }
+    @page shipment-label {
+        size: 100mm 100mm;
+        margin: 0;
+    }
+    html,
+    body {
+        width: auto !important;
+        height: auto !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
+        background: #fff !important;
+        color: #171717 !important;
+        color-scheme: light;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+    body:has([data-print-portal]) > *:not([data-print-portal]) {
+        display: none !important;
+    }
+    [data-print-portal] {
+        position: static !important;
+        inset: auto !important;
+        width: auto !important;
+        height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
+        background: #fff !important;
+    }
+    [data-print-toolbar] {
+        display: none !important;
+    }
+    .a4-sheet {
+        width: 100% !important;
+        max-width: none !important;
+        min-height: 0 !important;
+        height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        overflow: visible !important;
+    }
+    .a4-sheet thead {
+        display: table-header-group;
+    }
+    .a4-sheet tfoot {
+        display: table-footer-group;
+    }
+    .a4-sheet tr,
+    .a4-sheet img,
+    .a4-sheet footer,
+    .invoice-totals,
+    .invoice-parties,
+    .invoice-payment-account {
+        break-inside: avoid;
+    }
+    #invoice-print-portal {
+        page: invoice;
+    }
+    .invoice-sheet {
+        display: block;
+    }
+    .invoice-sheet header {
+        flex-direction: row;
+    }
+    .invoice-summary {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        break-inside: avoid;
+    }
+    /* The larger bottom page margin reserves space for this repeating footer. */
+    .invoice-print-footer {
+        position: fixed;
+        bottom: -20mm;
+        left: 0;
+        right: 0;
+        height: 16mm;
+        margin: 0;
+        background: white;
+    }
+    .invoice-parties {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 160px;
+    }
+    .invoice-items {
+        overflow: visible !important;
+    }
+    .invoice-items table {
+        min-width: 0 !important;
+        table-layout: fixed;
+    }
+    #resi-print-portal {
+        page: shipment-label;
+    }
+    #resi-print-portal > .print-content {
+        padding: 0 !important;
+    }
+    .resi-sheet {
+        page: shipment-label;
+        margin: 0 !important;
+        break-inside: avoid;
+        break-after: page;
+        box-shadow: none !important;
+    }
+    .resi-sheet:last-child {
+        break-after: auto;
+    }
+    .resi-sheet img {
+        image-rendering: pixelated;
+    }
 }

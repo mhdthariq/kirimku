@@ -73,7 +73,7 @@ export async function GET(req: NextRequest) {
       db.topUpRequest.aggregate({ where: { status: "VERIFIED" }, _sum: { amount: true } }),
       db.marketingCommission.aggregate({ where: { status: "RELEASED" }, _sum: { commissionAmount: true } }),
       db.transportSettlement.aggregate({ _sum: { ownerAmount: true, transportValue: true } }),
-      db.vehicleRepair.aggregate({ where: { status: "VERIFIED" }, _sum: { amount: true } }),
+      db.vehicleRepair.aggregate({ where: { status: "VERIFIED", ownerId: { not: null } }, _sum: { deductedAmount: true } }),
       db.withdrawalRequest.aggregate({ where: { status: "COMPLETED" }, _sum: { amount: true } }),
       // Total paid against SETTLED invoices (full payments).
       db.invoiceSettlement.aggregate({
@@ -149,7 +149,7 @@ export async function GET(req: NextRequest) {
         releasedCommissions: commissionAgg._sum.commissionAmount ?? 0,
         transportSharePaid: transportShareAgg._sum.ownerAmount ?? 0,
         transportValueSettled: transportShareAgg._sum.transportValue ?? 0,
-        repairDeductions: repairDeductionAgg._sum.amount ?? 0,
+        repairDeductions: repairDeductionAgg._sum.deductedAmount ?? 0,
         withdrawalsCompleted: withdrawalAgg._sum.amount ?? 0,
         unsettledArrivedTransports,
         // Revision 6 — invoice payments are realized company profit the
@@ -183,7 +183,7 @@ export async function GET(req: NextRequest) {
           id: r.id,
           repairCode: r.repairCode,
           vehicleNumber: r.vehicle.vehicleNumber,
-          ownerName: r.owner.user.name,
+          ownerName: r.owner?.user.name ?? "Perusahaan",
           amount: r.amount,
           status: r.status,
           createdAt: r.createdAt,

@@ -864,7 +864,7 @@ model VehicleRepair {
     id                  Int       @id @default(autoincrement())
     repairCode          String    @unique
     vehicleId           Int
-    ownerId             Int
+    ownerId             Int?
     description         String
     amount              Float
     repairDate          DateTime
@@ -879,7 +879,7 @@ model VehicleRepair {
     verifiedAt          DateTime?
     createdAt           DateTime  @default(now())
     updatedAt           DateTime  @updatedAt
-    owner               Partner   @relation(fields: [ownerId], references: [id])
+    owner               Partner?  @relation(fields: [ownerId], references: [id], onDelete: Restrict)
     vehicle             Vehicle   @relation(fields: [vehicleId], references: [id])
 
     @@index([ownerId, status])
@@ -890,7 +890,7 @@ model RepairActionLog {
     id            Int      @id @default(autoincrement())
     repairId      Int
     repairCode    String
-    ownerId       Int
+    ownerId       Int?
     vehicleNumber String
     action        String
     detail        String?
