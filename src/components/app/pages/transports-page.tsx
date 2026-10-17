@@ -29,6 +29,7 @@ import {
   type Options,
 } from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
+import { OperationalHeader } from "@/components/app/operational-ui";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
 import { ItemAuditDialog } from "@/components/app/item-audit-dialog";
@@ -700,52 +701,34 @@ export function TransportsPage({
 
   return (
     <div className="min-w-0 space-y-6">
-      <section className="relative overflow-hidden rounded-2xl border bg-linear-to-br from-primary/10 via-card to-card p-5 sm:p-6">
-        <div className="mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-primary">
-          <Route className="size-4" /> Operasional linehaul
-        </div>
-        <div className="[&>div]:flex-col [&>div]:gap-5 [&>div]:2xl:flex-row [&>div>div:last-child]:w-full [&>div>div:last-child]:2xl:w-auto [&_button]:min-h-11">
-          <PageHeader
-            title={historyMode ? "Riwayat Transport" : "Transport"}
-            subtitle={
-              historyMode
-                ? "Transport selesai yang pernah Anda jalani sebagai driver/kenek."
-                : "Rencanakan keberangkatan, pantau perjalanan, dan kelola muatan antar gudang dalam satu tempat."
-            }
-            icon={<Route className="h-5 w-5" />}
-            actions={
-              <>
-                {!isOwner && !historyMode && (
-                  <GudangScopeBadge
-                    gudangName={user?.warehouseName ?? null}
-                  />
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={exportCsv}
-                  disabled={rows.length === 0}
-                >
-                  <Download className="h-4 w-4" /> Export CSV
-                </Button>
-                {can.create && !historyMode && (
-                  <Button
-                    onClick={openCreate}
-                    className="w-full sm:w-auto"
-                  >
-                    <Plus className="h-4 w-4" /> Rencanakan
-                    Transport
-                  </Button>
-                )}
-              </>
-            }
-          />
-        </div>
-        <p className="mt-5 border-t border-primary/10 pt-4 text-xs leading-relaxed text-muted-foreground">
-          Kedatangan terdeteksi otomatis saat kru check-in di
-          checkpoint akhir.
-        </p>
-      </section>
+      <OperationalHeader
+        eyebrow="Operasional linehaul"
+        note="Kedatangan terdeteksi otomatis saat kru check-in di checkpoint akhir."
+        title={historyMode ? "Riwayat Transport" : "Transport"}
+        subtitle={
+          historyMode
+            ? "Transport selesai yang pernah Anda jalani sebagai driver/kenek."
+            : "Rencanakan keberangkatan, pantau perjalanan, dan kelola muatan antar gudang dalam satu tempat."
+        }
+        icon={<Route className="h-5 w-5" />}
+        actions={
+          <>
+            {!isOwner && !historyMode && (
+              <GudangScopeBadge
+                gudangName={user?.warehouseName ?? null}
+              />
+            )}
+            <Button variant="outline" size="sm" onClick={exportCsv} disabled={rows.length === 0}>
+              <Download className="h-4 w-4" /> Export CSV
+            </Button>
+            {can.create && !historyMode && (
+              <Button onClick={openCreate} className="w-full sm:w-auto">
+                <Plus className="h-4 w-4" /> Rencanakan Transport
+              </Button>
+            )}
+          </>
+        }
+      />
 
       <section
         aria-label="Ringkasan transport"

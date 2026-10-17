@@ -185,7 +185,7 @@ export function TransportExpensesPanel({
   const hasExistingPhoto = !!editing?.hasPhoto && !form.removePhoto && !form.photo;
 
   return (
-    <Card>
+    <Card className="min-w-0 rounded-2xl shadow-sm">
       <CardHeader className="pb-2">
         <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-base">
           <span className="flex items-center gap-2">
@@ -312,7 +312,7 @@ export function TransportExpensesPanel({
       </CardContent>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-h-[90dvh] overflow-y-auto rounded-2xl sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{editing ? "Edit Biaya" : "Tambah Biaya"}</DialogTitle>
             <DialogDescription>Satu transport boleh punya banyak biaya untuk tiap jenis. Foto bukti opsional. GPS saat ini wajib diambil saat menyimpan. Biaya baru menunggu persetujuan.</DialogDescription>
@@ -368,7 +368,7 @@ export function TransportExpensesPanel({
       </Dialog>
 
       <Dialog open={!!viewPhoto} onOpenChange={(o) => !o && setViewPhoto(null)}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="max-h-[90dvh] overflow-y-auto rounded-2xl sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{viewPhoto?.title}</DialogTitle>
             <DialogDescription>Foto bukti biaya</DialogDescription>

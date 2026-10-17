@@ -5,7 +5,8 @@ import { Camera, CheckCircle2, ClipboardList, PackageCheck, Pencil, Plus, QrCode
 import { useAuth } from "@/hooks/use-auth";
 import { apiDelete, apiGet, apiPost, apiPut, hasPermission, employeesByPosition, type DeliveryTask, type Options, type Shipment } from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
-import { PageHeader, DataTable } from "@/components/app/data-table";
+import { PageHeader } from "@/components/app/data-table";
+import { OperationalHeader, OperationalSummary, OperationalTable, operationalTabsClass } from "@/components/app/operational-ui";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
 import { ItemAuditDialog } from "@/components/app/item-audit-dialog";
 import { PhotoDetailDialog } from "@/components/app/photo-detail-dialog";
@@ -158,8 +159,10 @@ export function DeliveriesPage() {
   ).length;
 
   return (
-    <div className="space-y-4">
-      <PageHeader
+    <div className="min-w-0 space-y-6">
+      <OperationalHeader
+        eyebrow="Operasional pengantaran"
+        note="Tinjau paket dan bukti serah terima sebelum menyelesaikan delivery."
         title="Deliveries"
         subtitle="Pengiriman akhir ke penerima - kurir scan QR semua paket customer sebelum konfirmasi."
         icon={<ClipboardList className="h-5 w-5" />}
@@ -180,6 +183,13 @@ export function DeliveriesPage() {
           </>
         }
       />
+      <OperationalSummary loading={loading} items={[
+        { label: "Total Tugas", value: data?.length ?? 0 },
+        { label: "Ditugaskan", value: data?.filter((task) => task.status === "ASSIGNED").length ?? 0 },
+        { label: "Dalam Proses", value: data?.filter((task) => task.status === "DELIVERED").length ?? 0 },
+        { label: "Selesai", value: data?.filter((task) => task.status === "COMPLETED").length ?? 0 },
+      ]} />
+
 
       {/* Shipments whose driver already checked in at the destination gudang
           but whose packages were not scan-received by Admin Gudang yet -
@@ -191,7 +201,7 @@ export function DeliveriesPage() {
       )}
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
+        <TabsList className={operationalTabsClass}>
           <TabsTrigger value="list">Daftar</TabsTrigger>
           {isOwner && <GudangTabsTriggers warehouses={gudangOptions} />}
           <TabsTrigger value="activity">Log Aktivitas</TabsTrigger>
@@ -201,7 +211,7 @@ export function DeliveriesPage() {
           return (
             <TabsContent key={v} value={v} className="mt-3 space-y-3">
               {activeW && <GudangTabBanner gudangName={activeW.name} count={rows.length} />}
-              <DataTable
+              <OperationalTable
             rows={rows}
             loading={loading}
             search={search}
@@ -210,7 +220,7 @@ export function DeliveriesPage() {
             toolbar={
               <div className="flex max-w-full flex-wrap items-center gap-1.5">
                 {["all", "ASSIGNED", "COMPLETED", "FAILED"].map((s) => (
-                  <Button key={s} size="sm" variant={statusFilter === s ? "default" : "outline"} className="h-7 px-2.5 text-xs" onClick={() => setStatusFilter(s)}>
+                  <Button key={s} size="sm" variant={statusFilter === s ? "default" : "outline"} className="min-h-10 rounded-lg px-3 text-xs" onClick={() => setStatusFilter(s)}>
                     {s === "all" ? "Semua" : s}
                   </Button>
                 ))}
@@ -234,7 +244,7 @@ export function DeliveriesPage() {
                 header: "Penerima",
                 render: (d) => (
                   <div>
-                    <p className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                    <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-foreground">
                       {d.customerName}
                       {d.customerType === "b2b" && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-950 dark:text-sky-300" title="B2B - cukup scan Master Resi sekali">
@@ -374,7 +384,7 @@ export function DeliveriesPage() {
 
       {/* Create / edit dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-h-[90dvh] overflow-y-auto rounded-2xl sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{editTarget ? `Edit Delivery - ${editTarget.deliveryCode}` : "Buat Delivery"}</DialogTitle>
             <DialogDescription>
@@ -419,7 +429,7 @@ export function DeliveriesPage() {
 
       {/* Detail barang dialog - packages of this delivery + handover state */}
       <Dialog open={!!detailTarget} onOpenChange={(open) => !open && setDetailTarget(null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-h-[90dvh] overflow-y-auto rounded-2xl sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <PackageCheck className="h-5 w-5 text-primary" />

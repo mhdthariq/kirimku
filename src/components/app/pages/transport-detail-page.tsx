@@ -30,7 +30,8 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { apiDelete, apiGet, apiPost, hasPermission, type Transport, type TransportDetail, type TransportDropsBoard } from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
-import { DashboardHeading, DashboardMetric } from "@/components/app/dashboard-ui";
+import { DashboardMetric } from "@/components/app/dashboard-ui";
+import { OperationalHeader } from "@/components/app/operational-ui";
 import { PageHeader } from "@/components/app/data-table";
 import { StatusBadge } from "@/components/app/status-badge";
 import { formatDate, formatNumber, formatRupiah } from "@/components/app/form-parts";
@@ -256,7 +257,8 @@ export function TransportDetailPage({ transportId, initialTab }: { transportId: 
         <ArrowLeft className="h-4 w-4" /> {backLabel}
       </Button>
 
-      <DashboardHeading
+      <OperationalHeader
+        icon={<Route className="h-5 w-5" />}
         eyebrow="Detail transport"
         title={transport.transportCode}
         description={`${transport.origin ?? "?"} → ${transport.destination ?? "?"} · ${transport.routeName ?? "tanpa rute"}`}
@@ -327,7 +329,7 @@ export function TransportDetailPage({ transportId, initialTab }: { transportId: 
 
       <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.3fr)]">
         {/* 1. Transport information */}
-        <Card className={driverFocused ? "xl:col-span-2" : undefined}>
+        <Card className={`min-w-0 rounded-2xl shadow-sm ${driverFocused ? "xl:col-span-2" : ""}`}>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
               <Info className="h-4 w-4 text-primary" /> Informasi Transport
@@ -347,7 +349,7 @@ export function TransportDetailPage({ transportId, initialTab }: { transportId: 
         </Card>
 
         {/* 2. Current location map */}
-        {!driverFocused && <Card className="min-w-0">
+        {!driverFocused && <Card className="min-w-0 rounded-2xl shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="flex min-w-0 flex-wrap items-center justify-between gap-3 text-base">
               <span className="flex items-center gap-2">
@@ -375,7 +377,7 @@ export function TransportDetailPage({ transportId, initialTab }: { transportId: 
       </div>
 
       <Tabs key={transport.id} defaultValue={initialTab === "expenses" && canAccessExpenses ? "expenses" : isActivity ? "activity" : "checkpoints"} className="min-w-0">
-        <TabsList className="h-auto min-h-11 rounded-xl p-1">
+        <TabsList className="h-auto min-h-11 flex-wrap justify-start gap-1 rounded-xl p-1 sm:justify-start">
           <TabsTrigger value={isActivity ? "activity" : "checkpoints"}>{isActivity ? "Activity" : "Checkpoint"}</TabsTrigger>
           {canAccessExpenses && <TabsTrigger value="expenses">Biaya Operasional</TabsTrigger>}
         </TabsList>
@@ -385,7 +387,7 @@ export function TransportDetailPage({ transportId, initialTab }: { transportId: 
       ) : (
       <>
       {/* 3. Check-in information per checkpoint */}
-      <Card>
+      <Card className="min-w-0 rounded-2xl shadow-sm">
         <CardHeader className="pb-2">
           <CardTitle className="flex min-w-0 flex-wrap items-center justify-between gap-3 text-base">
             <span className="flex items-center gap-2">
@@ -534,7 +536,7 @@ export function TransportDetailPage({ transportId, initialTab }: { transportId: 
       )}
 
       {/* 4. Shipments in transport + totals (Parts K/L) */}
-      {!driverFocused && <Card>
+      {!driverFocused && <Card className="min-w-0 rounded-2xl shadow-sm">
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-base">
             <Package className="h-4 w-4 text-primary" /> Shipment dalam Transport

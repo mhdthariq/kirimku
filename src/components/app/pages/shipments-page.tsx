@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   Ban,
   Calculator,
+  ChevronDown,
   Package,
   Pencil,
   Plus,
@@ -44,7 +45,8 @@ import {
 import { customerDisplayParts, customerPrimaryName } from "@/presentation/customer-display";
 import { tariffLabel, tariffsForCustomer } from "@/presentation/tariff-form";
 import { runAction, useApiData } from "@/hooks/use-api-data";
-import { PageHeader, DataTable } from "@/components/app/data-table";
+import { PageHeader } from "@/components/app/data-table";
+import { OperationalHeader, OperationalTable, operationalTabsClass } from "@/components/app/operational-ui";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
 import { ItemAuditDialog } from "@/components/app/item-audit-dialog";
 import { StatusBadge } from "@/components/app/status-badge";
@@ -417,8 +419,10 @@ function ShipmentList() {
   const discountIsMarketingFunded = user?.partnerType === "MARKETING";
 
   return (
-    <div className="min-w-0 space-y-5">
-      <PageHeader
+    <div className="min-w-0 space-y-6">
+      <OperationalHeader
+        eyebrow="Operasional pengiriman"
+        note="Kelola booking, harga, pergerakan paket, dan riwayat kiriman."
         title="Shipments"
         subtitle="Kiriman dari pembuatan hingga diterima."
         icon={<Package className="h-5 w-5" />}
@@ -454,7 +458,7 @@ function ShipmentList() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab} className="min-w-0">
-        <TabsList className="h-auto max-w-full flex-wrap justify-start gap-1 rounded-xl p-1.5">
+        <TabsList className={operationalTabsClass}>
           {/* Revise round 8 - Regular / Direct top-level tabs.
               "Regular" = STANDARD fulfillment (kurir → gudang → transport → gudang → kurir).
               "Direct"  = DIRECT fulfillment (driver picks up at origin warehouse → delivers to destination).
@@ -490,7 +494,7 @@ function ShipmentList() {
                   <b>TIBA DI GUDANG TUJUAN</b> - klik <b>Terima / Scan</b> untuk menerima paket.
                 </p>
               )}
-              <DataTable
+              <OperationalTable
             rows={rows}
             loading={loading}
             search={search}
@@ -498,27 +502,33 @@ function ShipmentList() {
             searchPlaceholder="Cari resi / customer / kota…"
             toolbar={
               <div className="grid w-full grid-cols-1 gap-2 min-[400px]:grid-cols-2 sm:flex sm:w-auto sm:flex-wrap">
-                <select aria-label="Filter invoice" value={invoiceFilter} onChange={(e) => setInvoiceFilter(e.target.value)} className="h-10 min-w-0 rounded-lg border bg-background px-3 text-sm">
-                  <option value="all">All invoices</option>
-                  <option value="on_invoice">On invoice</option>
-                  <option value="not_invoice">Not on invoice</option>
-                </select>
-                <select aria-label="Filter status shipment" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-10 min-w-0 rounded-lg border bg-background px-3 text-sm">
-                  {[
-                    { key: "all", label: "All statuses" },
-                    { key: "CREATED", label: "Created" },
-                    { key: "READY_FOR_PICKUP", label: "Ready for Pickup" },
-                    { key: "PICKED_UP", label: "Picked Up" },
-                    { key: "RECEIVED_AT_GUDANG", label: "At Origin Gudang" },
-                    { key: "IN_TRANSPORT", label: "In Transport" },
-                    { key: "AT_DEST_GUDANG", label: "At Dest. Gudang" },
-                    { key: "ARRIVED_AT_GUDANG", label: "Arrived at Gudang" },
-                    { key: "DELIVERED", label: "Delivered" },
-                    { key: "CANCELLED", label: "Cancelled" },
-                  ].map((item) => (
-                    <option key={item.key} value={item.key}>{item.label}</option>
-                  ))}
-                </select>
+                <div className="relative min-w-0">
+                  <select aria-label="Filter invoice" value={invoiceFilter} onChange={(e) => setInvoiceFilter(e.target.value)} className="h-10 w-full min-w-0 appearance-none rounded-lg border bg-background pl-3 pr-10 text-sm">
+                    <option value="all">All invoices</option>
+                    <option value="on_invoice">On invoice</option>
+                    <option value="not_invoice">Not on invoice</option>
+                  </select>
+                  <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                </div>
+                <div className="relative min-w-0">
+                  <select aria-label="Filter status shipment" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-10 w-full min-w-0 appearance-none rounded-lg border bg-background pl-3 pr-10 text-sm">
+                    {[
+                      { key: "all", label: "All statuses" },
+                      { key: "CREATED", label: "Created" },
+                      { key: "READY_FOR_PICKUP", label: "Ready for Pickup" },
+                      { key: "PICKED_UP", label: "Picked Up" },
+                      { key: "RECEIVED_AT_GUDANG", label: "At Origin Gudang" },
+                      { key: "IN_TRANSPORT", label: "In Transport" },
+                      { key: "AT_DEST_GUDANG", label: "At Dest. Gudang" },
+                      { key: "ARRIVED_AT_GUDANG", label: "Arrived at Gudang" },
+                      { key: "DELIVERED", label: "Delivered" },
+                      { key: "CANCELLED", label: "Cancelled" },
+                    ].map((item) => (
+                      <option key={item.key} value={item.key}>{item.label}</option>
+                    ))}
+                  </select>
+                  <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                </div>
               </div>
             }
             emptyMessage="Belum ada shipment. Klik “Buat Shipment” untuk membuat booking baru."
@@ -1159,7 +1169,7 @@ function ScanArrivalPickerDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-xl">
+        <DialogContent className="max-h-[90dvh] overflow-y-auto rounded-2xl sm:max-w-xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <QrCode className="h-5 w-5 text-primary" /> Scan Kedatangan
@@ -1377,7 +1387,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
 
   if (loading) {
     return (
-      <div className="space-y-4">
+      <div className="min-w-0 space-y-6">
         <div className="h-8 w-40 animate-pulse rounded-lg bg-muted" />
         <div className="h-40 animate-pulse rounded-xl bg-muted" />
         <div className="h-64 animate-pulse rounded-xl bg-muted" />
@@ -1387,7 +1397,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
 
   if (error || !shipment) {
     return (
-      <div className="space-y-4">
+      <div className="min-w-0 space-y-6">
         <Button variant="ghost" size="sm" onClick={() => (window.location.hash = "#/shipments")} className="-ml-2">
           <ArrowLeft className="h-4 w-4" /> Kembali
         </Button>
@@ -1705,12 +1715,14 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
   );
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-6">
       <Button variant="ghost" size="sm" onClick={() => (window.location.hash = "#/shipments")} className="-ml-2">
         <ArrowLeft className="h-4 w-4" /> Semua shipment
       </Button>
 
-      <PageHeader
+      <OperationalHeader
+        eyebrow="Detail shipment"
+        icon={<Package className="h-5 w-5" />}
         title={shipment.masterCode}
         subtitle={`${shipment.customer ? customerPrimaryName(shipment.customer) : "-"} · ${shipment.origin} → ${shipment.destination} · dibuat ${formatDate(shipment.createdAt)}`}
         actions={
@@ -1793,10 +1805,10 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
         </p>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-4">
+      <div className="grid min-w-0 gap-4 xl:grid-cols-2">
         {/* Pricing summary */}
-        <Card className="lg:col-span-1">
-          <CardHeader className="pb-3">
+        <Card className="min-w-0 rounded-2xl shadow-sm">
+          <CardHeader className="pb-4">
             <div className="flex items-center justify-between gap-2">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Calculator className="h-4 w-4 text-primary" /> Ringkasan Harga
@@ -1921,8 +1933,8 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
         </Card>
 
         {/* Penerima & Pengirim */}
-        <Card className="lg:col-span-1">
-          <CardHeader className="pb-3">
+        <Card className="min-w-0 rounded-2xl shadow-sm">
+          <CardHeader className="pb-4">
             <div className="flex items-center justify-between gap-2">
               <CardTitle className="flex items-center gap-2 text-base">
                 <UserRound className="h-4 w-4 text-primary" /> Penerima
@@ -1959,8 +1971,8 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
         {/* Pengirim (sender) - was a tiny footer row in the Penerima card;
             now its own card so the four editable fields have room to breathe
             and the user can override them per-shipment. */}
-        <Card className="lg:col-span-1">
-          <CardHeader className="pb-3">
+        <Card className="min-w-0 rounded-2xl shadow-sm">
+          <CardHeader className="pb-4">
             <div className="flex items-center justify-between gap-2">
               <CardTitle className="flex items-center gap-2 text-base">
                 <UserRound className="h-4 w-4 text-primary" /> Pengirim
@@ -1984,8 +1996,8 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
         </Card>
 
         {/* Tracking timeline */}
-        <Card className="lg:col-span-2 lg:col-start-1">
-          <CardHeader className="pb-3">
+        <Card className="min-w-0 rounded-2xl shadow-sm xl:col-span-2">
+          <CardHeader className="pb-4">
             <CardTitle className="flex items-center gap-2 text-base">
               <Truck className="h-4 w-4 text-primary" /> Riwayat Tracking
             </CardTitle>
@@ -2013,7 +2025,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
       </div>
 
       {/* Detail Barang - tabs: Semua (1 baris per paket) / Ringkas (digabung) */}
-      <Card>
+      <Card className="min-w-0 rounded-2xl shadow-sm">
         <CardHeader className="pb-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <CardTitle className="text-base">Detail Barang ({shipment.details.length})</CardTitle>
@@ -2031,12 +2043,12 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
             </p>
           ) : (
             <Tabs defaultValue="all">
-              <TabsList>
+              <TabsList className={operationalTabsClass}>
                 <TabsTrigger value="all">Semua ({shipment.details.length})</TabsTrigger>
                 <TabsTrigger value="grouped">Ringkas ({groupedDetails.length})</TabsTrigger>
               </TabsList>
               <TabsContent value="all" className="mt-3">
-                <DataTable
+                <OperationalTable
                   rows={shipment.details}
                   emptyMessage="-"
                   columns={[
@@ -2094,7 +2106,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
                 />
               </TabsContent>
               <TabsContent value="grouped" className="mt-3">
-                <DataTable
+                <OperationalTable
                   rows={groupedDetails}
                   emptyMessage="-"
                   columns={[
@@ -2154,7 +2166,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="min-w-0 rounded-2xl shadow-sm">
         <CardHeader className="pb-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <CardTitle className="flex items-center gap-2 text-base">
@@ -2211,7 +2223,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
 
       {/* Detail create/edit dialog */}
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-h-[90dvh] overflow-y-auto rounded-2xl sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{editingGroup ? `Edit ${editingGroup.length} Paket - ${editingGroup[0].description}` : editingDetail ? `Edit Detail - ${editingDetail.detailCode}` : "Tambah Detail Barang"}</DialogTitle>
             <DialogDescription>
@@ -2342,7 +2354,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
 
       {/* Penerima edit dialog */}
       <Dialog open={penerimaOpen} onOpenChange={setPenerimaOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-h-[90dvh] overflow-y-auto rounded-2xl sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <UserRound className="h-5 w-5 text-primary" /> Edit Penerima
@@ -2371,7 +2383,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
 
       {/* Pengirim edit dialog */}
       <Dialog open={pengirimOpen} onOpenChange={setPengirimOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-h-[90dvh] overflow-y-auto rounded-2xl sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <UserRound className="h-5 w-5 text-primary" /> Edit Pengirim
@@ -2404,7 +2416,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
       </Dialog>
 
       <Dialog open={pricingOpen} onOpenChange={setPricingOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-h-[90dvh] overflow-y-auto rounded-2xl sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Edit Discount &amp; Asuransi</DialogTitle>
             <DialogDescription>Discount akan dihitung ulang dari harga shipment saat ini. Persentasenya dibuat otomatis oleh sistem.</DialogDescription>
@@ -2472,9 +2484,9 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 text-sm">
-      <span className="shrink-0 text-muted-foreground">{label}</span>
-      <span className="text-right font-semibold text-foreground">{value}</span>
+    <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-3 gap-y-1 text-sm">
+      <span className="min-w-0 break-words text-muted-foreground">{label}</span>
+      <span className="min-w-0 break-words text-right font-semibold text-foreground">{value}</span>
     </div>
   );
 }

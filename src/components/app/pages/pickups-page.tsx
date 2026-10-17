@@ -5,7 +5,8 @@ import { Camera, CheckCircle2, MapPin, Pencil, Phone, Plus, QrCode, Truck, User,
 import { useAuth } from "@/hooks/use-auth";
 import { apiDelete, apiGet, apiPost, apiPut, hasPermission, employeesByPosition, type PickupTask, type Options, type Shipment } from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
-import { PageHeader, DataTable } from "@/components/app/data-table";
+import { PageHeader } from "@/components/app/data-table";
+import { OperationalHeader, OperationalSummary, OperationalTable, operationalTabsClass } from "@/components/app/operational-ui";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
 import { ItemAuditDialog } from "@/components/app/item-audit-dialog";
 import { PhotoDetailDialog } from "@/components/app/photo-detail-dialog";
@@ -178,7 +179,7 @@ export function PickupsPage() {
   ).length;
 
   const tableView = (
-    <DataTable
+    <OperationalTable
       rows={rows}
       loading={loading}
       search={search}
@@ -187,7 +188,7 @@ export function PickupsPage() {
       toolbar={
         <div className="flex max-w-full flex-wrap items-center gap-1.5">
           {["all", "ASSIGNED", "PICKED_UP", "COMPLETED", "CANCELLED"].map((s) => (
-            <Button key={s} size="sm" variant={statusFilter === s ? "default" : "outline"} className="h-7 px-2.5 text-xs" onClick={() => setStatusFilter(s)}>
+            <Button key={s} size="sm" variant={statusFilter === s ? "default" : "outline"} className="min-h-10 rounded-lg px-3 text-xs" onClick={() => setStatusFilter(s)}>
               {s === "all" ? "Semua" : s.replace("_", " ")}
             </Button>
           ))}
@@ -211,7 +212,7 @@ export function PickupsPage() {
           header: "Customer & Alamat Pickup",
           render: (p) => (
             <div className="space-y-1">
-              <p className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+              <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-foreground">
                 {p.customerName}
                 {p.customerType === "b2b" && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-950 dark:text-sky-300" title="B2B - cukup scan Master Resi sekali">
@@ -396,8 +397,10 @@ export function PickupsPage() {
   );
 
   return (
-    <div className="space-y-4">
-      <PageHeader
+    <div className="min-w-0 space-y-6">
+      <OperationalHeader
+        eyebrow="Operasional penjemputan"
+        note="Pantau penugasan kurir, alamat penjemputan, dan progres scan paket."
         title="Pickups"
         subtitle="Penjemputan kiriman oleh kurir dari alamat customer."
         icon={<Truck className="h-5 w-5" />}
@@ -412,9 +415,16 @@ export function PickupsPage() {
           </>
         }
       />
+      <OperationalSummary loading={loading} items={[
+        { label: "Total Tugas", value: data?.length ?? 0 },
+        { label: "Ditugaskan", value: data?.filter((task) => task.status === "ASSIGNED").length ?? 0 },
+        { label: "Dalam Proses", value: data?.filter((task) => task.status === "PICKED_UP").length ?? 0 },
+        { label: "Selesai", value: data?.filter((task) => task.status === "COMPLETED").length ?? 0 },
+      ]} />
+
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
+        <TabsList className={operationalTabsClass}>
           <TabsTrigger value="list">Daftar</TabsTrigger>
           {isOwner && <GudangTabsTriggers warehouses={gudangOptions} />}
           <TabsTrigger value="activity">Log Aktivitas</TabsTrigger>
@@ -435,7 +445,7 @@ export function PickupsPage() {
       </Tabs>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-h-[90dvh] overflow-y-auto rounded-2xl sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{editing ? `Edit Pickup - ${editing.pickupCode}` : "Buat Pickup"}</DialogTitle>
             <DialogDescription>

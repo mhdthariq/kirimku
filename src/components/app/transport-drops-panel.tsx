@@ -58,7 +58,7 @@ export function TransportDropsPanel({
   }
 
   return (
-    <Card>
+    <Card className="min-w-0 rounded-2xl shadow-sm">
       <CardHeader className="pb-2">
         <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-base">
           <span className="flex items-center gap-2">
@@ -90,7 +90,7 @@ export function TransportDropsPanel({
                 </p>
                 <OverallCapacityBadge state={ls.remainingCapacity.overallStatus} className="!text-[10px]" />
               </div>
-              <div className="mt-2 grid grid-cols-3 gap-2">
+              <div className="mt-2 grid min-w-0 grid-cols-1 gap-2 min-[400px]:grid-cols-3">
                 {dims.map(({ label, icon: Icon, unit, digits, init, rem }) => {
                   const droppedPct = init > 0 ? Math.min(100, Math.round(((init - rem) / init) * 100)) : 0;
                   return (
@@ -98,7 +98,7 @@ export function TransportDropsPanel({
                       <div className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
                         <Icon className="h-2.5 w-2.5" />{label}
                       </div>
-                      <p className="mt-0.5 text-xs font-bold tabular-nums text-foreground">
+                      <p className="mt-0.5 break-words text-xs font-bold tabular-nums text-foreground">
                         {formatNumber(rem, digits)}<span className="text-muted-foreground">/{formatNumber(init, digits)} {unit}</span>
                       </p>
                       <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
@@ -122,7 +122,7 @@ export function TransportDropsPanel({
           const cp = board.checkpoints.find((c) => c.id === g.checkpointId);
           return (
             <div key={g.checkpointId ?? "none"} className="rounded-lg border">
-              <div className="flex items-center justify-between gap-2 border-b bg-muted/40 px-3 py-2">
+              <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 border-b bg-muted/40 px-3 py-2">
                 <p className="flex items-center gap-1.5 text-sm font-semibold">
                   <MapPin className="h-3.5 w-3.5 text-primary" />
                   {cp ? `CP${cp.sequence} · ${cp.name}` : "Tujuan akhir"}

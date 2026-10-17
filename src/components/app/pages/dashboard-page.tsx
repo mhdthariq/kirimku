@@ -23,6 +23,7 @@ import {
   ArrowUpCircle,
   MapPin,
 } from "lucide-react";
+import { OperationalHeader } from "@/components/app/operational-ui";
 import { useAuth } from "@/hooks/use-auth";
 import { apiGet, hasPermission, type DashboardData, type DashboardApprovalItem, type GudangDashboardWorkspace, type MarketingDashboardSnapshot } from "@/infrastructure/http/client-api";
 import { useApiData } from "@/hooks/use-api-data";
@@ -32,7 +33,7 @@ import { formatDate, formatNumber, formatRupiah } from "@/components/app/form-pa
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/shared/utils";
-import { DashboardHeading, DashboardMetric, DashboardSectionTitle, DashboardError } from "@/components/app/dashboard-ui";
+import { DashboardMetric, DashboardSectionTitle, DashboardError } from "@/components/app/dashboard-ui";
 import { FleetCapacityWidget } from "@/components/app/capacity-status-card";
 import { CapacityTrendChart } from "@/components/app/capacity-trend-chart";
 
@@ -275,7 +276,7 @@ export function DashboardPage() {
 
   return (
     <div className="dashboard-workspace mx-auto min-w-0 max-w-[1600px] space-y-6 sm:space-y-8">
-      <DashboardHeading
+      <OperationalHeader
         eyebrow="Dashboard operasional"
         title={`${greeting}, ${user?.name?.split(" ")[0] ?? "Anda"}`}
         description={`${roleLabel[data.role]} · Pantau pengiriman, armada, dan aktivitas bisnis Anda.`}

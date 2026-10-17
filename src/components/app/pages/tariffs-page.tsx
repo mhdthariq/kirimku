@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowRight, Building2, CalendarDays, MapPin, Pencil, Plus, Search, Tag, Trash2 } from "lucide-react";
+import { ArrowRight, Building2, CalendarDays, LayoutGrid, MapPin, Pencil, Plus, Search, Table2, Tag, Trash2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type Options, type Tariff } from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
@@ -50,6 +50,7 @@ export function TariffsPage() {
   const { data: options } = useApiData<Options>(() => apiGet<Options>("/options"), []);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("active");
+  const [viewMode, setViewMode] = useState<"card" | "table">("card");
   const [activeTab, setActiveTab] = useState<TariffTab | "activity">("b2c");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogTab, setDialogTab] = useState<TariffTab>("b2c");
@@ -170,9 +171,21 @@ export function TariffsPage() {
         {(["b2c", "b2b"] as const).map((tab) => (
           <TabsContent key={tab} value={tab} className="min-w-0 space-y-4">
             <section className="space-y-4 rounded-2xl border bg-card p-4 sm:p-5" aria-label={`Pengaturan daftar tarif ${tab.toUpperCase()}`}>
-              <div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
                 <h2 className="text-base font-semibold">Tarif {tab.toUpperCase()}</h2>
                 <p className="mt-1 text-sm text-muted-foreground">{tab === "b2b" ? "Harga khusus yang terhubung ke masing-masing customer bisnis." : "Harga pengiriman umum berdasarkan berat, koli, atau volume."}</p>
+                </div>
+                <div role="group" aria-label="Tampilan tarif" className="flex w-full shrink-0 gap-1 rounded-xl border bg-muted/40 p-1 sm:w-auto">
+                  <Button size="sm" variant={viewMode === "table" ? "default" : "ghost"} aria-pressed={viewMode === "table"}
+                    className="min-h-10 flex-1 rounded-lg px-3 sm:flex-none" onClick={() => setViewMode("table")}>
+                    <Table2 aria-hidden="true" className="h-4 w-4" /> Table
+                  </Button>
+                  <Button size="sm" variant={viewMode === "card" ? "default" : "ghost"} aria-pressed={viewMode === "card"}
+                    className="min-h-10 flex-1 rounded-lg px-3 sm:flex-none" onClick={() => setViewMode("card")}>
+                    <LayoutGrid aria-hidden="true" className="h-4 w-4" /> Card
+                  </Button>
+                </div>
               </div>
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div className="relative min-w-0 flex-1 lg:max-w-md">
@@ -186,8 +199,8 @@ export function TariffsPage() {
             </section>
             <p role="status" className="px-1 text-xs text-muted-foreground">{loading ? "Memuat tarif…" : `${rowsByTab[tab].length} tarif ditampilkan`}</p>
             {loading ? (
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label="Memuat tarif">
-                {[0, 1, 2].map((id) => <Skeleton key={id} className="h-80 rounded-2xl" />)}
+              <div className={viewMode === "card" ? "grid gap-4 md:grid-cols-2 xl:grid-cols-3" : "space-y-3"} aria-label="Memuat tarif">
+                {[0, 1, 2].map((id) => <Skeleton key={id} className={viewMode === "card" ? "h-80 rounded-2xl" : "h-16 rounded-xl"} />)}
               </div>
             ) : rowsByTab[tab].length === 0 ? (
               <div className="flex flex-col items-center rounded-2xl border border-dashed bg-card px-5 py-14 text-center">
@@ -196,6 +209,8 @@ export function TariffsPage() {
                 <p className="mt-2 max-w-sm text-sm text-muted-foreground">Coba kata kunci atau filter lain untuk menemukan tarif.</p>
                 {(search || statusFilter !== "active") && <Button variant="outline" className="mt-5 rounded-xl" onClick={() => { setSearch(""); setStatusFilter("active"); }}>Reset Filter</Button>}
               </div>
+            ) : viewMode === "table" ? (
+              <TariffTable rows={rowsByTab[tab]} tab={tab} canUpdate={can.update} onEdit={openEdit} onDelete={setConfirmDelete} />
             ) : (
               <div className="grid items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {rowsByTab[tab].map((tariff) => <TariffCard key={tariff.id} tariff={tariff} canUpdate={can.update} onEdit={openEdit} onDelete={setConfirmDelete} />)}
@@ -260,6 +275,63 @@ function tariffRules(tariff: Tariff): string {
   return `Minimum ${formatNumber(tariff.minChargeableKg)} kg · ${formatNumber(tariff.volumetricMultiplier, 0)} kg/m³ · ${tariff.roundingMode === "UP" ? "round up" : "nearest"} ${formatNumber(tariff.roundingUnitKg)} kg`;
 }
 
+function tariffRate(tariff: Tariff): number {
+  const method = tariff.pricingMethod ?? "PER_KG";
+  return method === "PER_KOLI" ? tariff.ratePerKoli ?? 0 : method === "PER_CUBIC" ? tariff.ratePerCubic ?? 0 : tariff.ratePerKg;
+}
+
+function TariffTable({ rows, tab, canUpdate, onEdit, onDelete }: {
+  rows: Tariff[];
+  tab: TariffTab;
+  canUpdate: boolean;
+  onEdit: (tariff: Tariff) => void;
+  onDelete: (tariff: Tariff) => void;
+}) {
+  const headingClass = "whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-muted-foreground";
+  return (
+    <div role="region" aria-label="Tabel tarif" tabIndex={0} className="max-w-full overflow-x-auto rounded-2xl border bg-card shadow-sm focus-visible:outline-2 focus-visible:outline-primary">
+      <table aria-label={`Tarif ${tab.toUpperCase()}`} className="w-full min-w-[760px] text-sm">
+        <thead className="border-b bg-muted/50">
+          <tr>
+            <th scope="col" className={headingClass}>Tarif &amp; Rute</th>
+            {tab === "b2b" && <th scope="col" className={headingClass}>Customer</th>}
+            <th scope="col" className={headingClass}>Harga</th>
+            <th scope="col" className={headingClass}>Aturan</th>
+            <th scope="col" className={headingClass}>Berlaku</th>
+            {canUpdate && <th scope="col" className={headingClass}>Aksi</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((tariff) => (
+            <tr key={tariff.id} className="border-b transition-colors last:border-0 hover:bg-muted/30">
+              <th scope="row" className="min-w-48 max-w-72 px-4 py-4 text-left align-top font-normal">
+                <p className="break-words font-semibold">{tariff.name || "Tanpa nama"}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{tariff.origin} → {tariff.destination}</p>
+              </th>
+              {tab === "b2b" && <td className="min-w-40 max-w-64 break-words px-4 py-4 align-top">{tariff.customer ? customerPrimaryName({ ...tariff.customer, type: "b2b" }) : "Belum terikat customer"}</td>}
+              <td className="px-4 py-4 align-top">
+                <p className="whitespace-nowrap font-semibold tabular-nums">Rp{tariffRate(tariff).toLocaleString("id-ID")}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{PRICING_METHOD_LABEL[tariff.pricingMethod ?? "PER_KG"]}</p>
+              </td>
+              <td className="min-w-48 max-w-64 px-4 py-4 align-top text-xs leading-relaxed text-muted-foreground">{tariffRules(tariff)}</td>
+              <td className="px-4 py-4 align-top text-xs">
+                <p className="whitespace-nowrap">{formatDate(tariff.effectiveFrom)}</p>
+                <p className="mt-1 whitespace-nowrap text-muted-foreground">s.d. {tariff.effectiveTo ? formatDate(tariff.effectiveTo) : "Tanpa batas"}</p>
+              </td>
+              {canUpdate && <td className="px-4 py-3 align-top">
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="icon" className="h-10 w-10" onClick={() => onEdit(tariff)} aria-label={`Edit tarif ${tariff.name || tariffLabel(tariff)}`}><Pencil className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="h-10 w-10 text-destructive hover:text-destructive" onClick={() => onDelete(tariff)} aria-label={`Hapus tarif ${tariff.name || tariffLabel(tariff)}`}><Trash2 className="h-4 w-4" /></Button>
+                </div>
+              </td>}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function TariffCard({ tariff, canUpdate, onEdit, onDelete }: {
   tariff: Tariff;
   canUpdate: boolean;
@@ -267,7 +339,7 @@ function TariffCard({ tariff, canUpdate, onEdit, onDelete }: {
   onDelete: (tariff: Tariff) => void;
 }) {
   const method = tariff.pricingMethod ?? "PER_KG";
-  const rate = method === "PER_KOLI" ? tariff.ratePerKoli ?? 0 : method === "PER_CUBIC" ? tariff.ratePerCubic ?? 0 : tariff.ratePerKg;
+  const rate = tariffRate(tariff);
   const unit = method === "PER_KOLI" ? "Per koli" : method === "PER_CUBIC" ? "Per m³" : "Per kg";
   return (
     <article aria-label={tariffLabel(tariff)} className="flex min-w-0 flex-col overflow-hidden rounded-2xl border bg-card shadow-sm transition-shadow hover:shadow-md">

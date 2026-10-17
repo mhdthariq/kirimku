@@ -5,7 +5,8 @@ import { CheckCheck, Truck, Undo2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { apiGet, apiPost, hasPermission, type ReturnTaskRow } from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
-import { PageHeader, DataTable } from "@/components/app/data-table";
+import { PageHeader } from "@/components/app/data-table";
+import { OperationalHeader, OperationalSummary, OperationalTable, operationalTabsClass } from "@/components/app/operational-ui";
 import { StatusBadge } from "@/components/app/status-badge";
 import { Field, SubmitButton, formatDate } from "@/components/app/form-parts";
 import { Button } from "@/components/ui/button";
@@ -76,14 +77,23 @@ export function ReturnTasksPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <PageHeader
+    <div className="min-w-0 space-y-6">
+      <OperationalHeader
+        eyebrow="Operasional tugas balik"
+        note="Pantau persetujuan dan perjalanan kendaraan kembali ke gudang asal."
         title="Resi Tugas Balik"
         subtitle="Kendaraan kosong yang kembali ke asal setelah seluruh resi disetujui. Dibuat dari halaman detail transport."
         icon={<Undo2 className="h-5 w-5" />}
       />
+      <OperationalSummary loading={loading} items={[
+        { label: "Hasil Filter", value: rows.length },
+        { label: "Menunggu Approval", value: rows.filter((task) => task.status === "CREATED").length },
+        { label: "Siap Direncanakan", value: rows.filter((task) => task.status === "APPROVED").length },
+        { label: "Dalam Perjalanan", value: rows.filter((task) => task.status === "DEPARTED").length },
+      ]} />
+
       <Tabs value={filter} onValueChange={setFilter}>
-        <TabsList className="flex-wrap">
+        <TabsList className={operationalTabsClass}>
           {FILTERS.map((f) => (
             <TabsTrigger key={f.value} value={f.value}>
               {f.label}
@@ -91,7 +101,7 @@ export function ReturnTasksPage() {
           ))}
         </TabsList>
       </Tabs>
-      <DataTable
+      <OperationalTable
         rows={rows}
         loading={loading}
         search={search}
@@ -177,7 +187,7 @@ export function ReturnTasksPage() {
       />
 
       <Dialog open={!!transportFor} onOpenChange={(o) => !o && setTransportFor(null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-h-[90dvh] overflow-y-auto rounded-2xl sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Buat Transport Balik</DialogTitle>
             <DialogDescription>

@@ -271,7 +271,7 @@ function QrScanSession({ open, onOpenChange, mode, task, onDone }: QrScanDialogP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100%-1rem)] max-h-[calc(100dvh-1rem)] gap-3 p-3 sm:max-w-lg sm:gap-4 sm:p-6">
+      <DialogContent className="w-[calc(100%-1rem)] max-h-[calc(100dvh-1rem)] overflow-y-auto rounded-2xl gap-3 p-3 sm:max-w-lg sm:gap-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="flex items-start gap-2 pr-6 text-base leading-snug sm:text-lg">
             <QrCode className="h-5 w-5 text-primary" />
@@ -323,7 +323,7 @@ function QrScanSession({ open, onOpenChange, mode, task, onDone }: QrScanDialogP
 
         {/* Progress */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
             <span className="font-medium text-foreground">
               {progress?.isB2B
                 ? progress.masterScanned

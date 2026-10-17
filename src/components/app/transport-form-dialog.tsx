@@ -232,7 +232,7 @@ function TransportFormSession({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+      <DialogContent className="max-h-[90dvh] overflow-y-auto rounded-2xl sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{editing ? `Edit Transport - ${editing.transportCode}` : "Rencanakan Transport"}</DialogTitle>
           <DialogDescription>

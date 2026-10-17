@@ -38,7 +38,7 @@ export function TransportActivitiesPanel({ transportId, canCreate, onChanged }: 
   }
 
   return (
-    <Card>
+    <Card className="min-w-0 rounded-2xl shadow-sm">
       <CardHeader>
         <CardTitle className="text-base">Activity Tracking (Tanpa Checkpoint)</CardTitle>
       </CardHeader>

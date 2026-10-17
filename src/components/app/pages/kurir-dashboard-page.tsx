@@ -12,6 +12,7 @@ import {
   QrCode,
   Truck,
 } from "lucide-react";
+import { OperationalHeader } from "@/components/app/operational-ui";
 import { useAuth } from "@/hooks/use-auth";
 import { apiGet, type PickupTask, type DeliveryTask } from "@/infrastructure/http/client-api";
 import { useApiData } from "@/hooks/use-api-data";
@@ -123,16 +124,14 @@ export function KurirDashboard() {
   ];
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-            {greeting}, {user?.name.split(" ")[0]}
-          </h1>
-          <p className="text-sm text-muted-foreground">Dashboard operasional kurir - tugas pickup & delivery Anda.</p>
-        </div>
-        <DatePeriodFilter from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t); }} />
-      </div>
+    <div className="min-w-0 space-y-6">
+      <OperationalHeader
+        eyebrow="Dashboard operasional kurir"
+        title={`${greeting}, ${user?.name?.split(" ")[0] ?? "Anda"}`}
+        subtitle="Pantau tugas pickup, delivery, dan progres serah terima paket Anda."
+        icon={<Truck className="h-5 w-5" />}
+        actions={<DatePeriodFilter from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t); }} />}
+      />
 
       {data.note && (
         <p className="rounded-lg border border-amber-300 bg-amber-50/60 px-3.5 py-2.5 text-sm text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">{data.note}</p>
