@@ -90,7 +90,7 @@ export function InvoicePrint({
         <div
             id="invoice-print-portal"
             data-print-portal
-            className="fixed inset-0 z-[80] overflow-y-auto bg-neutral-200 dark:bg-neutral-900"
+            className="fixed inset-0 z-[80] overflow-auto bg-neutral-200 dark:bg-neutral-900"
         >
             <div
                 data-print-toolbar
@@ -102,7 +102,8 @@ export function InvoicePrint({
                     </p>
                     <p className="truncate text-xs text-muted-foreground">
                         {invoice.invoiceNumber} · A4 (210 × 297 mm) · siap
-                        dicetak atau disimpan sebagai PDF
+                        dicetak atau disimpan sebagai PDF · skala 100%, margin
+                        Tidak Ada, header/footer browser nonaktif
                     </p>
                     {printByLabel && (
                         <p className="mt-1 text-xs text-muted-foreground">
@@ -138,7 +139,7 @@ export function InvoicePrint({
                 className="a4-sheet invoice-sheet mx-auto my-6 bg-white text-neutral-900 shadow-xl"
                 aria-label={`Invoice ${invoice.invoiceNumber}`}
             >
-                <header className="flex flex-col justify-between gap-8 border-b-2 border-neutral-900 pb-7 sm:flex-row">
+                <header className="flex flex-row justify-between gap-8 border-b-2 border-neutral-900 pb-7">
                     <div>
                         <p className="text-2xl font-black tracking-tight">
                             {displayCompanyName}
@@ -147,14 +148,14 @@ export function InvoicePrint({
                             {COMPANY_TAGLINE}
                         </p>
                     </div>
-                    <div className="sm:text-right">
+                    <div className="text-right">
                         <p className="text-3xl font-black tracking-tight text-emerald-700">
                             INVOICE
                         </p>
                         <p className="mt-1 font-mono text-sm font-bold">
                             {invoice.invoiceNumber}
                         </p>
-                        <div className="mt-2 flex items-center gap-2 sm:justify-end">
+                        <div className="mt-2 flex items-center justify-end gap-2">
                             <StatusBadge status={invoice.status} />
                             {invoice.isOverdue && (
                                 <span className="text-[10px] font-bold text-red-600">
@@ -164,7 +165,7 @@ export function InvoicePrint({
                         </div>
                     </div>
                 </header>
-                <section className="invoice-parties grid gap-7 border-b py-7 text-sm sm:grid-cols-[1fr_1fr_160px]">
+                <section className="invoice-parties grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_160px] gap-7 border-b py-7 text-sm">
                     <div>
                         <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
                             Ditagihkan kepada
@@ -207,7 +208,7 @@ export function InvoicePrint({
                             </div>
                         </dl>
                     </div>
-                    <div className="border-l border-neutral-200 pl-4 sm:text-right">
+                    <div className="border-l border-neutral-200 pl-4 text-right">
                         <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
                             Jumlah jatuh tempo
                         </p>
@@ -219,8 +220,8 @@ export function InvoicePrint({
                         </p>
                     </div>
                 </section>
-                <section className="invoice-items overflow-x-auto py-7">
-                    <table className="w-full min-w-130 text-sm">
+                <section className="invoice-items py-7">
+                    <table className="w-full text-sm">
                         <thead>
                             <tr className="border-b-2 border-neutral-900 text-left text-[10px] uppercase tracking-wider text-neutral-500">
                                 <th className="pb-3">Deskripsi</th>
@@ -265,7 +266,7 @@ export function InvoicePrint({
                     </table>
                 </section>
                 <section
-                    className="invoice-summary grid items-start gap-8 border-t-2 border-neutral-900 pt-4 sm:grid-cols-2"
+                    className="invoice-summary grid grid-cols-2 items-start gap-8 border-t-2 border-neutral-900 pt-4"
                     aria-label="Ringkasan pembayaran"
                 >
                     <div className="min-w-0">
@@ -339,7 +340,7 @@ export function InvoicePrint({
                 </section>
                 {(Boolean(invoice.notes) ||
                     (invoice.settlements?.length ?? 0) > 0) && (
-                    <section className="invoice-notes mt-8 grid gap-8 border-t pt-6 text-xs sm:grid-cols-2">
+                    <section className="invoice-notes mt-8 grid grid-cols-2 gap-8 border-t pt-6 text-xs">
                         <div>
                             {invoice.notes && (
                                 <>

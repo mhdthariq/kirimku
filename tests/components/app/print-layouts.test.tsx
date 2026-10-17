@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { render, screen, waitFor } from "@testing-library/react";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ComponentProps } from "react";
@@ -32,6 +32,53 @@ beforeEach(() => {
 });
 
 describe("document and shipment print layouts", () => {
+    it("preserves physical A4 geometry instead of depending on browser margins", () => {
+        const css = readFileSync("src/app/globals.css", "utf8");
+        const printCss = css.slice(css.indexOf("@media print"));
+        const sheet = printCss.match(/\.a4-sheet\s*\{([^}]+)\}/)?.[1];
+        expect(printCss).toMatch(
+            /@page\s*\{\s*size: A4 portrait;\s*margin: 0;/,
+        );
+        expect(sheet).toContain("width: 210mm !important;");
+        expect(sheet).toContain("min-height: 297mm !important;");
+        expect(sheet).toContain("padding: 12mm !important;");
+        expect(sheet).toContain("box-decoration-break: clone;");
+        expect(printCss).not.toMatch(/\.invoice-sheet\s*\{[^}]*display: block/);
+        expect(printCss).not.toMatch(
+            /\.invoice-print-footer\s*\{[^}]*position: fixed/,
+        );
+        expect(printCss).toMatch(
+            /@page shipment-label\s*\{\s*size: 100mm 100mm;\s*margin: 0;/,
+        );
+    });
+
+    it("uses the same invoice columns and table layout at every preview width", () => {
+        render(
+            <InvoicePrint
+                invoice={{ ...invoice, notes: "Catatan pengiriman" }}
+                onClose={() => {}}
+            />,
+        );
+        const article = screen.getByRole("article");
+        expect(article.querySelector("header")).toHaveClass("flex-row");
+        expect(article.querySelector(".invoice-parties")).toHaveClass(
+            "grid-cols-[minmax(0,1fr)_minmax(0,1fr)_160px]",
+        );
+        expect(article.querySelector(".invoice-summary")).toHaveClass(
+            "grid-cols-2",
+        );
+        expect(article.querySelector(".invoice-notes")).toHaveClass(
+            "grid-cols-2",
+        );
+        expect(article.querySelector(".invoice-items")).not.toHaveClass(
+            "overflow-x-auto",
+        );
+        expect(article.querySelector("table")).not.toHaveClass("min-w-130");
+        expect(article.querySelector("footer")).toHaveTextContent(
+            "INV-PRINT-QA",
+        );
+    });
+
   it.each([[], undefined])("does not render a stray zero for an unpaid invoice with settlements %j", (settlements) => {
     render(<InvoicePrint invoice={{ ...invoice, settlements }} onClose={() => {}} />);
     const article = screen.getByRole("article");

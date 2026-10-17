@@ -100,9 +100,12 @@ export function TransportManifestPrint({ transportId, onClose }: TransportManife
 
   return createPortal(
     <>
-      <div id="manifest-print-portal" data-print-portal className="fixed inset-0 z-[100] overflow-y-auto bg-neutral-200 p-4 dark:bg-neutral-900 print:bg-white print:p-0">
+      <div id="manifest-print-portal" data-print-portal className="fixed inset-0 z-[100] overflow-auto bg-neutral-200 p-4 dark:bg-neutral-900 print:bg-white print:p-0">
         <div data-print-toolbar className="manifest-toolbar mx-auto mb-3 flex max-w-205 items-center justify-between print:hidden">
-          <p className="text-sm font-semibold text-foreground">Pratinjau Manifest Transport · A4 (210 × 297 mm)</p>
+          <div>
+            <p className="text-sm font-semibold text-foreground">Pratinjau Manifest Transport · A4 (210 × 297 mm)</p>
+            <p className="text-xs text-muted-foreground">Skala 100%, margin Tidak Ada, header/footer browser nonaktif.</p>
+          </div>
           <div className="flex gap-2">
             <Button size="sm" onClick={doPrint} disabled={!ready || !transport}>
               <Printer className="h-3.5 w-3.5" /> Cetak / Simpan PDF

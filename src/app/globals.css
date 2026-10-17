@@ -260,11 +260,12 @@
     }
 }
 
-/* A4 preview includes the same 12mm margins as the printed page. */
+/* Paper geometry belongs to the document, not the print dialog's margins.
+   Keep the preview at physical size even on narrow screens (scroll to view). */
 .a4-sheet {
     box-sizing: border-box;
     width: 210mm;
-    max-width: 100%;
+    max-width: none;
     min-height: 297mm;
     padding: 12mm;
     background: #fff;
@@ -274,6 +275,12 @@
 .invoice-sheet {
     display: flex;
     flex-direction: column;
+}
+.invoice-sheet > * {
+    flex-shrink: 0;
+}
+.invoice-items table {
+    table-layout: fixed;
 }
 .invoice-summary .invoice-payment-account {
     margin-top: 0;
@@ -314,11 +321,7 @@
 @media print {
     @page {
         size: A4 portrait;
-        margin: 12mm;
-    }
-    @page invoice {
-        size: A4 portrait;
-        margin: 12mm 12mm 28mm;
+        margin: 0;
     }
     @page shipment-label {
         size: 100mm 100mm;
@@ -355,12 +358,15 @@
         display: none !important;
     }
     .a4-sheet {
-        width: 100% !important;
+        width: 210mm !important;
         max-width: none !important;
-        min-height: 0 !important;
+        min-height: 297mm !important;
         height: auto !important;
         margin: 0 !important;
-        padding: 0 !important;
+        padding: 12mm !important;
+        /* Repeat the safe inset when a long document spans multiple pages. */
+        -webkit-box-decoration-break: clone;
+        box-decoration-break: clone;
         border: none !important;
         border-radius: 0 !important;
         box-shadow: none !important;
@@ -380,38 +386,8 @@
     .invoice-payment-account {
         break-inside: avoid;
     }
-    #invoice-print-portal {
-        page: invoice;
-    }
-    .invoice-sheet {
-        display: block;
-    }
-    .invoice-sheet header {
-        flex-direction: row;
-    }
     .invoice-summary {
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         break-inside: avoid;
-    }
-    /* The larger bottom page margin reserves space for this repeating footer. */
-    .invoice-print-footer {
-        position: fixed;
-        bottom: -20mm;
-        left: 0;
-        right: 0;
-        height: 16mm;
-        margin: 0;
-        background: white;
-    }
-    .invoice-parties {
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 160px;
-    }
-    .invoice-items {
-        overflow: visible !important;
-    }
-    .invoice-items table {
-        min-width: 0 !important;
-        table-layout: fixed;
     }
     #resi-print-portal {
         page: shipment-label;
