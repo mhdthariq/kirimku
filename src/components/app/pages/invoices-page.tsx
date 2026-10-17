@@ -1,918 +1,1978 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Edit, Eye, Paperclip, Plus, Printer, Receipt, Send, Trash2, Wallet } from "lucide-react";
+import {
+    Edit,
+    Paperclip,
+    Plus,
+    Printer,
+    Receipt,
+    Send,
+    Trash2,
+    Wallet,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
-import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type BankAccount, type Invoice, type InvoiceLine, type InvoiceSettlement, type Options } from "@/infrastructure/http/client-api";
+import {
+    apiDelete,
+    apiGet,
+    apiPost,
+    apiPut,
+    hasPermission,
+    type BankAccount,
+    type Invoice,
+    type InvoiceLine,
+    type InvoiceSettlement,
+    type Options,
+} from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
 import { StatusBadge } from "@/components/app/status-badge";
-import { Field, FormSelect, Input, NumberInput, SubmitButton, formatDate, formatNumber, formatRupiah } from "@/components/app/form-parts";
+import {
+    Field,
+    FormSelect,
+    Input,
+    NumberInput,
+    SubmitButton,
+    formatDate,
+    formatNumber,
+    formatRupiah,
+} from "@/components/app/form-parts";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { InvoicePaymentAccount } from "@/components/app/invoice-payment-account";
 import { InvoicePrint } from "@/components/app/invoice-print";
 import { openDataUrlInNewTab } from "@/presentation/open-data-url";
 
 interface DraftLine {
-  description: string;
-  quantity: string;
-  unitPrice: string;
-  /** Revise.md §7.1 — optional link to the billed B2B shipment */
-  shipmentId: string;
+    description: string;
+    quantity: string;
+    unitPrice: string;
+    /** Revise.md §7.1 — optional link to the billed B2B shipment */
+    shipmentId: string;
 }
 
 interface InvoiceForm {
-  bankAccountId: string;
-  customerId: string;
-  issueDate: string;
-  dueDate: string;
-  discount: string;
-  rounding: string;
-  notes: string;
-  lines: DraftLine[];
+    bankAccountId: string;
+    customerId: string;
+    issueDate: string;
+    dueDate: string;
+    discount: string;
+    rounding: string;
+    notes: string;
+    lines: DraftLine[];
 }
 
 const EMPTY: InvoiceForm = {
-  bankAccountId: "",
-  customerId: "",
-  issueDate: new Date().toISOString().slice(0, 10),
-  dueDate: "",
-  discount: "0",
-  rounding: "0",
-  notes: "",
-  lines: [{ description: "", quantity: "1", unitPrice: "", shipmentId: "" }],
+    bankAccountId: "",
+    customerId: "",
+    issueDate: new Date().toISOString().slice(0, 10),
+    dueDate: "",
+    discount: "0",
+    rounding: "0",
+    notes: "",
+    lines: [{ description: "", quantity: "1", unitPrice: "", shipmentId: "" }],
 };
 
 export function InvoicesPage() {
-  const { user } = useAuth();
-  const can = {
-    view: hasPermission(user, "invoice.view"),
-    create: hasPermission(user, "invoice.create"),
-    update: hasPermission(user, "invoice.update"),
-    send: hasPermission(user, "invoice.send"),
-    settle: hasPermission(user, "payment.verify"),
-    editSettlement: hasPermission(user, "invoice.settlement.update"),
-    deleteSettlement: hasPermission(user, "invoice.settlement.delete"),
-  };
-
-  const { data, loading, reload } = useApiData<Invoice[]>(() => apiGet<Invoice[]>("/invoices"), []);
-  const { data: options } = useApiData<Options>(() => apiGet<Options>("/options"), []);
-  const { data: bankAccounts } = useApiData<BankAccount[]>(() => can.create || can.update ? apiGet<BankAccount[]>("/bank-accounts?active=true") : Promise.resolve([]), [can.create, can.update]);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [createOpen, setCreateOpen] = useState(false);
-  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
-  const [form, setForm] = useState<InvoiceForm>(EMPTY);
-  const [busy, setBusy] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState<Invoice | null>(null);
-  const [shipmentPickerOpen, setShipmentPickerOpen] = useState(false);
-  const [detail, setDetail] = useState<Invoice | null>(null);
-  const [settleOpen, setSettleOpen] = useState(false);
-  const [settleTarget, setSettleTarget] = useState<Invoice | null>(null);
-  const [editingSettlement, setEditingSettlement] = useState<InvoiceSettlement | null>(null);
-  const [deletingSettlement, setDeletingSettlement] = useState<InvoiceSettlement | null>(null);
-  const [settleAmount, setSettleAmount] = useState("");
-  const [settlePph, setSettlePph] = useState("");
-  const [settleMethod, setSettleMethod] = useState("TRANSFER");
-  const [settleRef, setSettleRef] = useState("");
-  const [settleDate, setSettleDate] = useState(new Date().toISOString().slice(0, 10));
-  const [settleProof, setSettleProof] = useState<{ name: string; type: string; dataUrl: string } | null>(null);
-  const [settleProofError, setSettleProofError] = useState("");
-  const [printOpen, setPrintOpen] = useState(false);
-
-  const rows = useMemo(() => {
-    if (!data) return [];
-    const q = search.toLowerCase();
-    return data.filter(
-      (inv) =>
-        (statusFilter === "all" || inv.status === statusFilter) &&
-        (!q || inv.invoiceNumber.toLowerCase().includes(q) || inv.customerName.toLowerCase().includes(q)),
-    );
-  }, [data, search, statusFilter]);
-
-  const detailWithLines = useMemo(() => {
-    return detail;
-  }, [detail]);
-
-  async function loadDetail(inv: Invoice) {
-    try {
-      const full = await apiGet<Invoice & { lines: InvoiceLine[] }>(`/invoices/${inv.id}`);
-      setDetail(full);
-    } catch {
-      toast.error("Gagal memuat detail invoice.");
-    }
-  }
-
-  function openCreate() {
-    setEditingInvoice(null);
-    setForm({ ...EMPTY, lines: [{ description: "", quantity: "1", unitPrice: "", shipmentId: "" }] });
-    setCreateOpen(true);
-  }
-
-  async function openEdit(inv: Invoice) {
-    try {
-      const full = await apiGet<Invoice & { lines: InvoiceLine[] }>(`/invoices/${inv.id}`);
-      if (full.status !== "DRAFT") return;
-      setEditingInvoice(full);
-      setForm({
-        bankAccountId: full.bankAccountId ? String(full.bankAccountId) : "",
-        customerId: String(full.customerId),
-        issueDate: full.issueDate?.slice(0, 10) ?? "",
-        dueDate: full.dueDate?.slice(0, 10) ?? "",
-        discount: String(full.discount),
-        rounding: String(full.rounding),
-        notes: full.notes ?? "",
-        lines: full.lines.map((line) => ({ description: line.description, quantity: String(line.quantity), unitPrice: String(line.unitPrice), shipmentId: line.shipmentId ? String(line.shipmentId) : "" })),
-      });
-      setCreateOpen(true);
-    } catch {
-      toast.error("Gagal memuat invoice untuk diedit.");
-    }
-  }
-
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    const payload = {
-      bankAccountId: form.bankAccountId ? Number(form.bankAccountId) : null,
-      customerId: Number(form.customerId),
-      issueDate: form.issueDate || null,
-      dueDate: form.dueDate || null,
-      discount: Number(form.discount) || 0,
-      rounding: Number(form.rounding) || 0,
-      notes: form.notes || null,
-      lines: form.lines
-        .filter((l) => l.description.trim() && Number(l.unitPrice) > 0)
-        .map((l) => ({
-          description: l.description,
-          quantity: Number(l.quantity) || 1,
-          unitPrice: Number(l.unitPrice),
-          // Revise.md §7.1 — link the line to its B2B shipment so the
-          // Marketing commission attaches to this invoice (§8).
-          shipmentId: l.shipmentId ? Number(l.shipmentId) : null,
-        })),
+    const { user } = useAuth();
+    const can = {
+        view: hasPermission(user, "invoice.view"),
+        create: hasPermission(user, "invoice.create"),
+        update: hasPermission(user, "invoice.update"),
+        send: hasPermission(user, "invoice.send"),
+        settle: hasPermission(user, "payment.verify"),
+        editSettlement: hasPermission(user, "invoice.settlement.update"),
+        deleteSettlement: hasPermission(user, "invoice.settlement.delete"),
     };
-    const ok = await runAction(
-      () => (editingInvoice ? apiPut(`/invoices/${editingInvoice.id}`, payload) : apiPost("/invoices", payload)),
-      { success: editingInvoice ? "Invoice draft diperbarui." : "Invoice draft dibuat - komisi Marketing (bila ada) otomatis terlacak PENDING." },
+
+    const { data, loading, reload } = useApiData<Invoice[]>(
+        () => apiGet<Invoice[]>("/invoices"),
+        [],
     );
-    setBusy(false);
-    if (ok) {
-      setCreateOpen(false);
-      setEditingInvoice(null);
-      reload();
-    }
-  }
-
-  async function onSend(inv: Invoice) {
-    const ok = await runAction(() => apiPost(`/invoices/${inv.id}/send`, {}), {
-      success: `Invoice ${inv.invoiceNumber} dikirim - baris item terkunci.`,
-    });
-    if (ok) reload();
-  }
-
-  async function onDelete() {
-    if (!confirmDelete) return;
-    const target = confirmDelete;
-    setConfirmDelete(null);
-    const ok = await runAction(() => apiDelete(`/invoices/${target.id}`), { success: "Invoice dihapus." });
-    if (ok) reload();
-  }
-
-  async function onSettle(e: React.FormEvent) {
-    e.preventDefault();
-    // Use the invoice the user clicked on (settleTarget) — not the
-    // async-loaded `detail` — so the settle never silently no-ops while
-    // the detail fetch is in flight. This was the root cause of the
-    // "Settle doesn't work" bug: the dialog opened before `detail` was
-    // populated, and the early `if (!detail) return;` swallowed the
-    // submit without any user feedback.
-    const target = settleTarget ?? detail;
-    if (!target) {
-      toast.error("Pilih invoice yang akan di-settle.");
-      return;
-    }
-    const amount = Number(settleAmount);
-    const pph = Number(settlePph || 0);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      toast.error("Jumlah settlement harus lebih dari 0.");
-      return;
-    }
-    if (!Number.isFinite(pph) || pph < 0 || pph > amount) {
-      toast.error("PPh harus antara 0 dan jumlah pembayaran.");
-      return;
-    }
-    if (amount > target.remainingAmount + (editingSettlement?.amount ?? 0) + 0.01) {
-      toast.error("Pembayaran melebihi sisa tagihan.");
-      return;
-    }
-    setBusy(true);
-    const payload = {
-      amount, pph, method: settleMethod, reference: settleRef || null,
-      settledAt: editingSettlement && settleDate === editingSettlement.settledAt.slice(0, 10) ? editingSettlement.settledAt : settleDate || null,
-      proofUrl: settleProof?.dataUrl ?? null,
-    };
-    const ok = await runAction(
-      () => editingSettlement
-        ? apiPut(`/invoices/${target.id}/settlements/${editingSettlement.id}`, payload)
-        : apiPost(`/invoices/${target.id}/settlements`, payload),
-      {
-        success: editingSettlement ? "Settlement diperbarui. Total invoice dihitung ulang." : "Pembayaran dicatat. PPh termasuk dalam jumlah pembayaran.",
-      },
+    const { data: options } = useApiData<Options>(
+        () => apiGet<Options>("/options"),
+        [],
     );
-    setBusy(false);
-    if (ok) {
-      setSettleOpen(false);
-      setSettleTarget(null);
-      setEditingSettlement(null);
-      setSettleAmount("");
-      setSettlePph("");
-      setSettleRef("");
-      setSettleDate(new Date().toISOString().slice(0, 10));
-      setSettleProof(null);
-      setSettleProofError("");
-      reload();
-      // Refresh the detail dialog if it's open on this same invoice.
-      if (detail && detail.id === target.id) loadDetail(target);
-    }
-  }
+    const { data: bankAccounts } = useApiData<BankAccount[]>(
+        () =>
+            can.create || can.update
+                ? apiGet<BankAccount[]>("/bank-accounts?active=true")
+                : Promise.resolve([]),
+        [can.create, can.update],
+    );
+    const [search, setSearch] = useState("");
+    const [statusFilter, setStatusFilter] = useState("all");
+    const [createOpen, setCreateOpen] = useState(false);
+    const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
+    const [form, setForm] = useState<InvoiceForm>(EMPTY);
+    const [busy, setBusy] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState<Invoice | null>(null);
+    const [shipmentPickerOpen, setShipmentPickerOpen] = useState(false);
+    const [detail, setDetail] = useState<Invoice | null>(null);
+    const [settleOpen, setSettleOpen] = useState(false);
+    const [settleTarget, setSettleTarget] = useState<Invoice | null>(null);
+    const [editingSettlement, setEditingSettlement] =
+        useState<InvoiceSettlement | null>(null);
+    const [deletingSettlement, setDeletingSettlement] =
+        useState<InvoiceSettlement | null>(null);
+    const [settleAmount, setSettleAmount] = useState("");
+    const [settlePph, setSettlePph] = useState("");
+    const [settleMethod, setSettleMethod] = useState("TRANSFER");
+    const [settleRef, setSettleRef] = useState("");
+    const [settleDate, setSettleDate] = useState(
+        new Date().toISOString().slice(0, 10),
+    );
+    const [settleProof, setSettleProof] = useState<{
+        name: string;
+        type: string;
+        dataUrl: string;
+    } | null>(null);
+    const [settleProofError, setSettleProofError] = useState("");
+    const [printOpen, setPrintOpen] = useState(false);
 
-  function openSettlementEdit(settlement: InvoiceSettlement) {
-    if (!detail) return;
-    setSettleTarget(detail);
-    setEditingSettlement(settlement);
-    setSettleAmount(String(settlement.amount));
-    setSettlePph(String(settlement.pph));
-    setSettleMethod(settlement.method);
-    setSettleRef(settlement.reference ?? "");
-    setSettleDate(settlement.settledAt.slice(0, 10));
-    setSettleProof(settlement.proofUrl ? { name: "Bukti tersimpan", type: settlement.proofUrl.startsWith("data:image/") ? "image/" : "application/pdf", dataUrl: settlement.proofUrl } : null);
-    setSettleProofError("");
-    setSettleOpen(true);
-  }
+    const rows = useMemo(() => {
+        if (!data) return [];
+        const q = search.toLowerCase();
+        return data.filter(
+            (inv) =>
+                (statusFilter === "all" || inv.status === statusFilter) &&
+                (!q ||
+                    inv.invoiceNumber.toLowerCase().includes(q) ||
+                    inv.customerName.toLowerCase().includes(q)),
+        );
+    }, [data, search, statusFilter]);
 
-  async function onDeleteSettlement() {
-    if (!deletingSettlement || !detail) return;
-    const target = detail;
-    setBusy(true);
-    const ok = await runAction(() => apiDelete(`/invoices/${target.id}/settlements/${deletingSettlement.id}`), { success: "Settlement dihapus. Total invoice dihitung ulang." });
-    setBusy(false);
-    if (ok) {
-      setDeletingSettlement(null);
-      reload();
-      await loadDetail(target);
-    }
-  }
+    const detailWithLines = useMemo(() => {
+        return detail;
+    }, [detail]);
 
-  function onSettleProofChange(file: File | undefined) {
-    setSettleProofError("");
-    if (!file) {
-      setSettleProof(null);
-      return;
-    }
-    if (!file.type.startsWith("image/") && file.type !== "application/pdf") {
-      setSettleProofError("Pilih file gambar atau PDF.");
-      return;
-    }
-    if (file.size > 8 * 1024 * 1024) {
-      setSettleProofError("Ukuran file maksimal 8 MB.");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => setSettleProof({ name: file.name, type: file.type, dataUrl: String(reader.result) });
-    reader.onerror = () => setSettleProofError("File tidak bisa dibaca. Coba pilih file lain.");
-    reader.readAsDataURL(file);
-  }
-
-  if (!can.view) {
-    return <PageHeader title="Invoice" subtitle="Anda tidak memiliki izin melihat invoice." />;
-  }
-
-  const b2bCustomers = (options?.customers ?? []).filter((c) => c.type === "b2b");
-  const customerOptions = b2bCustomers.map((c) => ({ value: String(c.id), label: c.companyName ?? "Nama perusahaan belum diisi" }));
-  const customerShipments = (options?.b2bShipments ?? []).filter(
-    (s) => (!form.customerId || s.customerId === Number(form.customerId)) && s.invoiceLines.length === 0 && !form.lines.some((line) => line.shipmentId === String(s.id)),
-  );
-  const bankOptions = [
-    { value: "none", label: "Tanpa rekening pembayaran" },
-    ...(bankAccounts ?? []).map(account => ({ value: String(account.id), label: `${account.bankName} · ${account.accountNumber} · ${account.accountName}` })),
-  ];
-  if (editingInvoice?.bankAccountId && !(bankAccounts ?? []).some(account => account.id === editingInvoice.bankAccountId)) bankOptions.push({ value: String(editingInvoice.bankAccountId), label: `${editingInvoice.paymentBankName ?? "Rekening tersimpan"} · ${editingInvoice.paymentAccountNumber ?? ""} (tersimpan)` });
-  const draftSubtotal = form.lines.reduce((sum, l) => sum + (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0), 0);
-  const draftLinesTotal = draftSubtotal - (Number(form.discount) || 0) + (Number(form.rounding) || 0);
-
-  return (
-    <div className="space-y-4">
-      <PageHeader
-        title="Invoice"
-        subtitle="Tagihan B2B per customer - draft, kirim, dan settlement bertahap."
-        icon={<Receipt className="h-5 w-5" />}
-        actions={
-          can.create && (
-            <Button onClick={openCreate}>
-              <Plus className="h-4 w-4" /> Buat Invoice
-            </Button>
-          )
+    async function loadDetail(inv: Invoice) {
+        try {
+            const full = await apiGet<Invoice & { lines: InvoiceLine[] }>(
+                `/invoices/${inv.id}`,
+            );
+            setDetail(full);
+        } catch {
+            toast.error("Gagal memuat detail invoice.");
         }
-      />
+    }
 
-      <Tabs defaultValue="list">
-        <TabsList>
-          <TabsTrigger value="list">Daftar</TabsTrigger>
-          <TabsTrigger value="activity">Log Aktivitas</TabsTrigger>
-        </TabsList>
-        <TabsContent value="list" className="mt-3">
-          <DataTable
-            rows={rows}
-            loading={loading}
-            search={search}
-            onSearchChange={setSearch}
-            searchPlaceholder="Cari nomor / customer…"
-            toolbar={
-              <div className="flex max-w-full flex-wrap items-center gap-1.5">
-                {["all", "DRAFT", "SENT", "PARTIALLY_SETTLED", "SETTLED"].map((s) => (
-                  <Button key={s} size="sm" variant={statusFilter === s ? "default" : "outline"} className="h-7 px-2.5 text-[11px]" onClick={() => setStatusFilter(s)}>
-                    {s === "all" ? "Semua" : s === "PARTIALLY_SETTLED" ? "PARTIAL" : s}
-                  </Button>
-                ))}
-              </div>
-            }
-            emptyMessage="Belum ada invoice B2B."
-            columns={[
-              {
-                key: "number",
-                header: "Nomor",
-                primary: true,
-                render: (inv) => (
-                  <button onClick={() => (window.location.hash = `#/invoices/${inv.id}`)} className="font-mono text-xs font-semibold text-primary hover:underline">
-                    {inv.invoiceNumber}
-                  </button>
-                ),
-              },
-              {
-                key: "customer",
-                header: "Customer",
-                render: (inv) => (
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{inv.customerCompanyName ?? inv.customerName}</p>
-                    <p className="text-xs text-muted-foreground">{inv.linesCount} baris item</p>
-                  </div>
-                ),
-              },
-              {
-                key: "amount",
-                header: "Total",
-                render: (inv) => (
-                  <div>
-                    <p className="text-sm font-semibold">{formatRupiah(inv.totalAmount)}</p>
-                    {inv.remainingAmount > 0 && inv.settledAmount > 0 && (
-                      <p className="text-[11px] text-muted-foreground">sisa {formatRupiah(inv.remainingAmount)}</p>
-                    )}
-                  </div>
-                ),
-              },
-              {
-                key: "pph",
-                header: "PPh",
-                render: (inv) => <span className="text-xs">{formatRupiah(inv.pphAmount ?? 0)}</span>,
-              },
-              {
-                key: "lastPaid",
-                header: "Last Paid",
-                hideOnMobile: true,
-                render: (inv) => (inv.lastPaidAt ? formatDate(inv.lastPaidAt, true) : "-"),
-              },
-              {
-                key: "remaining",
-                header: "Sisa",
-                render: (inv) => <span className={inv.remainingAmount > 0 ? "font-semibold text-destructive" : "text-primary"}>{formatRupiah(inv.remainingAmount)}</span>,
-              },
-              { key: "due", header: "Jatuh Tempo", hideOnMobile: true, render: (inv) => formatDate(inv.dueDate) },
-              {
-                key: "status",
-                header: "Status",
-                render: (inv) => (
-                  <div className="flex flex-col items-start gap-1">
-                    <StatusBadge status={inv.status} />
-                    {inv.isOverdue && <span className="text-[10px] font-semibold text-destructive">OVERDUE</span>}
-                    {inv.commission && (
-                      <span className="text-[10px] font-medium text-primary" title={`Komisi ${inv.commission.partnerName}`}>
-                        komisi {formatRupiah(inv.commission.commissionAmount)} · {inv.commission.status}
-                      </span>
-                    )}
-                  </div>
-                ),
-              },
-              {
-                key: "actions",
-                header: "Aksi",
-                render: (inv) => (
-                  <div className="flex flex-wrap gap-1.5">
-                    <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => loadDetail(inv)} aria-label={`Lihat riwayat ${inv.invoiceNumber}`} title="Lihat riwayat pembayaran">
-                      <Eye className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="outline" size="sm" className="h-7" onClick={() => (window.location.hash = `#/invoices/${inv.id}`)}>
-                      Detail
-                    </Button>
-                    {inv.status === "DRAFT" && can.send && (
-                      <Button size="sm" className="h-7" onClick={() => onSend(inv)}>
-                        <Send className="h-3.5 w-3.5" /> Kirim
-                      </Button>
-                    )}
-                    {inv.status === "DRAFT" && can.update && (
-                      <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => openEdit(inv)} aria-label={`Edit invoice ${inv.invoiceNumber}`} title="Edit invoice">
-                        <Edit className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                    {(inv.status === "SENT" || inv.status === "PARTIALLY_SETTLED") && can.settle && (
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        className="h-7"
-                        onClick={() => {
-                          // Capture the invoice the user clicked on so the
-                          // settle action doesn't depend on the async detail
-                          // fetch (which previously caused silent no-ops).
-                          setSettleTarget(inv);
-                          setEditingSettlement(null);
-                          setSettlePph("");
-                          setSettleMethod("TRANSFER");
-                          setSettleRef("");
-                          setSettleProof(null);
-                          setSettleAmount(String(Math.round(inv.remainingAmount)));
-                          setSettleDate(new Date().toISOString().slice(0, 10));
-                          setSettleOpen(true);
-                        }}
-                      >
-                        <Wallet className="h-3.5 w-3.5" /> Settle
-                      </Button>
-                    )}
-                    {inv.status === "DRAFT" && can.update && (
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setConfirmDelete(inv)} aria-label="Hapus invoice">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                ),
-              },
-            ]}
-          />
-        </TabsContent>
-        <TabsContent value="activity" className="mt-3">
-          <ActivityLogPanel entityTypes={["invoice", "invoice_line"]} />
-        </TabsContent>
-      </Tabs>
+    function openCreate() {
+        setEditingInvoice(null);
+        setForm({
+            ...EMPTY,
+            lines: [
+                {
+                    description: "",
+                    quantity: "1",
+                    unitPrice: "",
+                    shipmentId: "",
+                },
+            ],
+        });
+        setCreateOpen(true);
+    }
 
-      {/* Create dialog */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{editingInvoice ? `Edit Invoice ${editingInvoice.invoiceNumber}` : "Buat Invoice (Draft)"}</DialogTitle>
-            <DialogDescription>Invoice hanya dapat diedit selama status DRAFT.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={onSubmit} className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Customer B2B" htmlFor="inv-customer">
-                <FormSelect
-                  value={form.customerId}
-                  onValueChange={(v) =>
-                    setForm({
-                      ...form,
-                      customerId: v,
-                      lines: form.lines.map((line) => (line.shipmentId ? { ...line, shipmentId: "", description: "", unitPrice: "" } : line)),
-                    })
+    async function openEdit(inv: Invoice) {
+        try {
+            const full = await apiGet<Invoice & { lines: InvoiceLine[] }>(
+                `/invoices/${inv.id}`,
+            );
+            if (full.status !== "DRAFT") return;
+            setEditingInvoice(full);
+            setForm({
+                bankAccountId: full.bankAccountId
+                    ? String(full.bankAccountId)
+                    : "",
+                customerId: String(full.customerId),
+                issueDate: full.issueDate?.slice(0, 10) ?? "",
+                dueDate: full.dueDate?.slice(0, 10) ?? "",
+                discount: String(full.discount),
+                rounding: String(full.rounding),
+                notes: full.notes ?? "",
+                lines: full.lines.map((line) => ({
+                    description: line.description,
+                    quantity: String(line.quantity),
+                    unitPrice: String(line.unitPrice),
+                    shipmentId: line.shipmentId ? String(line.shipmentId) : "",
+                })),
+            });
+            setCreateOpen(true);
+        } catch {
+            toast.error("Gagal memuat invoice untuk diedit.");
+        }
+    }
+
+    async function onSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        setBusy(true);
+        const payload = {
+            bankAccountId: form.bankAccountId
+                ? Number(form.bankAccountId)
+                : null,
+            customerId: Number(form.customerId),
+            issueDate: form.issueDate || null,
+            dueDate: form.dueDate || null,
+            discount: Number(form.discount) || 0,
+            rounding: Number(form.rounding) || 0,
+            notes: form.notes || null,
+            lines: form.lines
+                .filter((l) => l.description.trim() && Number(l.unitPrice) > 0)
+                .map((l) => ({
+                    description: l.description,
+                    quantity: Number(l.quantity) || 1,
+                    unitPrice: Number(l.unitPrice),
+                    // Revise.md §7.1 — link the line to its B2B shipment so the
+                    // Marketing commission attaches to this invoice (§8).
+                    shipmentId: l.shipmentId ? Number(l.shipmentId) : null,
+                })),
+        };
+        const ok = await runAction(
+            () =>
+                editingInvoice
+                    ? apiPut(`/invoices/${editingInvoice.id}`, payload)
+                    : apiPost("/invoices", payload),
+            {
+                success: editingInvoice
+                    ? "Invoice draft diperbarui."
+                    : "Invoice draft dibuat - komisi Marketing (bila ada) otomatis terlacak PENDING.",
+            },
+        );
+        setBusy(false);
+        if (ok) {
+            setCreateOpen(false);
+            setEditingInvoice(null);
+            reload();
+        }
+    }
+
+    async function onSend(inv: Invoice) {
+        const ok = await runAction(
+            () => apiPost(`/invoices/${inv.id}/send`, {}),
+            {
+                success: `Invoice ${inv.invoiceNumber} dikirim - baris item terkunci.`,
+            },
+        );
+        if (ok) reload();
+    }
+
+    async function onDelete() {
+        if (!confirmDelete) return;
+        const target = confirmDelete;
+        setConfirmDelete(null);
+        const ok = await runAction(() => apiDelete(`/invoices/${target.id}`), {
+            success: "Invoice dihapus.",
+        });
+        if (ok) reload();
+    }
+
+    async function onSettle(e: React.FormEvent) {
+        e.preventDefault();
+        // Use the invoice the user clicked on (settleTarget) — not the
+        // async-loaded `detail` — so the settle never silently no-ops while
+        // the detail fetch is in flight. This was the root cause of the
+        // "Settle doesn't work" bug: the dialog opened before `detail` was
+        // populated, and the early `if (!detail) return;` swallowed the
+        // submit without any user feedback.
+        const target = settleTarget ?? detail;
+        if (!target) {
+            toast.error("Pilih invoice yang akan di-settle.");
+            return;
+        }
+        const amount = Number(settleAmount);
+        const pph = Number(settlePph || 0);
+        if (!Number.isFinite(amount) || amount <= 0) {
+            toast.error("Jumlah settlement harus lebih dari 0.");
+            return;
+        }
+        if (!Number.isFinite(pph) || pph < 0 || pph > amount) {
+            toast.error("PPh harus antara 0 dan jumlah pembayaran.");
+            return;
+        }
+        if (
+            amount >
+            target.remainingAmount + (editingSettlement?.amount ?? 0) + 0.01
+        ) {
+            toast.error("Pembayaran melebihi sisa tagihan.");
+            return;
+        }
+        setBusy(true);
+        const payload = {
+            amount,
+            pph,
+            method: settleMethod,
+            reference: settleRef || null,
+            settledAt:
+                editingSettlement &&
+                settleDate === editingSettlement.settledAt.slice(0, 10)
+                    ? editingSettlement.settledAt
+                    : settleDate || null,
+            proofUrl: settleProof?.dataUrl ?? null,
+        };
+        const ok = await runAction(
+            () =>
+                editingSettlement
+                    ? apiPut(
+                          `/invoices/${target.id}/settlements/${editingSettlement.id}`,
+                          payload,
+                      )
+                    : apiPost(`/invoices/${target.id}/settlements`, payload),
+            {
+                success: editingSettlement
+                    ? "Settlement diperbarui. Total invoice dihitung ulang."
+                    : "Pembayaran dicatat. PPh termasuk dalam jumlah pembayaran.",
+            },
+        );
+        setBusy(false);
+        if (ok) {
+            setSettleOpen(false);
+            setSettleTarget(null);
+            setEditingSettlement(null);
+            setSettleAmount("");
+            setSettlePph("");
+            setSettleRef("");
+            setSettleDate(new Date().toISOString().slice(0, 10));
+            setSettleProof(null);
+            setSettleProofError("");
+            reload();
+            // Refresh the detail dialog if it's open on this same invoice.
+            if (detail && detail.id === target.id) loadDetail(target);
+        }
+    }
+
+    function openSettlementEdit(settlement: InvoiceSettlement) {
+        if (!detail) return;
+        setSettleTarget(detail);
+        setEditingSettlement(settlement);
+        setSettleAmount(String(settlement.amount));
+        setSettlePph(String(settlement.pph));
+        setSettleMethod(settlement.method);
+        setSettleRef(settlement.reference ?? "");
+        setSettleDate(settlement.settledAt.slice(0, 10));
+        setSettleProof(
+            settlement.proofUrl
+                ? {
+                      name: "Bukti tersimpan",
+                      type: settlement.proofUrl.startsWith("data:image/")
+                          ? "image/"
+                          : "application/pdf",
+                      dataUrl: settlement.proofUrl,
                   }
-                  placeholder={customerOptions.length ? "Pilih customer…" : "Belum ada customer B2B"}
-                  options={customerOptions}
-                  disabled={busy || !!editingInvoice || customerOptions.length === 0}
-                />
-              </Field>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Tanggal terbit" htmlFor="inv-issue">
-                  <Input id="inv-issue" type="date" value={form.issueDate} onChange={(e) => setForm({ ...form, issueDate: e.target.value })} disabled={busy} />
-                </Field>
-                <Field label="Jatuh tempo" htmlFor="inv-due">
-                  <Input id="inv-due" type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} disabled={busy} />
-                </Field>
-              </div>
-            </div>
+                : null,
+        );
+        setSettleProofError("");
+        setSettleOpen(true);
+    }
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Diskon (Rp)" htmlFor="inv-discount" hint="Potongan nominal dari subtotal.">
-                <NumberInput id="inv-discount" min="0" value={form.discount} onChange={(e) => setForm({ ...form, discount: e.target.value })} disabled={busy} />
-              </Field>
-              <Field label="Pembulatan (Rp)" htmlFor="inv-rounding" hint="Bisa positif atau negatif, mis. 2 atau -3.">
-                <NumberInput id="inv-rounding" value={form.rounding} onChange={(e) => setForm({ ...form, rounding: e.target.value })} disabled={busy} />
-              </Field>
-              <div className="min-w-0 sm:col-span-2"><Field label="Rekening pembayaran" htmlFor="inv-bank" hint="Invoice hanya menampilkan Bank, No. Rekening, dan Nama Rekening."><FormSelect id="inv-bank" value={form.bankAccountId || "none"} onValueChange={value => setForm({ ...form, bankAccountId: value === "none" ? "" : value })} options={bankOptions} disabled={busy} /></Field></div>
-            </div>
+    async function onDeleteSettlement() {
+        if (!deletingSettlement || !detail) return;
+        const target = detail;
+        setBusy(true);
+        const ok = await runAction(
+            () =>
+                apiDelete(
+                    `/invoices/${target.id}/settlements/${deletingSettlement.id}`,
+                ),
+            { success: "Settlement dihapus. Total invoice dihitung ulang." },
+        );
+        setBusy(false);
+        if (ok) {
+            setDeletingSettlement(null);
+            reload();
+            await loadDetail(target);
+        }
+    }
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-foreground">Baris item</p>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setForm((f) => ({ ...f, lines: [...f.lines, { description: "", quantity: "1", unitPrice: "", shipmentId: "" }] }))}
-                    disabled={busy}
-                  >
-                    <Plus className="h-3.5 w-3.5" /> Baris
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setShipmentPickerOpen(true)}
-                    disabled={busy || !form.customerId || customerShipments.length === 0}
-                  >
-                    <Plus className="h-3.5 w-3.5" /> Add Shipment
-                  </Button>
-                </div>
-              </div>
-              {(() => {
-                const allCustomerShipments = (options?.b2bShipments ?? []).filter(
-                  (s) => !form.customerId || s.customerId === Number(form.customerId),
-                );
-                const linkedPartner = form.lines
-                  .map((l) => allCustomerShipments.find((s) => String(s.id) === l.shipmentId)?.createdByPartnerId ?? null)
-                  .find((p) => p != null);
-                return (
-                  <>
-                    <div className="space-y-2">
-                      {form.lines.map((line, i) => (
-                        <div key={i} className="space-y-1.5 rounded-lg border p-2.5">
-                          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                            <span>{line.shipmentId ? `Shipment ${allCustomerShipments.find((s) => String(s.id) === line.shipmentId)?.masterCode ?? line.shipmentId}` : "Manual item"}</span>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive"
-                              onClick={() => setForm((f) => ({ ...f, lines: f.lines.filter((_, idx) => idx !== i) }))}
-                              disabled={busy || form.lines.length === 1}
-                              aria-label="Hapus baris"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                          <div className="grid grid-cols-[1fr_70px_100px] items-center gap-2">
-                            <Input
-                              value={line.description}
-                              onChange={(e) => setForm((f) => ({ ...f, lines: f.lines.map((l, idx) => (idx === i ? { ...l, description: e.target.value } : l)) }))}
-                              placeholder={`Deskripsi item ${i + 1}`}
-                              disabled={busy}
-                              aria-label={`Deskripsi item ${i + 1}`}
-                            />
-                            <NumberInput
-                              value={line.quantity}
-                              onChange={(e) => setForm((f) => ({ ...f, lines: f.lines.map((l, idx) => (idx === i ? { ...l, quantity: e.target.value } : l)) }))}
-                              placeholder="Qty"
-                              disabled={busy}
-                              aria-label={`Jumlah item ${i + 1}`}
-                            />
-                            <NumberInput
-                              value={line.unitPrice}
-                              onChange={(e) => setForm((f) => ({ ...f, lines: f.lines.map((l, idx) => (idx === i ? { ...l, unitPrice: e.target.value } : l)) }))}
-                              placeholder="Harga"
-                              disabled={busy}
-                              aria-label={`Harga item ${i + 1}`}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    {allCustomerShipments.some((s) => s.invoiceLines.length > 0) && (
-                      <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
-                        {allCustomerShipments.filter((s) => s.invoiceLines.length > 0).length} shipment sudah termasuk invoice dan tidak bisa ditagihkan ulang.
-                      </p>
-                    )}
-                    {linkedPartner != null && (
-                      <p className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-[11px] text-primary">
-                        Invoice ini membawa shipment buatan Marketing - komisi partner akan tercatat <b>PENDING</b> dan hanya dirilis saat invoice <b>LUNAS penuh</b> (§8/§9).
-                      </p>
-                    )}
-                  </>
-                );
-              })()}
-              <div className="flex items-center justify-end gap-2 rounded-lg bg-muted/60 px-3 py-2 text-sm">
-                <span className="text-muted-foreground">Total draft:</span>
-                <span className="font-bold text-foreground">{formatRupiah(draftLinesTotal)}</span>
-              </div>
-            </div>
+    function onSettleProofChange(file: File | undefined) {
+        setSettleProofError("");
+        if (!file) {
+            setSettleProof(null);
+            return;
+        }
+        if (
+            !file.type.startsWith("image/") &&
+            file.type !== "application/pdf"
+        ) {
+            setSettleProofError("Pilih file gambar atau PDF.");
+            return;
+        }
+        if (file.size > 8 * 1024 * 1024) {
+            setSettleProofError("Ukuran file maksimal 8 MB.");
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = () =>
+            setSettleProof({
+                name: file.name,
+                type: file.type,
+                dataUrl: String(reader.result),
+            });
+        reader.onerror = () =>
+            setSettleProofError(
+                "File tidak bisa dibaca. Coba pilih file lain.",
+            );
+        reader.readAsDataURL(file);
+    }
 
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setCreateOpen(false)} disabled={busy}>
-                Batal
-              </Button>
-              <SubmitButton busy={busy}>Buat Invoice Draft</SubmitButton>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+    if (!can.view) {
+        return (
+            <PageHeader
+                title="Invoice"
+                subtitle="Anda tidak memiliki izin melihat invoice."
+            />
+        );
+    }
 
-      <Dialog open={shipmentPickerOpen} onOpenChange={setShipmentPickerOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Add Shipment</DialogTitle>
-            <DialogDescription>Pilih shipment milik customer ini untuk ditambahkan ke invoice. Shipment yang sudah pernah ditagihkan tidak ditampilkan.</DialogDescription>
-          </DialogHeader>
-          <div className="max-h-80 space-y-2 overflow-y-auto">
-            {customerShipments.length === 0 ? (
-              <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">Tidak ada shipment yang bisa ditambahkan.</p>
-            ) : (
-              customerShipments.map((shipment) => (
-                <Button
-                  key={shipment.id}
-                  type="button"
-                  variant="outline"
-                  className="h-auto w-full justify-between px-3 py-2 text-left"
-                  onClick={() => {
-                    setForm((current) => ({
-                      ...current,
-                      lines: (() => {
-                        const shipmentLine = {
-                          description: `${shipment.masterCode} - pengiriman ${shipment.origin} → ${shipment.destination}`,
-                          quantity: "1",
-                          unitPrice: String(shipment.priceAmount ?? ""),
-                          shipmentId: String(shipment.id),
-                        };
-                        const emptyLineIndex = current.lines.findIndex(
-                          (line) => !line.description.trim() && !line.unitPrice.trim() && !line.shipmentId,
-                        );
-                        if (emptyLineIndex === -1) return [...current.lines, shipmentLine];
-                        return current.lines.map((line, index) => (index === emptyLineIndex ? shipmentLine : line));
-                      })(),
-                    }));
-                    setShipmentPickerOpen(false);
-                  }}
-                >
-                  <span>
-                    <span className="block font-mono text-xs font-semibold">{shipment.masterCode}</span>
-                    <span className="block text-xs text-muted-foreground">{shipment.origin} → {shipment.destination}</span>
-                  </span>
-                  <span className="shrink-0 text-xs font-semibold">{formatRupiah(shipment.priceAmount)}</span>
-                </Button>
-              ))
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+    const b2bCustomers = (options?.customers ?? []).filter(
+        (c) => c.type === "b2b",
+    );
+    const customerOptions = b2bCustomers.map((c) => ({
+        value: String(c.id),
+        label: c.companyName ?? "Nama perusahaan belum diisi",
+    }));
+    const customerShipments = (options?.b2bShipments ?? []).filter(
+        (s) =>
+            (!form.customerId || s.customerId === Number(form.customerId)) &&
+            s.invoiceLines.length === 0 &&
+            !form.lines.some((line) => line.shipmentId === String(s.id)),
+    );
+    const bankOptions = [
+        { value: "none", label: "Tanpa rekening pembayaran" },
+        ...(bankAccounts ?? []).map((account) => ({
+            value: String(account.id),
+            label: `${account.bankName} · ${account.accountNumber} · ${account.accountName}`,
+        })),
+    ];
+    if (
+        editingInvoice?.bankAccountId &&
+        !(bankAccounts ?? []).some(
+            (account) => account.id === editingInvoice.bankAccountId,
+        )
+    )
+        bankOptions.push({
+            value: String(editingInvoice.bankAccountId),
+            label: `${editingInvoice.paymentBankName ?? "Rekening tersimpan"} · ${editingInvoice.paymentAccountNumber ?? ""} (tersimpan)`,
+        });
+    const draftSubtotal = form.lines.reduce(
+        (sum, l) =>
+            sum + (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0),
+        0,
+    );
+    const draftLinesTotal =
+        draftSubtotal -
+        (Number(form.discount) || 0) +
+        (Number(form.rounding) || 0);
 
-      {/* Detail dialog */}
-      <Dialog open={!!detailWithLines} onOpenChange={(open) => !open && setDetail(null)}>
-        <DialogContent className="sm:max-w-3xl">
-          <DialogHeader className="border-b pb-4">
-            <div className="flex items-start justify-between gap-4 pr-4">
-              <div>
-                <DialogTitle className="font-mono text-xl tracking-tight">{detailWithLines?.invoiceNumber}</DialogTitle>
-                <DialogDescription className="mt-1">Invoice B2B · diterbitkan {formatDate(detailWithLines?.issueDate)}</DialogDescription>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                {detailWithLines && <StatusBadge status={detailWithLines.status} />}
-                <Button variant="outline" size="sm" onClick={() => detailWithLines && (window.location.hash = `#/invoices/${detailWithLines.id}`)} disabled={!detailWithLines || !("lines" in detailWithLines)}>
-                  <Printer className="h-4 w-4" /> Cetak
-                </Button>
-              </div>
-            </div>
-          </DialogHeader>
-          {detailWithLines && "lines" in detailWithLines && (
-            <div className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-lg border bg-muted/20 p-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Ditagihkan kepada</p>
-                  <p className="mt-1 font-semibold text-foreground">{(detailWithLines as Invoice & { customer?: { companyName?: string | null } }).customer?.companyName ?? detailWithLines.customerCompanyName ?? detailWithLines.customerName}</p>
-                  <p className="text-xs text-muted-foreground">{detailWithLines.customerCode}</p>
-                  {(detailWithLines as Invoice & { customer?: { address?: string | null } }).customer?.address && <p className="mt-1 text-xs text-muted-foreground">{(detailWithLines as Invoice & { customer?: { address?: string | null } }).customer?.address}</p>}
-                </div>
-                <div className="rounded-lg border bg-muted/20 p-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Tanggal pembayaran</p>
-                  <div className="mt-1 grid grid-cols-2 gap-3 text-xs">
-                    <div><p className="text-muted-foreground">Jatuh tempo</p><p className="font-semibold">{formatDate(detailWithLines.dueDate)}</p></div>
-                    <div><p className="text-muted-foreground">Status</p><p className={detailWithLines.isOverdue ? "font-semibold text-destructive" : "font-semibold"}>{detailWithLines.isOverdue ? "Terlambat" : detailWithLines.status === "SETTLED" ? "Lunas" : "Belum lunas"}</p></div>
-                  </div>
-                </div>
-              </div>
-              <div className="overflow-x-auto rounded-lg border">
-                <table className="w-full min-w-120 text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/50 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-                      <th className="px-3 py-2 font-semibold">Deskripsi</th>
-                      <th className="px-3 py-2 text-right font-semibold">Qty</th>
-                      <th className="px-3 py-2 text-right font-semibold">Harga satuan</th>
-                      <th className="px-3 py-2 text-right font-semibold">Subtotal</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(detailWithLines as Invoice & { lines: InvoiceLine[] }).lines?.map((line) => (
-                      <tr key={line.id} className="border-b last:border-0">
-                        <td className="px-3 py-2">{line.description}</td>
-                        <td className="px-3 py-2 text-right">{formatNumber(line.quantity)}</td>
-                        <td className="px-3 py-2 text-right">{formatRupiah(line.unitPrice)}</td>
-                        <td className="px-3 py-2 text-right font-semibold">{formatRupiah(line.quantity * line.unitPrice)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+    return (
+        <div className="space-y-4">
+            <PageHeader
+                title="Invoice"
+                subtitle="Tagihan B2B per customer - draft, kirim, dan settlement bertahap."
+                icon={<Receipt className="h-5 w-5" />}
+                actions={
+                    can.create && (
+                        <Button onClick={openCreate}>
+                            <Plus className="h-4 w-4" /> Buat Invoice
+                        </Button>
+                    )
+                }
+            />
 
-              <div className="grid grid-cols-1 gap-2 text-center sm:grid-cols-3">
-                <div className="rounded-lg border bg-muted/30 p-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Total tagihan</p>
-                  <p className="mt-1 text-base font-bold">{formatRupiah(detailWithLines.totalAmount)}</p>
-                </div>
-                <div className="rounded-lg border border-primary/25 bg-primary/5 p-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">Sudah dibayar</p>
-                  <p className="mt-1 text-base font-bold text-primary">{formatRupiah(detailWithLines.settledAmount)}</p>
-                </div>
-                <div className="rounded-lg border border-destructive/25 bg-destructive/5 p-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-destructive">Sisa pembayaran</p>
-                  <p className="mt-1 text-base font-bold text-destructive">{formatRupiah(detailWithLines.remainingAmount)}</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
-                <div><span className="text-muted-foreground">Subtotal</span><p className="font-semibold">{formatRupiah(detailWithLines.lines?.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0) ?? 0)}</p></div>
-                <div><span className="text-muted-foreground">Diskon</span><p className="font-semibold">- {formatRupiah(detailWithLines.discount)}</p></div>
-                <div><span className="text-muted-foreground">Pembulatan</span><p className="font-semibold">{detailWithLines.rounding >= 0 ? "+ " : "- "}{formatRupiah(Math.abs(detailWithLines.rounding))}</p></div>
-              </div>
-
-              <p className="rounded-lg bg-muted/50 px-3 py-2 text-sm">PPh (termasuk pembayaran): <b>{formatRupiah(detailWithLines.pphAmount ?? detailWithLines.settlements?.reduce((sum, s) => sum + s.pph, 0) ?? 0)}</b></p>
-
-              <InvoicePaymentAccount invoice={detailWithLines} />
-
-              {detailWithLines.notes && <div className="rounded-lg border-l-2 border-primary bg-primary/5 px-3 py-2 text-xs"><p className="font-semibold text-primary">Catatan</p><p className="mt-0.5 text-muted-foreground">{detailWithLines.notes}</p></div>}
-
-              {/* Revise.md §8 - commission panel attached to this invoice */}
-              {detailWithLines.commission && (
-                <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-primary">
-                      Komisi Marketing · {detailWithLines.commission.partnerName} ({detailWithLines.commission.partnerPercent}%)
-                    </span>
-                    <StatusBadge status={detailWithLines.commission.status} />
-                  </div>
-                  <p className="mt-1 text-muted-foreground">
-                    {formatRupiah(detailWithLines.commission.commissionAmount)} -{" "}
-                    {detailWithLines.commission.status === "RELEASED"
-                      ? "sudah dikredit ke wallet Marketing"
-                      : "dirilis ke wallet hanya setelah invoice LUNAS penuh (§9)"}
-                  </p>
-                </div>
-              )}
-
-              {((detailWithLines as Invoice & { settlements?: InvoiceSettlement[] }).settlements?.length ?? 0) > 0 && (
-                <div>
-                  <p className="mb-1.5 text-xs font-semibold text-foreground">Riwayat Settlement</p>
-                  <ul className="space-y-1 text-sm">
-                    {((detailWithLines as Invoice & { settlements?: InvoiceSettlement[] }).settlements ?? []).map((s) => (
-                      <li key={s.id} className="flex flex-col gap-2 rounded-lg bg-muted/50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="min-w-0">
-                          <p className="text-muted-foreground">
-                            {formatDate(s.settledAt, true)} · {s.method}
-                            {s.reference && <span className="ml-1 text-xs">· {s.reference}</span>}
-                          </p>
-                          <p className="text-xs text-muted-foreground">Dibayar {formatRupiah(s.amount)} · PPh (termasuk pembayaran) {formatRupiah(s.pph)} · masuk invoice {formatRupiah(s.amount)}</p>
-                          {s.proofUrl && (
-                            s.proofUrl.startsWith("data:image/") ? (
-                              <a href={s.proofUrl} target="_blank" rel="noreferrer" onClick={(event) => { event.preventDefault(); if (s.proofUrl) openDataUrlInNewTab(s.proofUrl); }} className="mt-2 block w-fit" aria-label={`Lihat bukti pembayaran ${formatDate(s.settledAt, true)}`}>
-                                <img src={s.proofUrl} alt="Bukti pembayaran" className="h-16 w-24 rounded border object-cover shadow-sm hover:opacity-80" />
-                              </a>
-                            ) : (
-                              <a
-                                href={s.proofUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                onClick={(event) => { event.preventDefault(); if (s.proofUrl) openDataUrlInNewTab(s.proofUrl); }}
-                                className="mt-1 inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary hover:bg-primary/20"
-                              >
-                                <Paperclip className="h-3 w-3" /> Buka bukti PDF
-                              </a>
-                            )
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold">{formatRupiah(s.amount)}</span>
-                          {detailWithLines.status !== "CANCELLED" && can.editSettlement && <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => openSettlementEdit(s)}><Edit className="h-3 w-3" /> Edit</Button>}
-                          {detailWithLines.status !== "CANCELLED" && can.deleteSettlement && <Button type="button" size="sm" variant="destructive" disabled={busy} onClick={() => setDeletingSettlement(s)}><Trash2 className="h-3 w-3" /> Hapus</Button>}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {printOpen && detailWithLines && "lines" in detailWithLines && <InvoicePrint invoice={detailWithLines as Invoice & { lines: InvoiceLine[] }} onClose={() => setPrintOpen(false)} />}
-
-      {/* Settle dialog */}
-      <Dialog open={settleOpen} onOpenChange={(open) => { setSettleOpen(open); if (!open) { setSettleProof(null); setSettleProofError(""); } }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{editingSettlement ? "Edit Settlement" : "Settle"} {settleTarget?.invoiceNumber ?? detailWithLines?.invoiceNumber ?? ""}</DialogTitle>
-            <DialogDescription>
-              Sisa tagihan: {formatRupiah((settleTarget?.remainingAmount ?? detailWithLines?.remainingAmount ?? 0) + (editingSettlement?.amount ?? 0))}. PPh termasuk dalam pembayaran dan tidak mengurangi pelunasan.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={onSettle} className="space-y-4">
-            <Field label="Jumlah Transfer / Cash (Rp)" htmlFor="st-amount">
-              <NumberInput id="st-amount" value={settleAmount} onChange={(e) => setSettleAmount(e.target.value)} required disabled={busy} />
-            </Field>
-            <Field label="PPh (Rp)" htmlFor="st-pph" hint="Informasi PPh yang sudah termasuk dalam jumlah pembayaran. Tidak mengurangi pelunasan invoice.">
-              <NumberInput id="st-pph" min="0" value={settlePph} onChange={(e) => setSettlePph(e.target.value)} disabled={busy} />
-            </Field>
-            <Field label="Tanggal pembayaran" htmlFor="st-date">
-              <Input id="st-date" type="date" value={settleDate} onChange={(e) => setSettleDate(e.target.value)} required disabled={busy} />
-            </Field>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label="Metode" htmlFor="st-method">
-                <FormSelect
-                  value={settleMethod}
-                  onValueChange={setSettleMethod}
-                  options={[{ value: "TRANSFER", label: "Transfer" }, { value: "CASH", label: "Cash" }]}
-                  disabled={busy}
-                />
-              </Field>
-              <Field label="Referensi" htmlFor="st-ref">
-                <Input id="st-ref" value={settleRef} onChange={(e) => setSettleRef(e.target.value)} placeholder="No. bukti transfer" disabled={busy} />
-              </Field>
-            </div>
-            <Field label="Bukti Pembayaran (opsional)" htmlFor="st-proof" hint="Bukti transfer / kuitansi kasir. Maks 8 MB.">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md border bg-background px-3 text-sm font-medium hover:bg-accent hover:text-accent-foreground">
-                    <Paperclip className="h-4 w-4" />
-                    <span>{settleProof ? settleProof.name : "Pilih file…"}</span>
-                    <input
-                      id="st-proof"
-                      type="file"
-                      accept="image/*,application/pdf"
-                      className="hidden"
-                      onChange={(e) => onSettleProofChange(e.target.files?.[0])}
-                      disabled={busy}
+            <Tabs defaultValue="list">
+                <TabsList>
+                    <TabsTrigger value="list">Daftar</TabsTrigger>
+                    <TabsTrigger value="activity">Log Aktivitas</TabsTrigger>
+                </TabsList>
+                <TabsContent value="list" className="mt-3">
+                    <DataTable
+                        rows={rows}
+                        loading={loading}
+                        search={search}
+                        onSearchChange={setSearch}
+                        searchPlaceholder="Cari nomor / customer…"
+                        toolbar={
+                            <div className="flex max-w-full flex-wrap items-center gap-1.5">
+                                {[
+                                    "all",
+                                    "DRAFT",
+                                    "SENT",
+                                    "PARTIALLY_SETTLED",
+                                    "SETTLED",
+                                ].map((s) => (
+                                    <Button
+                                        key={s}
+                                        size="sm"
+                                        variant={
+                                            statusFilter === s
+                                                ? "default"
+                                                : "outline"
+                                        }
+                                        className="h-7 px-2.5 text-[11px]"
+                                        onClick={() => setStatusFilter(s)}
+                                    >
+                                        {s === "all"
+                                            ? "Semua"
+                                            : s === "PARTIALLY_SETTLED"
+                                              ? "PARTIAL"
+                                              : s}
+                                    </Button>
+                                ))}
+                            </div>
+                        }
+                        emptyMessage="Belum ada invoice B2B."
+                        columns={[
+                            {
+                                key: "number",
+                                header: "Nomor",
+                                primary: true,
+                                render: (inv) => (
+                                    <button
+                                        onClick={() =>
+                                            (window.location.hash = `#/invoices/${inv.id}`)
+                                        }
+                                        className="font-mono text-xs font-semibold text-primary hover:underline"
+                                    >
+                                        {inv.invoiceNumber}
+                                    </button>
+                                ),
+                            },
+                            {
+                                key: "customer",
+                                header: "Customer",
+                                render: (inv) => (
+                                    <div>
+                                        <p className="text-sm font-medium text-foreground">
+                                            {inv.customerCompanyName ??
+                                                inv.customerName}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {inv.linesCount} baris item
+                                        </p>
+                                    </div>
+                                ),
+                            },
+                            {
+                                key: "amount",
+                                header: "Total",
+                                render: (inv) => (
+                                    <div>
+                                        <p className="text-sm font-semibold">
+                                            {formatRupiah(inv.totalAmount)}
+                                        </p>
+                                        {inv.remainingAmount > 0 &&
+                                            inv.settledAmount > 0 && (
+                                                <p className="text-[11px] text-muted-foreground">
+                                                    sisa{" "}
+                                                    {formatRupiah(
+                                                        inv.remainingAmount,
+                                                    )}
+                                                </p>
+                                            )}
+                                    </div>
+                                ),
+                            },
+                            {
+                                key: "pph",
+                                header: "PPh",
+                                render: (inv) => (
+                                    <span className="text-xs">
+                                        {formatRupiah(inv.pphAmount ?? 0)}
+                                    </span>
+                                ),
+                            },
+                            {
+                                key: "lastPaid",
+                                header: "Last Paid",
+                                hideOnMobile: true,
+                                render: (inv) =>
+                                    inv.lastPaidAt
+                                        ? formatDate(inv.lastPaidAt, true)
+                                        : "-",
+                            },
+                            {
+                                key: "remaining",
+                                header: "Sisa",
+                                render: (inv) => (
+                                    <span
+                                        className={
+                                            inv.remainingAmount > 0
+                                                ? "font-semibold text-destructive"
+                                                : "text-primary"
+                                        }
+                                    >
+                                        {formatRupiah(inv.remainingAmount)}
+                                    </span>
+                                ),
+                            },
+                            {
+                                key: "due",
+                                header: "Jatuh Tempo",
+                                hideOnMobile: true,
+                                render: (inv) => formatDate(inv.dueDate),
+                            },
+                            {
+                                key: "status",
+                                header: "Status",
+                                render: (inv) => (
+                                    <div className="flex flex-col items-start gap-1">
+                                        <StatusBadge status={inv.status} />
+                                        {inv.isOverdue && (
+                                            <span className="text-[10px] font-semibold text-destructive">
+                                                OVERDUE
+                                            </span>
+                                        )}
+                                        {inv.commission && (
+                                            <span
+                                                className="text-[10px] font-medium text-primary"
+                                                title={`Komisi ${inv.commission.partnerName}`}
+                                            >
+                                                komisi{" "}
+                                                {formatRupiah(
+                                                    inv.commission
+                                                        .commissionAmount,
+                                                )}{" "}
+                                                · {inv.commission.status}
+                                            </span>
+                                        )}
+                                    </div>
+                                ),
+                            },
+                            {
+                                key: "actions",
+                                header: "Aksi",
+                                render: (inv) => (
+                                    <div className="flex flex-wrap gap-1.5">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-7"
+                                            onClick={() => loadDetail(inv)}
+                                            aria-label={`Detail ${inv.invoiceNumber}`}
+                                            title="Lihat detail dan riwayat pembayaran"
+                                        >
+                                            Detail
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-7"
+                                            onClick={() =>
+                                                (window.location.hash = `#/invoices/${inv.id}`)
+                                            }
+                                            aria-label={`Cetak ${inv.invoiceNumber}`}
+                                            title="Pratinjau dan cetak invoice"
+                                        >
+                                            <Printer className="h-3.5 w-3.5" />{" "}
+                                            Cetak
+                                        </Button>
+                                        {inv.status === "DRAFT" && can.send && (
+                                            <Button
+                                                size="sm"
+                                                className="h-7"
+                                                onClick={() => onSend(inv)}
+                                            >
+                                                <Send className="h-3.5 w-3.5" />{" "}
+                                                Kirim
+                                            </Button>
+                                        )}
+                                        {inv.status === "DRAFT" &&
+                                            can.update && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="icon"
+                                                    className="h-7 w-7"
+                                                    onClick={() =>
+                                                        openEdit(inv)
+                                                    }
+                                                    aria-label={`Edit invoice ${inv.invoiceNumber}`}
+                                                    title="Edit invoice"
+                                                >
+                                                    <Edit className="h-3.5 w-3.5" />
+                                                </Button>
+                                            )}
+                                        {(inv.status === "SENT" ||
+                                            inv.status ===
+                                                "PARTIALLY_SETTLED") &&
+                                            can.settle && (
+                                                <Button
+                                                    size="sm"
+                                                    variant="secondary"
+                                                    className="h-7"
+                                                    onClick={() => {
+                                                        // Capture the invoice the user clicked on so the
+                                                        // settle action doesn't depend on the async detail
+                                                        // fetch (which previously caused silent no-ops).
+                                                        setSettleTarget(inv);
+                                                        setEditingSettlement(
+                                                            null,
+                                                        );
+                                                        setSettlePph("");
+                                                        setSettleMethod(
+                                                            "TRANSFER",
+                                                        );
+                                                        setSettleRef("");
+                                                        setSettleProof(null);
+                                                        setSettleAmount(
+                                                            String(
+                                                                Math.round(
+                                                                    inv.remainingAmount,
+                                                                ),
+                                                            ),
+                                                        );
+                                                        setSettleDate(
+                                                            new Date()
+                                                                .toISOString()
+                                                                .slice(0, 10),
+                                                        );
+                                                        setSettleOpen(true);
+                                                    }}
+                                                >
+                                                    <Wallet className="h-3.5 w-3.5" />{" "}
+                                                    Settle
+                                                </Button>
+                                            )}
+                                        {inv.status === "DRAFT" &&
+                                            can.update && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-destructive hover:text-destructive"
+                                                    onClick={() =>
+                                                        setConfirmDelete(inv)
+                                                    }
+                                                    aria-label="Hapus invoice"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            )}
+                                    </div>
+                                ),
+                            },
+                        ]}
                     />
-                  </label>
-                  {settleProof && (
-                    <Button type="button" variant="ghost" size="sm" className="h-8 text-destructive" onClick={() => setSettleProof(null)} disabled={busy}>
-                      Hapus
-                    </Button>
-                  )}
-                </div>
-                {settleProof && settleProof.type.startsWith("image/") && (
-                  <img src={settleProof.dataUrl} alt="Pratinjau bukti" className="max-h-40 rounded-md border" />
-                )}
-                {settleProof && settleProof.type === "application/pdf" && (
-                  <p className="rounded-md border bg-muted/40 px-2 py-1.5 text-xs text-muted-foreground">PDF terpilih ({settleProof.name})</p>
-                )}
-                {settleProofError && <p className="text-xs text-destructive">{settleProofError}</p>}
-              </div>
-            </Field>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setSettleOpen(false)} disabled={busy}>
-                Batal
-              </Button>
-              <SubmitButton busy={busy}>{editingSettlement ? "Simpan Perubahan" : "Catat Settlement"}</SubmitButton>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+                </TabsContent>
+                <TabsContent value="activity" className="mt-3">
+                    <ActivityLogPanel
+                        entityTypes={["invoice", "invoice_line"]}
+                    />
+                </TabsContent>
+            </Tabs>
 
-      <AlertDialog open={!!deletingSettlement} onOpenChange={(open) => !open && !busy && setDeletingSettlement(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Hapus settlement {formatRupiah(deletingSettlement?.amount ?? 0)}?</AlertDialogTitle>
-            <AlertDialogDescription>Total pembayaran dan status invoice akan dihitung ulang. Komisi yang sudah dirilis akan dikoreksi bila invoice kembali belum lunas.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy}>Batal</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" disabled={busy} onClick={(event) => { event.preventDefault(); void onDeleteSettlement(); }}>Ya, hapus settlement</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            {/* Create dialog */}
+            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+                <DialogContent className="sm:max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>
+                            {editingInvoice
+                                ? `Edit Invoice ${editingInvoice.invoiceNumber}`
+                                : "Buat Invoice (Draft)"}
+                        </DialogTitle>
+                        <DialogDescription>
+                            Invoice hanya dapat diedit selama status DRAFT.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={onSubmit} className="space-y-4">
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <Field label="Customer B2B" htmlFor="inv-customer">
+                                <FormSelect
+                                    value={form.customerId}
+                                    onValueChange={(v) =>
+                                        setForm({
+                                            ...form,
+                                            customerId: v,
+                                            lines: form.lines.map((line) =>
+                                                line.shipmentId
+                                                    ? {
+                                                          ...line,
+                                                          shipmentId: "",
+                                                          description: "",
+                                                          unitPrice: "",
+                                                      }
+                                                    : line,
+                                            ),
+                                        })
+                                    }
+                                    placeholder={
+                                        customerOptions.length
+                                            ? "Pilih customer…"
+                                            : "Belum ada customer B2B"
+                                    }
+                                    options={customerOptions}
+                                    disabled={
+                                        busy ||
+                                        !!editingInvoice ||
+                                        customerOptions.length === 0
+                                    }
+                                />
+                            </Field>
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <Field
+                                    label="Tanggal terbit"
+                                    htmlFor="inv-issue"
+                                >
+                                    <Input
+                                        id="inv-issue"
+                                        type="date"
+                                        value={form.issueDate}
+                                        onChange={(e) =>
+                                            setForm({
+                                                ...form,
+                                                issueDate: e.target.value,
+                                            })
+                                        }
+                                        disabled={busy}
+                                    />
+                                </Field>
+                                <Field label="Jatuh tempo" htmlFor="inv-due">
+                                    <Input
+                                        id="inv-due"
+                                        type="date"
+                                        value={form.dueDate}
+                                        onChange={(e) =>
+                                            setForm({
+                                                ...form,
+                                                dueDate: e.target.value,
+                                            })
+                                        }
+                                        disabled={busy}
+                                    />
+                                </Field>
+                            </div>
+                        </div>
 
-      <AlertDialog open={!!confirmDelete} onOpenChange={(open) => !open && setConfirmDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Hapus invoice {confirmDelete?.invoiceNumber}?</AlertDialogTitle>
-            <AlertDialogDescription>Invoice yang sudah memiliki settlement tidak bisa dihapus.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={onDelete}>
-              Ya, hapus
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
-  );
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            <Field
+                                label="Diskon (Rp)"
+                                htmlFor="inv-discount"
+                                hint="Potongan nominal dari subtotal."
+                            >
+                                <NumberInput
+                                    id="inv-discount"
+                                    min="0"
+                                    value={form.discount}
+                                    onChange={(e) =>
+                                        setForm({
+                                            ...form,
+                                            discount: e.target.value,
+                                        })
+                                    }
+                                    disabled={busy}
+                                />
+                            </Field>
+                            <Field
+                                label="Pembulatan (Rp)"
+                                htmlFor="inv-rounding"
+                                hint="Bisa positif atau negatif, mis. 2 atau -3."
+                            >
+                                <NumberInput
+                                    id="inv-rounding"
+                                    value={form.rounding}
+                                    onChange={(e) =>
+                                        setForm({
+                                            ...form,
+                                            rounding: e.target.value,
+                                        })
+                                    }
+                                    disabled={busy}
+                                />
+                            </Field>
+                            <div className="min-w-0 sm:col-span-2">
+                                <Field
+                                    label="Rekening pembayaran"
+                                    htmlFor="inv-bank"
+                                    hint="Invoice hanya menampilkan Bank, No. Rekening, dan Nama Rekening."
+                                >
+                                    <FormSelect
+                                        id="inv-bank"
+                                        value={form.bankAccountId || "none"}
+                                        onValueChange={(value) =>
+                                            setForm({
+                                                ...form,
+                                                bankAccountId:
+                                                    value === "none"
+                                                        ? ""
+                                                        : value,
+                                            })
+                                        }
+                                        options={bankOptions}
+                                        disabled={busy}
+                                    />
+                                </Field>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <p className="text-sm font-medium text-foreground">
+                                    Baris item
+                                </p>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() =>
+                                            setForm((f) => ({
+                                                ...f,
+                                                lines: [
+                                                    ...f.lines,
+                                                    {
+                                                        description: "",
+                                                        quantity: "1",
+                                                        unitPrice: "",
+                                                        shipmentId: "",
+                                                    },
+                                                ],
+                                            }))
+                                        }
+                                        disabled={busy}
+                                    >
+                                        <Plus className="h-3.5 w-3.5" /> Baris
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={() =>
+                                            setShipmentPickerOpen(true)
+                                        }
+                                        disabled={
+                                            busy ||
+                                            !form.customerId ||
+                                            customerShipments.length === 0
+                                        }
+                                    >
+                                        <Plus className="h-3.5 w-3.5" /> Add
+                                        Shipment
+                                    </Button>
+                                </div>
+                            </div>
+                            {(() => {
+                                const allCustomerShipments = (
+                                    options?.b2bShipments ?? []
+                                ).filter(
+                                    (s) =>
+                                        !form.customerId ||
+                                        s.customerId ===
+                                            Number(form.customerId),
+                                );
+                                const linkedPartner = form.lines
+                                    .map(
+                                        (l) =>
+                                            allCustomerShipments.find(
+                                                (s) =>
+                                                    String(s.id) ===
+                                                    l.shipmentId,
+                                            )?.createdByPartnerId ?? null,
+                                    )
+                                    .find((p) => p != null);
+                                return (
+                                    <>
+                                        <div className="space-y-2">
+                                            {form.lines.map((line, i) => (
+                                                <div
+                                                    key={i}
+                                                    className="space-y-1.5 rounded-lg border p-2.5"
+                                                >
+                                                    <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                                                        <span>
+                                                            {line.shipmentId
+                                                                ? `Shipment ${allCustomerShipments.find((s) => String(s.id) === line.shipmentId)?.masterCode ?? line.shipmentId}`
+                                                                : "Manual item"}
+                                                        </span>
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 text-destructive"
+                                                            onClick={() =>
+                                                                setForm(
+                                                                    (f) => ({
+                                                                        ...f,
+                                                                        lines: f.lines.filter(
+                                                                            (
+                                                                                _,
+                                                                                idx,
+                                                                            ) =>
+                                                                                idx !==
+                                                                                i,
+                                                                        ),
+                                                                    }),
+                                                                )
+                                                            }
+                                                            disabled={
+                                                                busy ||
+                                                                form.lines
+                                                                    .length ===
+                                                                    1
+                                                            }
+                                                            aria-label="Hapus baris"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                    <div className="grid grid-cols-[1fr_70px_100px] items-center gap-2">
+                                                        <Input
+                                                            value={
+                                                                line.description
+                                                            }
+                                                            onChange={(e) =>
+                                                                setForm(
+                                                                    (f) => ({
+                                                                        ...f,
+                                                                        lines: f.lines.map(
+                                                                            (
+                                                                                l,
+                                                                                idx,
+                                                                            ) =>
+                                                                                idx ===
+                                                                                i
+                                                                                    ? {
+                                                                                          ...l,
+                                                                                          description:
+                                                                                              e
+                                                                                                  .target
+                                                                                                  .value,
+                                                                                      }
+                                                                                    : l,
+                                                                        ),
+                                                                    }),
+                                                                )
+                                                            }
+                                                            placeholder={`Deskripsi item ${i + 1}`}
+                                                            disabled={busy}
+                                                            aria-label={`Deskripsi item ${i + 1}`}
+                                                        />
+                                                        <NumberInput
+                                                            value={
+                                                                line.quantity
+                                                            }
+                                                            onChange={(e) =>
+                                                                setForm(
+                                                                    (f) => ({
+                                                                        ...f,
+                                                                        lines: f.lines.map(
+                                                                            (
+                                                                                l,
+                                                                                idx,
+                                                                            ) =>
+                                                                                idx ===
+                                                                                i
+                                                                                    ? {
+                                                                                          ...l,
+                                                                                          quantity:
+                                                                                              e
+                                                                                                  .target
+                                                                                                  .value,
+                                                                                      }
+                                                                                    : l,
+                                                                        ),
+                                                                    }),
+                                                                )
+                                                            }
+                                                            placeholder="Qty"
+                                                            disabled={busy}
+                                                            aria-label={`Jumlah item ${i + 1}`}
+                                                        />
+                                                        <NumberInput
+                                                            value={
+                                                                line.unitPrice
+                                                            }
+                                                            onChange={(e) =>
+                                                                setForm(
+                                                                    (f) => ({
+                                                                        ...f,
+                                                                        lines: f.lines.map(
+                                                                            (
+                                                                                l,
+                                                                                idx,
+                                                                            ) =>
+                                                                                idx ===
+                                                                                i
+                                                                                    ? {
+                                                                                          ...l,
+                                                                                          unitPrice:
+                                                                                              e
+                                                                                                  .target
+                                                                                                  .value,
+                                                                                      }
+                                                                                    : l,
+                                                                        ),
+                                                                    }),
+                                                                )
+                                                            }
+                                                            placeholder="Harga"
+                                                            disabled={busy}
+                                                            aria-label={`Harga item ${i + 1}`}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        {allCustomerShipments.some(
+                                            (s) => s.invoiceLines.length > 0,
+                                        ) && (
+                                            <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                                                {
+                                                    allCustomerShipments.filter(
+                                                        (s) =>
+                                                            s.invoiceLines
+                                                                .length > 0,
+                                                    ).length
+                                                }{" "}
+                                                shipment sudah termasuk invoice
+                                                dan tidak bisa ditagihkan ulang.
+                                            </p>
+                                        )}
+                                        {linkedPartner != null && (
+                                            <p className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-[11px] text-primary">
+                                                Invoice ini membawa shipment
+                                                buatan Marketing - komisi
+                                                partner akan tercatat{" "}
+                                                <b>PENDING</b> dan hanya dirilis
+                                                saat invoice <b>LUNAS penuh</b>{" "}
+                                                (§8/§9).
+                                            </p>
+                                        )}
+                                    </>
+                                );
+                            })()}
+                            <div className="flex items-center justify-end gap-2 rounded-lg bg-muted/60 px-3 py-2 text-sm">
+                                <span className="text-muted-foreground">
+                                    Total draft:
+                                </span>
+                                <span className="font-bold text-foreground">
+                                    {formatRupiah(draftLinesTotal)}
+                                </span>
+                            </div>
+                        </div>
+
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setCreateOpen(false)}
+                                disabled={busy}
+                            >
+                                Batal
+                            </Button>
+                            <SubmitButton busy={busy}>
+                                Buat Invoice Draft
+                            </SubmitButton>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog
+                open={shipmentPickerOpen}
+                onOpenChange={setShipmentPickerOpen}
+            >
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Add Shipment</DialogTitle>
+                        <DialogDescription>
+                            Pilih shipment milik customer ini untuk ditambahkan
+                            ke invoice. Shipment yang sudah pernah ditagihkan
+                            tidak ditampilkan.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="max-h-80 space-y-2 overflow-y-auto">
+                        {customerShipments.length === 0 ? (
+                            <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
+                                Tidak ada shipment yang bisa ditambahkan.
+                            </p>
+                        ) : (
+                            customerShipments.map((shipment) => (
+                                <Button
+                                    key={shipment.id}
+                                    type="button"
+                                    variant="outline"
+                                    className="h-auto w-full justify-between px-3 py-2 text-left"
+                                    onClick={() => {
+                                        setForm((current) => ({
+                                            ...current,
+                                            lines: (() => {
+                                                const shipmentLine = {
+                                                    description: `${shipment.masterCode} - pengiriman ${shipment.origin} → ${shipment.destination}`,
+                                                    quantity: "1",
+                                                    unitPrice: String(
+                                                        shipment.priceAmount ??
+                                                            "",
+                                                    ),
+                                                    shipmentId: String(
+                                                        shipment.id,
+                                                    ),
+                                                };
+                                                const emptyLineIndex =
+                                                    current.lines.findIndex(
+                                                        (line) =>
+                                                            !line.description.trim() &&
+                                                            !line.unitPrice.trim() &&
+                                                            !line.shipmentId,
+                                                    );
+                                                if (emptyLineIndex === -1)
+                                                    return [
+                                                        ...current.lines,
+                                                        shipmentLine,
+                                                    ];
+                                                return current.lines.map(
+                                                    (line, index) =>
+                                                        index === emptyLineIndex
+                                                            ? shipmentLine
+                                                            : line,
+                                                );
+                                            })(),
+                                        }));
+                                        setShipmentPickerOpen(false);
+                                    }}
+                                >
+                                    <span>
+                                        <span className="block font-mono text-xs font-semibold">
+                                            {shipment.masterCode}
+                                        </span>
+                                        <span className="block text-xs text-muted-foreground">
+                                            {shipment.origin} →{" "}
+                                            {shipment.destination}
+                                        </span>
+                                    </span>
+                                    <span className="shrink-0 text-xs font-semibold">
+                                        {formatRupiah(shipment.priceAmount)}
+                                    </span>
+                                </Button>
+                            ))
+                        )}
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Detail dialog */}
+            <Dialog
+                open={!!detailWithLines}
+                onOpenChange={(open) => !open && setDetail(null)}
+            >
+                <DialogContent className="sm:max-w-3xl">
+                    <DialogHeader className="border-b pb-4">
+                        <div className="flex items-start justify-between gap-4 pr-4">
+                            <div>
+                                <DialogTitle className="font-mono text-xl tracking-tight">
+                                    {detailWithLines?.invoiceNumber}
+                                </DialogTitle>
+                                <DialogDescription className="mt-1">
+                                    Invoice B2B · diterbitkan{" "}
+                                    {formatDate(detailWithLines?.issueDate)}
+                                </DialogDescription>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-2">
+                                {detailWithLines && (
+                                    <StatusBadge
+                                        status={detailWithLines.status}
+                                    />
+                                )}
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                        detailWithLines &&
+                                        (window.location.hash = `#/invoices/${detailWithLines.id}`)
+                                    }
+                                    disabled={
+                                        !detailWithLines ||
+                                        !("lines" in detailWithLines)
+                                    }
+                                >
+                                    <Printer className="h-4 w-4" /> Cetak
+                                </Button>
+                            </div>
+                        </div>
+                    </DialogHeader>
+                    {detailWithLines && "lines" in detailWithLines && (
+                        <div className="space-y-4">
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <div className="rounded-lg border bg-muted/20 p-3">
+                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                        Ditagihkan kepada
+                                    </p>
+                                    <p className="mt-1 font-semibold text-foreground">
+                                        {(
+                                            detailWithLines as Invoice & {
+                                                customer?: {
+                                                    companyName?: string | null;
+                                                };
+                                            }
+                                        ).customer?.companyName ??
+                                            detailWithLines.customerCompanyName ??
+                                            detailWithLines.customerName}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {detailWithLines.customerCode}
+                                    </p>
+                                    {(
+                                        detailWithLines as Invoice & {
+                                            customer?: {
+                                                address?: string | null;
+                                            };
+                                        }
+                                    ).customer?.address && (
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            {
+                                                (
+                                                    detailWithLines as Invoice & {
+                                                        customer?: {
+                                                            address?:
+                                                                string | null;
+                                                        };
+                                                    }
+                                                ).customer?.address
+                                            }
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="rounded-lg border bg-muted/20 p-3">
+                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                        Tanggal pembayaran
+                                    </p>
+                                    <div className="mt-1 grid grid-cols-2 gap-3 text-xs">
+                                        <div>
+                                            <p className="text-muted-foreground">
+                                                Jatuh tempo
+                                            </p>
+                                            <p className="font-semibold">
+                                                {formatDate(
+                                                    detailWithLines.dueDate,
+                                                )}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p className="text-muted-foreground">
+                                                Status
+                                            </p>
+                                            <p
+                                                className={
+                                                    detailWithLines.isOverdue
+                                                        ? "font-semibold text-destructive"
+                                                        : "font-semibold"
+                                                }
+                                            >
+                                                {detailWithLines.isOverdue
+                                                    ? "Terlambat"
+                                                    : detailWithLines.status ===
+                                                        "SETTLED"
+                                                      ? "Lunas"
+                                                      : "Belum lunas"}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="overflow-x-auto rounded-lg border">
+                                <table className="w-full min-w-120 text-sm">
+                                    <thead>
+                                        <tr className="border-b bg-muted/50 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+                                            <th className="px-3 py-2 font-semibold">
+                                                Deskripsi
+                                            </th>
+                                            <th className="px-3 py-2 text-right font-semibold">
+                                                Qty
+                                            </th>
+                                            <th className="px-3 py-2 text-right font-semibold">
+                                                Harga satuan
+                                            </th>
+                                            <th className="px-3 py-2 text-right font-semibold">
+                                                Subtotal
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {(
+                                            detailWithLines as Invoice & {
+                                                lines: InvoiceLine[];
+                                            }
+                                        ).lines?.map((line) => (
+                                            <tr
+                                                key={line.id}
+                                                className="border-b last:border-0"
+                                            >
+                                                <td className="px-3 py-2">
+                                                    {line.description}
+                                                </td>
+                                                <td className="px-3 py-2 text-right">
+                                                    {formatNumber(
+                                                        line.quantity,
+                                                    )}
+                                                </td>
+                                                <td className="px-3 py-2 text-right">
+                                                    {formatRupiah(
+                                                        line.unitPrice,
+                                                    )}
+                                                </td>
+                                                <td className="px-3 py-2 text-right font-semibold">
+                                                    {formatRupiah(
+                                                        line.quantity *
+                                                            line.unitPrice,
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-2 text-center sm:grid-cols-3">
+                                <div className="rounded-lg border bg-muted/30 p-3">
+                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                        Total tagihan
+                                    </p>
+                                    <p className="mt-1 text-base font-bold">
+                                        {formatRupiah(
+                                            detailWithLines.totalAmount,
+                                        )}
+                                    </p>
+                                </div>
+                                <div className="rounded-lg border border-primary/25 bg-primary/5 p-3">
+                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">
+                                        Sudah dibayar
+                                    </p>
+                                    <p className="mt-1 text-base font-bold text-primary">
+                                        {formatRupiah(
+                                            detailWithLines.settledAmount,
+                                        )}
+                                    </p>
+                                </div>
+                                <div className="rounded-lg border border-destructive/25 bg-destructive/5 p-3">
+                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-destructive">
+                                        Sisa pembayaran
+                                    </p>
+                                    <p className="mt-1 text-base font-bold text-destructive">
+                                        {formatRupiah(
+                                            detailWithLines.remainingAmount,
+                                        )}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
+                                <div>
+                                    <span className="text-muted-foreground">
+                                        Subtotal
+                                    </span>
+                                    <p className="font-semibold">
+                                        {formatRupiah(
+                                            detailWithLines.lines?.reduce(
+                                                (sum, line) =>
+                                                    sum +
+                                                    line.quantity *
+                                                        line.unitPrice,
+                                                0,
+                                            ) ?? 0,
+                                        )}
+                                    </p>
+                                </div>
+                                <div>
+                                    <span className="text-muted-foreground">
+                                        Diskon
+                                    </span>
+                                    <p className="font-semibold">
+                                        -{" "}
+                                        {formatRupiah(detailWithLines.discount)}
+                                    </p>
+                                </div>
+                                <div>
+                                    <span className="text-muted-foreground">
+                                        Pembulatan
+                                    </span>
+                                    <p className="font-semibold">
+                                        {detailWithLines.rounding >= 0
+                                            ? "+ "
+                                            : "- "}
+                                        {formatRupiah(
+                                            Math.abs(detailWithLines.rounding),
+                                        )}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <p className="rounded-lg bg-muted/50 px-3 py-2 text-sm">
+                                PPh (termasuk pembayaran):{" "}
+                                <b>
+                                    {formatRupiah(
+                                        detailWithLines.pphAmount ??
+                                            detailWithLines.settlements?.reduce(
+                                                (sum, s) => sum + s.pph,
+                                                0,
+                                            ) ??
+                                            0,
+                                    )}
+                                </b>
+                            </p>
+
+                            <InvoicePaymentAccount invoice={detailWithLines} />
+
+                            {detailWithLines.notes && (
+                                <div className="rounded-lg border-l-2 border-primary bg-primary/5 px-3 py-2 text-xs">
+                                    <p className="font-semibold text-primary">
+                                        Catatan
+                                    </p>
+                                    <p className="mt-0.5 text-muted-foreground">
+                                        {detailWithLines.notes}
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Revise.md §8 - commission panel attached to this invoice */}
+                            {detailWithLines.commission && (
+                                <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5 text-xs">
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-semibold text-primary">
+                                            Komisi Marketing ·{" "}
+                                            {
+                                                detailWithLines.commission
+                                                    .partnerName
+                                            }{" "}
+                                            (
+                                            {
+                                                detailWithLines.commission
+                                                    .partnerPercent
+                                            }
+                                            %)
+                                        </span>
+                                        <StatusBadge
+                                            status={
+                                                detailWithLines.commission
+                                                    .status
+                                            }
+                                        />
+                                    </div>
+                                    <p className="mt-1 text-muted-foreground">
+                                        {formatRupiah(
+                                            detailWithLines.commission
+                                                .commissionAmount,
+                                        )}{" "}
+                                        -{" "}
+                                        {detailWithLines.commission.status ===
+                                        "RELEASED"
+                                            ? "sudah dikredit ke wallet Marketing"
+                                            : "dirilis ke wallet hanya setelah invoice LUNAS penuh (§9)"}
+                                    </p>
+                                </div>
+                            )}
+
+                            {((
+                                detailWithLines as Invoice & {
+                                    settlements?: InvoiceSettlement[];
+                                }
+                            ).settlements?.length ?? 0) > 0 && (
+                                <div>
+                                    <p className="mb-1.5 text-xs font-semibold text-foreground">
+                                        Riwayat Settlement
+                                    </p>
+                                    <ul className="space-y-1 text-sm">
+                                        {(
+                                            (
+                                                detailWithLines as Invoice & {
+                                                    settlements?: InvoiceSettlement[];
+                                                }
+                                            ).settlements ?? []
+                                        ).map((s) => (
+                                            <li
+                                                key={s.id}
+                                                className="flex flex-col gap-2 rounded-lg bg-muted/50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+                                            >
+                                                <div className="min-w-0">
+                                                    <p className="text-muted-foreground">
+                                                        {formatDate(
+                                                            s.settledAt,
+                                                            true,
+                                                        )}{" "}
+                                                        · {s.method}
+                                                        {s.reference && (
+                                                            <span className="ml-1 text-xs">
+                                                                · {s.reference}
+                                                            </span>
+                                                        )}
+                                                    </p>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Dibayar{" "}
+                                                        {formatRupiah(s.amount)}{" "}
+                                                        · PPh (termasuk
+                                                        pembayaran){" "}
+                                                        {formatRupiah(s.pph)} ·
+                                                        masuk invoice{" "}
+                                                        {formatRupiah(s.amount)}
+                                                    </p>
+                                                    {s.proofUrl &&
+                                                        (s.proofUrl.startsWith(
+                                                            "data:image/",
+                                                        ) ? (
+                                                            <a
+                                                                href={
+                                                                    s.proofUrl
+                                                                }
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                onClick={(
+                                                                    event,
+                                                                ) => {
+                                                                    event.preventDefault();
+                                                                    if (
+                                                                        s.proofUrl
+                                                                    )
+                                                                        openDataUrlInNewTab(
+                                                                            s.proofUrl,
+                                                                        );
+                                                                }}
+                                                                className="mt-2 block w-fit"
+                                                                aria-label={`Lihat bukti pembayaran ${formatDate(s.settledAt, true)}`}
+                                                            >
+                                                                <img
+                                                                    src={
+                                                                        s.proofUrl
+                                                                    }
+                                                                    alt="Bukti pembayaran"
+                                                                    className="h-16 w-24 rounded border object-cover shadow-sm hover:opacity-80"
+                                                                />
+                                                            </a>
+                                                        ) : (
+                                                            <a
+                                                                href={
+                                                                    s.proofUrl
+                                                                }
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                onClick={(
+                                                                    event,
+                                                                ) => {
+                                                                    event.preventDefault();
+                                                                    if (
+                                                                        s.proofUrl
+                                                                    )
+                                                                        openDataUrlInNewTab(
+                                                                            s.proofUrl,
+                                                                        );
+                                                                }}
+                                                                className="mt-1 inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary hover:bg-primary/20"
+                                                            >
+                                                                <Paperclip className="h-3 w-3" />{" "}
+                                                                Buka bukti PDF
+                                                            </a>
+                                                        ))}
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-semibold">
+                                                        {formatRupiah(s.amount)}
+                                                    </span>
+                                                    {detailWithLines.status !==
+                                                        "CANCELLED" &&
+                                                        can.editSettlement && (
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                variant="outline"
+                                                                disabled={busy}
+                                                                onClick={() =>
+                                                                    openSettlementEdit(
+                                                                        s,
+                                                                    )
+                                                                }
+                                                            >
+                                                                <Edit className="h-3 w-3" />{" "}
+                                                                Edit
+                                                            </Button>
+                                                        )}
+                                                    {detailWithLines.status !==
+                                                        "CANCELLED" &&
+                                                        can.deleteSettlement && (
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                variant="destructive"
+                                                                disabled={busy}
+                                                                onClick={() =>
+                                                                    setDeletingSettlement(
+                                                                        s,
+                                                                    )
+                                                                }
+                                                            >
+                                                                <Trash2 className="h-3 w-3" />{" "}
+                                                                Hapus
+                                                            </Button>
+                                                        )}
+                                                </div>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
+
+            {printOpen && detailWithLines && "lines" in detailWithLines && (
+                <InvoicePrint
+                    invoice={
+                        detailWithLines as Invoice & { lines: InvoiceLine[] }
+                    }
+                    onClose={() => setPrintOpen(false)}
+                />
+            )}
+
+            {/* Settle dialog */}
+            <Dialog
+                open={settleOpen}
+                onOpenChange={(open) => {
+                    setSettleOpen(open);
+                    if (!open) {
+                        setSettleProof(null);
+                        setSettleProofError("");
+                    }
+                }}
+            >
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>
+                            {editingSettlement ? "Edit Settlement" : "Settle"}{" "}
+                            {settleTarget?.invoiceNumber ??
+                                detailWithLines?.invoiceNumber ??
+                                ""}
+                        </DialogTitle>
+                        <DialogDescription>
+                            Sisa tagihan:{" "}
+                            {formatRupiah(
+                                (settleTarget?.remainingAmount ??
+                                    detailWithLines?.remainingAmount ??
+                                    0) + (editingSettlement?.amount ?? 0),
+                            )}
+                            . PPh termasuk dalam pembayaran dan tidak mengurangi
+                            pelunasan.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={onSettle} className="space-y-4">
+                        <Field
+                            label="Jumlah Transfer / Cash (Rp)"
+                            htmlFor="st-amount"
+                        >
+                            <NumberInput
+                                id="st-amount"
+                                value={settleAmount}
+                                onChange={(e) =>
+                                    setSettleAmount(e.target.value)
+                                }
+                                required
+                                disabled={busy}
+                            />
+                        </Field>
+                        <Field
+                            label="PPh (Rp)"
+                            htmlFor="st-pph"
+                            hint="Informasi PPh yang sudah termasuk dalam jumlah pembayaran. Tidak mengurangi pelunasan invoice."
+                        >
+                            <NumberInput
+                                id="st-pph"
+                                min="0"
+                                value={settlePph}
+                                onChange={(e) => setSettlePph(e.target.value)}
+                                disabled={busy}
+                            />
+                        </Field>
+                        <Field label="Tanggal pembayaran" htmlFor="st-date">
+                            <Input
+                                id="st-date"
+                                type="date"
+                                value={settleDate}
+                                onChange={(e) => setSettleDate(e.target.value)}
+                                required
+                                disabled={busy}
+                            />
+                        </Field>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <Field label="Metode" htmlFor="st-method">
+                                <FormSelect
+                                    value={settleMethod}
+                                    onValueChange={setSettleMethod}
+                                    options={[
+                                        {
+                                            value: "TRANSFER",
+                                            label: "Transfer",
+                                        },
+                                        { value: "CASH", label: "Cash" },
+                                    ]}
+                                    disabled={busy}
+                                />
+                            </Field>
+                            <Field label="Referensi" htmlFor="st-ref">
+                                <Input
+                                    id="st-ref"
+                                    value={settleRef}
+                                    onChange={(e) =>
+                                        setSettleRef(e.target.value)
+                                    }
+                                    placeholder="No. bukti transfer"
+                                    disabled={busy}
+                                />
+                            </Field>
+                        </div>
+                        <Field
+                            label="Bukti Pembayaran (opsional)"
+                            htmlFor="st-proof"
+                            hint="Bukti transfer / kuitansi kasir. Maks 8 MB."
+                        >
+                            <div className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md border bg-background px-3 text-sm font-medium hover:bg-accent hover:text-accent-foreground">
+                                        <Paperclip className="h-4 w-4" />
+                                        <span>
+                                            {settleProof
+                                                ? settleProof.name
+                                                : "Pilih file…"}
+                                        </span>
+                                        <input
+                                            id="st-proof"
+                                            type="file"
+                                            accept="image/*,application/pdf"
+                                            className="hidden"
+                                            onChange={(e) =>
+                                                onSettleProofChange(
+                                                    e.target.files?.[0],
+                                                )
+                                            }
+                                            disabled={busy}
+                                        />
+                                    </label>
+                                    {settleProof && (
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-8 text-destructive"
+                                            onClick={() => setSettleProof(null)}
+                                            disabled={busy}
+                                        >
+                                            Hapus
+                                        </Button>
+                                    )}
+                                </div>
+                                {settleProof &&
+                                    settleProof.type.startsWith("image/") && (
+                                        <img
+                                            src={settleProof.dataUrl}
+                                            alt="Pratinjau bukti"
+                                            className="max-h-40 rounded-md border"
+                                        />
+                                    )}
+                                {settleProof &&
+                                    settleProof.type === "application/pdf" && (
+                                        <p className="rounded-md border bg-muted/40 px-2 py-1.5 text-xs text-muted-foreground">
+                                            PDF terpilih ({settleProof.name})
+                                        </p>
+                                    )}
+                                {settleProofError && (
+                                    <p className="text-xs text-destructive">
+                                        {settleProofError}
+                                    </p>
+                                )}
+                            </div>
+                        </Field>
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setSettleOpen(false)}
+                                disabled={busy}
+                            >
+                                Batal
+                            </Button>
+                            <SubmitButton busy={busy}>
+                                {editingSettlement
+                                    ? "Simpan Perubahan"
+                                    : "Catat Settlement"}
+                            </SubmitButton>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            <AlertDialog
+                open={!!deletingSettlement}
+                onOpenChange={(open) =>
+                    !open && !busy && setDeletingSettlement(null)
+                }
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Hapus settlement{" "}
+                            {formatRupiah(deletingSettlement?.amount ?? 0)}?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Total pembayaran dan status invoice akan dihitung
+                            ulang. Komisi yang sudah dirilis akan dikoreksi bila
+                            invoice kembali belum lunas.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={busy}>
+                            Batal
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            variant="destructive"
+                            disabled={busy}
+                            onClick={(event) => {
+                                event.preventDefault();
+                                void onDeleteSettlement();
+                            }}
+                        >
+                            Ya, hapus settlement
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog
+                open={!!confirmDelete}
+                onOpenChange={(open) => !open && setConfirmDelete(null)}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Hapus invoice {confirmDelete?.invoiceNumber}?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Invoice yang sudah memiliki settlement tidak bisa
+                            dihapus.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Batal</AlertDialogCancel>
+                        <AlertDialogAction
+                            variant="destructive"
+                            onClick={onDelete}
+                        >
+                            Ya, hapus
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </div>
+    );
 }

@@ -159,11 +159,26 @@ describe("invoice history and print", () => {
             screen.getByRole("region", { name: "Total invoice" }),
         ).toHaveTextContent("Subtotal");
     });
-    it("opens history from the eye button and saves PPh edits without losing proof", async () => {
+    it("opens the print preview from the Cetak button", async () => {
+        const user = userEvent.setup();
+        window.location.hash = "#/invoices";
+        render(<InvoicesPage />);
+        const printButton = await screen.findByRole("button", {
+            name: "Cetak INV-1",
+        });
+        expect(printButton).toHaveTextContent("Cetak");
+        expect(
+            await screen.findByRole("button", { name: "Detail INV-1" }),
+        ).toHaveTextContent("Detail");
+        await user.click(printButton);
+        expect(window.location.hash).toBe("#/invoices/1");
+        window.location.hash = "";
+    });
+    it("opens history from the Detail button and saves PPh edits without losing proof", async () => {
         const user = userEvent.setup();
         render(<InvoicesPage />);
         await user.click(
-            await screen.findByRole("button", { name: "Lihat riwayat INV-1" }),
+            await screen.findByRole("button", { name: "Detail INV-1" }),
         );
         await user.click(await screen.findByRole("button", { name: /^Edit$/ }));
         expect(
@@ -191,7 +206,7 @@ describe("invoice history and print", () => {
         const user = userEvent.setup();
         render(<InvoicesPage />);
         await user.click(
-            await screen.findByRole("button", { name: "Lihat riwayat INV-1" }),
+            await screen.findByRole("button", { name: "Detail INV-1" }),
         );
         await user.click(
             await screen.findByRole("button", { name: /^Hapus$/ }),
@@ -209,7 +224,7 @@ describe("invoice history and print", () => {
         const user = userEvent.setup();
         render(<InvoicesPage />);
         await user.click(
-            await screen.findByRole("button", { name: "Lihat riwayat INV-1" }),
+            await screen.findByRole("button", { name: "Detail INV-1" }),
         );
         await screen.findByText("Riwayat Settlement");
         expect(
