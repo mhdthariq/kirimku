@@ -2,12 +2,14 @@ import { NextRequest } from "next/server";
 import { db } from "@/infrastructure/persistence/db";
 import { guard, ok, handle, fail, str, requireNum, num, dateOrNull } from "@/composition/api-helpers";
 import { audit, diffFields } from "@/infrastructure/services/audit";
+import { expireTariffs, isTariffConflict, tariffEndDate } from "@/infrastructure/services/tariff-lifecycle";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function PUT(req: NextRequest, { params }: Params) {
   return handle(req, async () => {
     const user = await guard(req, "tariff.update");
+    await expireTariffs();
     const { id } = await params;
     const existing = await db.tariff.findUnique({ where: { id: Number(id) } });
     if (!existing) return fail(404, "Tariff tidak ditemukan.");
@@ -61,9 +63,31 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (body.roundingMode !== undefined) data.roundingMode = body.roundingMode === "NEAREST" ? "NEAREST" : "UP";
     if (body.roundingUnitKg !== undefined) data.roundingUnitKg = num(body.roundingUnitKg) ?? existing.roundingUnitKg;
     if (body.effectiveFrom !== undefined) data.effectiveFrom = dateOrNull(body.effectiveFrom) ?? existing.effectiveFrom;
-    if (body.effectiveTo !== undefined) data.effectiveTo = dateOrNull(body.effectiveTo);
+    if (body.effectiveTo !== undefined) data.effectiveTo = tariffEndDate(body.effectiveTo);
     if (body.isActive !== undefined) data.isActive = Boolean(body.isActive);
-    const tariff = await db.tariff.update({ where: { id: existing.id }, data });
+    const effectiveFrom = (data.effectiveFrom as Date | undefined) ?? existing.effectiveFrom;
+    const effectiveTo = data.effectiveTo !== undefined ? data.effectiveTo as Date | null : existing.effectiveTo;
+    if ((body.effectiveFrom && !dateOrNull(body.effectiveFrom)) || (body.effectiveTo && !effectiveTo) || (effectiveTo && effectiveTo < effectiveFrom)) {
+      return fail(422, "Masa berlaku tarif tidak valid.");
+    }
+    const isActive = effectiveTo && effectiveTo < new Date() ? false : (data.isActive as boolean | undefined) ?? existing.isActive;
+    data.isActive = isActive;
+    if (isActive) {
+      const duplicate = await db.tariff.findFirst({ where: {
+        id: { not: existing.id }, isActive: true,
+        origin: (data.origin as string | undefined) ?? existing.origin,
+        destination: (data.destination as string | undefined) ?? existing.destination,
+        name: data.name !== undefined ? data.name as string | null : existing.name,
+        customerType: effectiveCustomerType,
+        customerId: data.customerId !== undefined ? data.customerId as number | null : existing.customerId,
+      } });
+      if (duplicate) return fail(422, "Tarif aktif dengan nama, koridor, dan customer ini sudah ada.");
+    }
+    const tariff = await db.tariff.update({ where: { id: existing.id }, data }).catch((error: unknown) => {
+      if (isTariffConflict(error)) return null;
+      throw error;
+    });
+    if (!tariff) return fail(422, "Tarif aktif dengan nama, koridor, dan customer ini sudah ada.");
     await audit({ action: "updated", entityType: "tariff", entityId: tariff.id, entityLabel: `${tariff.origin} → ${tariff.destination} (${tariff.customerType ?? "semua"})`, actor: user, before: diffFields(existing, tariff as unknown as Record<string, unknown>) });
     return ok(tariff);
   });

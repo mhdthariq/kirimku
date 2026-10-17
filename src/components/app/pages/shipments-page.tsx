@@ -417,7 +417,7 @@ function ShipmentList() {
   const discountIsMarketingFunded = user?.partnerType === "MARKETING";
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-5">
       <PageHeader
         title="Shipments"
         subtitle="Kiriman dari pembuatan hingga diterima."
@@ -439,8 +439,22 @@ function ShipmentList() {
         }
       />
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Ringkasan shipment">
+        {[
+          { label: "Total Shipment", count: data?.length ?? 0 },
+          { label: "Dalam Perjalanan", count: data?.filter((s) => ["PICKED_UP", "IN_TRANSPORT"].includes(s.status)).length ?? 0 },
+          { label: "Terkirim", count: data?.filter((s) => s.status === "DELIVERED").length ?? 0 },
+          { label: "Belum Dihitung", count: data?.filter((s) => s.priceAmount == null && s.status !== "CANCELLED").length ?? 0 },
+        ].map((item) => (
+          <div key={item.label} className="rounded-2xl border bg-card p-4 shadow-sm sm:p-5">
+            <p className="text-xs font-medium text-muted-foreground">{item.label}</p>
+            <p className="mt-2 text-2xl font-bold tabular-nums tracking-tight">{loading ? "…" : item.count}</p>
+          </div>
+        ))}
+      </div>
+
+      <Tabs value={tab} onValueChange={setTab} className="min-w-0">
+        <TabsList className="h-auto max-w-full flex-wrap justify-start gap-1 rounded-xl p-1.5">
           {/* Revise round 8 - Regular / Direct top-level tabs.
               "Regular" = STANDARD fulfillment (kurir → gudang → transport → gudang → kurir).
               "Direct"  = DIRECT fulfillment (driver picks up at origin warehouse → delivers to destination).
@@ -483,37 +497,28 @@ function ShipmentList() {
             onSearchChange={setSearch}
             searchPlaceholder="Cari resi / customer / kota…"
             toolbar={
-              <div className="flex max-w-full flex-wrap items-center gap-1.5">
-                <select aria-label="Filter invoice" value={invoiceFilter} onChange={(e) => setInvoiceFilter(e.target.value)} className="h-7 rounded-md border bg-background px-2 text-[11px]">
+              <div className="grid w-full grid-cols-1 gap-2 min-[400px]:grid-cols-2 sm:flex sm:w-auto sm:flex-wrap">
+                <select aria-label="Filter invoice" value={invoiceFilter} onChange={(e) => setInvoiceFilter(e.target.value)} className="h-10 min-w-0 rounded-lg border bg-background px-3 text-sm">
                   <option value="all">All invoices</option>
                   <option value="on_invoice">On invoice</option>
                   <option value="not_invoice">Not on invoice</option>
                 </select>
-                {[
-                  { key: "all", label: "All" },
-                  { key: "CREATED", label: "Created" },
-                  { key: "READY_FOR_PICKUP", label: "Ready for Pickup" },
-                  { key: "PICKED_UP", label: "Picked Up" },
-                  { key: "RECEIVED_AT_GUDANG", label: "At Origin Gudang" },
-                  { key: "IN_TRANSPORT", label: "In Transport" },
-                  { key: "AT_DEST_GUDANG", label: "At Dest. Gudang" },
-                  { key: "ARRIVED_AT_GUDANG", label: "Arrived at Gudang" },
-                  { key: "DELIVERED", label: "Delivered" },
-                  { key: "CANCELLED", label: "Cancelled" },
-                ].map((t) => (
-                  <Button
-                    key={t.key}
-                    size="sm"
-                    variant={statusFilter === t.key ? "default" : "outline"}
-                    className="h-7 shrink-0 whitespace-nowrap px-2.5 text-[11px]"
-                    onClick={() => setStatusFilter(t.key)}
-                  >
-                    {t.label}
-                    {t.key !== "all" && (
-                      <span className="ml-1 opacity-70">{data?.filter((s) => s.status === t.key).length ?? 0}</span>
-                    )}
-                  </Button>
-                ))}
+                <select aria-label="Filter status shipment" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-10 min-w-0 rounded-lg border bg-background px-3 text-sm">
+                  {[
+                    { key: "all", label: "All statuses" },
+                    { key: "CREATED", label: "Created" },
+                    { key: "READY_FOR_PICKUP", label: "Ready for Pickup" },
+                    { key: "PICKED_UP", label: "Picked Up" },
+                    { key: "RECEIVED_AT_GUDANG", label: "At Origin Gudang" },
+                    { key: "IN_TRANSPORT", label: "In Transport" },
+                    { key: "AT_DEST_GUDANG", label: "At Dest. Gudang" },
+                    { key: "ARRIVED_AT_GUDANG", label: "Arrived at Gudang" },
+                    { key: "DELIVERED", label: "Delivered" },
+                    { key: "CANCELLED", label: "Cancelled" },
+                  ].map((item) => (
+                    <option key={item.key} value={item.key}>{item.label}</option>
+                  ))}
+                </select>
               </div>
             }
             emptyMessage="Belum ada shipment. Klik “Buat Shipment” untuk membuat booking baru."
@@ -535,7 +540,7 @@ function ShipmentList() {
                   const cust = s.customer ? customerDisplayParts(s.customer) : { primary: "-", secondary: null };
                   return (
                   <div>
-                    <p className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                    <p className="flex flex-wrap items-center gap-1.5 break-words text-sm font-medium text-foreground">
                       {cust.primary}
                       {s.customer?.type === "b2b" && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-950 dark:text-sky-300" title="B2B - cukup scan Master Resi sekali">
@@ -675,7 +680,7 @@ function ShipmentList() {
 
       {/* Create dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Buat Shipment</DialogTitle>
           </DialogHeader>

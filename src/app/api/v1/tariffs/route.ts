@@ -2,10 +2,12 @@ import { NextRequest } from "next/server";
 import { db } from "@/infrastructure/persistence/db";
 import { guard, ok, handle, fail, requireStr, str, requireNum, num, bool, dateOrNull } from "@/composition/api-helpers";
 import { audit } from "@/infrastructure/services/audit";
+import { expireTariffs, isTariffConflict, tariffEndDate } from "@/infrastructure/services/tariff-lifecycle";
 
 export async function GET(req: NextRequest) {
   return handle(req, async () => {
     await guard(req, "tariff.view");
+    await expireTariffs();
     const params = req.nextUrl.searchParams;
     const search = str(params.get("search"));
     const activeOnly = bool(params.get("active_only"), false);
@@ -51,12 +53,19 @@ export async function POST(req: NextRequest) {
       customerId = customer.id;
     }
 
+    const effectiveFrom = dateOrNull(body.effectiveFrom) ?? new Date();
+    const effectiveTo = tariffEndDate(body.effectiveTo);
+    if ((body.effectiveFrom && !dateOrNull(body.effectiveFrom)) || (body.effectiveTo && !effectiveTo) || (effectiveTo && effectiveTo < effectiveFrom)) {
+      return fail(422, "Masa berlaku tarif tidak valid.");
+    }
+    const isActive = !effectiveTo || effectiveTo >= new Date();
+    await expireTariffs();
     // The same corridor may have several tariffs as long as the NAME differs
     // (per customer for B2B). Only an identical name+corridor+customer clashes.
     const duplicate = await db.tariff.findFirst({
       where: { origin, destination, customerType, customerId, name, isActive: true },
     });
-    if (duplicate) {
+    if (isActive && duplicate) {
       return fail(422, `Tarif aktif ${name ? `“${name}” ` : ""}${origin} → ${destination}${customerType ? ` (${customerType})` : ""} sudah ada. Pakai nama tarif lain atau nonaktifkan yang lama.`, {
         name: ["Nama tarif sudah dipakai untuk koridor ini."],
       });
@@ -92,11 +101,15 @@ export async function POST(req: NextRequest) {
         ratePerCubic: pricingMethodRaw === "PER_CUBIC" ? num(body.ratePerCubic) : null,
         minChargeableKoli: num(body.minChargeableKoli) ?? 1,
         minChargeableM3: num(body.minChargeableM3) ?? 0,
-        effectiveFrom: dateOrNull(body.effectiveFrom) ?? new Date(),
-        effectiveTo: dateOrNull(body.effectiveTo),
-        isActive: true,
+        effectiveFrom,
+        effectiveTo,
+        isActive,
       },
+    }).catch((error: unknown) => {
+      if (isTariffConflict(error)) return null;
+      throw error;
     });
+    if (!tariff) return fail(422, "Tarif aktif dengan nama, koridor, dan customer ini sudah ada.");
     await audit({ action: "created", entityType: "tariff", entityId: tariff.id, entityLabel: `${name ? `${name} · ` : ""}${origin} → ${destination} (${customerType ?? "semua"})`, actor: user, after: tariff });
     return ok(tariff);
   });

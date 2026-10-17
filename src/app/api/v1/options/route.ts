@@ -3,11 +3,13 @@ import { db } from "@/infrastructure/persistence/db";
 import { guard, ok, handle } from "@/composition/api-helpers";
 import { scopeForUser } from "@/infrastructure/services/gudang-scope";
 import { currentCompanyName } from "@/infrastructure/persistence/tenant-context";
+import { expireTariffs } from "@/infrastructure/services/tariff-lifecycle";
 
 /** Lightweight dropdown options for any authenticated user (ids + labels only). */
 export async function GET(req: NextRequest) {
   return handle(req, async () => {
     const user = await guard(req);
+    await expireTariffs();
     const marketingOwner = user.partnerType === "MARKETING" ? user.partnerId : null;
     // Revise round 7 — Customer Gudang attachment. Customers with a
     // warehouseId set are only visible to admins of that gudang (plus

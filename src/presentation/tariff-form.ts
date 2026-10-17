@@ -119,6 +119,7 @@ export function buildTariffPayload(tab: TariffTab, form: TariffFormState) {
 
 /** Client-side validation message for a B2B tariff panel/form, or null when OK. */
 export function validateTariffForm(tab: TariffTab, form: TariffFormState): string | null {
+  if (form.effectiveTo && form.effectiveTo < form.effectiveFrom) return "Tanggal akhir harus sama atau setelah tanggal mulai.";
   if (!form.origin.trim() || !form.destination.trim()) return "Kota asal dan tujuan wajib diisi.";
   if (tab === "b2b" && !form.customerId) return "Pilih customer B2B untuk tarif ini.";
   const method = form.pricingMethod;

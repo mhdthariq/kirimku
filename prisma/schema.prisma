@@ -693,6 +693,8 @@ model Delivery {
 }
 
 model Tariff {
+    // Active-only name/route/customer uniqueness is managed by SQL migration
+    // Tariff_active_identity_key; inactive versions retain distinct primary IDs.
     id                   Int              @id @default(autoincrement())
     /// Human-readable tariff name (e.g. "Reguler", "Express") — lets the same
     /// corridor have several tariffs that differ only by name. Null on legacy rows.

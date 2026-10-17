@@ -53,6 +53,25 @@ async function openGrouped() {
 }
 
 describe("ShipmentsPage requested UI changes", () => {
+  it("combines the compact status and invoice filters on the shipment list", async () => {
+    const originalGet = mocks.get.getMockImplementation()!;
+    mocks.get.mockImplementation(async (path: string) => path === "/shipments" ? [
+      { ...shipment, id: 1, masterCode: "CREATED-ROW", invoiceLines: [] },
+      { ...shipment, id: 2, masterCode: "DELIVERED-ROW", status: "DELIVERED", invoiceLines: [{ invoice: { id: 4, invoiceNumber: "INV-4" } }] },
+    ] : originalGet(path));
+    render(<ShipmentsPage shipmentId={null} />);
+    const user = userEvent.setup();
+    await screen.findAllByText("CREATED-ROW");
+    expect(screen.getByLabelText("Ringkasan shipment")).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Filter status shipment"), "DELIVERED");
+    expect(screen.queryByText("CREATED-ROW")).not.toBeInTheDocument();
+    expect(screen.getAllByText("DELIVERED-ROW").length).toBeGreaterThan(0);
+    await user.selectOptions(screen.getByLabelText("Filter invoice"), "not_invoice");
+    expect(screen.queryByText("DELIVERED-ROW")).not.toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Filter status shipment"), "all");
+    expect(screen.getAllByText("CREATED-ROW").length).toBeGreaterThan(0);
+  });
+
   it("retains leading-zero decimal typing and paste, converting only on submit", async () => {
     render(<ShipmentsPage shipmentId={7} />);
     const user = userEvent.setup();
