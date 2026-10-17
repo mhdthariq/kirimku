@@ -117,6 +117,53 @@ describe("responsive transport finance and bank management", () => {
     expect(screen.getByRole("tab", { name: "Biaya Operasional" })).toHaveAttribute("data-state", "active");
     fixture("transport-expenses");
   });
+  it.each([
+    ["transport.view", "transport.expense.create"],
+    ["transport.view", "transport.expense.create", "transport.expense.update"],
+  ])("lets expense creators add costs without expense view permission (%j)", async (...permissions) => {
+    m.owner = false;
+    m.permissions = permissions;
+    render(<TransportDetailPage transportId={10} initialTab="expenses" />);
+    expect(
+      await screen.findByRole("button", { name: "Tambah Biaya" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("tab", { name: "Biaya Operasional" }),
+    ).toHaveAttribute("data-state", "active");
+    expect(m.get).not.toHaveBeenCalledWith("/transports/10/expenses");
+    expect(screen.queryByText("EXP-2026-000001")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Tambah Biaya" }));
+    expect(
+      screen.getByRole("dialog", { name: "Tambah Biaya" }),
+    ).toBeInTheDocument();
+  });
+  it("keeps expense creation hidden for view-only users", async () => {
+    m.owner = false;
+    m.permissions = ["transport.view", "transport.expense.view"];
+    render(<TransportDetailPage transportId={10} initialTab="expenses" />);
+    await screen.findByText("EXP-2026-000001");
+    expect(
+      screen.queryByRole("button", { name: "Tambah Biaya" }),
+    ).not.toBeInTheDocument();
+  });
+  it("allows update-only users with view permission to edit, but not add, expenses", async () => {
+    m.owner = false; m.permissions = ["transport.view", "transport.expense.view", "transport.expense.update"];
+    render(<TransportDetailPage transportId={10} initialTab="expenses" />);
+    const edit = await screen.findByRole("button", { name: "Edit biaya" });
+    expect(screen.queryByRole("button", { name: "Tambah Biaya" })).not.toBeInTheDocument();
+    fireEvent.click(edit);
+    expect(screen.getByRole("dialog", { name: "Edit Biaya" })).toBeInTheDocument();
+  });
+  it("does not expose the expense tab without any expense permission", async () => {
+    m.owner = false;
+    m.permissions = ["transport.view"];
+    render(<TransportDetailPage transportId={10} initialTab="expenses" />);
+    await screen.findByText("Informasi Transport");
+    expect(
+      screen.queryByRole("tab", { name: "Biaya Operasional" }),
+    ).not.toBeInTheDocument();
+    expect(m.get).not.toHaveBeenCalledWith("/transports/10/expenses");
+  });
   it("prints only the bank, account number and account name in payment instructions", () => {
     render(<InvoicePrint invoice={invoice} onClose={() => {}} />);
     const payment = screen.getByRole("region", { name: "Rekening pembayaran" });

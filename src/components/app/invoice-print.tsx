@@ -112,7 +112,7 @@ export function InvoicePrint({ invoice, onClose }: { invoice: PrintableInvoice; 
                 </span>
               )}
             </div>
-            <span className="font-mono text-[9px] text-neutral-400">Dokumen ini dicetak dari sistem KirimKu.</span>
+            <span className="font-mono text-[9px] text-neutral-400">Dokumen ini dicetak dari sistem NovaLogistik.</span>
           </div>
         </footer>
       </article>

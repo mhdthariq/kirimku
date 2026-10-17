@@ -69,6 +69,7 @@ const EMPTY: FormState = { type: "BBM", amount: "", description: "", photo: "", 
  */
 export function TransportExpensesPanel({
   transportId,
+  canView = true,
   canCreate: createPermission,
   canUpdate: updatePermission,
   transportStatus,
@@ -77,6 +78,7 @@ export function TransportExpensesPanel({
 }: {
   transportId: number;
   transportStatus?: string;
+  canView?: boolean;
   canCreate: boolean;
   canUpdate: boolean;
   canDelete: boolean;
@@ -87,8 +89,11 @@ export function TransportExpensesPanel({
   const canCreate = createPermission && !completed;
   const canUpdate = updatePermission && !completed;
   const canApprove = approvePermission ?? hasPermission(user, "transport.expense.approve");
-  const { data, loading, reload } = useApiData<TransportExpenseRow[]>(() => apiGet<TransportExpenseRow[]>(`/transports/${transportId}/expenses`), [transportId]);
-  const rows = useMemo(() => data ?? [], [data]);
+  const { data, loading, reload } = useApiData<TransportExpenseRow[]>(
+    () => canView ? apiGet<TransportExpenseRow[]>(`/transports/${transportId}/expenses`) : Promise.resolve([]),
+    [transportId, canView],
+  );
+  const rows = useMemo(() => canView ? data ?? [] : [], [data, canView]);
   const summary = useMemo(() => summarizeExpenses(rows), [rows]);
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -187,7 +192,7 @@ export function TransportExpensesPanel({
             <Wallet className="h-4 w-4 text-primary" /> Biaya Operasional
           </span>
           <span className="flex min-w-0 flex-wrap items-center gap-3">
-            <span className="text-sm font-semibold">{formatRupiah(summary.total)} (total biaya disetujui)</span>
+            {canView && <span className="text-sm font-semibold">{formatRupiah(summary.total)} (total biaya disetujui)</span>}
             {canCreate && (
               <Button size="sm" onClick={() => openCreate()}>
                 <Plus className="h-3.5 w-3.5" /> Tambah Biaya
@@ -202,7 +207,7 @@ export function TransportExpensesPanel({
             ? "Transport sudah COMPLETED. Penambahan biaya dan unggah foto ditutup; approval biaya tetap terpisah."
             : "Approval berlaku per biaya, bukan untuk seluruh transport. Biaya baru tetap dapat ditambahkan sampai transport COMPLETED."}
         </p>
-        <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2 xl:grid-cols-5">
+        {canView && <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2 xl:grid-cols-5">
           {EXPENSE_TYPES.map((t) => {
             const Icon = ICON[t];
             const s = summary.byType[t];
@@ -216,9 +221,11 @@ export function TransportExpensesPanel({
               </div>
             );
           })}
-        </div>
+        </div>}
 
-        {loading ? (
+        {!canView ? (
+          <p className="rounded-lg border border-dashed px-3.5 py-4 text-sm text-muted-foreground">Anda tidak memiliki izin melihat daftar biaya. Izin transport.expense.view diperlukan untuk melihat dan memilih biaya yang akan diubah.</p>
+        ) : loading ? (
           <p className="text-sm text-muted-foreground">Memuat biaya…</p>
         ) : rows.length === 0 ? (
           <p className="rounded-lg border border-dashed px-3.5 py-4 text-center text-sm text-muted-foreground">Belum ada biaya operasional untuk transport ini.</p>

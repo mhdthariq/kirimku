@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatDate, formatNumber } from "@/components/app/form-parts";
+import { LogoMark } from "@/components/app/logo";
 import { cn } from "@/shared/utils";
 
 /**
@@ -160,10 +161,8 @@ export default function TrackingPaketPage() {
       <header className="border-b bg-background/80 backdrop-blur">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-4">
           <a href="/" className="flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              <Truck className="h-5 w-5" />
-            </span>
-            <span className="text-base font-bold tracking-tight">KirimKu</span>
+            <LogoMark className="h-9 w-9" />
+            <span className="text-base font-bold tracking-tight">NovaLogistik</span>
           </a>
           <a
             href="/"
@@ -441,7 +440,7 @@ export default function TrackingPaketPage() {
 
       {/* Footer */}
       <footer className="border-t bg-background/80 py-6 text-center text-xs text-muted-foreground">
-        <p>© {new Date().getFullYear()} KirimKu - Layanan Lacak Paket Publik</p>
+        <p>© {new Date().getFullYear()} NovaLogistik - Layanan Lacak Paket Publik</p>
       </footer>
     </main>
   );

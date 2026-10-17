@@ -317,13 +317,13 @@ model MasterShipment {
 }
 
 model ShipmentDocument {
-    id         Int            @id @default(autoincrement())
-    masterId   Int
-    fileName   String
-    mimeType   String
-    dataUrl    String
-    createdAt  DateTime       @default(now())
-    master     MasterShipment @relation(fields: [masterId], references: [id], onDelete: Cascade)
+    id        Int            @id @default(autoincrement())
+    masterId  Int
+    fileName  String
+    mimeType  String
+    dataUrl   String
+    createdAt DateTime       @default(now())
+    master    MasterShipment @relation(fields: [masterId], references: [id], onDelete: Cascade)
 
     @@index([masterId, createdAt])
 }
@@ -752,36 +752,36 @@ model Payment {
 }
 
 model Invoice {
-    id            Int                  @id @default(autoincrement())
-    invoiceNumber String               @unique
-    customerId    Int
-    status        String               @default("DRAFT")
-    discount      Float                @default(0)
-    rounding      Float                @default(0)
-    issueDate     DateTime?
-    dueDate       DateTime?
-    notes         String?
-    bankAccountId Int?
-    paymentBankName String?
+    id                   Int                  @id @default(autoincrement())
+    invoiceNumber        String               @unique
+    customerId           Int
+    status               String               @default("DRAFT")
+    discount             Float                @default(0)
+    rounding             Float                @default(0)
+    issueDate            DateTime?
+    dueDate              DateTime?
+    notes                String?
+    bankAccountId        Int?
+    paymentBankName      String?
     paymentAccountNumber String?
-    paymentAccountName String?
-    createdAt     DateTime             @default(now())
-    updatedAt     DateTime             @updatedAt
-    customer      Customer             @relation(fields: [customerId], references: [id])
-    lines         InvoiceLine[]
-    settlements   InvoiceSettlement[]
-    commission    MarketingCommission?
-    bankAccount   BankAccount? @relation(fields: [bankAccountId], references: [id], onDelete: SetNull)
+    paymentAccountName   String?
+    createdAt            DateTime             @default(now())
+    updatedAt            DateTime             @updatedAt
+    customer             Customer             @relation(fields: [customerId], references: [id])
+    lines                InvoiceLine[]
+    settlements          InvoiceSettlement[]
+    commission           MarketingCommission?
+    bankAccount          BankAccount?         @relation(fields: [bankAccountId], references: [id], onDelete: SetNull)
 }
 
 model BankAccount {
-    id            Int @id @default(autoincrement())
+    id            Int       @id @default(autoincrement())
     bankName      String
     accountNumber String
     accountName   String
-    isActive      Boolean @default(true)
-    createdAt     DateTime @default(now())
-    updatedAt     DateTime @updatedAt
+    isActive      Boolean   @default(true)
+    createdAt     DateTime  @default(now())
+    updatedAt     DateTime  @updatedAt
     invoices      Invoice[]
 }
 

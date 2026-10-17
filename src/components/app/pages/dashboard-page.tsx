@@ -281,7 +281,7 @@ export function DashboardPage() {
         description={`${roleLabel[data.role]} · Pantau pengiriman, armada, dan aktivitas bisnis Anda.`}
         actions={<DatePeriodFilter from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t); }} className="dashboard-period" />}
       />
-      <section className="relative overflow-hidden rounded-2xl bg-emerald-950 p-5 text-white sm:p-7">
+      <section className="relative overflow-hidden rounded-2xl bg-[#008B75] p-5 text-white dark:bg-emerald-950 sm:p-7">
         <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-24 h-72 w-72 rounded-full border-[40px] border-emerald-400/10" />
         <div className="relative flex flex-col justify-between gap-6 md:flex-row md:items-end">
           <div className="min-w-0">

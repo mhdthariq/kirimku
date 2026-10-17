@@ -127,6 +127,8 @@ export function TransportDetailPage({ transportId, initialTab }: { transportId: 
     expenseDelete: hasPermission(user, "transport.expense.delete"),
   };
 
+  const canAccessExpenses = can.expenseView || can.expenseCreate || can.expenseUpdate;
+
   async function onDelete() {
     setConfirmDelete(false);
     const ok = await runAction(() => apiDelete(`/transports/${transportId}`), { success: "Transport dihapus." });
@@ -296,7 +298,7 @@ export function TransportDetailPage({ transportId, initialTab }: { transportId: 
         }
       />
 
-      <section className="relative overflow-hidden rounded-2xl bg-emerald-950 p-5 text-white sm:p-7" aria-label="Ringkasan perjalanan">
+      <section className="relative overflow-hidden rounded-2xl bg-[#008B75] p-5 text-white dark:bg-emerald-950 sm:p-7" aria-label="Ringkasan perjalanan">
         <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full border-[40px] border-emerald-400/10" />
         <div className="relative grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
           <div className="min-w-0"><p className="text-xs font-medium text-emerald-200">Koridor perjalanan</p><div className="mt-4 grid min-w-0 grid-cols-[minmax(0,1fr)_24px_minmax(0,1fr)] items-start gap-3"><div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-emerald-100/60">Asal</p><p className="mt-1 break-words text-lg font-semibold sm:text-2xl">{transport.origin ?? "—"}</p></div><Route className="mt-5 h-5 w-5 text-emerald-300" /><div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-emerald-100/60">Tujuan</p><p className="mt-1 break-words text-lg font-semibold sm:text-2xl">{transport.destination ?? "—"}</p></div></div><p className="mt-4 break-words text-xs text-emerald-100/75">{isActivity ? "Activity tracking" : `${checkedInCount}/${mapCheckpoints.length} checkpoint ter-check-in`} · {formatNumber(transport.shipmentCount, 0)} shipment</p></div>
@@ -372,10 +374,10 @@ export function TransportDetailPage({ transportId, initialTab }: { transportId: 
         </Card>}
       </div>
 
-      <Tabs key={transport.id} defaultValue={initialTab === "expenses" && can.expenseView ? "expenses" : isActivity ? "activity" : "checkpoints"} className="min-w-0">
+      <Tabs key={transport.id} defaultValue={initialTab === "expenses" && canAccessExpenses ? "expenses" : isActivity ? "activity" : "checkpoints"} className="min-w-0">
         <TabsList className="h-auto min-h-11 rounded-xl p-1">
           <TabsTrigger value={isActivity ? "activity" : "checkpoints"}>{isActivity ? "Activity" : "Checkpoint"}</TabsTrigger>
-          {can.expenseView && <TabsTrigger value="expenses">Biaya Operasional</TabsTrigger>}
+          {canAccessExpenses && <TabsTrigger value="expenses">Biaya Operasional</TabsTrigger>}
         </TabsList>
         <TabsContent value={isActivity ? "activity" : "checkpoints"}>
       {isActivity ? (
@@ -494,9 +496,9 @@ export function TransportDetailPage({ transportId, initialTab }: { transportId: 
       </>
       )}
         </TabsContent>
-        {can.expenseView && (
+        {canAccessExpenses && (
           <TabsContent value="expenses">
-            <TransportExpensesPanel transportId={transport.id} transportStatus={transport.status} canCreate={can.expenseCreate} canUpdate={can.expenseUpdate} canDelete={can.expenseDelete} />
+            <TransportExpensesPanel transportId={transport.id} transportStatus={transport.status} canView={can.expenseView} canCreate={can.expenseCreate} canUpdate={can.expenseUpdate} canDelete={can.expenseDelete} />
           </TabsContent>
         )}
       </Tabs>

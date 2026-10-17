@@ -102,7 +102,7 @@ export async function GET(req: NextRequest) {
         },
       }),
     ]);
-    const company = { name: currentCompanyName() ?? process.env.NEXT_PUBLIC_COMPANY_NAME ?? "KirimKu Logistics" };
+    const company = { name: currentCompanyName() ?? process.env.NEXT_PUBLIC_COMPANY_NAME ?? "NovaLogistik" };
     return ok({
       company, employees, vehicles, routes, warehouses,
       customers: customers.map((c) => ({ ...c, warehouseName: c.warehouse?.name ?? null, warehouse: undefined })),

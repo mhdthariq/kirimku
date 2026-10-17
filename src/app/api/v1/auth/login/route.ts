@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
     await audit({ action: "login", entityType: "auth", entityLabel: user.username, actor: sessionUser });
 
     const company = {
-      name: currentCompanyName() ?? process.env.NEXT_PUBLIC_COMPANY_NAME ?? "KirimKu Logistics",
+      name: currentCompanyName() ?? process.env.NEXT_PUBLIC_COMPANY_NAME ?? "NovaLogistik",
     };
 
     return ok({ token, expiresAt: expiresAt.toISOString(), user: sessionUser, company });

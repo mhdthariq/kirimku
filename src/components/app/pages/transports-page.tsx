@@ -12,36 +12,70 @@ import {
   Pencil,
   Plus,
   Route,
+  Search,
+  SlidersHorizontal,
+  Users,
   Scale,
   Truck,
   XCircle,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { apiDelete, apiGet, apiPost, hasPermission, type Transport, type Options } from "@/infrastructure/http/client-api";
+import {
+  apiDelete,
+  apiGet,
+  apiPost,
+  hasPermission,
+  type Transport,
+  type Options,
+} from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { ActivityLogPanel } from "@/components/app/activity-log-panel";
 import { ItemAuditDialog } from "@/components/app/item-audit-dialog";
 import { StatusBadge } from "@/components/app/status-badge";
-import { formatDate, formatNumber, formatRupiah } from "@/components/app/form-parts";
+import {
+  formatDate,
+  formatNumber,
+  formatRupiah,
+} from "@/components/app/form-parts";
 import { Button } from "@/components/ui/button";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TransportFormDialog } from "@/components/app/transport-form-dialog";
 import { CapacitySummaryInline } from "@/components/app/capacity-status-card";
-import { GudangScopeBadge, GudangTabBanner, GudangTabsTriggers, gudangTabValue, parseGudangTabValue } from "@/components/app/gudang-tabs";
+import {
+  GudangScopeBadge,
+  GudangTabBanner,
+  GudangTabsTriggers,
+  gudangTabValue,
+  parseGudangTabValue,
+} from "@/components/app/gudang-tabs";
 
 /**
- * Transports list (Revision Parts I/J/M/N):
- * - Road-style Route icon instead of the old chart/transport glyph (Part I)
- * - planning fields on create/edit: origin, destination, planned departure &
- *   arrival (Part J)
- * - aggregate columns: shipment count, Total Berat, Total Volume, Total Price
- *   computed by backend database aggregation (Part M/L)
- * - NO manual "Arrived" button (Part N) — arrival is auto-detected when the
- *   crew checks in inside the final checkpoint radius (see detail page).
- */
-export function TransportsPage({ historyMode = false }: { historyMode?: boolean }) {
+* Transports list (Revision Parts I/J/M/N):
+* - Road-style Route icon instead of the old chart/transport glyph (Part I)
+* - planning fields on create/edit: origin, destination, planned departure &
+*   arrival (Part J)
+* - aggregate columns: shipment count, Total Berat, Total Volume, Total Price
+*   computed by backend database aggregation (Part M/L)
+* - NO manual "Arrived" button (Part N) — arrival is auto-detected when the
+*   crew checks in inside the final checkpoint radius (see detail page).
+*/
+export function TransportsPage({
+  historyMode = false,
+}: {
+  historyMode?: boolean;
+}) {
   const { user } = useAuth();
   const can = {
     view: hasPermission(user, "transport.view"),
@@ -54,37 +88,98 @@ export function TransportsPage({ historyMode = false }: { historyMode?: boolean 
   };
 
   const { data, loading, reload } = useApiData<Transport[]>(
-    () => apiGet<Transport[]>(`/transports${historyMode ? "?history=true&mine=true" : ""}`),
+    () =>
+      apiGet<Transport[]>(
+        `/transports${historyMode ? "?history=true&mine=true" : ""}`,
+      ),
     [historyMode],
   );
-  const { data: options } = useApiData<Options>(() => apiGet<Options>("/options"), []);
+  const { data: options } = useApiData<Options>(
+    () => apiGet<Options>("/options"),
+    [],
+  );
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState(historyMode ? "all" : "all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [tab, setTab] = useState("list");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Transport | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Transport | null>(null);
-  const [confirmComplete, setConfirmComplete] = useState<Transport | null>(null);
+  const [confirmComplete, setConfirmComplete] = useState<Transport | null>(
+    null,
+  );
 
   // Owner per-gudang tabs: filter the fetched rows to the selected gudang.
   const isOwner = !!user?.isOwner;
   const gudangOptions = options?.warehouses ?? [];
   const activeGudangId = parseGudangTabValue(tab);
 
+  const scopedTransports = useMemo(
+    () =>
+      (data ?? []).filter(
+        (t) =>
+          activeGudangId == null ||
+          (t.gudangIds ?? []).includes(activeGudangId),
+      ),
+    [data, activeGudangId],
+  );
+  const statusOptions = historyMode
+    ? ["all", "ARRIVED", "COMPLETED", "CANCELLED"]
+    : ["all", "PLANNED", "DEPARTED", "ARRIVED", "COMPLETED"];
+  const statusLabels: Record<string, string> = {
+    all: "Semua",
+    PLANNED: "Direncanakan",
+    DEPARTED: "Dalam perjalanan",
+    ARRIVED: "Tiba",
+    COMPLETED: "Selesai",
+    CANCELLED: "Dibatalkan",
+  };
+  const overview = [
+    {
+      label: "Total transport",
+      count: scopedTransports.length,
+      icon: Route,
+      tone: "bg-primary/10 text-primary",
+    },
+    {
+      label: "Direncanakan",
+      count: scopedTransports.filter((t) => t.status === "PLANNED")
+        .length,
+      icon: Calendar,
+      tone: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+    },
+    {
+      label: "Dalam perjalanan",
+      count: scopedTransports.filter((t) => t.status === "DEPARTED")
+        .length,
+      icon: Truck,
+      tone: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
+    },
+    {
+      label: "Menunggu konfirmasi",
+      count: scopedTransports.filter((t) => t.status === "ARRIVED")
+        .length,
+      icon: CheckCircle2,
+      tone: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+    },
+  ];
+
   const rows = useMemo(() => {
     if (!data) return [];
-    const q = search.toLowerCase();
+    const q = search.trim().toLowerCase();
     return data.filter(
       (t) =>
         (statusFilter === "all" || t.status === statusFilter) &&
-        (activeGudangId == null || (t.gudangIds ?? []).includes(activeGudangId)) &&
+        (activeGudangId == null ||
+          (t.gudangIds ?? []).includes(activeGudangId)) &&
         (!q ||
           t.transportCode.toLowerCase().includes(q) ||
           (t.routeName ?? "").toLowerCase().includes(q) ||
           t.vehicleNumber.toLowerCase().includes(q) ||
           (t.origin ?? "").toLowerCase().includes(q) ||
-          (t.destination ?? "").toLowerCase().includes(q)),
+          (t.destination ?? "").toLowerCase().includes(q) ||
+          (t.driverName ?? "").toLowerCase().includes(q) ||
+          (t.kenekName ?? "").toLowerCase().includes(q)),
     );
   }, [data, search, statusFilter, activeGudangId]);
 
@@ -153,33 +248,348 @@ export function TransportsPage({ historyMode = false }: { historyMode?: boolean 
     URL.revokeObjectURL(url);
   }
 
+  function renderActions(t: Transport) {
+    return (
+      <div className="flex flex-wrap items-center gap-2 [&_button]:min-h-10 [&_a]:min-h-10">
+        <Button
+          asChild
+          variant="outline"
+          size="sm"
+          className="mr-auto xl:mr-0"
+        >
+          <a href={`#/transports/${t.id}`}>
+            Detail perjalanan <ArrowRight className="h-3.5 w-3.5" />
+          </a>
+        </Button>
+        <ItemAuditDialog
+          entityType="transport"
+          entityId={t.id}
+          itemLabel={t.transportCode}
+        />
+        {t.status === "PLANNED" && can.depart && (
+          <Button size="sm" onClick={() => onDepart(t)}>
+            <Truck className="h-3.5 w-3.5" /> Depart
+          </Button>
+        )}
+        {(t.status === "PLANNED" || t.status === "DEPARTED") &&
+          can.arrive && (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => setConfirmComplete(t)}
+            >
+              <CheckCircle2 className="h-3.5 w-3.5" /> Tandai Tiba
+            </Button>
+          )}
+        {t.status === "ARRIVED" && can.complete && (
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => setConfirmComplete(t)}
+          >
+            <CheckCircle2 className="h-3.5 w-3.5" /> Konfirmasi
+            Completed
+          </Button>
+        )}
+        {["ARRIVED", "COMPLETED"].includes(t.status) &&
+          t.vehicleOwnerId != null &&
+          !t.settlement &&
+          can.settle && (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() =>
+                window.location.assign(
+                  new URL(
+                    "#/settlements",
+                    window.location.href,
+                  ).href,
+                )
+              }
+            >
+              <Coins className="h-3.5 w-3.5" /> Settle
+            </Button>
+          )}
+        {t.status === "PLANNED" && can.create && (
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10"
+              onClick={() => openEdit(t)}
+              aria-label={`Edit ${t.transportCode}`}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10 text-destructive hover:text-destructive"
+              onClick={() => setConfirmDelete(t)}
+              aria-label={`Hapus ${t.transportCode}`}
+            >
+              <XCircle className="h-4 w-4" />
+            </Button>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  function renderTransportCard(t: Transport) {
+    return (
+      <article
+        aria-label={`Transport ${t.transportCode}`}
+        className="flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border bg-card shadow-sm"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b bg-muted/20 p-4">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border bg-background text-primary">
+              <Truck className="size-5" aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <a
+                href={`#/transports/${t.id}`}
+                className="break-all font-mono text-sm font-semibold text-primary hover:underline"
+              >
+                {t.transportCode}
+              </a>
+              <p className="break-words text-xs text-muted-foreground">
+                {t.vehicleNumber}
+              </p>
+            </div>
+          </div>
+          <StatusBadge status={t.status} />
+        </div>
+        <div className="flex-1 space-y-4 p-4 sm:p-5">
+          <div className="relative space-y-4 pl-5 before:absolute before:bottom-2 before:left-[3px] before:top-2 before:border-l before:border-dashed before:border-primary/40">
+            <div className="relative before:absolute before:-left-5 before:top-1.5 before:size-2 before:rounded-full before:border-2 before:border-primary before:bg-card">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Asal
+              </p>
+              <p className="break-words text-sm font-semibold">
+                {t.origin ?? "Belum ditentukan"}
+              </p>
+            </div>
+            <div className="relative before:absolute before:-left-5 before:top-1.5 before:size-2 before:rounded-full before:bg-primary">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Tujuan
+              </p>
+              <p className="break-words text-sm font-semibold">
+                {t.destination ?? "Belum ditentukan"}
+              </p>
+            </div>
+          </div>
+          {t.routeName && (
+            <p className="break-words text-xs text-muted-foreground">
+              Rute: {t.routeName}
+            </p>
+          )}
+          <dl className="grid grid-cols-2 gap-3 rounded-xl bg-muted/40 p-3">
+            <div className="min-w-0">
+              <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Calendar className="size-3.5 shrink-0" />{" "}
+                Berangkat
+              </dt>
+              <dd className="mt-1 break-words text-xs font-medium">
+                {t.plannedDepartureAt
+                  ? formatDate(t.plannedDepartureAt, true)
+                  : "Belum dijadwalkan"}
+              </dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-xs text-muted-foreground">
+                Estimasi tiba
+              </dt>
+              <dd className="mt-1 break-words text-xs font-medium">
+                {t.plannedArrivalAt
+                  ? formatDate(t.plannedArrivalAt, true)
+                  : "Belum dijadwalkan"}
+              </dd>
+            </div>
+            <div className="col-span-2 min-w-0 border-t pt-3">
+              <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Users className="size-3.5" /> Kru perjalanan
+              </dt>
+              <dd className="mt-1 break-words text-xs font-medium">
+                {t.driverName ?? "Driver belum ditentukan"}
+                {t.kenekName ? ` · ${t.kenekName}` : ""}
+              </dd>
+            </div>
+          </dl>
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            <div className="min-w-0">
+              <p className="text-muted-foreground">Shipment</p>
+              <p className="mt-1 break-words font-semibold">
+                {formatNumber(t.shipmentCount, 0)}
+              </p>
+            </div>
+            <div className="min-w-0">
+              <p className="text-muted-foreground">Berat</p>
+              <p className="mt-1 break-words font-semibold">
+                {formatNumber(t.totalWeightKg, 1)} kg
+              </p>
+            </div>
+            <div className="min-w-0">
+              <p className="text-muted-foreground">Volume</p>
+              <p className="mt-1 break-words font-semibold">
+                {formatNumber(t.totalVolumeM3, 2)} m³
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3">
+            <div>
+              <p className="text-xs text-muted-foreground">
+                Total harga muatan
+              </p>
+              <p className="mt-1 break-all text-sm font-semibold">
+                {t.totalPrice != null
+                  ? formatRupiah(t.totalPrice)
+                  : "-"}
+              </p>
+            </div>
+            {t.capacity && (
+              <CapacitySummaryInline
+                capacity={t.capacity}
+                showRing
+              />
+            )}
+          </div>
+          {t.settlement && (
+            <p className="break-words rounded-lg bg-primary/5 p-2.5 text-xs text-primary">
+              {t.settlement.settlementCode} · +
+              {formatRupiah(t.settlement.ownerAmount)} (
+              {t.settlement.ownerPercent}%)
+            </p>
+          )}
+        </div>
+        <div className="border-t p-4">{renderActions(t)}</div>
+      </article>
+    );
+  }
+
   if (!can.view) {
-    return <PageHeader title="Transport" subtitle="Anda tidak memiliki izin melihat transport." />;
+    return (
+      <PageHeader
+        title="Transport"
+        subtitle="Anda tidak memiliki izin melihat transport."
+      />
+    );
   }
 
   const listTable = (
     <DataTable
       rows={rows}
       loading={loading}
-      search={search}
-      onSearchChange={setSearch}
-      searchPlaceholder="Cari kode / rute / nopol…"
+      renderCard={renderTransportCard}
+      desktopBreakpoint="xl"
       toolbar={
-        <div className="flex max-w-full flex-wrap items-center gap-1.5">
-          {["all", ...(historyMode ? ["ARRIVED", "COMPLETED", "CANCELLED"] : ["PLANNED", "DEPARTED", "ARRIVED", "COMPLETED"])].map((s) => (
-            <Button
-              key={s}
-              size="sm"
-              variant={statusFilter === s ? "default" : "outline"}
-              className="h-7 px-2.5 text-xs"
-              onClick={() => setStatusFilter(s)}
+        <div className="w-full min-w-0 space-y-4 rounded-2xl border bg-card p-4 sm:p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="font-semibold">
+                {historyMode
+                  ? "Riwayat perjalanan"
+                  : "Daftar perjalanan"}
+              </h2>
+              <p
+                role="status"
+                className="mt-1 text-xs text-muted-foreground"
+              >
+                {loading
+                  ? "Memuat transport…"
+                  : `${rows.length} transport ditampilkan`}
+              </p>
+            </div>
+            <div className="relative w-full sm:max-w-sm">
+              <Search
+                aria-hidden="true"
+                className="pointer-events-none absolute left-3 top-3 size-4 text-muted-foreground"
+              />
+              <Input
+                aria-label="Cari transport"
+                placeholder="Cari kode, rute, nopol, atau kru…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-11 pl-9 text-base sm:text-sm"
+              />
+            </div>
+          </div>
+          <div className="flex items-start gap-3 border-t pt-4">
+            <SlidersHorizontal
+              aria-hidden="true"
+              className="mt-3 hidden size-4 shrink-0 text-muted-foreground sm:block"
+            />
+            <div
+              role="group"
+              aria-label="Filter status transport"
+              className="flex min-w-0 flex-wrap gap-2"
             >
-              {s === "all" ? "Semua" : s}
+              {statusOptions.map((s) => (
+                <Button
+                  key={s}
+                  size="sm"
+                  variant={
+                    statusFilter === s
+                      ? "default"
+                      : "outline"
+                  }
+                  className="min-h-10 gap-2 rounded-lg px-3 text-xs"
+                  aria-pressed={statusFilter === s}
+                  onClick={() => setStatusFilter(s)}
+                >
+                  {statusLabels[s]}
+                  <span className="rounded-md bg-background/20 px-1.5 py-0.5 text-[10px] tabular-nums">
+                    {loading
+                      ? "–"
+                      : s === "all"
+                       ? scopedTransports.length
+                       : scopedTransports.filter(
+                          (t) => t.status === s,
+                        ).length}
+                  </span>
+                </Button>
+              ))}
+            </div>
+          </div>
+          {(search || statusFilter !== "all") && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSearch("");
+                setStatusFilter("all");
+              }}
+            >
+              Reset filter
             </Button>
-          ))}
+          )}
         </div>
       }
-      emptyMessage={historyMode ? "Belum ada riwayat transport selesai." : "Belum ada transport. Klik “Rencanakan Transport” untuk menjadwalkan linehaul."}
+      emptyMessage={
+        search || statusFilter !== "all"
+          ? "Tidak ada transport yang cocok. Coba kata kunci atau status lain."
+          : historyMode
+           ? "Belum ada riwayat transport selesai."
+           : "Belum ada transport. Rencanakan perjalanan pertama Anda."
+      }
+      emptyAction={
+        search || statusFilter !== "all" ? (
+          <Button
+            variant="outline"
+            onClick={() => {
+              setSearch("");
+              setStatusFilter("all");
+            }}
+          >
+            Reset filter
+          </Button>
+        ) : can.create && !historyMode ? (
+          <Button onClick={openCreate}>
+            <Plus className="size-4" /> Rencanakan Transport
+          </Button>
+        ) : undefined
+      }
       columns={[
         {
           key: "code",
@@ -282,89 +692,122 @@ export function TransportsPage({ historyMode = false }: { historyMode?: boolean 
         {
           key: "actions",
           header: "Aksi",
-          render: (t) => (
-            <div className="flex flex-wrap gap-1.5">
-                <ItemAuditDialog entityType="transport" entityId={t.id} itemLabel={t.transportCode} />
-              <Button asChild variant="outline" size="sm" className="h-7">
-                <a href={`#/transports/${t.id}`}>
-                  <Route className="h-3.5 w-3.5" /> Detail
-                </a>
-              </Button>
-              {t.status === "PLANNED" && can.depart && (
-                <Button size="sm" className="h-7" onClick={() => onDepart(t)}>
-                  <Truck className="h-3.5 w-3.5" /> Depart
-                </Button>
-              )}
-              {(t.status === "PLANNED" || t.status === "DEPARTED") && can.arrive && (
-                <Button size="sm" variant="secondary" className="h-7" onClick={() => setConfirmComplete(t)}>
-                  <CheckCircle2 className="h-3.5 w-3.5" /> Tandai Tiba
-                </Button>
-              )}
-              {t.status === "ARRIVED" && can.complete && (
-                <Button size="sm" variant="secondary" className="h-7" onClick={() => setConfirmComplete(t)}>
-                  <CheckCircle2 className="h-3.5 w-3.5" /> Konfirmasi Completed
-                </Button>
-              )}
-              {/* Revise.md §14/§15 - settle ARRIVED / COMPLETED partner transports (credits
-                  the Vehicle Owner wallet atomically) */}
-              {["ARRIVED", "COMPLETED"].includes(t.status) && t.vehicleOwnerId != null && !t.settlement && can.settle && (
-                <Button size="sm" variant="secondary" className="h-7" onClick={() => window.location.assign(new URL("#/settlements", window.location.href).href)}>
-                  <Coins className="h-3.5 w-3.5" /> Settle
-                </Button>
-              )}
-              {t.status === "PLANNED" && can.create && (
-                <>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(t)} aria-label={`Edit ${t.transportCode}`}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setConfirmDelete(t)} aria-label={`Hapus ${t.transportCode}`}>
-                    <XCircle className="h-4 w-4" />
-                  </Button>
-                </>
-              )}
-            </div>
-          ),
+          render: renderActions,
         },
       ]}
     />
   );
 
   return (
-    <div className="space-y-4">
-      <PageHeader
-        title={historyMode ? "Riwayat Transport" : "Transport"}
-        subtitle={
-          historyMode
-            ? "Transport selesai yang pernah Anda jalani sebagai driver/kenek."
-            : "Perjalanan linehaul antar gudang mengikuti rute checkpoint - tiba terdeteksi otomatis lewat check-in checkpoint akhir."
-        }
-        icon={<Route className="h-5 w-5" />}
-        actions={
-          <>
-            {!isOwner && !historyMode && <GudangScopeBadge gudangName={user?.warehouseName ?? null} />}
-            <Button variant="outline" size="sm" onClick={exportCsv} disabled={rows.length === 0}>
-              <Download className="h-4 w-4" /> Export CSV
-            </Button>
-            {can.create && !historyMode && (
-              <Button onClick={openCreate}>
-                <Plus className="h-4 w-4" /> Rencanakan Transport
-              </Button>
-            )}
-          </>
-        }
-      />
+    <div className="min-w-0 space-y-6">
+      <section className="relative overflow-hidden rounded-2xl border bg-linear-to-br from-primary/10 via-card to-card p-5 sm:p-6">
+        <div className="mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-primary">
+          <Route className="size-4" /> Operasional linehaul
+        </div>
+        <div className="[&>div]:flex-col [&>div]:gap-5 [&>div]:2xl:flex-row [&>div>div:last-child]:w-full [&>div>div:last-child]:2xl:w-auto [&_button]:min-h-11">
+          <PageHeader
+            title={historyMode ? "Riwayat Transport" : "Transport"}
+            subtitle={
+              historyMode
+                ? "Transport selesai yang pernah Anda jalani sebagai driver/kenek."
+                : "Rencanakan keberangkatan, pantau perjalanan, dan kelola muatan antar gudang dalam satu tempat."
+            }
+            icon={<Route className="h-5 w-5" />}
+            actions={
+              <>
+                {!isOwner && !historyMode && (
+                  <GudangScopeBadge
+                    gudangName={user?.warehouseName ?? null}
+                  />
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={exportCsv}
+                  disabled={rows.length === 0}
+                >
+                  <Download className="h-4 w-4" /> Export CSV
+                </Button>
+                {can.create && !historyMode && (
+                  <Button
+                    onClick={openCreate}
+                    className="w-full sm:w-auto"
+                  >
+                    <Plus className="h-4 w-4" /> Rencanakan
+                    Transport
+                  </Button>
+                )}
+              </>
+            }
+          />
+        </div>
+        <p className="mt-5 border-t border-primary/10 pt-4 text-xs leading-relaxed text-muted-foreground">
+          Kedatangan terdeteksi otomatis saat kru check-in di
+          checkpoint akhir.
+        </p>
+      </section>
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="list">{historyMode ? "Riwayat" : "Daftar"}</TabsTrigger>
-          {isOwner && !historyMode && <GudangTabsTriggers warehouses={gudangOptions} />}
-          {!historyMode && <TabsTrigger value="activity">Log Aktivitas</TabsTrigger>}
-        </TabsList>
-        {["list", ...(isOwner && !historyMode ? gudangOptions.map((g) => gudangTabValue(g.id)) : [])].map((v) => {
-          const activeW = gudangOptions.find((g) => gudangTabValue(g.id) === v) ?? null;
+      <section
+        aria-label="Ringkasan transport"
+        className="grid min-w-0 grid-cols-2 gap-3 lg:grid-cols-4"
+      >
+        {overview.map(({ label, count, icon: Icon, tone }) => (
+          <div
+            key={label}
+            className="min-w-0 rounded-2xl border bg-card p-4 sm:p-5"
+          >
+            <span
+              className={`mb-3 inline-flex size-9 items-center justify-center rounded-xl ${tone}`}
+            >
+              <Icon aria-hidden="true" className="size-4" />
+            </span>
+            <p className="text-2xl font-bold tracking-tight tabular-nums sm:text-3xl">
+              {loading ? "–" : formatNumber(count, 0)}
+            </p>
+            <p className="mt-1 break-words text-xs text-muted-foreground sm:text-sm">
+              {label}
+            </p>
+          </div>
+        ))}
+      </section>
+
+      <Tabs value={tab} onValueChange={setTab} className="min-w-0">
+        <div className="min-w-0 max-w-full overflow-x-auto pb-1">
+          <TabsList className="h-11 w-max min-w-full justify-start gap-1 rounded-xl p-1 sm:min-w-0 [&_button]:min-h-9 [&_button]:shrink-0">
+            <TabsTrigger value="list">
+              {historyMode ? "Riwayat" : "Daftar"}
+            </TabsTrigger>
+            {isOwner && !historyMode && (
+              <GudangTabsTriggers warehouses={gudangOptions} />
+            )}
+            {!historyMode && (
+              <TabsTrigger value="activity">
+                Log Aktivitas
+              </TabsTrigger>
+            )}
+          </TabsList>
+        </div>
+        {[
+          "list",
+          ...(isOwner && !historyMode
+            ? gudangOptions.map((g) => gudangTabValue(g.id))
+            : []),
+        ].map((v) => {
+          const activeW =
+            gudangOptions.find((g) => gudangTabValue(g.id) === v) ??
+            null;
           return (
-            <TabsContent key={v} value={v} className="mt-3 space-y-3">
-              {activeW && <GudangTabBanner gudangName={activeW.name} count={rows.length} />}
+            <TabsContent
+              key={v}
+              value={v}
+              className="mt-4 min-w-0 space-y-4"
+            >
+              {activeW && (
+                <GudangTabBanner
+                  gudangName={activeW.name}
+                  count={rows.length}
+                />
+              )}
               {listTable}
             </TabsContent>
           );
