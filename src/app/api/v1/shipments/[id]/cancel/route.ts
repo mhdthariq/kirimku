@@ -34,7 +34,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     // Business Rules (Roadmap Phase 4) — cancellation guards: check for active
-    // transport assignment, active delivery, verified payments, active pickup.
+    // transport assignment, active delivery, active invoice, verified payments, active pickup.
     const { error: cancelError, warnings: cancelWarnings } = await checkCancellationGuards(master.id, master.status);
     if (cancelError) return fail(422, cancelError);
     // Warnings are non-blocking — the cancel proceeds, but the operator is

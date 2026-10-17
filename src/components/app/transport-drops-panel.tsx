@@ -43,6 +43,7 @@ export function TransportDropsPanel({
   if (!board || board.shipments.length === 0) return null;
 
   const multi = board.transportMode === "MULTI_DROP";
+  const isActivity = board.trackingMode === "ACTIVITY";
   const active = board.transportStatus === "PLANNED" || board.transportStatus === "DEPARTED";
   const firstSeq = Math.min(...board.checkpoints.map((c) => c.sequence));
   const assignable = board.checkpoints.filter((c) => c.sequence !== firstSeq);
@@ -125,7 +126,7 @@ export function TransportDropsPanel({
               <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 border-b bg-muted/40 px-3 py-2">
                 <p className="flex items-center gap-1.5 text-sm font-semibold">
                   <MapPin className="h-3.5 w-3.5 text-primary" />
-                  {cp ? `CP${cp.sequence} · ${cp.name}` : "Tujuan akhir"}
+                  {cp ? `CP${cp.sequence} · ${cp.name}` : isActivity ? "Tujuan resi · Activity Tracking" : "Tujuan akhir"}
                   {cp?.isFinal && <span className="text-[11px] font-normal text-muted-foreground">(tujuan akhir)</span>}
                 </p>
                 {cp && <span className={cp.checkedIn ? "text-xs text-emerald-600" : "text-xs text-muted-foreground"}>{cp.checkedIn ? "kendaraan sudah check-in" : "belum check-in"}</span>}
@@ -134,8 +135,8 @@ export function TransportDropsPanel({
                 {g.shipmentIds.map((sid) => {
                   const s = byId.get(sid);
                   if (!s) return null;
-                  const canAssignNow = multi && can.assign && active && (s.dropStatus === "LOADED" || s.dropStatus === "AT_DROP_POINT");
-                  const canDropNow = multi && (isCrew || can.drop) && board.transportStatus === "DEPARTED" && s.dropStatus === "AT_DROP_POINT";
+                  const canAssignNow = !isActivity && multi && can.assign && active && (s.dropStatus === "LOADED" || s.dropStatus === "AT_DROP_POINT");
+                  const canDropNow = multi && (isCrew || can.drop) && board.transportStatus === "DEPARTED" && (s.dropStatus === "AT_DROP_POINT" || (isActivity && s.dropStatus === "LOADED"));
                   const canApproveNow = can.approve && (s.dropStatus === "DROPPED" || s.dropStatus === "DELIVERY_PENDING");
                   return (
                     <div key={sid} className="flex flex-wrap items-center gap-2 px-3 py-2.5">
@@ -180,7 +181,7 @@ export function TransportDropsPanel({
           );
         })}
 
-        {multi && active && assignable.length > 0 && can.assign && board.shipments.some((s) => !s.dropCheckpointId && s.dropStatus === "LOADED") && (
+        {!isActivity && multi && active && assignable.length > 0 && can.assign && board.shipments.some((s) => !s.dropCheckpointId && s.dropStatus === "LOADED") && (
           <p className="text-xs text-muted-foreground">Resi tanpa titik drop akan turun di tujuan akhir ({cpName.get(board.checkpoints.find((c) => c.isFinal)?.id ?? -1) ?? "-"}).</p>
         )}
 

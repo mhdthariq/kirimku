@@ -16,6 +16,7 @@ const m = vi.hoisted(() => ({
     warehouses: vi.fn(),
     shipmentUpdate: vi.fn(),
     shipmentUpdateMany: vi.fn(),
+    dropUpdate: vi.fn(),
     event: vi.fn(),
     deliveryFind: vi.fn(),
     deliveryCreate: vi.fn(),
@@ -44,7 +45,7 @@ vi.mock("@/infrastructure/persistence/db", () => {
         vehicle: { findUnique: m.vehicle },
         warehouse: { findMany: m.warehouses },
         masterShipment: { update: m.shipmentUpdate, findMany: m.shipmentFind },
-        transportShipment: { updateMany: m.shipmentUpdateMany },
+        transportShipment: { updateMany: m.shipmentUpdateMany, update: m.dropUpdate },
         trackingEvent: { create: m.event },
         delivery: { findFirst: m.deliveryFind, create: m.deliveryCreate },
     };
@@ -98,6 +99,7 @@ import { POST as depart } from "@/app/api/v1/transports/[id]/depart/route";
 import { POST as arrive } from "@/app/api/v1/transports/[id]/arrive/route";
 import { POST as checkin } from "@/app/api/v1/transports/[id]/checkins/route";
 import { PUT as edit } from "@/app/api/v1/transports/[id]/route";
+import { POST as drop } from "@/app/api/v1/transports/[id]/drops/[shipmentId]/route";
 import { POST as plan } from "@/app/api/v1/transports/route";
 import { HttpError } from "@/shared/http-error";
 import {
@@ -291,12 +293,21 @@ describe("activity evidence API", () => {
         });
         expect((await route(req(), params())).status).toBe(422);
     });
-    it("rejects legacy invalid ACTIVITY+MULTI_DROP", async () => {
+    it("accepts ACTIVITY+MULTI_DROP with the same transaction-time assignment guards", async () => {
         m.transport.mockResolvedValue({
             ...transport,
             transportMode: "MULTI_DROP",
         });
-        expect((await POST(req(), params())).status).toBe(422);
+        expect((await POST(req(), params())).status).toBe(200);
+        expect(m.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    trackingMode: "ACTIVITY",
+                    transportMode: "MULTI_DROP",
+                    OR: [{ driverId: 8 }, { kenekId: 8 }],
+                }),
+            }),
+        );
     });
     it("rejects missing, coerced or out-of-range GPS and stale/future captures", async () => {
         for (const patch of [
@@ -485,6 +496,129 @@ describe("checkpoint-free lifecycle", () => {
     });
 });
 
+describe("checkpoint-free MultiDrop unloading", () => {
+    const dropParams = () => ({
+        params: Promise.resolve({ id: "10", shipmentId: "20" }),
+    });
+    const multi = () => ({
+        ...transport,
+        status: "DEPARTED",
+        transportMode: "MULTI_DROP",
+        shipments: [
+            {
+                shipmentId: 20,
+                dropStatus: "LOADED",
+                dropCheckpointId: null,
+                master: {
+                    id: 20,
+                    status: "IN_TRANSPORT",
+                    fulfillmentMode: "STANDARD",
+                    destination: "B",
+                },
+            },
+        ],
+    });
+
+    it("unloads one ACTIVITY resi without checkpoints, retaining warehouse receipt and approval", async () => {
+        m.transport.mockResolvedValue(multi());
+        const response = await drop(req({ action: "DROP" }), dropParams());
+        expect(response.status).toBe(200);
+        expect(m.dropUpdate).toHaveBeenCalledWith({
+            where: {
+                transportId_shipmentId: { transportId: 10, shipmentId: 20 },
+            },
+            data: {
+                dropStatus: "DROPPED",
+                droppedAt: expect.any(Date),
+                droppedById: 7,
+            },
+        });
+        expect(m.shipmentUpdate).toHaveBeenCalledWith({
+            where: { id: 20 },
+            data: {
+                status: "AT_DEST_GUDANG",
+                arrivedWarehouseId: 2,
+                destReceivedAt: null,
+            },
+        });
+        expect(m.shipmentUpdateMany).not.toHaveBeenCalled();
+        expect(m.event).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                event: "AT_DEST_GUDANG",
+                description: expect.stringContaining("tujuan resi B"),
+            }),
+        });
+    });
+    it("retains the check-in prerequisite for checkpoint MultiDrop", async () => {
+        const t = { ...multi(), trackingMode: "CHECKPOINT", route: { checkpoints: [{ id: 1, sequence: 1 }, { id: 2, sequence: 2 }] } };
+        m.transport.mockResolvedValue(t);
+        expect((await drop(req({ action: "DROP" }), dropParams())).status).toBe(422);
+        expect(m.dropUpdate).not.toHaveBeenCalled();
+        m.transport.mockResolvedValue({ ...t, checkpointRecords: [{ checkpointId: 2 }] });
+        expect((await drop(req({ action: "DROP" }), dropParams())).status).toBe(200);
+    });
+    it("creates a delivery task for DIRECT fulfillment without requiring checkpoints", async () => {
+        const t = multi();
+        t.shipments[0].master.fulfillmentMode = "DIRECT";
+        m.transport.mockResolvedValue(t);
+        expect((await drop(req({ action: "DROP" }), dropParams())).status).toBe(
+            200,
+        );
+        expect(m.deliveryCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                masterId: 20,
+                kurirId: 8,
+                status: "ASSIGNED",
+            }),
+        });
+    });
+    it("keeps checkpoint tracking dependent on an assigned checkpoint", async () => {
+        m.transport.mockResolvedValue({
+            ...multi(),
+            trackingMode: "CHECKPOINT",
+        });
+        expect((await drop(req({ action: "DROP" }), dropParams())).status).toBe(
+            422,
+        );
+        expect(m.dropUpdate).not.toHaveBeenCalled();
+    });
+    it.each(["PLANNED", "ARRIVED", "COMPLETED"])(
+        "rejects activity drops while %s",
+        async (status) => {
+            m.transport.mockResolvedValue({ ...multi(), status });
+            expect(
+                (await drop(req({ action: "DROP" }), dropParams())).status,
+            ).toBe(422);
+            expect(m.dropUpdate).not.toHaveBeenCalled();
+        },
+    );
+    it("rejects repeat drops and checkpoint assignment in activity mode", async () => {
+        const t = multi();
+        t.shipments[0].dropStatus = "DROPPED";
+        m.transport.mockResolvedValue(t);
+        expect((await drop(req({ action: "DROP" }), dropParams())).status).toBe(
+            422,
+        );
+        expect(
+            (
+                await drop(
+                    req({ action: "ASSIGN", dropCheckpointId: 1 }),
+                    dropParams(),
+                )
+            ).status,
+        ).toBe(422);
+        expect(m.dropUpdate).not.toHaveBeenCalled();
+    });
+    it("does not allow unrelated drivers to unload", async () => {
+        m.transport.mockResolvedValue(multi());
+        m.auth.mockResolvedValue({ ...actor, employeeId: 99 });
+        expect((await drop(req({ action: "DROP" }), dropParams())).status).toBe(
+            403,
+        );
+        expect(m.dropUpdate).not.toHaveBeenCalled();
+    });
+});
+
 describe("planning mode and freshness boundaries", () => {
     it("persists ACTIVITY separately from transport mode when planning", async () => {
         m.route.mockResolvedValue({ ...transport.route });
@@ -506,6 +640,33 @@ describe("planning mode and freshness boundaries", () => {
             }),
         });
     });
+    it("creates a checkpoint-free ACTIVITY MultiDrop plan", async () => {
+        m.route.mockResolvedValue(transport.route);
+        m.vehicle.mockResolvedValue({
+            status: "ACTIVE",
+            vehicleNumber: "BK-1",
+        });
+        expect(
+            (
+                await plan(
+                    req({
+                        routeId: 1,
+                        vehicleId: 2,
+                        trackingMode: "ACTIVITY",
+                        transportMode: "MULTI_DROP",
+                        plannedDepartureAt: "2026-10-17T08:00:00Z",
+                        plannedArrivalAt: "2026-10-17T09:00:00Z",
+                    }),
+                )
+            ).status,
+        ).toBe(200);
+        expect(m.transportCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                trackingMode: "ACTIVITY",
+                transportMode: "MULTI_DROP",
+            }),
+        });
+    });
     it("updates an activity plan without requiring checkpoints", async () => {
         m.route.mockResolvedValue(transport.route);
         expect(
@@ -523,11 +684,15 @@ describe("planning mode and freshness boundaries", () => {
         ).toBe(422);
         expect(m.update).not.toHaveBeenCalled();
     });
-    it("rejects MULTI_DROP updates on activity transports", async () => {
+    it("permits MULTI_DROP updates on activity transports", async () => {
+        m.route.mockResolvedValue(transport.route);
         expect(
             (await edit(req({ transportMode: "MULTI_DROP" }), params())).status,
-        ).toBe(422);
-        expect(m.update).not.toHaveBeenCalled();
+        ).toBe(200);
+        expect(m.update).toHaveBeenCalledWith({
+            where: { id: 10 },
+            data: { trackingMode: "ACTIVITY", transportMode: "MULTI_DROP" },
+        });
     });
     it.each([null, [], "invalid"])(
         "rejects malformed plan/edit payload %j",
@@ -558,10 +723,10 @@ describe("planning mode and freshness boundaries", () => {
             ).toBeNull();
         }
     });
-    it("rejects invalid modes and ACTIVITY+MULTI_DROP before querying route", async () => {
+    it("rejects invalid tracking modes before querying route", async () => {
         for (const body of [
             { trackingMode: "bad" },
-            { trackingMode: "ACTIVITY", transportMode: "MULTI_DROP" },
+            { trackingMode: null }
         ]) {
             expect((await plan(req(body))).status).toBe(422);
         }

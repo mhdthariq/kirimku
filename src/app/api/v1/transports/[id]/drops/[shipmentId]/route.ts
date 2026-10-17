@@ -13,7 +13,7 @@ type Params = { params: Promise<{ id: string; shipmentId: string }> };
 /**
  * POST /transports/:id/drops/:shipmentId
  *   { action: "ASSIGN", dropCheckpointId }  plan: where this resi is unloaded
- *   { action: "DROP" }                      unload it (vehicle must have checked in at the drop checkpoint)
+ *   { action: "DROP" }                      unload it (CHECKPOINT tracking requires check-in; ACTIVITY does not)
  */
 export async function POST(req: NextRequest, { params }: Params) {
   return handle(req, async () => {
@@ -33,13 +33,15 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (!ts) return fail(404, "Resi tidak ada di transport ini.");
 
     const mode = normalizeTransportMode(transport.transportMode);
-    const checkpoints = transport.route?.checkpoints ?? [];
+    const isActivity = transport.trackingMode === "ACTIVITY";
+    const checkpoints = isActivity ? [] : transport.route?.checkpoints ?? [];
     const body = await req.json().catch(() => ({}));
     const action = body.action === "DROP" ? "DROP" : body.action === "ASSIGN" ? "ASSIGN" : null;
     if (!action) return fail(422, 'action harus "ASSIGN" atau "DROP".');
 
     if (action === "ASSIGN") {
       if (!hasPermission(user, "transport.create")) return fail(403, "Missing permission: transport.create");
+      if (isActivity) return fail(422, "Activity tracking tidak menggunakan checkpoint drop.");
       const problem = canAssignDrop(mode, transport.status, ts.dropStatus);
       if (problem) return fail(422, problem);
       const cpId = num(body.dropCheckpointId);
@@ -61,12 +63,14 @@ export async function POST(req: NextRequest, { params }: Params) {
     const finalId = checkpoints.length ? checkpoints[checkpoints.length - 1].id : null;
     const dropCpId = effectiveDropCheckpointId(ts.dropCheckpointId, finalId);
     const dropCp = checkpoints.find((c) => c.id === dropCpId);
-    if (!dropCp) return fail(422, "Titik drop resi belum ditentukan.");
+    if (!isActivity && !dropCp) return fail(422, "Titik drop resi belum ditentukan.");
+    const dropName = dropCp?.name ?? ts.master.destination ?? transport.destination ?? "tujuan resi";
     const problem = canDrop({
       mode,
       transportStatus: transport.status,
       dropStatus: ts.dropStatus,
-      vehicleCheckedInAtDrop: transport.checkpointRecords.some((r) => r.checkpointId === dropCp.id),
+      trackingMode: isActivity ? "ACTIVITY" : "CHECKPOINT",
+      vehicleCheckedInAtDrop: !!dropCp && transport.checkpointRecords.some((r) => r.checkpointId === dropCp.id),
     });
     if (problem) return fail(422, problem);
 
@@ -86,9 +90,9 @@ export async function POST(req: NextRequest, { params }: Params) {
           await tx.masterShipment.update({ where: { id: master.id }, data: { status: "ARRIVED_AT_GUDANG", arrivedWarehouseId, destReceivedAt: new Date() } });
           const existing = await tx.delivery.findFirst({ where: { masterId: master.id }, select: { id: true } });
           if (!existing && transport.driverId != null) {
-            const deliveryCode = await nextCode("delivery", "DLV-2026-", "deliveryCode");
+            const deliveryCode = await nextCode("delivery", "DLV-2026-", "deliveryCode", 1, tx);
             await tx.delivery.create({
-              data: { deliveryCode, masterId: master.id, kurirId: transport.driverId, status: "ASSIGNED", notes: `Auto-assigned dari transport ${transport.transportCode} (multi drop di ${dropCp.name})` },
+              data: { deliveryCode, masterId: master.id, kurirId: transport.driverId, status: "ASSIGNED", notes: `Auto-assigned dari transport ${transport.transportCode} (multi drop di ${dropName})` },
             });
           }
         } else {
@@ -99,12 +103,12 @@ export async function POST(req: NextRequest, { params }: Params) {
         data: {
           masterId: master.id,
           event: isDirectFulfillment ? "ARRIVED_AT_GUDANG" : "AT_DEST_GUDANG",
-          description: `Resi diturunkan di checkpoint ${dropCp.name} (transport ${transport.transportCode}) oleh ${user.name} - menunggu persetujuan delivery`,
+          description: `Resi diturunkan di ${isActivity ? "tujuan resi" : "checkpoint"} ${dropName} (transport ${transport.transportCode}) oleh ${user.name} - menunggu persetujuan delivery`,
           actorId: user.id,
         },
       });
     });
-    await audit({ action: "drop", entityType: "transport", entityId: transport.id, entityLabel: `${transport.transportCode} · ${master.masterCode} diturunkan di ${dropCp.name}`, actor: user });
-    return ok({ shipmentId: ts.shipmentId, dropStatus: "DROPPED", checkpointName: dropCp.name });
+    await audit({ action: "drop", entityType: "transport", entityId: transport.id, entityLabel: `${transport.transportCode} · ${master.masterCode} diturunkan di ${dropName}`, actor: user });
+    return ok({ shipmentId: ts.shipmentId, dropStatus: "DROPPED", checkpointName: dropCp?.name ?? null });
   });
 }

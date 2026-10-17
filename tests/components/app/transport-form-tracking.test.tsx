@@ -36,16 +36,16 @@ describe("transport creation tracking modes", () => {
     await waitFor(() => expect(saved).toHaveBeenCalledOnce());
     expect(m.post).toHaveBeenCalledWith("/transports", expect.objectContaining({ trackingMode: "ACTIVITY", transportMode: "DIRECT", routeId: 1, origin: "A", destination: "B" }));
   });
-  it("defaults to checkpoint and resets activity when Multi Drop is selected", async () => {
+  it("defaults to checkpoint and preserves activity when Multi Drop is selected", async () => {
     render(<TransportFormDialog open editing={null} onOpenChange={vi.fn()} onSaved={vi.fn()} />);
     await fillPlan();
     expect(screen.getByLabelText("Mode Tracking")).toHaveValue("CHECKPOINT");
     fireEvent.change(screen.getByLabelText("Mode Tracking"), { target: { value: "ACTIVITY" } });
     fireEvent.change(screen.getByLabelText("Mode Transport"), { target: { value: "MULTI_DROP" } });
-    expect(screen.getByLabelText("Mode Tracking")).toBeDisabled();
-    expect(screen.getByLabelText("Mode Tracking")).toHaveValue("CHECKPOINT");
-    expect(screen.queryByRole("option", { name: "Activity Tracking (Tanpa Checkpoint)" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Mode Tracking")).not.toBeDisabled();
+    expect(screen.getByLabelText("Mode Tracking")).toHaveValue("ACTIVITY");
+    expect(screen.getByRole("option", { name: "Activity Tracking (Tanpa Checkpoint)" })).toBeInTheDocument();
     submit();
-    await waitFor(() => expect(m.post).toHaveBeenCalledWith("/transports", expect.objectContaining({ trackingMode: "CHECKPOINT", transportMode: "MULTI_DROP" })));
+    await waitFor(() => expect(m.post).toHaveBeenCalledWith("/transports", expect.objectContaining({ trackingMode: "ACTIVITY", transportMode: "MULTI_DROP" })));
   });
 });

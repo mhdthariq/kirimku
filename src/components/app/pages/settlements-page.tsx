@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Briefcase, CheckCircle2, Coins, Route as RouteIcon } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { useHashRoute } from "@/hooks/use-hash-route";
 import { apiGet, apiPost, hasPermission, type Invoice, type Transport } from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
@@ -36,6 +37,8 @@ interface SettleableTransport extends Transport {
  *    — released automatically by the invoice settlement flow.
  */
 export function SettlementsPage() {
+  const { query, navigate } = useHashRoute();
+  const tab = query.get("tab") === "commission" ? "commission" : "transport";
   const { user } = useAuth();
   const canSettle = hasPermission(user, "transport.settle");
   const canViewInvoices = hasPermission(user, "invoice.view");
@@ -64,7 +67,7 @@ export function SettlementsPage() {
         icon={<Coins className="h-5 w-5" />}
       />
 
-      <Tabs defaultValue="transport">
+      <Tabs value={tab} onValueChange={(value) => navigate(`/settlements?tab=${value === "commission" ? "commission" : "transport"}`)}>
         <TabsList>
           <TabsTrigger value="transport">Settlement Transport</TabsTrigger>
           <TabsTrigger value="commission">Komisi B2B Marketing</TabsTrigger>

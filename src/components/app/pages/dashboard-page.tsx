@@ -214,7 +214,7 @@ export function DashboardPage() {
         title="Verifikasi Pembayaran"
         icon={Coins}
         items={approvals.pendingPayments}
-        href="#/shipments"
+        href="#/settlements?tab=transport"
         accent="bg-amber-500/10 text-amber-600 dark:text-amber-400"
         empty="Tidak ada pembayaran yang menunggu verifikasi pada periode ini."
         renderItem={(it) => (
@@ -238,7 +238,7 @@ export function DashboardPage() {
         title="Komisi Marketing"
         icon={Banknote}
         items={approvals.pendingCommissions}
-        href="#/invoices"
+        href="#/settlements?tab=commission"
         accent="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
         empty="Tidak ada komisi yang menunggu (semua invoice B2B sudah LUNAS)."
         renderItem={(it) => (

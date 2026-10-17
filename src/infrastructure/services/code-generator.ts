@@ -1,13 +1,15 @@
+import type { Prisma } from "@prisma/client";
 import { db } from "@/infrastructure/persistence/db";
 
-/** Compute the first unused sequential code for a prefix. */
+/** Compute the first unused code; pass the transaction client to see its pending inserts. */
 export async function nextCode(
   model: "pickup" | "transport" | "delivery" | "invoice" | "masterShipment" | "detailShipment" | "warehouse" | "customer" | "employee" | "topUpRequest" | "withdrawalRequest" | "vehicleRepair" | "transportSettlement" | "marketingCommission" | "transportExpense" | "returnTask",
   prefix: string,
   field: "pickupCode" | "transportCode" | "deliveryCode" | "invoiceNumber" | "masterCode" | "detailCode" | "code" | "employeeNumber" | "requestCode" | "repairCode" | "settlementCode" | "commissionCode" | "expenseCode" | "returnTaskCode" = "code",
   fallbackStart = 1,
+  client: Prisma.TransactionClient = db,
 ): Promise<string> {
-  const rows: { code: string }[] = await (db as any)[model].findMany({
+  const rows: { code: string }[] = await (client as any)[model].findMany({
     select: { [field]: true },
   }).then((list: Record<string, string>[]) => list.map((r) => ({ code: String(r[field]) })));
 

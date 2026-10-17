@@ -67,6 +67,8 @@ export async function POST(req: NextRequest, { params }: Params) {
                   "delivery",
                   "DLV-2026-",
                   "deliveryCode",
+                  1,
+                  tx,
                 ),
                 masterId: s.shipmentId,
                 kurirId: transport.driverId,

@@ -73,6 +73,15 @@ describe("multi drop", () => {
     expect(canDrop({ ...ok, mode: "DIRECT" })).toMatch(/bukan MULTI_DROP/);
   });
 
+  it("activity drops skip check-in but preserve lifecycle and unloaded-state guards", () => {
+    const args = { mode: "MULTI_DROP" as const, trackingMode: "ACTIVITY" as const, transportStatus: "DEPARTED", dropStatus: "LOADED", vehicleCheckedInAtDrop: false };
+    expect(canDrop(args)).toBeNull();
+    expect(canDrop({ ...args, trackingMode: "CHECKPOINT" })).toMatch(/belum check-in/);
+    expect(canDrop({ ...args, transportStatus: "PLANNED" })).toMatch(/DEPARTED/);
+    expect(canDrop({ ...args, dropStatus: "DROPPED" })).toMatch(/DROPPED/);
+    expect(canDrop({ ...args, mode: "DIRECT" })).toMatch(/bukan MULTI_DROP/);
+  });
+
   it("groups resi by drop checkpoint in route order; no checkpoint = the final one", () => {
     const cps = [{ id: 1, sequence: 1 }, { id: 2, sequence: 2 }, { id: 3, sequence: 3 }, { id: 4, sequence: 4 }];
     const groups = groupByDropCheckpoint(

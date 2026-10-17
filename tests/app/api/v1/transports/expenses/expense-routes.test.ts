@@ -40,6 +40,60 @@ beforeEach(() => {
 });
 
 describe("expense API approval and GPS", () => {
+    it("creates and updates toll expenses using the shared category", async () => {
+        const toll = { ...expense, type: "TOL" };
+        m.create.mockResolvedValue(toll);
+        m.findUnique.mockResolvedValue(toll);
+        const created = await create(req({ ...body, type: "TOL" }), params());
+        expect(created.status).toBe(200);
+        expect((await created.json()).data.type).toBe("TOL");
+        expect(m.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                type: "TOL",
+                amount: 100,
+                status: "PENDING",
+                ...gps,
+            }),
+        });
+        const updated = await update(req({ ...body, type: "TOL" }), params());
+        expect(updated.status).toBe(200);
+        expect((await updated.json()).data.type).toBe("TOL");
+        expect(m.updateMany).toHaveBeenCalledWith({
+            where: { id: 12, transportId: 10, status: "PENDING" },
+            data: { ...gps, type: "TOL", amount: 100 },
+        });
+    });
+    it.each([create, update])(
+        "keeps category and amount validation on writes %#",
+        async (route) => {
+            for (const payload of [
+                { ...body, type: "UNKNOWN" },
+                { ...body, type: "tol" },
+                { ...body, type: "TOL", amount: 0 },
+                { ...body, type: "TOL", amount: -1 },
+            ]) {
+                expect((await route(req(payload), params())).status).toBe(422);
+            }
+            expect(m.create).not.toHaveBeenCalled();
+            expect(m.updateMany).not.toHaveBeenCalled();
+        },
+    );
+    it.each([create, update])(
+        "keeps toll writes authenticated and permission checked %#",
+        async (route) => {
+            m.auth.mockResolvedValue(null);
+            expect(
+                (await route(req({ ...body, type: "TOL" }), params())).status,
+            ).toBe(401);
+            m.auth.mockResolvedValue(actor);
+            m.permission.mockReturnValue(false);
+            expect(
+                (await route(req({ ...body, type: "TOL" }), params())).status,
+            ).toBe(403);
+            expect(m.create).not.toHaveBeenCalled();
+            expect(m.updateMany).not.toHaveBeenCalled();
+        },
+    );
   it.each([create, update])("requires fresh GPS for writes %#", async (route) => {
     for (const payload of [{ type: "BBM", amount: 100 }, { ...body, latitude: null }, { ...body, locationAccuracy: -1 }, null]) {
       expect((await route(req(payload), params())).status).toBe(422);

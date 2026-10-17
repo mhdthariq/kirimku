@@ -507,7 +507,7 @@ export function TransportDetailPage({ transportId, initialTab }: { transportId: 
 
       {/* 3b. Multi drop board, delivery approval and return task. Re-mounted
           (key) whenever a check-in or status change happens so it refetches. */}
-      {!driverFocused && <TransportDropsPanel
+      {(!driverFocused || transport.transportMode === "MULTI_DROP") && <TransportDropsPanel
         key={`drops:${transport.status}:${transport.checkpointRecords.length}`}
         transportId={transport.id}
         isCrew={isCrew}

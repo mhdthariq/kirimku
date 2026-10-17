@@ -586,6 +586,7 @@ export interface TransportExpenseRow {
 
 /** Multi drop board — GET /transports/:id/drops */
 export interface TransportDropsBoard {
+  trackingMode?: TrackingMode;
   transportMode: "DIRECT" | "MULTI_DROP";
   transportStatus: string;
   deliveryApprovedAt: string | null;

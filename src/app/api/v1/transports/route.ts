@@ -173,8 +173,6 @@ export async function POST(req: NextRequest) {
     const trackingMode = parseTrackingMode(body.trackingMode);
     if (!trackingMode) return fail(422, "Mode tracking tidak valid.");
     const transportMode = normalizeTransportMode(body.transportMode);
-    if (trackingMode === "ACTIVITY" && transportMode === "MULTI_DROP")
-      return fail(422, "Activity tracking tidak mendukung MULTI_DROP.");
     const routeId = num(body.routeId);
     const vehicleId = num(body.vehicleId);
     if (!routeId) return fail(422, "Rute wajib dipilih.", { routeId: ["Rute wajib dipilih."] });
@@ -296,7 +294,7 @@ export async function POST(req: NextRequest) {
         for (const s of directShipments) {
           const existing = await tx.pickup.findFirst({ where: { masterId: s.id }, select: { id: true } });
           if (existing) continue;
-          const pickupCode = await nextCode("pickup", "PICK-2026-", "pickupCode");
+          const pickupCode = await nextCode("pickup", "PICK-2026-", "pickupCode", 1, tx);
           await tx.pickup.create({
             data: {
               pickupCode,

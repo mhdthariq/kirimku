@@ -530,7 +530,7 @@ model TransportExpense {
     id                 Int       @id @default(autoincrement())
     expenseCode        String    @unique
     transportId        Int
-    /// BONGKAR | PARKIR | MAKAN | BBM | ANGKUT
+    /// BONGKAR | PARKIR | MAKAN | BBM | ANGKUT | TOL
     type               String
     amount             Float
     description        String?

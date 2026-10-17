@@ -32,7 +32,8 @@ export async function GET(req: NextRequest, { params }: Params) {
     if (!transport) return fail(404, "Transport tidak ditemukan.");
     await assertTransportAccess(user, transport);
 
-    const checkpoints = transport.route?.checkpoints ?? [];
+    const isActivity = transport.trackingMode === "ACTIVITY";
+    const checkpoints = isActivity ? [] : transport.route?.checkpoints ?? [];
     const finalId = checkpoints.length ? checkpoints[checkpoints.length - 1].id : null;
     const checkedIn = new Set(transport.checkpointRecords.map((r) => r.checkpointId));
     const items = transport.shipments.map((s) => ({
@@ -41,8 +42,8 @@ export async function GET(req: NextRequest, { params }: Params) {
       customerName: s.master.customer.companyName || s.master.customer.name,
       destination: s.master.destination,
       penerimaName: s.master.penerimaName ?? null,
-      dropCheckpointId: s.dropCheckpointId,
-      effectiveDropCheckpointId: effectiveDropCheckpointId(s.dropCheckpointId, finalId),
+      dropCheckpointId: isActivity ? null : s.dropCheckpointId,
+      effectiveDropCheckpointId: isActivity ? null : effectiveDropCheckpointId(s.dropCheckpointId, finalId),
       dropStatus: s.dropStatus,
       droppedAt: s.droppedAt,
       deliveryApprovedAt: s.deliveryApprovedAt,
@@ -69,6 +70,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     );
 
     return ok({
+      trackingMode: isActivity ? "ACTIVITY" : "CHECKPOINT",
       transportMode: normalizeTransportMode(transport.transportMode),
       transportStatus: transport.status,
       deliveryApprovedAt: transport.deliveryApprovedAt,

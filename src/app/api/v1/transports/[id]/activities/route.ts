@@ -42,7 +42,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     await assertTransportAccess(user, transport);
     // Even owners need a crew assignment to submit driver evidence.
     if (!isAssignedCrew(user, transport)) return fail(403, "Hanya driver/kenek yang ditugaskan yang boleh mencatat aktivitas.");
-    if (transport.trackingMode !== "ACTIVITY" || transport.transportMode === "MULTI_DROP") return fail(422, "Transport ini tidak mendukung activity tracking.");
+    if (transport.trackingMode !== "ACTIVITY") return fail(422, "Transport ini tidak mendukung activity tracking.");
     if (!["PLANNED", "DEPARTED"].includes(transport.status)) return fail(422, "Aktivitas hanya untuk transport PLANNED atau DEPARTED.");
 
     const parsed: unknown = await req.json().catch(() => null);
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const activity = await db.$transaction(async (tx) => {
       // Lock and recheck lifecycle/mode/assignment before writing evidence.
       const active = await tx.transport.updateMany({
-        where: { id: transport.id, trackingMode: "ACTIVITY", transportMode: "DIRECT", status: { in: ["PLANNED", "DEPARTED"] },
+        where: { id: transport.id, trackingMode: "ACTIVITY", transportMode: transport.transportMode, status: { in: ["PLANNED", "DEPARTED"] },
           OR: [{ driverId: user.employeeId! }, { kenekId: user.employeeId! }] },
         data: { updatedAt: new Date() },
       });

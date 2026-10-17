@@ -73,6 +73,10 @@ describe("dashboard redesign", () => {
     render(<DashboardPage />);
     await screen.findByText("Sekilas operasional");
     expect(screen.getByText("4 menunggu")).toBeInTheDocument();
+    const paymentCard = screen.getByText("Verifikasi Pembayaran").closest("[data-slot=card]")!;
+    const commissionCard = screen.getByText("Komisi Marketing").closest("[data-slot=card]")!;
+    expect(within(paymentCard as HTMLElement).getByRole("link")).toHaveAttribute("href", "#/settlements?tab=transport");
+    expect(within(commissionCard as HTMLElement).getByRole("link")).toHaveAttribute("href", "#/settlements?tab=commission");
     expect(screen.getByRole("link", { name: /Pickup Aktif/ })).toHaveAttribute("href", "/pickups");
     expect(screen.getByRole("link", { name: /MS-2026-000001/ })).toHaveAttribute("href", "#/shipments/1");
     await screen.findByText("Tidak ada perubahan kapasitas dalam periode ini.");

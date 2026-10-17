@@ -6,20 +6,20 @@ import { TransportDetailPage } from "@/components/app/pages/transport-detail-pag
 
 const m = vi.hoisted(() => ({
   post: vi.fn(), permissions: [] as string[], employeeId: 1 as number | null, owner: false,
-  mode: "ACTIVITY", status: "PLANNED", role: "driver",
+  mode: "ACTIVITY", status: "PLANNED", role: "driver", transportMode: "DIRECT",
   dropStatus: "DELIVERY_PENDING", deliveryApprovedAt: null as string | null,
 }));
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: { employeeId: m.employeeId, isOwner: m.owner, roles: [{ slug: m.role }] } }) }));
 vi.mock("@/infrastructure/http/client-api", () => ({
   apiGet: async (url: string) => url.endsWith("/drops") ? {
-    transportMode: "DIRECT", transportStatus: m.status, deliveryApprovedAt: m.deliveryApprovedAt,
+    trackingMode: m.mode, transportMode: m.transportMode, transportStatus: m.status, deliveryApprovedAt: m.deliveryApprovedAt,
     checkpoints: [],
     shipments: [{ shipmentId: 20, masterCode: "RESI-20", customerName: "Customer", dropCheckpointId: null, dropStatus: m.dropStatus }],
     groups: [{ checkpointId: null, shipmentIds: [20] }],
     progress: { total: 1, dropped: 1, approved: m.dropStatus === "DELIVERY_APPROVED" ? 1 : 0, allApproved: m.dropStatus === "DELIVERY_APPROVED" },
     vehicleEmpty: true,
   } : {
-    id: 10, transportCode: "TR-10", trackingMode: m.mode, transportMode: "DIRECT", status: m.status,
+    id: 10, transportCode: "TR-10", trackingMode: m.mode, transportMode: m.transportMode, status: m.status,
     origin: "A", destination: "B", vehicle: { id: 2, vehicleNumber: "BK-1" }, driver: { id: 1, name: "Driver" }, kenek: null,
     checkpoints: [], checkpointRecords: [], shipments: [], shipmentCount: 0, totalWeightKg: 0, totalVolumeM3: 0, totalPrice: 0,
   },
@@ -35,7 +35,7 @@ vi.mock("@/components/app/photo-detail-dialog", () => ({ PhotoDetailDialog: () =
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 beforeEach(() => {
   vi.clearAllMocks(); m.employeeId = 1; m.owner = false; m.role = "driver"; m.mode = "ACTIVITY"; m.status = "PLANNED";
-  m.dropStatus = "DELIVERY_PENDING"; m.deliveryApprovedAt = null;
+  m.dropStatus = "DELIVERY_PENDING"; m.deliveryApprovedAt = null; m.transportMode = "DIRECT";
   m.permissions = ["transport.checkin", "transport.depart", "transport.arrive", "transport.expense.view"];
   m.post.mockImplementation(async (url: string) => {
     if (url.endsWith("/depart")) m.status = "DEPARTED";
@@ -67,6 +67,21 @@ describe("activity transport detail", () => {
     await waitFor(() => expect(m.post).toHaveBeenCalledWith("/transports/10/arrive", {}));
     await waitFor(() => expect(screen.getByTestId("activities")).toHaveTextContent("readonly"));
   });
+  it("shows checkpoint-free MultiDrop unloading to assigned activity crew", async () => {
+    m.transportMode = "MULTI_DROP"; m.status = "DEPARTED"; m.dropStatus = "LOADED";
+    render(<TransportDetailPage transportId={10} />);
+    expect(await screen.findByRole("button", { name: "Turunkan" })).toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.queryByText(/belum check-in/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Turunkan" }));
+    await waitFor(() => expect(m.post).toHaveBeenCalledWith("/transports/10/drops/20", { action: "DROP" }));
+  });
+  it("does not offer MultiDrop unload before departure", async () => {
+    m.transportMode = "MULTI_DROP"; m.dropStatus = "LOADED";
+    render(<TransportDetailPage transportId={10} />);
+    await screen.findByText("Tujuan resi · Activity Tracking");
+    expect(screen.queryByRole("button", { name: "Turunkan" })).not.toBeInTheDocument();
+  });
   it("gates lifecycle by the specific depart/arrive permissions, not checkin", async () => {
     m.permissions = ["transport.checkin"];
     render(<TransportDetailPage transportId={10} />);
@@ -86,7 +101,7 @@ describe("activity transport detail", () => {
     m.permissions = ["transport.delivery.approve", "return-task.create"];
     render(<TransportDetailPage transportId={10} />);
     expect(await screen.findByText("Penurunan & Approval Resi")).toBeInTheDocument();
-    expect(screen.getByText("Tujuan akhir")).toBeInTheDocument();
+    expect(screen.getByText("Tujuan resi · Activity Tracking")).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Checkpoint" })).not.toBeInTheDocument();
     expect(screen.queryByText("Check-in Checkpoint")).not.toBeInTheDocument();
     expect(screen.queryByText(/belum check-in/)).not.toBeInTheDocument();

@@ -7,6 +7,35 @@ beforeEach(() => {
   m.group.mockResolvedValue([{ type: "ANGKUT", status: "APPROVED", _sum: { amount: 150_000 }, _count: { _all: 1 } }, { type: "ANGKUT", status: "PENDING", _sum: { amount: 50_000 }, _count: { _all: 2 } }, { type: "BBM", status: "APPROVED", _sum: { amount: 100_000 }, _count: { _all: 1 } }]);
 });
 describe("operational expense finance aggregation", () => {
+    it("labels, aggregates and filters toll expenses without counting pending costs as approved", async () => {
+        m.group.mockResolvedValue([
+            {
+                type: "TOL",
+                status: "APPROVED",
+                _sum: { amount: 25_000 },
+                _count: { _all: 1 },
+            },
+            {
+                type: "TOL",
+                status: "PENDING",
+                _sum: { amount: 10_000 },
+                _count: { _all: 1 },
+            },
+        ]);
+        const report = await operationalExpenseReport({ type: "TOL" }, 1);
+        expect(report.byType.find((row) => row.type === "TOL")).toEqual({
+            type: "TOL",
+            label: "Biaya Tol",
+            approved: 25_000,
+            pending: 10_000,
+            count: 2,
+        });
+        expect(report.approvedTotal).toBe(25_000);
+        expect(report.pendingTotal).toBe(10_000);
+        expect(m.list).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { type: "TOL" } }),
+        );
+    });
   it("aggregates expenses directly, so shipment joins cannot duplicate transport costs", async () => {
     const report = await operationalExpenseReport({}, 1);
     expect(report.approvedTotal).toBe(250_000);

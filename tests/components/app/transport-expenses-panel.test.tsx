@@ -74,6 +74,49 @@ async function submitExpense() {
     await act(async () => {});
 }
 describe("expense panel GPS and approval", () => {
+    it("offers Biaya Tol and submits the TOL category with fresh GPS", async () => {
+        Object.defineProperty(Element.prototype, "scrollIntoView", {
+            configurable: true,
+            value: vi.fn(),
+        });
+        render(<TransportExpensesPanel {...props} />);
+        expect(screen.getByText("Biaya Tol")).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: /Tambah Biaya/ }));
+        fireEvent.click(screen.getByRole("combobox"));
+        fireEvent.click(
+            await screen.findByRole("option", { name: "Biaya Tol" }),
+        );
+        fireEvent.change(screen.getByLabelText("Nominal (Rp)"), {
+            target: { value: "25000" },
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Tambah" }));
+        await waitFor(() =>
+            expect(m.post).toHaveBeenCalledWith(
+                "/transports/10/expenses",
+                expect.objectContaining({
+                    type: "TOL",
+                    amount: 25000,
+                    latitude: -6.2,
+                    longitude: 106.8,
+                    locationAccuracy: 5,
+                }),
+            ),
+        );
+    });
+    it("displays and edits a saved toll expense without changing its category", async () => {
+        m.rows = [{ ...pending, type: "TOL", amount: 25000 }];
+        render(<TransportExpensesPanel {...props} />);
+        expect(screen.getByText(/Biaya Tol ·/)).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "Edit biaya" }));
+        expect(screen.getByRole("combobox")).toHaveTextContent("Biaya Tol");
+        fireEvent.click(screen.getByRole("button", { name: "Simpan" }));
+        await waitFor(() =>
+            expect(m.put).toHaveBeenCalledWith(
+                "/transports/10/expenses/1",
+                expect.objectContaining({ type: "TOL", amount: 25000 }),
+            ),
+        );
+    });
     it("captures fresh GPS before creation and keeps receipt picker unrestricted", async () => {
         render(<TransportExpensesPanel {...props} />);
         await submitExpense();

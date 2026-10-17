@@ -11,7 +11,7 @@
  */
 
 // ---------------------------------------------------------------- expenses --
-export const EXPENSE_TYPES = ["BONGKAR", "PARKIR", "MAKAN", "BBM", "ANGKUT"] as const;
+export const EXPENSE_TYPES = ["BONGKAR", "PARKIR", "MAKAN", "BBM", "ANGKUT", "TOL"] as const;
 export type ExpenseType = (typeof EXPENSE_TYPES)[number];
 
 export const EXPENSE_LABEL: Record<ExpenseType, string> = {
@@ -20,6 +20,7 @@ export const EXPENSE_LABEL: Record<ExpenseType, string> = {
   MAKAN: "Uang Makan",
   BBM: "Biaya BBM",
   ANGKUT: "Biaya Angkut",
+  TOL: "Biaya Tol",
 };
 
 export function isExpenseType(value: unknown): value is ExpenseType {
@@ -100,19 +101,20 @@ export function canAssignDrop(mode: TransportMode, transportStatus: string, drop
 }
 
 /**
- * Can this resi be unloaded now? The vehicle must have CHECKED IN at the
- * resi's drop checkpoint first (checkpoint check-in = vehicle arrived).
+ * Checkpoint tracking requires vehicle check-in at the resi's drop checkpoint.
+ * Activity tracking supports unloading without checkpoint assignment/check-in.
  */
 export function canDrop(args: {
   mode: TransportMode;
   transportStatus: string;
   dropStatus: string;
   vehicleCheckedInAtDrop: boolean;
+  trackingMode?: "CHECKPOINT" | "ACTIVITY";
 }): string | null {
   if (args.mode !== "MULTI_DROP") return "Transport ini bukan MULTI_DROP - resi turun di tujuan akhir.";
   if (args.transportStatus !== "DEPARTED") return `Drop hanya untuk transport DEPARTED (saat ini: ${args.transportStatus}).`;
   if (!["LOADED", "AT_DROP_POINT"].includes(args.dropStatus)) return `Resi sudah berstatus ${args.dropStatus}.`;
-  if (!args.vehicleCheckedInAtDrop) return "Kendaraan belum check-in di checkpoint drop resi ini.";
+  if (args.trackingMode !== "ACTIVITY" && !args.vehicleCheckedInAtDrop) return "Kendaraan belum check-in di checkpoint drop resi ini.";
   return null;
 }
 

@@ -199,10 +199,6 @@ function TransportFormSession({
       toast.error("Rencana Tiba tidak boleh lebih awal dari Rencana Berangkat.");
       return;
     }
-    if (form.trackingMode === "ACTIVITY" && form.transportMode === "MULTI_DROP") {
-      toast.error("Activity Tracking tidak mendukung Multi Drop.");
-      return;
-    }
     setBusy(true);
     const payload: Record<string, unknown> = {
       routeId: Number(form.routeId),
@@ -262,10 +258,10 @@ function TransportFormSession({
               />
             </Field>
             {!editing && (
-              <Field label="Mode Transport" htmlFor="t-mode" hint="Multi Drop: tiap resi bisa turun di checkpoint berbeda" className="sm:col-span-2">
+              <Field label="Mode Transport" htmlFor="t-mode" hint="Multi Drop: tiap resi bisa turun di titik berbeda, dengan checkpoint atau activity tracking" className="sm:col-span-2">
                 <FormSelect
                   value={form.transportMode}
-                  onValueChange={(v) => setForm({ ...form, transportMode: v as "DIRECT" | "MULTI_DROP", trackingMode: v === "MULTI_DROP" ? "CHECKPOINT" : form.trackingMode })}
+                  onValueChange={(v) => setForm({ ...form, transportMode: v as "DIRECT" | "MULTI_DROP" })}
                   options={[
                     { value: "DIRECT", label: "Direct - satu tujuan akhir" },
                     { value: "MULTI_DROP", label: "Multi Drop - banyak titik turun" },
@@ -281,9 +277,9 @@ function TransportFormSession({
                   onValueChange={(v) => setForm({ ...form, trackingMode: v as "CHECKPOINT" | "ACTIVITY" })}
                   options={[
                     { value: "CHECKPOINT", label: "Checkpoint Tracking" },
-                    ...(form.transportMode === "MULTI_DROP" ? [] : [{ value: "ACTIVITY", label: "Activity Tracking (Tanpa Checkpoint)" }]),
+                    { value: "ACTIVITY", label: "Activity Tracking (Tanpa Checkpoint)" },
                   ]}
-                  disabled={busy || form.transportMode === "MULTI_DROP"}
+                  disabled={busy}
                 />
               </Field>
             )}

@@ -1,7 +1,7 @@
 # Activity Tracking and operational expense approval
 
 ## Acceptance criteria
-- Transport creation selects Checkpoint tracking (existing default) or Activity Tracking (Tanpa Checkpoint), separately from DIRECT/MULTI_DROP. Activity mode supports DIRECT only and does not require checkpoints.
+- Transport creation selects Checkpoint tracking (existing default) or Activity Tracking (Tanpa Checkpoint), separately from DIRECT/MULTI_DROP. Activity mode supports both DIRECT and MULTI_DROP and does not require checkpoints. ACTIVITY MultiDrop permits per-resi unloading while DEPARTED; checkpoint assignment/check-in remains exclusive to CHECKPOINT tracking.
 - Assigned crew can submit multiple live-camera photos, each with fresh GPS, accuracy and capture time. No activity file/gallery upload UI exists. Location/camera denial blocks submission.
 - Expenses require fresh GPS on entry/edit and start Pending. Authorized reviewers approve atomically; approved entries display the authenticated approver username and role and are immutable.
 - Approval defaults to Owner, Admin Kantor and Admin Finance. Existing records retain approved accounting treatment without fabricated approver identities.

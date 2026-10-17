@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
-const ICON: Record<ExpenseType, typeof Fuel> = { BBM: Fuel, PARKIR: ParkingCircle, MAKAN: Utensils, BONGKAR: HandCoins, ANGKUT: HandCoins };
+const ICON: Record<ExpenseType, typeof Fuel> = { BBM: Fuel, PARKIR: ParkingCircle, MAKAN: Utensils, BONGKAR: HandCoins, ANGKUT: HandCoins, TOL: HandCoins };
 
 type TransportExpenseRow = BaseExpenseRow & {
   status: string;
@@ -64,7 +64,7 @@ interface FormState {
 const EMPTY: FormState = { type: "BBM", amount: "", description: "", photo: "", removePhoto: false };
 
 /**
- * "Biaya Operasional" of a transport: BBM, Parkir, Makan and Bongkar. Every
+ * "Biaya Operasional" of a transport. Every
  * type can have many entries (e.g. 3 BBM fill-ups); the photo proof is optional.
  */
 export function TransportExpensesPanel({

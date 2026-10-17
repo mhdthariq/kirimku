@@ -13,7 +13,8 @@ import { db } from "@/infrastructure/persistence/db";
  *      Cancelling a shipment that's physically on a moving truck is not allowed.
  *   2. If there's an active delivery (ASSIGNED / IN_PROGRESS), it must be
  *      cancelled first.
- *   3. If there are VERIFIED payments, the operator is warned (but the cancel
+ *   3. If linked to a non-CANCELLED invoice, that invoice must be cancelled first.
+ *   4. If there are VERIFIED payments, the operator is warned (but the cancel
  *      is allowed — financial corrections happen separately via adjustments).
  *
  * Returns an error message string if cancellation is blocked, or null if OK.
@@ -56,7 +57,18 @@ export async function checkCancellationGuards(masterId: number, currentStatus: s
     };
   }
 
-  // 3. Verified payments — warn (non-blocking). Financial corrections happen
+  const activeInvoiceLine = await db.invoiceLine.findFirst({
+    where: { shipmentId: masterId, invoice: { status: { not: "CANCELLED" } } },
+    select: { invoice: { select: { invoiceNumber: true, status: true } } },
+  });
+  if (activeInvoiceLine) {
+    return {
+      error: `Shipment sudah termasuk dalam invoice aktif ${activeInvoiceLine.invoice.invoiceNumber} (${activeInvoiceLine.invoice.status}). Batalkan invoice tersebut terlebih dahulu sebelum membatalkan shipment.`,
+      warnings,
+    };
+  }
+
+  // 4. Verified payments — warn (non-blocking). Financial corrections happen
   // separately via wallet adjustments / payment reversals.
   const verifiedPaymentCount = await db.payment.count({
     where: { masterId, status: "VERIFIED" },
@@ -67,7 +79,7 @@ export async function checkCancellationGuards(masterId: number, currentStatus: s
     );
   }
 
-  // 4. Active pickup (ASSIGNED/IN_PROGRESS) — warn but allow (the pickup will
+  // 5. Active pickup (ASSIGNED/IN_PROGRESS) — warn but allow (the pickup will
   // be orphaned, but the operator can clean it up).
   const activePickup = await db.pickup.findFirst({
     where: { masterId, status: { in: ["ASSIGNED", "IN_PROGRESS"] } },

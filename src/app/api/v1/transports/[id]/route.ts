@@ -213,8 +213,6 @@ export async function PUT(req: NextRequest, { params }: Params) {
         ? existing.transportMode
         : body.transportMode,
     );
-    if (trackingMode === "ACTIVITY" && transportMode === "MULTI_DROP")
-      return fail(422, "Activity tracking tidak mendukung MULTI_DROP.");
     if (
       body.trackingMode !== undefined &&
       trackingMode !== existing.trackingMode
