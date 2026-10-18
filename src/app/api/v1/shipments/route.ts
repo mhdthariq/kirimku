@@ -238,6 +238,7 @@ export async function POST(req: NextRequest) {
           discountPercentage: discountType === "PERCENTAGE" && (discountPercentageInput ?? 0) > 0 ? discountPercentageInput : null,
           discountFundedBy,
           createdByPartnerId,
+          paymentTrackingEnabled: customer.type === "b2c" && user.partnerType !== "MARKETING" && user.roles.some((role) => role.slug === "admin-gudang"),
         },
       });
 

@@ -25,7 +25,7 @@ export async function GET(req: NextRequest, { params }: Params) {
         trackingEvents: { orderBy: { occurredAt: "desc" }, include: { actor: true } },
         pickups: { include: { scans: true } },
         deliveries: true,
-        payments: { include: { recordedBy: true, verifiedBy: true } },
+        payments: { include: { recordedBy: { select: { name: true } }, verifiedBy: { select: { name: true } } } },
         transportItems: { include: { transport: true } },
       },
     });

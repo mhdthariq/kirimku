@@ -655,7 +655,7 @@ async function buildGudangWorkspace(user: AuthUser, scope: { unscoped: boolean; 
   });
   const heldPaymentRows = heldShipments.length
     ? await db.payment.findMany({
-        where: { masterId: { in: heldShipments.map((s) => s.id) }, status: { in: ["RECORDED", "VERIFIED"] } },
+        where: { masterId: { in: heldShipments.map((s) => s.id) }, status: "VERIFIED" },
         select: { masterId: true, amount: true },
       })
     : [];

@@ -217,7 +217,7 @@ export interface PaymentSummary {
   priceAmount: number | null;
   discountAmount: number; // Revise.md §6 - Marketing-funded discount
   finalPriceAmount: number | null; // what the customer actually owes
-  paidAmount: number; // sum of RECORDED + VERIFIED payments
+  paidAmount: number; // sum of VERIFIED payments only
   remainingAmount: number; // final price - paid (>= 0)
   dpRequirement: number; // deprecated - always 0 (DP rule dihapus)
   dpOk: boolean; // deprecated - always true (DP rule dihapus)
@@ -235,7 +235,7 @@ export async function paymentSummary(masterId: number): Promise<PaymentSummary> 
       where: { id: masterId },
       select: { priceAmount: true, discountAmount: true, finalPriceAmount: true },
     }),
-    db.payment.findMany({ where: { masterId, status: { in: ["RECORDED", "VERIFIED"] } }, select: { amount: true } }),
+    db.payment.findMany({ where: { masterId, status: "VERIFIED" }, select: { amount: true } }),
   ]);
   const priceAmount = master?.priceAmount ?? null;
   const discountAmount = master?.discountAmount ?? 0;

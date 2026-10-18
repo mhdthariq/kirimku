@@ -23,6 +23,7 @@ import {
   Warehouse,
 } from "lucide-react";
 import { toast } from "sonner";
+import { ShipmentPayments } from "@/components/app/shipment-payments";
 import { ShipmentTransportExpenses } from "@/components/app/operational-expense-report";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -1776,6 +1777,8 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
           </>
         }
       />
+
+      <ShipmentPayments shipment={shipment} onChanged={refresh} />
 
       {/* Where is this shipment from? - origin gudang banner for shipments that
           reached the destination gudang. Admin Gudang of the destination branch

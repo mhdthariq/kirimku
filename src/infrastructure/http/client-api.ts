@@ -262,6 +262,9 @@ export interface Shipment {
   pricingPreview?: PricingPreview | null;
   totals?: ShipmentTotals;
   paymentSummary?: PaymentSummary;
+  /** Server-owned snapshot: B2C created by Admin Gudang. */
+  paymentTrackingEnabled?: boolean;
+  payments?: Payment[];
   chargeableWeightKg: number | null;
   ratePerKg: number | null;
   /** Snapshot of the pricing method used; null on legacy rows = PER_KG. */

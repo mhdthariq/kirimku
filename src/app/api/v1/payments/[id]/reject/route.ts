@@ -7,24 +7,44 @@ import { assertShipmentScope } from "@/infrastructure/services/gudang-scope";
 type Params = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, { params }: Params) {
-  return handle(req, async () => {
-    const user = await guard(req, "payment.verify");
-    const { id } = await params;
-    const payment = await db.payment.findUnique({ where: { id: Number(id) }, include: { master: true } });
-    if (!payment) return fail(404, "Payment tidak ditemukan.");
-    await assertShipmentScope(user, payment.master);
-    if (payment.status !== "RECORDED") return fail(422, `Payment berstatus ${payment.status}, hanya RECORDED yang bisa ditolak.`);
+    return handle(req, async () => {
+        const user = await guard(req, "payment.verify");
+        const { id } = await params;
+        const payment = await db.payment.findUnique({
+            where: { id: Number(id) },
+            include: { master: true },
+        });
+        if (!payment) return fail(404, "Payment tidak ditemukan.");
+        await assertShipmentScope(user, payment.master);
+        if (payment.status !== "RECORDED")
+            return fail(
+                422,
+                `Payment berstatus ${payment.status}, hanya RECORDED yang bisa ditolak.`,
+            );
 
-    const body = await req.json().catch(() => ({}));
-    const reason = str(body.reason);
-    const updated = await db.payment.update({
-      where: { id: payment.id },
-      data: { status: "REJECTED", verifiedById: user.id, verifiedAt: new Date() },
+        const body = await req.json().catch(() => ({}));
+        const reason = str(body.reason);
+        const result = await db.payment.updateMany({
+            where: { id: payment.id, status: "RECORDED" },
+            data: {
+                status: "REJECTED",
+                verifiedById: user.id,
+                verifiedAt: new Date(),
+            },
+        });
+        if (result.count !== 1)
+            return fail(409, "Status pembayaran sudah berubah. Muat ulang.");
+        const updated = await db.payment.findUnique({
+            where: { id: payment.id },
+        });
+        await audit({
+            action: "status_change",
+            entityType: "payment",
+            entityId: payment.id,
+            entityLabel: `${payment.master.masterCode} → REJECTED`,
+            actor: user,
+            after: { reason },
+        });
+        return ok(updated);
     });
-    await audit({
-      action: "status_change", entityType: "payment", entityId: payment.id,
-      entityLabel: `${payment.master.masterCode} → REJECTED`, actor: user, after: { reason },
-    });
-    return ok(updated);
-  });
 }

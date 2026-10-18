@@ -260,8 +260,31 @@
     }
 }
 
-/* Paper geometry belongs to the document, not the print dialog's margins.
-   Keep the preview at physical size even on narrow screens (scroll to view). */
+/* Screen previews scale the complete paper, never reflow its printed columns. */
+.paper-preview {
+    width: 100%;
+    min-width: 0;
+    padding: 16px 8px;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+.paper-preview-page {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+}
+.paper-preview-content {
+    width: max-content;
+    margin-inline: auto;
+    transform-origin: top left;
+}
+.paper-preview-content > .a4-sheet {
+    margin: 0;
+}
+.paper-preview-content > .resi-sheet + .resi-sheet {
+    margin-top: 16px;
+}
+/* Paper geometry is independent of the viewport. */
 .a4-sheet {
     box-sizing: border-box;
     width: 210mm;
@@ -321,7 +344,7 @@
 @media print {
     @page {
         size: A4 portrait;
-        margin: 0;
+        margin: 12mm 12mm 18mm;
     }
     @page shipment-label {
         size: 100mm 100mm;
@@ -358,25 +381,48 @@
         display: none !important;
     }
     .a4-sheet {
-        width: 210mm !important;
+        width: auto !important;
         max-width: none !important;
-        min-height: 297mm !important;
+        min-height: 0 !important;
         height: auto !important;
         margin: 0 !important;
-        padding: 12mm !important;
-        /* Repeat the safe inset when a long document spans multiple pages. */
-        -webkit-box-decoration-break: clone;
-        box-decoration-break: clone;
+        padding: 0 !important;
+        /* Page margins reserve space on every page, including Safari. A full
+           paper-height box plus repeated padding can create a blank page. */
         border: none !important;
         border-radius: 0 !important;
         box-shadow: none !important;
         overflow: visible !important;
     }
+    .paper-preview,
+    .paper-preview-page,
+    .paper-preview-content {
+        display: contents !important;
+        height: auto !important;
+        transform: none !important;
+        overflow: visible !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    .invoice-sheet {
+        /* WebKit fragments normal block flow more reliably than flex pages. */
+        display: block;
+    }
+    .manifest-print-footer {
+        position: fixed;
+        bottom: -12mm;
+        left: 0;
+        right: 0;
+        margin: 0 !important;
+        padding: 0 !important;
+        color: #666;
+    }
     .a4-sheet thead {
         display: table-header-group;
     }
     .a4-sheet tfoot {
-        display: table-footer-group;
+        /* Shipment totals belong at the end, not on every page. */
+        display: table-row-group;
     }
     .a4-sheet tr,
     .a4-sheet img,
@@ -394,16 +440,24 @@
     }
     #resi-print-portal > .print-content {
         padding: 0 !important;
+        margin: 0 !important;
     }
     .resi-sheet {
         page: shipment-label;
+        /* Leave a fractional-mm rounding allowance for WebKit pagination. */
+        height: 99.5mm !important;
+        min-height: 99.5mm !important;
+        max-height: 99.5mm !important;
         margin: 0 !important;
         break-inside: avoid;
+        page-break-inside: avoid;
         break-after: page;
+        page-break-after: always;
         box-shadow: none !important;
     }
     .resi-sheet:last-child {
         break-after: auto;
+        page-break-after: auto;
     }
     .resi-sheet img {
         image-rendering: pixelated;

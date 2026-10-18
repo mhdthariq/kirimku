@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
     }
     const paymentRows = arrivalIds.length
       ? await db.payment.findMany({
-          where: { masterId: { in: arrivalIds }, status: { in: ["RECORDED", "VERIFIED"] } },
+          where: { masterId: { in: arrivalIds }, status: "VERIFIED" },
           select: { masterId: true, amount: true },
         })
       : [];
@@ -234,7 +234,7 @@ export async function GET(req: NextRequest) {
     });
     const heldPaymentRows = heldShipments.length
       ? await db.payment.findMany({
-          where: { masterId: { in: heldShipments.map((s) => s.id) }, status: { in: ["RECORDED", "VERIFIED"] } },
+          where: { masterId: { in: heldShipments.map((s) => s.id) }, status: "VERIFIED" },
           select: { masterId: true, amount: true },
         })
       : [];

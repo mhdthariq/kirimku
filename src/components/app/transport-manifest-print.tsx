@@ -4,273 +4,531 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Printer, X } from "lucide-react";
 import { COMPANY_NAME } from "@/shared/company";
-import { apiGet, apiPost, type TransportDetail, type TransportDropsBoard } from "@/infrastructure/http/client-api";
+import {
+    apiGet,
+    apiPost,
+    type TransportDetail,
+    type TransportDropsBoard,
+} from "@/infrastructure/http/client-api";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
-import { formatNumber, formatDate, formatRupiah } from "@/components/app/form-parts";
+import { formatNumber, formatDate } from "@/components/app/form-parts";
+import { PrintPreview } from "@/components/app/print-preview";
 import { cn } from "@/shared/utils";
 
 interface TransportManifestPrintProps {
-  transportId: number | null;
-  onClose: () => void;
+    transportId: number | null;
+    onClose: () => void;
 }
 
 /**
  * Transport Manifest — printable A4 summary of a transport: vehicle + crew,
  * capacity status (Capacity Round), route + schedule, and the shipment list
- * with per-shipment weight/volume/koli/price. Triggered from the transport
+ * with per-shipment weight/volume/koli. Triggered from the transport
  * detail page's "Cetak Manifest" button.
  *
  * Opened on its own hash route, like InvoiceDetailPage, with a printable
  * portal and an A4 preview.
  */
-export function TransportManifestPrint({ transportId, onClose }: TransportManifestPrintProps) {
-  const { user } = useAuth();
-  const [transport, setTransport] = useState<TransportDetail | null>(null);
-  const [transportMode, setTransportMode] = useState<TransportDropsBoard["transportMode"] | null>(null);
-  const [ready, setReady] = useState(false);
+export function TransportManifestPrint({
+    transportId,
+    onClose,
+}: TransportManifestPrintProps) {
+    const { user, companyName } = useAuth();
+    const displayCompanyName = companyName ?? COMPANY_NAME;
+    const [transport, setTransport] = useState<TransportDetail | null>(null);
+    const [transportMode, setTransportMode] = useState<
+        TransportDropsBoard["transportMode"] | null
+    >(null);
+    const [ready, setReady] = useState(false);
 
-  useEffect(() => {
-    if (transportId == null) {
-      const t = setTimeout(() => {
-        setTransport(null);
-        setTransportMode(null);
-        setReady(false);
-      }, 0);
-      return () => clearTimeout(t);
+    useEffect(() => {
+        if (transportId == null) {
+            const t = setTimeout(() => {
+                setTransport(null);
+                setTransportMode(null);
+                setReady(false);
+            }, 0);
+            return () => clearTimeout(t);
+        }
+        let cancelled = false;
+        const timer = setTimeout(() => {
+            if (cancelled) return;
+            setReady(false);
+        }, 0);
+        Promise.all([
+            apiGet<TransportDetail>(`/transports/${transportId}`),
+            apiGet<TransportDropsBoard>(
+                `/transports/${transportId}/drops`,
+            ).catch(() => null),
+        ])
+            .then(([t, drops]) => {
+                if (cancelled) return;
+                clearTimeout(timer);
+                setTransport(t);
+                setTransportMode(drops?.transportMode ?? null);
+                setReady(true);
+            })
+            .catch(() => {
+                if (cancelled) return;
+                clearTimeout(timer);
+                setReady(true);
+            });
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
+    }, [transportId]);
+
+    useEffect(() => {
+        if (!transport) return;
+        const previousTitle = document.title;
+        document.title = `Manifest ${transport.transportCode}`;
+        return () => {
+            document.title = previousTitle;
+        };
+    }, [transport]);
+
+    if (transportId == null || typeof document === "undefined") return null;
+
+    function doPrint() {
+        // Fire-and-forget audit log (mirrors the resi print-log pattern) — logs
+        // WHO printed the manifest and WHEN, for the audit trail.
+        if (transport) {
+            apiPost(`/transports/${transport.id}/print-log`, {}).catch(
+                () => undefined,
+            );
+        }
+        window.print();
     }
-    let cancelled = false;
-    const timer = setTimeout(() => {
-      if (cancelled) return;
-      setReady(false);
-    }, 0);
-    Promise.all([
-      apiGet<TransportDetail>(`/transports/${transportId}`),
-      apiGet<TransportDropsBoard>(`/transports/${transportId}/drops`).catch(() => null),
-    ])
-      .then(([t, drops]) => {
-        if (cancelled) return;
-        clearTimeout(timer);
-        setTransport(t);
-        setTransportMode(drops?.transportMode ?? null);
-        setReady(true);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        clearTimeout(timer);
-        setReady(true);
-      });
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [transportId]);
 
-  useEffect(() => {
-    if (!transport) return;
-    const previousTitle = document.title;
-    document.title = `Manifest ${transport.transportCode}`;
-    return () => { document.title = previousTitle; };
-  }, [transport]);
+    const cap = transport?.capacity;
+    const capRows = cap
+        ? [
+              {
+                  label: "Berat",
+                  current: cap.weight.current,
+                  max: cap.weight.maximum,
+                  unit: "KG",
+                  digits: 1,
+                  state: cap.weight.status,
+              },
+              {
+                  label: "Volume",
+                  current: cap.volume.current,
+                  max: cap.volume.maximum,
+                  unit: "M³",
+                  digits: 2,
+                  state: cap.volume.status,
+              },
+              {
+                  label: "Koli",
+                  current: cap.koli.current,
+                  max: cap.koli.maximum,
+                  unit: "koli",
+                  digits: 0,
+                  state: cap.koli.status,
+              },
+          ]
+        : [];
 
-  if (transportId == null || typeof document === "undefined") return null;
+    const overallLabel =
+        cap?.overallStatus === "OK"
+            ? "AMAN"
+            : cap?.overallStatus === "OVERLIMIT"
+              ? "OVER KAPASITAS"
+              : cap?.overallStatus === "PARTIALLY_CONFIGURED"
+                ? "SEBAGIAN TERKONFIGURASI"
+                : "BELUM DIKONFIGURASI";
 
-  function doPrint() {
-    // Fire-and-forget audit log (mirrors the resi print-log pattern) — logs
-    // WHO printed the manifest and WHEN, for the audit trail.
-    if (transport) {
-      apiPost(`/transports/${transport.id}/print-log`, {}).catch(() => undefined);
-    }
-    window.print();
-  }
-
-  const cap = transport?.capacity;
-  const capRows = cap
-    ? [
-        { label: "Berat", current: cap.weight.current, max: cap.weight.maximum, unit: "KG", digits: 1, state: cap.weight.status },
-        { label: "Volume", current: cap.volume.current, max: cap.volume.maximum, unit: "M³", digits: 2, state: cap.volume.status },
-        { label: "Koli", current: cap.koli.current, max: cap.koli.maximum, unit: "koli", digits: 0, state: cap.koli.status },
-      ]
-    : [];
-
-  const overallLabel = cap?.overallStatus === "OK" ? "AMAN"
-    : cap?.overallStatus === "OVERLIMIT" ? "OVER KAPASITAS"
-    : cap?.overallStatus === "PARTIALLY_CONFIGURED" ? "SEBAGIAN TERKONFIGURASI"
-    : "BELUM DIKONFIGURASI";
-
-  return createPortal(
-    <>
-      <div id="manifest-print-portal" data-print-portal className="fixed inset-0 z-[100] overflow-auto bg-neutral-200 p-4 dark:bg-neutral-900 print:bg-white print:p-0">
-        <div data-print-toolbar className="manifest-toolbar mx-auto mb-3 flex max-w-205 items-center justify-between print:hidden">
-          <div>
-            <p className="text-sm font-semibold text-foreground">Pratinjau Manifest Transport · A4 (210 × 297 mm)</p>
-            <p className="text-xs text-muted-foreground">Skala 100%, margin Tidak Ada, header/footer browser nonaktif.</p>
-          </div>
-          <div className="flex gap-2">
-            <Button size="sm" onClick={doPrint} disabled={!ready || !transport}>
-              <Printer className="h-3.5 w-3.5" /> Cetak / Simpan PDF
-            </Button>
-            <Button size="sm" variant="outline" onClick={onClose}>
-              <X className="h-3.5 w-3.5" /> Tutup
-            </Button>
-          </div>
-        </div>
-
-        <div className="a4-sheet manifest-sheet mx-auto rounded-xl bg-white text-black shadow-xl print:rounded-none print:shadow-none">
-          {!transport ? (
-            <p className="py-20 text-center text-gray-500">{ready ? "Transport tidak ditemukan." : "Memuat…"}</p>
-          ) : (
-            <div className="space-y-5 text-[12px]">
-              {/* Header */}
-              <div className="flex items-start justify-between border-b border-gray-300 pb-3">
-                <div>
-                  <p className="text-[18px] font-bold">{COMPANY_NAME}</p>
-                  <p className="text-[11px] text-gray-600">Manifest Transport / Surat Jalan</p>
+    return createPortal(
+        <>
+            <div
+                id="manifest-print-portal"
+                data-print-portal
+                className="fixed inset-0 z-[100] overflow-auto bg-neutral-200 p-4 dark:bg-neutral-900 print:bg-white print:p-0"
+            >
+                <div
+                    data-print-toolbar
+                    className="manifest-toolbar mx-auto mb-3 flex max-w-205 flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center print:hidden"
+                >
+                    <div>
+                        <p className="text-sm font-semibold text-foreground">
+                            Pratinjau Manifest Transport · A4 (210 × 297 mm)
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                            Skala 100%, margin sesuai dokumen, header/footer
+                            browser nonaktif.
+                        </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        <Button
+                            size="sm"
+                            onClick={doPrint}
+                            disabled={!ready || !transport}
+                        >
+                            <Printer className="h-3.5 w-3.5" /> Cetak / Simpan
+                            PDF
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={onClose}>
+                            <X className="h-3.5 w-3.5" /> Tutup
+                        </Button>
+                    </div>
                 </div>
-                <div className="text-right">
-                  <p className="font-mono text-[14px] font-bold">{transport.transportCode}</p>
-                  <p className="text-[10px] text-gray-600">Dicetak: {formatDate(new Date(), true)}</p>
-                  {user && <p className="text-[10px] text-gray-600">Oleh: {user.name}</p>}
-                </div>
-              </div>
 
-              {/* Transport info grid */}
-              <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
-                <Info label="Kendaraan" value={`${transport.vehicle.vehicleNumber}${transport.vehicle.name ? ` — ${transport.vehicle.name}` : ""}`} />
-                <Info label="Status" value={transport.status} />
-                <Info label="Rute" value={transport.routeName ?? "-"} />
-                <Info label="Mode" value={transportMode ?? "—"} />
-                <Info label="Koridor" value={`${transport.origin ?? "?"} → ${transport.destination ?? "?"}`} />
-                <Info label="Driver" value={transport.driver?.name ?? "-"} />
-                <Info label="Rencana Berangkat" value={transport.plannedDepartureAt ? formatDate(transport.plannedDepartureAt, true) : "-"} />
-                <Info label="Rencana Tiba" value={transport.plannedArrivalAt ? formatDate(transport.plannedArrivalAt, true) : "-"} />
-                {transport.kenek && <Info label="Kenek" value={transport.kenek.name} />}
-              </div>
+                <PrintPreview paper="a4">
+                    <div className="a4-sheet manifest-sheet mx-auto rounded-xl bg-white text-black shadow-xl print:rounded-none print:shadow-none">
+                        {!transport ? (
+                            <p className="py-20 text-center text-gray-500">
+                                {ready
+                                    ? "Transport tidak ditemukan."
+                                    : "Memuat…"}
+                            </p>
+                        ) : (
+                            <div className="space-y-5 text-[12px]">
+                                {/* Header */}
+                                <div className="flex items-start justify-between border-b border-gray-300 pb-3">
+                                    <div>
+                                        <p className="text-[18px] font-bold">
+                                            {displayCompanyName}
+                                        </p>
+                                        <p className="text-[11px] text-gray-600">
+                                            Manifest Transport / Surat Jalan
+                                        </p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="font-mono text-[14px] font-bold">
+                                            {transport.transportCode}
+                                        </p>
+                                        <p className="text-[10px] text-gray-600">
+                                            Dicetak:{" "}
+                                            {formatDate(new Date(), true)}
+                                        </p>
+                                        {user && (
+                                            <p className="text-[10px] text-gray-600">
+                                                Oleh: {user.name}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
 
-              {/* Capacity summary */}
-              {cap && (
-                <div className="rounded-lg border border-gray-300 p-3">
-                  <div className="mb-2 flex items-center justify-between">
-                    <p className="text-[11px] font-bold uppercase tracking-wide">Kapasitas Kendaraan</p>
-                    <span className={cn("rounded px-2 py-0.5 text-[10px] font-bold",
-                      cap.overallStatus === "OK" ? "bg-emerald-100 text-emerald-800"
-                        : cap.overallStatus === "OVERLIMIT" ? "bg-rose-100 text-rose-800"
-                        : "bg-amber-100 text-amber-800")}>
-                      {overallLabel}
-                    </span>
-                  </div>
-                  <table className="w-full text-[11px]">
-                    <thead>
-                      <tr className="border-b border-gray-200 text-left text-[9px] uppercase text-gray-500">
-                        <th className="py-1">Dimensi</th>
-                        <th className="py-1 text-right">Muatan</th>
-                        <th className="py-1 text-right">Kapasitas</th>
-                        <th className="py-1 text-right">Utilisasi</th>
-                        <th className="py-1 text-right">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {capRows.map((r) => (
-                        <tr key={r.label} className="border-b border-gray-100">
-                          <td className="py-1 font-medium">{r.label}</td>
-                          <td className="py-1 text-right font-mono">{formatNumber(r.current, r.digits)} {r.unit}</td>
-                          <td className="py-1 text-right font-mono">{r.max != null ? `${formatNumber(r.max, r.digits)} ${r.unit}` : "—"}</td>
-                          <td className="py-1 text-right font-mono">
-                            {cap[r.label.toLowerCase() === "berat" ? "weight" : r.label.toLowerCase() === "volume" ? "volume" : "koli"].utilizationPercent != null
-                              ? `${formatNumber(cap[r.label.toLowerCase() === "berat" ? "weight" : r.label.toLowerCase() === "volume" ? "volume" : "koli"].utilizationPercent, 1)}%`
-                              : "—"}
-                          </td>
-                          <td className="py-1 text-right font-semibold">{r.state}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  <p className="mt-2 text-[9px] italic text-gray-500">
-                    Status kapasitas bersifat informatif — tidak memblokir operasi. Berat aktual (bukan chargeable).
-                  </p>
-                </div>
-              )}
+                                {/* Transport info grid */}
+                                <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+                                    <Info
+                                        label="Kendaraan"
+                                        value={`${transport.vehicle.vehicleNumber}${transport.vehicle.name ? ` — ${transport.vehicle.name}` : ""}`}
+                                    />
+                                    <Info
+                                        label="Status"
+                                        value={transport.status}
+                                    />
+                                    <Info
+                                        label="Rute"
+                                        value={transport.routeName ?? "-"}
+                                    />
+                                    <Info
+                                        label="Mode"
+                                        value={transportMode ?? "—"}
+                                    />
+                                    <Info
+                                        label="Koridor"
+                                        value={`${transport.origin ?? "?"} → ${transport.destination ?? "?"}`}
+                                    />
+                                    <Info
+                                        label="Driver"
+                                        value={transport.driver?.name ?? "-"}
+                                    />
+                                    <Info
+                                        label="Rencana Berangkat"
+                                        value={
+                                            transport.plannedDepartureAt
+                                                ? formatDate(
+                                                      transport.plannedDepartureAt,
+                                                      true,
+                                                  )
+                                                : "-"
+                                        }
+                                    />
+                                    <Info
+                                        label="Rencana Tiba"
+                                        value={
+                                            transport.plannedArrivalAt
+                                                ? formatDate(
+                                                      transport.plannedArrivalAt,
+                                                      true,
+                                                  )
+                                                : "-"
+                                        }
+                                    />
+                                    {transport.kenek && (
+                                        <Info
+                                            label="Kenek"
+                                            value={transport.kenek.name}
+                                        />
+                                    )}
+                                </div>
 
-              {/* Shipment list */}
-              <div>
-                <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide">Daftar Shipment ({transport.shipmentCount})</p>
-                <table className="w-full border-collapse text-[10px]">
-                  <thead>
-                    <tr className="border-b-2 border-gray-400 bg-gray-100 text-left text-[9px] uppercase">
-                      <th className="border border-gray-300 px-1.5 py-1">#</th>
-                      <th className="border border-gray-300 px-1.5 py-1">Master Resi</th>
-                      <th className="border border-gray-300 px-1.5 py-1">Customer / Penerima</th>
-                      <th className="border border-gray-300 px-1.5 py-1">Tujuan</th>
-                      <th className="border border-gray-300 px-1.5 py-1 text-right">Koli</th>
-                      <th className="border border-gray-300 px-1.5 py-1 text-right">Berat (KG)</th>
-                      <th className="border border-gray-300 px-1.5 py-1 text-right">Volume (M³)</th>
-                      <th className="border border-gray-300 px-1.5 py-1 text-right">Harga</th>
-                      <th className="border border-gray-300 px-1.5 py-1">Tanda Terima</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {transport.shipments.map((s, i) => (
-                      <tr key={s.id} className="border-b border-gray-200">
-                        <td className="border border-gray-300 px-1.5 py-1 text-center">{i + 1}</td>
-                        <td className="border border-gray-300 px-1.5 py-1 font-mono font-semibold">{s.masterCode}</td>
-                        <td className="border border-gray-300 px-1.5 py-1">{s.customerName ?? "-"}{s.penerimaName ? ` → ${s.penerimaName}` : ""}</td>
-                        <td className="border border-gray-300 px-1.5 py-1">{s.destination}</td>
-                        <td className="border border-gray-300 px-1.5 py-1 text-right font-mono">{formatNumber(s.packages, 0)}</td>
-                        <td className="border border-gray-300 px-1.5 py-1 text-right font-mono">{formatNumber(s.weightKg, 1)}</td>
-                        <td className="border border-gray-300 px-1.5 py-1 text-right font-mono">{formatNumber(s.volumeM3, 3)}</td>
-                        <td className="border border-gray-300 px-1.5 py-1 text-right font-mono">{s.priceAmount != null ? formatRupiah(s.priceAmount) : "-"}</td>
-                        <td className="border-b border-gray-300 px-1.5 py-1" style={{ height: 28 }}>
-                          <span className="text-[8px] text-gray-400">(tanda tangan / cap)</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="bg-gray-100 font-bold">
-                      <td className="border border-gray-300 px-1.5 py-1" colSpan={4}>TOTAL ({transport.shipmentCount} shipment)</td>
-                      <td className="border border-gray-300 px-1.5 py-1 text-right font-mono">{formatNumber(transport.shipments.reduce((a, s) => a + s.packages, 0), 0)}</td>
-                      <td className="border border-gray-300 px-1.5 py-1 text-right font-mono">{formatNumber(transport.totalWeightKg, 1)}</td>
-                      <td className="border border-gray-300 px-1.5 py-1 text-right font-mono">{formatNumber(transport.totalVolumeM3, 3)}</td>
-                      <td className="border border-gray-300 px-1.5 py-1 text-right font-mono">{transport.totalPrice != null ? formatRupiah(transport.totalPrice) : "-"}</td>
-                      <td className="border border-gray-300 px-1.5 py-1" />
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
+                                {/* Capacity summary */}
+                                {cap && (
+                                    <div className="rounded-lg border border-gray-300 p-3">
+                                        <div className="mb-2 flex items-center justify-between">
+                                            <p className="text-[11px] font-bold uppercase tracking-wide">
+                                                Kapasitas Kendaraan
+                                            </p>
+                                            <span
+                                                className={cn(
+                                                    "rounded px-2 py-0.5 text-[10px] font-bold",
+                                                    cap.overallStatus === "OK"
+                                                        ? "bg-emerald-100 text-emerald-800"
+                                                        : cap.overallStatus ===
+                                                            "OVERLIMIT"
+                                                          ? "bg-rose-100 text-rose-800"
+                                                          : "bg-amber-100 text-amber-800",
+                                                )}
+                                            >
+                                                {overallLabel}
+                                            </span>
+                                        </div>
+                                        <table className="w-full text-[11px]">
+                                            <thead>
+                                                <tr className="border-b border-gray-200 text-left text-[9px] uppercase text-gray-500">
+                                                    <th className="py-1">
+                                                        Dimensi
+                                                    </th>
+                                                    <th className="py-1 text-right">
+                                                        Muatan
+                                                    </th>
+                                                    <th className="py-1 text-right">
+                                                        Kapasitas
+                                                    </th>
+                                                    <th className="py-1 text-right">
+                                                        Utilisasi
+                                                    </th>
+                                                    <th className="py-1 text-right">
+                                                        Status
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {capRows.map((r) => (
+                                                    <tr
+                                                        key={r.label}
+                                                        className="border-b border-gray-100"
+                                                    >
+                                                        <td className="py-1 font-medium">
+                                                            {r.label}
+                                                        </td>
+                                                        <td className="py-1 text-right font-mono">
+                                                            {formatNumber(
+                                                                r.current,
+                                                                r.digits,
+                                                            )}{" "}
+                                                            {r.unit}
+                                                        </td>
+                                                        <td className="py-1 text-right font-mono">
+                                                            {r.max != null
+                                                                ? `${formatNumber(r.max, r.digits)} ${r.unit}`
+                                                                : "—"}
+                                                        </td>
+                                                        <td className="py-1 text-right font-mono">
+                                                            {cap[
+                                                                r.label.toLowerCase() ===
+                                                                "berat"
+                                                                    ? "weight"
+                                                                    : r.label.toLowerCase() ===
+                                                                        "volume"
+                                                                      ? "volume"
+                                                                      : "koli"
+                                                            ]
+                                                                .utilizationPercent !=
+                                                            null
+                                                                ? `${formatNumber(cap[r.label.toLowerCase() === "berat" ? "weight" : r.label.toLowerCase() === "volume" ? "volume" : "koli"].utilizationPercent, 1)}%`
+                                                                : "—"}
+                                                        </td>
+                                                        <td className="py-1 text-right font-semibold">
+                                                            {r.state}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                        <p className="mt-2 text-[9px] italic text-gray-500">
+                                            Status kapasitas bersifat informatif
+                                            — tidak memblokir operasi. Berat
+                                            aktual (bukan chargeable).
+                                        </p>
+                                    </div>
+                                )}
 
-              {/* Signatures */}
-              <div className="mt-6 grid grid-cols-3 gap-6 text-center text-[10px]">
-                <div>
-                  <div className="border-t border-gray-500 pt-1">Driver</div>
-                  <p className="text-[9px] text-gray-500">{transport.driver?.name ?? "-"}</p>
-                </div>
-                <div>
-                  <div className="border-t border-gray-500 pt-1">Kenek</div>
-                  <p className="text-[9px] text-gray-500">{transport.kenek?.name ?? "-"}</p>
-                </div>
-                <div>
-                  <div className="border-t border-gray-500 pt-1">Petugas Gudang</div>
-                  <p className="text-[9px] text-gray-500">(nama &amp; tanda tangan)</p>
-                </div>
-              </div>
+                                {/* Shipment list */}
+                                <div>
+                                    <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide">
+                                        Daftar Shipment (
+                                        {transport.shipmentCount})
+                                    </p>
+                                    <table className="w-full border-collapse text-[10px]">
+                                        <thead>
+                                            <tr className="border-b-2 border-gray-400 bg-gray-100 text-left text-[9px] uppercase">
+                                                <th className="border border-gray-300 px-1.5 py-1">
+                                                    #
+                                                </th>
+                                                <th className="border border-gray-300 px-1.5 py-1">
+                                                    Master Resi
+                                                </th>
+                                                <th className="border border-gray-300 px-1.5 py-1">
+                                                    Customer / Penerima
+                                                </th>
+                                                <th className="border border-gray-300 px-1.5 py-1">
+                                                    Tujuan
+                                                </th>
+                                                <th className="border border-gray-300 px-1.5 py-1 text-right">
+                                                    Koli
+                                                </th>
+                                                <th className="border border-gray-300 px-1.5 py-1 text-right">
+                                                    Berat (KG)
+                                                </th>
+                                                <th className="border border-gray-300 px-1.5 py-1 text-right">
+                                                    Volume (M³)
+                                                </th>
+                                                <th className="border border-gray-300 px-1.5 py-1">
+                                                    Tanda Terima
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {transport.shipments.map((s, i) => (
+                                                <tr
+                                                    key={s.id}
+                                                    className="border-b border-gray-200"
+                                                >
+                                                    <td className="border border-gray-300 px-1.5 py-1 text-center">
+                                                        {i + 1}
+                                                    </td>
+                                                    <td className="border border-gray-300 px-1.5 py-1 font-mono font-semibold">
+                                                        {s.masterCode}
+                                                    </td>
+                                                    <td className="border border-gray-300 px-1.5 py-1">
+                                                        {s.customerName ?? "-"}
+                                                        {s.penerimaName
+                                                            ? ` → ${s.penerimaName}`
+                                                            : ""}
+                                                    </td>
+                                                    <td className="border border-gray-300 px-1.5 py-1">
+                                                        {s.destination}
+                                                    </td>
+                                                    <td className="border border-gray-300 px-1.5 py-1 text-right font-mono">
+                                                        {formatNumber(
+                                                            s.packages,
+                                                            0,
+                                                        )}
+                                                    </td>
+                                                    <td className="border border-gray-300 px-1.5 py-1 text-right font-mono">
+                                                        {formatNumber(
+                                                            s.weightKg,
+                                                            1,
+                                                        )}
+                                                    </td>
+                                                    <td className="border border-gray-300 px-1.5 py-1 text-right font-mono">
+                                                        {formatNumber(
+                                                            s.volumeM3,
+                                                            3,
+                                                        )}
+                                                    </td>
+                                                    <td
+                                                        className="border border-gray-300 px-1.5 py-1"
+                                                        style={{
+                                                            height: 80,
+                                                            width: 96,
+                                                        }}
+                                                    />
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr className="bg-gray-100 font-bold">
+                                                <td
+                                                    className="border border-gray-300 px-1.5 py-1"
+                                                    colSpan={4}
+                                                >
+                                                    TOTAL (
+                                                    {transport.shipmentCount}{" "}
+                                                    shipment)
+                                                </td>
+                                                <td className="border border-gray-300 px-1.5 py-1 text-right font-mono">
+                                                    {formatNumber(
+                                                        transport.shipments.reduce(
+                                                            (a, s) =>
+                                                                a + s.packages,
+                                                            0,
+                                                        ),
+                                                        0,
+                                                    )}
+                                                </td>
+                                                <td className="border border-gray-300 px-1.5 py-1 text-right font-mono">
+                                                    {formatNumber(
+                                                        transport.totalWeightKg,
+                                                        1,
+                                                    )}
+                                                </td>
+                                                <td className="border border-gray-300 px-1.5 py-1 text-right font-mono">
+                                                    {formatNumber(
+                                                        transport.totalVolumeM3,
+                                                        3,
+                                                    )}
+                                                </td>
+                                                <td className="border border-gray-300 px-1.5 py-1" />
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
 
-              <p className="pt-2 text-center text-[8px] text-gray-400">
-                Dokumen ini dicetak dari sistem {COMPANY_NAME} — manifest transport {transport.transportCode}.
-              </p>
+                                {/* Signatures */}
+                                <div className="mt-6 grid break-inside-avoid grid-cols-3 gap-6 pt-20 text-center text-[10px]">
+                                    <div>
+                                        <div className="border-t border-gray-500 pt-1">
+                                            Driver
+                                        </div>
+                                        <p className="text-[9px] text-gray-500">
+                                            {transport.driver?.name ?? "-"}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <div className="border-t border-gray-500 pt-1">
+                                            Kenek
+                                        </div>
+                                        <p className="text-[9px] text-gray-500">
+                                            {transport.kenek?.name ?? "-"}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <div className="border-t border-gray-500 pt-1">
+                                            Petugas Gudang
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </PrintPreview>
+                {transport && (
+                    <p className="manifest-print-footer mx-auto pt-2 text-center text-[8px] text-gray-400">
+                        Dokumen ini dicetak dari sistem {displayCompanyName} —
+                        manifest transport {transport.transportCode}.
+                    </p>
+                )}
             </div>
-          )}
-        </div>
-      </div>
-    </>,
-    document.body,
-  );
+        </>,
+        document.body,
+    );
 }
 
 function Info({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex gap-2">
-      <span className="w-32 shrink-0 text-[9px] font-semibold uppercase text-gray-500">{label}</span>
-      <span className="font-medium">{value}</span>
-    </div>
-  );
+    return (
+        <div className="flex gap-2">
+            <span className="w-32 shrink-0 text-[9px] font-semibold uppercase text-gray-500">
+                {label}
+            </span>
+            <span className="font-medium">{value}</span>
+        </div>
+    );
 }
