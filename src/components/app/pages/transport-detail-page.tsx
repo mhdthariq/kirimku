@@ -128,7 +128,7 @@ export function TransportDetailPage({ transportId, initialTab }: { transportId: 
     expenseDelete: hasPermission(user, "transport.expense.delete"),
   };
 
-  const canAccessExpenses = can.expenseView || can.expenseCreate || can.expenseUpdate;
+  const canAccessExpenses = can.expenseView || can.expenseCreate || can.expenseUpdate || can.expenseDelete;
 
   async function onDelete() {
     setConfirmDelete(false);

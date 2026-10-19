@@ -323,6 +323,7 @@ export interface TrackingEvent {
 }
 
 export interface Payment {
+  proofUrl?: string | null;
   id: number;
   masterId: number;
   method: string;
@@ -1587,6 +1588,7 @@ export interface SettingsResponse {
 }
 
 export interface FinanceSummary {
+  customerIncome?: { b2bReceived: number; b2bOutstanding: number; b2cReceived: number; b2cCash: number; b2cTransfer: number; b2cPending: number; totalReceived: number };
   totals: {
     partnerCount: number;
     marketingCount: number;

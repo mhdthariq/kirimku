@@ -25,6 +25,7 @@ export function FinancePage() {
   if (!data) return <div aria-label="Memuat dashboard keuangan" className="space-y-6"><Skeleton className="h-20 w-full max-w-lg rounded-2xl" /><Skeleton className="h-56 rounded-2xl" /><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[0, 1, 2, 3].map(i => <Skeleton key={i} className="h-44 rounded-2xl" />)}</div></div>;
 
   const t = data.totals;
+  const income = data.customerIncome;
   const ip = data.invoicePayments;
   const pendingCommission = data.pending.commissions.reduce((sum, c) => sum + c.commissionAmount, 0);
   const pendingCount = data.pending.topUps.length + data.pending.withdrawals.length + data.pending.commissions.length;
@@ -38,6 +39,7 @@ export function FinancePage() {
   return <div className="dashboard-workspace mx-auto min-w-0 max-w-[1600px] space-y-6 sm:space-y-8">
     <DashboardHeading eyebrow="Ringkasan keuangan" title="Finance Dashboard" description="Pantau penerimaan invoice, saldo partner, dan arus dana perusahaan." actions={<div className="flex flex-wrap gap-2"><span className="rounded-full border bg-card px-3 py-2 text-xs font-medium">{t.partnerCount} partner terdaftar</span><span className="rounded-full bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-700 dark:text-amber-300">{pendingCount} menunggu proses</span></div>} />
 
+    {income && <section className="space-y-4" aria-label="Pemasukan customer"><DashboardSectionTitle title="Pemasukan Customer" description="Penerimaan terverifikasi, terpisah dari saldo partner dan biaya operasional." /><div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4"><DashboardMetric label="Total Pemasukan Customer" value={formatRupiah(income.totalReceived)} hint="Penerimaan B2B + B2C" icon={<Wallet />} /><DashboardMetric label="Pemasukan B2B" value={formatRupiah(income.b2bReceived)} hint="Pembayaran invoice lunas dan parsial" icon={<Receipt />} /><DashboardMetric label="Sisa B2B Belum Bayar" value={formatRupiah(income.b2bOutstanding)} hint="Sisa invoice aktif, di luar draft dan cancelled" icon={<Briefcase />} tone="amber" /><DashboardMetric label="Pemasukan B2C" value={formatRupiah(income.b2cReceived)} hint={`Tunai ${formatRupiah(income.b2cCash)} · Transfer ${formatRupiah(income.b2cTransfer)}`} icon={<Banknote />} tone="blue" /></div>{income.b2cPending > 0 && <p className="break-words text-xs text-muted-foreground">Pembayaran B2C menunggu verifikasi: {formatRupiah(income.b2cPending)}. Belum dihitung sebagai pemasukan.</p>}</section>}
     <section aria-label="Penerimaan invoice" className="relative overflow-hidden rounded-2xl bg-[#008B75] p-5 text-white dark:bg-emerald-950 sm:p-7">
       <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-28 h-96 w-96 rounded-full border-[56px] border-emerald-400/10" />
       <div className="relative grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] xl:items-end">

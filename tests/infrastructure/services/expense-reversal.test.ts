@@ -8,10 +8,15 @@ const user = { id: 7 } as AuthUser;
 const expense = { id: 1, status: "APPROVED", expenseCode: "EXP-1", amount: 100_000, approvedByUsername: "approver" };
 beforeEach(() => { vi.resetAllMocks(); m.permission.mockReturnValue(true); m.update.mockResolvedValue({ count: 1 }); m.remove.mockResolvedValue({ count: 1 }); });
 describe("approved expense reversal", () => {
-  it("requires approval permission even when the actor can delete pending expenses", async () => {
+  it("requires the dedicated delete permission", async () => {
     m.permission.mockReturnValue(false);
     await expect(reverseExpense(user, expense, "remove", "duplicate")).rejects.toMatchObject({ status: 403 });
     expect(m.remove).not.toHaveBeenCalled();
+  });
+  it("allows a delegated deleter without granting approval or cancellation", async () => {
+    m.permission.mockImplementation((_user, permission) => permission === "transport.expense.delete");
+    await expect(reverseExpense(user, expense, "remove", "duplicate")).resolves.toEqual({ status: "REMOVED" });
+    await expect(reverseExpense(user, expense, "cancel", "duplicate")).rejects.toMatchObject({ status: 403 });
   });
   it.each(["", "   ", null, "x".repeat(1001)])("requires a bounded nonblank reason %#", async reason => {
     await expect(reverseExpense(user, expense, "cancel", reason)).rejects.toMatchObject({ status: 422 });

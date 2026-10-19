@@ -61,7 +61,7 @@ export const PERMISSIONS: { slug: string; module: string; description: string }[
   { slug: "transport.expense.view", module: "Transports", description: "View transport operational expenses" },
   { slug: "transport.expense.create", module: "Transports", description: "Add transport operational expenses" },
   { slug: "transport.expense.update", module: "Transports", description: "Edit transport operational expenses" },
-  { slug: "transport.expense.delete", module: "Transports", description: "Delete transport operational expenses" },
+  { slug: "transport.expense.delete", module: "Transports", description: "Delete pending, approved or cancelled expenses with confirmation (Owner by default; assignable to other roles)" },
   { slug: "transport.expense.approve", module: "Transports", description: "Approve pending transport operational expenses" },
   // Multi drop delivery approval (destination admin accepts the dropped resi)
   { slug: "transport.delivery.view", module: "Transports", description: "View dropped resi awaiting delivery approval" },
@@ -235,7 +235,7 @@ export const ROLE_TEMPLATES: { slug: string; name: string; description: string; 
       "vehicle.view", "vehicle.create", "vehicle.update",
       "checkpoint.view", "checkpoint.create", "checkpoint.update", "checkpoint.delete",
       "transport.view", "transport.create", "transport.depart", "transport.arrive",
-      "transport.expense.view", "transport.expense.create", "transport.expense.update", "transport.expense.delete",
+      "transport.expense.view", "transport.expense.create", "transport.expense.update",
       "transport.delivery.view", "transport.delivery.approve",
       "return-task.view", "return-task.create", "return-task.approve",
       "shipment.view", "shipment.view_tracking", "shipment.confirm_arrival", "shipment.notify_marketing",

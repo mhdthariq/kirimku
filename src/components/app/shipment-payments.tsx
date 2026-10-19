@@ -10,7 +10,6 @@ import {
 } from "@/infrastructure/http/client-api";
 import {
     shipmentPaymentTotals,
-    tracksShipmentPayments,
 } from "@/domain/shipment-payment";
 import {
     Field,
@@ -23,6 +22,8 @@ import {
 } from "@/components/app/form-parts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { fileToCompressedJpeg } from "@/presentation/image-file";
 
 export function CustomerPriceStatus({ shipment, detailed = false }: { shipment: Shipment; detailed?: boolean }) {
     const price = shipment.finalPriceAmount ?? shipment.paymentSummary?.finalPriceAmount ?? shipment.priceAmount;
@@ -47,8 +48,12 @@ export function ShipmentPayments({
     const [amount, setAmount] = useState("");
     const [reference, setReference] = useState("");
     const [busy, setBusy] = useState(false);
+    const [proof, setProof] = useState("");
+    const [proofBusy, setProofBusy] = useState(false);
+    const [proofError, setProofError] = useState("");
+    const [viewProof, setViewProof] = useState<string | null>(null);
     if (
-        !tracksShipmentPayments(shipment) ||
+        shipment.customer?.type !== "b2c" ||
         !hasPermission(user, "payment.view")
     )
         return null;
@@ -76,12 +81,14 @@ export function ShipmentPayments({
                         method,
                         amount: Number(amount),
                         reference: reference.trim() || null,
+                        ...(proof ? { proof } : {}),
                     }),
                 { success: "Pembayaran dicatat; menunggu verifikasi." },
             );
             if (saved) {
                 setAmount("");
                 setReference("");
+                setProof("");
                 await onChanged();
             }
         } finally {
@@ -110,7 +117,7 @@ export function ShipmentPayments({
     return (
         <Card className="min-w-0 rounded-2xl shadow-sm">
             <CardHeader>
-                <CardTitle className="text-base">Pembayaran</CardTitle>
+                <CardTitle className="text-base">Pembayaran Customer B2C</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
                 <div className="flex flex-wrap gap-4 text-sm">
@@ -182,8 +189,20 @@ export function ShipmentPayments({
                                         }
                                     />
                                 </Field>
+                                <Field label="Bukti pembayaran (opsional)">
+                                    <Input aria-label="Bukti pembayaran (opsional)" type="file" accept="image/jpeg,image/png" disabled={busy || proofBusy} onChange={async event => {
+                                        const file = event.target.files?.[0]; event.target.value = "";
+                                        if (!file) return;
+                                        setProofBusy(true); setProofError("");
+                                        try { setProof(await fileToCompressedJpeg(file)); }
+                                        catch (error) { setProofError(error instanceof Error ? error.message : "Bukti gagal dibaca."); }
+                                        finally { setProofBusy(false); }
+                                    }} />
+                                    {proofError && <p role="alert" className="text-xs text-destructive">{proofError}</p>}
+                                    {proof && <div className="flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" onClick={() => setViewProof(proof)}>Periksa bukti</Button><Button type="button" size="sm" variant="ghost" disabled={busy} onClick={() => setProof("")}>Hapus bukti</Button></div>}
+                                </Field>
                                 <div>
-                                    <SubmitButton busy={busy}>
+                                    <SubmitButton busy={busy || proofBusy}>
                                         Catat Pembayaran
                                     </SubmitButton>
                                 </div>
@@ -217,6 +236,7 @@ export function ShipmentPayments({
                                         : ""}
                                 </p>
                             </div>
+                            {payment.proofUrl && <Button type="button" variant="outline" size="sm" onClick={() => setViewProof(payment.proofUrl!)}>Lihat bukti pembayaran</Button>}
                             {canVerify && payment.status === "RECORDED" && (
                                 <div className="flex flex-wrap gap-2">
                                     {active && (
@@ -245,6 +265,7 @@ export function ShipmentPayments({
                         </li>
                     ))}
                 </ul>
+                <Dialog open={!!viewProof} onOpenChange={open => { if (!open) setViewProof(null); }}><DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg"><DialogHeader><DialogTitle>Bukti pembayaran</DialogTitle><DialogDescription>Foto bukti pembayaran customer. Verifikasi pembayaran dilakukan secara terpisah.</DialogDescription></DialogHeader>{viewProof && <img src={viewProof} alt="Bukti pembayaran customer" className="max-h-[65dvh] w-full rounded-lg object-contain" />}</DialogContent></Dialog>
             </CardContent>
         </Card>
     );

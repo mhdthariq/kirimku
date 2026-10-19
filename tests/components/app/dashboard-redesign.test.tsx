@@ -68,6 +68,15 @@ beforeEach(() => {
 });
 
 describe("dashboard redesign", () => {
+  it("separates B2B invoice receipts, unpaid B2B and verified B2C income", async () => {
+    m.get.mockImplementation(async (url: string) => url === "/finance/summary" ? { ...finance, customerIncome: { b2bReceived: 200_000, b2bOutstanding: 100_000, b2cReceived: 300_000, b2cCash: 100_000, b2cTransfer: 200_000, b2cPending: 50_000, totalReceived: 500_000 } } : operatingCosts);
+    render(<FinancePage />);
+    expect(await screen.findByText("Pemasukan Customer")).toBeInTheDocument();
+    expect(screen.getByText("Pemasukan B2B")).toBeInTheDocument();
+    expect(screen.getByText("Sisa B2B Belum Bayar")).toBeInTheDocument();
+    expect(screen.getByText("Pemasukan B2C")).toBeInTheDocument();
+    expect(screen.getByText(/Pembayaran B2C menunggu verifikasi: Rp50.000/)).toBeInTheDocument();
+  });
   it("retains operational metrics, approval counts, shipment links and the period filter", async () => {
     const user = userEvent.setup();
     render(<DashboardPage />);

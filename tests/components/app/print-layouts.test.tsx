@@ -65,28 +65,19 @@ beforeEach(() => {
 });
 
 describe("document and shipment print layouts", () => {
-    it("uses repeated page margins without full-page minimum height overflow", () => {
+    it("keeps A4 geometry identical in preview and print", () => {
         const css = readFileSync("src/app/globals.css", "utf8");
         const printCss = css.slice(css.indexOf("@media print"));
         const sheet = printCss.match(/\.a4-sheet\s*\{([^}]+)\}/)?.[1];
-        expect(printCss).toMatch(
-            /@page\s*\{\s*size: A4 portrait;\s*margin: 12mm 12mm 18mm;/,
-        );
-        expect(sheet).toContain("width: auto !important;");
-        expect(sheet).toContain("min-height: 0 !important;");
-        expect(sheet).toContain("padding: 0 !important;");
-        expect(printCss).toMatch(/\.invoice-sheet\s*\{[^}]*display: block/);
-        expect(printCss).toMatch(
-            /\.manifest-print-footer\s*\{[^}]*position: fixed/,
-        );
+        expect(printCss).toMatch(/@page\s*\{\s*size: A4 portrait;\s*margin: 0;/);
+        expect(sheet).toContain("width: 210mm !important;");
+        expect(sheet).toContain("height: 297mm !important;");
+        expect(sheet).toContain("padding: 12mm !important;");
+        expect(printCss).not.toMatch(/\.invoice-sheet\s*\{[^}]*display: block/);
+        expect(printCss).not.toMatch(/\.manifest-print-footer\s*\{[^}]*position: fixed/);
         expect(printCss).toContain("transform: none !important;");
         expect(printCss).toContain("height: 99.5mm !important;");
-        expect(printCss).not.toMatch(
-            /\.invoice-print-footer\s*\{[^}]*position: fixed/,
-        );
-        expect(printCss).toMatch(
-            /@page shipment-label\s*\{\s*size: 100mm 100mm;\s*margin: 0;/,
-        );
+        expect(printCss).toMatch(/@page shipment-label\s*\{\s*size: 100mm 100mm;\s*margin: 0;/);
     });
 
     it("uses the same invoice columns and table layout at every preview width", () => {

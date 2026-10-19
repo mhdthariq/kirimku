@@ -6,6 +6,10 @@ vi.mock("@/infrastructure/persistence/tenant-context", () => ({
 import { PERMISSIONS, ROLE_TEMPLATES } from "@/infrastructure/auth/rbac";
 
 describe("expense approval default permissions", () => {
+    it("defaults deletion to Owner and lets other roles receive it independently", () => {
+        expect(ROLE_TEMPLATES.filter(role => role.permissions.includes("transport.expense.delete")).map(role => role.slug)).toEqual(["owner"]);
+        expect(PERMISSIONS.find(permission => permission.slug === "transport.expense.delete")?.description).toContain("assignable");
+    });
     it("registers the approval permission", () => {
         expect(
             PERMISSIONS.filter((p) => p.slug === "transport.expense.approve"),

@@ -55,6 +55,14 @@ describe("trusted creator payment eligibility", () => {
 });
 
 describe("shipment payment recording", () => {
+  it("stores optional payment proof and rejects unsupported proof formats", async () => {
+    const proof = "data:image/jpeg;base64,QUJD";
+    expect((await record(request({ method: "CASH", amount: 100, proof }), params)).status).toBe(200);
+    expect(m.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ proofUrl: proof, method: "CASH" }) }));
+    m.create.mockClear();
+    expect((await record(request({ method: "CASH", amount: 100, proof: "javascript:alert(1)" }), params)).status).toBe(422);
+    expect(m.create).not.toHaveBeenCalled();
+  });
   it("requires authentication", async () => {
     m.auth.mockResolvedValue(null);
     expect((await record(request(), params)).status).toBe(401);
@@ -63,14 +71,14 @@ describe("shipment payment recording", () => {
   it("permits scoped Admin Gudang without global record permission, never trusting supplied status/actor", async () => {
     expect((await record(request({ method: "TRANSFER", amount: 50000, status: "VERIFIED", recordedById: 999 }), params)).status).toBe(200);
     expect(m.scope).toHaveBeenCalledWith(actor, master);
-    expect(m.create).toHaveBeenCalledWith({ data: { masterId: 12, method: "TRANSFER", amount: 50000, status: "RECORDED", reference: null, recordedById: 7 } });
+    expect(m.create).toHaveBeenCalledWith({ data: { masterId: 12, method: "TRANSFER", amount: 50000, status: "RECORDED", reference: null, proofUrl: null, recordedById: 7 } });
     expect(m.transaction).toHaveBeenCalledWith(expect.any(Function), { isolationLevel: "Serializable" });
     expect(m.audit).toHaveBeenCalledOnce();
   });
-  it.each([false, undefined])("denies Admin Gudang for untracked/legacy shipments (%s)", async (enabled) => {
+  it.each([false, undefined])("permits scoped Admin Gudang for legacy B2C shipments (%s)", async (enabled) => {
     m.master.mockResolvedValue({ ...master, paymentTrackingEnabled: enabled });
-    expect((await record(request(), params)).status).toBe(403);
-    expect(m.create).not.toHaveBeenCalled();
+    expect((await record(request(), params)).status).toBe(200);
+    expect(m.create).toHaveBeenCalledOnce();
   });
   it("does not grant staff or marketing the Admin Gudang exception", async () => {
     m.auth.mockResolvedValue({ ...actor, roles: [{ slug: "staff-gudang" }] });

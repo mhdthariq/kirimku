@@ -49,7 +49,7 @@ export function ShipmentExpenses({ shipmentId }: { shipmentId: number }) {
       <div className="flex flex-wrap gap-2">
         {approve && row.status === "PENDING" && <Button size="sm" disabled={busy} onClick={() => act(() => apiPost(`${path}/${row.id}`, { action: "approve" }), "Biaya disetujui.")}>Approve {formatRupiah(row.amount)}</Button>}
         {approve && row.status === "APPROVED" && <Button size="sm" variant="outline" disabled={busy} onClick={() => { setReason(""); setDialog({ row, action: "cancel" }); }}>Batalkan approval</Button>}
-        {((approve && ["APPROVED", "CANCELLED"].includes(row.status)) || (row.status === "PENDING" && hasPermission(user, "transport.expense.delete"))) && <Button size="sm" variant="destructive" disabled={busy} onClick={() => { setReason(""); setDialog({ row, action: "remove" }); }}>Hapus biaya</Button>}
+        {hasPermission(user, "transport.expense.delete") && <Button size="sm" variant="destructive" disabled={busy} onClick={() => { setReason(""); setDialog({ row, action: "remove" }); }}>Hapus biaya</Button>}
       </div>
     </div>)}
     <Dialog open={!!dialog} onOpenChange={open => { if (!open && !busy) setDialog(null); }}><DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-md">
@@ -67,9 +67,9 @@ export function UndoShipmentArrival({ shipmentId, onChanged }: { shipmentId: num
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
-  return <><Button variant="outline" onClick={() => { setReason(""); setOpen(true); }}>Undo tiba di gudang</Button><Dialog open={open} onOpenChange={value => { if (!busy) setOpen(value); }}><DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-md"><DialogHeader><DialogTitle>Undo tiba di gudang</DialogTitle><DialogDescription>Penerimaan gudang dibatalkan dan paket perlu dikonfirmasi ulang. Proses lanjutan dan biaya aktif harus dibatalkan terlebih dahulu.</DialogDescription></DialogHeader><form className="space-y-4" onSubmit={async event => {
+  return <><Button variant="outline" onClick={() => { setReason(""); setOpen(true); }}>Undo tiba di gudang</Button><Dialog open={open} onOpenChange={value => { if (!busy) setOpen(value); }}><DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-md"><DialogHeader><DialogTitle>Undo tiba di gudang</DialogTitle><DialogDescription>Status dikembalikan ke sebelum tiba di gudang. Shipment tetap aktif dan paket perlu dikonfirmasi ulang. Proses lanjutan dan biaya aktif harus dibatalkan terlebih dahulu.</DialogDescription></DialogHeader><form className="space-y-4" onSubmit={async event => {
     event.preventDefault(); if (busy || !reason.trim()) return; setBusy(true);
-    try { if (await runAction(() => apiPost(`/shipments/${shipmentId}/undo-arrival`, { reason }), { success: "Penerimaan gudang dibatalkan." })) { setOpen(false); await onChanged(); } }
+    try { if (await runAction(() => apiPost(`/shipments/${shipmentId}/undo-arrival`, { reason }), { success: "Status shipment dikembalikan ke sebelum tiba di gudang." })) { setOpen(false); await onChanged(); } }
     finally { setBusy(false); }
   }}><Field label="Alasan (wajib)"><Input aria-label="Alasan undo penerimaan" required maxLength={1000} value={reason} disabled={busy} onChange={event => setReason(event.target.value)} /></Field><DialogFooter><Button type="button" variant="outline" disabled={busy} onClick={() => setOpen(false)}>Kembali</Button><SubmitButton busy={busy} disabled={!reason.trim()}>Undo penerimaan</SubmitButton></DialogFooter></form></DialogContent></Dialog></>;
 }

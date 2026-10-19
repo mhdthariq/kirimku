@@ -7,6 +7,8 @@ vi.mock("@/infrastructure/persistence/db", () => {
   const aggregate = async () => ({ _sum: {} });
   return { db: {
     partner: { findMany: empty },
+    payment: { groupBy: empty, aggregate },
+    invoice: { findMany: empty },
     topUpRequest: { findMany: empty, aggregate },
     withdrawalRequest: { findMany: empty, aggregate },
     vehicleRepair: { findMany: m.repairs, aggregate: m.deductions },

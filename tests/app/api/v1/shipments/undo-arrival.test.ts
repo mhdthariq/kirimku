@@ -11,6 +11,13 @@ const req = (reason: unknown = "wrong receipt") => new NextRequest("http://local
 const params = () => ({ params: Promise.resolve({ id: "12" }) });
 beforeEach(() => { vi.resetAllMocks(); m.guard.mockResolvedValue({ id: 7 }); m.find.mockResolvedValue(shipment); m.update.mockResolvedValue({ count: 1 }); });
 describe("undo warehouse arrival", () => {
+  it("restores a legacy warehouse receipt from its tracking history without cancelling the shipment", async () => {
+    m.find.mockResolvedValue({ ...shipment, status: "RECEIVED_AT_GUDANG", destReceivedAt: null, arrivalPreviousStatus: null, trackingEvents: [{ event: "RECEIVED_AT_GUDANG" }, { event: "READY_FOR_PICKUP" }, { event: "CREATED" }], pickups: [] });
+    const response = await POST(req(), params());
+    expect(response.status).toBe(200);
+    expect((await response.json()).data.status).toBe("READY_FOR_PICKUP");
+    expect(m.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: "READY_FOR_PICKUP" }) }));
+  });
   it("requires the dedicated permission and applies shipment scope", async () => {
     m.guard.mockRejectedValue(new HttpError(403, "Missing permission"));
     expect((await POST(req(), params())).status).toBe(403);

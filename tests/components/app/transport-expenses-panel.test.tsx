@@ -5,6 +5,7 @@ import {
     render,
     screen,
     waitFor,
+    within,
 } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TransportExpensesPanel } from "@/components/app/transport-expenses-panel";
@@ -12,6 +13,7 @@ import { TransportExpensesPanel } from "@/components/app/transport-expenses-pane
 const m = vi.hoisted(() => ({
     post: vi.fn(),
     put: vi.fn(),
+    remove: vi.fn(),
     reload: vi.fn(),
     gps: vi.fn(),
     error: vi.fn(),
@@ -22,7 +24,7 @@ vi.mock("@/infrastructure/http/client-api", () => ({
     apiGet: vi.fn(),
     apiPost: m.post,
     apiPut: m.put,
-    apiDelete: vi.fn(),
+    apiDelete: m.remove,
     hasPermission: () => false,
 }));
 vi.mock("@/hooks/use-api-data", () => ({
@@ -74,6 +76,23 @@ async function submitExpense() {
     await act(async () => {});
 }
 describe("expense panel GPS and approval", () => {
+    it("lets a delegated deleter remove an approved cost only after confirming a reason", async () => {
+        m.rows = [{ ...pending, status: "APPROVED" }];
+        render(<TransportExpensesPanel {...props} canApprove={false} />);
+        fireEvent.click(screen.getByRole("button", { name: "Hapus biaya" }));
+        expect(m.remove).not.toHaveBeenCalled();
+        const dialog = within(screen.getByRole("dialog"));
+        expect(dialog.getByRole("button", { name: "Hapus biaya" })).toBeDisabled();
+        fireEvent.change(dialog.getByLabelText("Alasan (wajib)"), { target: { value: "Salah input" } });
+        fireEvent.click(dialog.getByRole("button", { name: "Hapus biaya" }));
+        await waitFor(() => expect(m.remove).toHaveBeenCalledWith("/transports/10/expenses/1", { reason: "Salah input" }));
+    });
+    it("does not imply delete permission from approval permission", () => {
+        m.rows = [{ ...pending, status: "APPROVED" }];
+        render(<TransportExpensesPanel {...props} canDelete={false} />);
+        expect(screen.queryByRole("button", { name: "Hapus biaya" })).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Batalkan approval" })).toBeInTheDocument();
+    });
     it("offers Biaya Tol and submits the TOL category with fresh GPS", async () => {
         Object.defineProperty(Element.prototype, "scrollIntoView", {
             configurable: true,

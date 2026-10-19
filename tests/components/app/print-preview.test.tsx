@@ -42,9 +42,7 @@ describe("responsive paper previews", () => {
                     ).style.height,
                 ),
             ).toBeCloseTo(1123 * scale, 2);
-            expect(container.querySelector("article")).not.toHaveAttribute(
-                "style",
-            );
+            expect(container.querySelector("article")).toHaveClass("a4-sheet");
         },
     );
 

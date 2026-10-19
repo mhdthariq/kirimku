@@ -14,15 +14,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (!reason || reason.length > 1000) return fail(422, "Alasan wajib diisi (maksimal 1000 karakter).");
     const updated = await db.$transaction(async tx => {
       await tx.$queryRaw`SELECT id FROM "MasterShipment" WHERE id = ${id} FOR UPDATE`;
-      const shipment = await tx.masterShipment.findUnique({ where: { id }, include: { deliveries: true, transportItems: true, expenses: true } });
+      const shipment = await tx.masterShipment.findUnique({ where: { id }, include: { deliveries: true, transportItems: true, expenses: true, trackingEvents: { orderBy: { occurredAt: "desc" } }, pickups: { orderBy: { createdAt: "desc" }, select: { id: true, status: true } } } });
       if (!shipment) throw new HttpError(404, "Shipment tidak ditemukan.");
       await assertShipmentScope(user, shipment);
       const destination = shipment.status === "ARRIVED_AT_GUDANG" && shipment.destReceivedAt != null;
-      const origin = shipment.status === "RECEIVED_AT_GUDANG" && ["CREATED", "READY_FOR_PICKUP", "PICKED_UP"].includes(shipment.arrivalPreviousStatus ?? "");
+      const priorOriginEvent = shipment.trackingEvents?.find(event => ["PICKED_UP", "READY_FOR_PICKUP", "CREATED"].includes(event.event))?.event;
+      const previousOriginStatus = shipment.arrivalPreviousStatus ?? priorOriginEvent ?? (shipment.pickups?.some(pickup => pickup.status === "COMPLETED") ? "PICKED_UP" : "CREATED");
+      const origin = shipment.status === "RECEIVED_AT_GUDANG" && ["CREATED", "READY_FOR_PICKUP", "PICKED_UP"].includes(previousOriginStatus);
       if (!destination && !origin) throw new HttpError(409, "Penerimaan gudang ini tidak dapat di-undo.");
       if (shipment.deliveries.some(delivery => delivery.status !== "CANCELLED") || (origin && shipment.transportItems.length > 0)) throw new HttpError(409, "Shipment sudah memiliki proses lanjutan. Batalkan proses tersebut terlebih dahulu.");
       if (shipment.expenses.some(expense => expense.status !== "CANCELLED")) throw new HttpError(409, "Batalkan atau hapus biaya shipment terlebih dahulu sebelum undo penerimaan.");
-      const status = destination ? "AT_DEST_GUDANG" : shipment.arrivalPreviousStatus!;
+      const status = destination ? "AT_DEST_GUDANG" : previousOriginStatus;
       const result = await tx.masterShipment.updateMany({ where: { id, status: shipment.status, destReceivedAt: shipment.destReceivedAt }, data: { status, destReceivedAt: null, arrivalPreviousStatus: null, ...(origin ? { arrivedWarehouseId: null } : {}) } });
       if (result.count !== 1) throw new HttpError(409, "Status shipment berubah. Muat ulang data.");
       await tx.handoverScan.deleteMany({ where: { masterId: id, context: destination ? "transport_arrival" : "gudang_arrival" } });

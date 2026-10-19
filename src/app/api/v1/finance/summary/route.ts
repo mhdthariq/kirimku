@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { db } from "@/infrastructure/persistence/db";
 import { guard, ok, handle } from "@/composition/api-helpers";
+import { customerIncomeSummary } from "@/infrastructure/services/customer-income";
 
 /**
  * GET /api/v1/finance/summary — company financial dashboard (§33/§34):
@@ -23,6 +24,7 @@ import { guard, ok, handle } from "@/composition/api-helpers";
 export async function GET(req: NextRequest) {
   return handle(req, async () => {
     const user = await guard(req, "financial.report.view");
+    const customerIncome = await customerIncomeSummary();
 
     const [
       partners,
@@ -138,6 +140,7 @@ export async function GET(req: NextRequest) {
 
     void user;
     return ok({
+      customerIncome: { ...customerIncome, b2bReceived: realizedInvoicePayments, totalReceived: realizedInvoicePayments + customerIncome.b2cReceived },
       totals: {
         partnerCount: partners.length,
         marketingCount: partners.filter((p) => p.type === "MARKETING").length,

@@ -134,26 +134,14 @@ describe("manifest print document", () => {
         ).not.toBeInTheDocument();
     });
 
-    it("keeps a tenant-branded repeating footer outside both the sheet and preview", async () => {
+    it("keeps the tenant-branded footer inside the same paper template in preview and print", async () => {
         apiGet.mockResolvedValue(transport);
         render(<TransportManifestPrint transportId={1} onClose={vi.fn()} />);
-        const footer = await screen.findByText(
-            /Dokumen ini dicetak dari sistem/,
-        );
+        const footer = await screen.findByText(/Dokumen ini dicetak dari sistem/);
         expect(footer).toHaveClass("manifest-print-footer");
-        expect(footer).toHaveTextContent(
-            "PT Tenant Logistik — manifest transport TR-001.",
-        );
-        expect(footer.parentElement).toHaveAttribute(
-            "id",
-            "manifest-print-portal",
-        );
-        const sheet = document.querySelector(".manifest-sheet")!;
-        expect(sheet).not.toContainElement(footer);
-        expect(sheet.parentElement).not.toContainElement(footer);
-        expect(sheet.closest(".paper-preview")?.nextElementSibling).toBe(
-            footer,
-        );
+        expect(footer).toHaveTextContent("PT Tenant Logistik — manifest transport TR-001.");
+        expect(document.querySelector(".manifest-sheet")).toContainElement(footer);
+        expect(footer.closest(".paper-preview")).not.toBeNull();
     });
 
     it("provides signing space before crew lines and a wrapping mobile toolbar", async () => {
@@ -202,7 +190,7 @@ describe("manifest print document", () => {
             screen.getByRole("button", { name: "Cetak / Simpan PDF" }),
         );
         expect(apiPost).toHaveBeenCalledWith("/transports/1/print-log", {});
-        expect(print).toHaveBeenCalledTimes(1);
+        await waitFor(() => expect(print).toHaveBeenCalledTimes(1));
         fireEvent.click(screen.getByRole("button", { name: "Tutup" }));
         expect(onClose).toHaveBeenCalledTimes(1);
         print.mockRestore();

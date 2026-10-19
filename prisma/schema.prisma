@@ -752,6 +752,7 @@ model Payment {
     amount       Float
     status       String         @default("RECORDED")
     reference    String?
+    proofUrl     String?
     recordedById Int?
     verifiedById Int?
     createdAt    DateTime       @default(now())

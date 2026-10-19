@@ -655,6 +655,7 @@ function ShipmentList() {
                       Detail
                     </Button>
                     <ItemAuditDialog entityType="shipment" entityId={s.id} itemLabel={s.masterCode} />
+                    {hasPermission(user, "shipment.undo_arrival") && (s.status === "RECEIVED_AT_GUDANG" || (s.status === "ARRIVED_AT_GUDANG" && s.destReceivedAt != null)) && <UndoShipmentArrival shipmentId={s.id} onChanged={async () => { await reload(); }} />}
                     {can.confirmArrival && s.status === "PICKED_UP" && (
                       <Button size="sm" className="h-7" onClick={() => openRowScan(s)} title="Scan paket & konfirmasi tiba di gudang">
                         <ScanLine className="h-3.5 w-3.5" /> Terima / Scan
@@ -1770,7 +1771,8 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
                 <Trash2 className="h-4 w-4" /> Hapus shipment
               </Button>
             )}
-            {can.cancel && shipment.status !== "CANCELLED" && shipment.status !== "DELIVERED" && (
+            {hasPermission(user, "shipment.undo_arrival") && (shipment.status === "RECEIVED_AT_GUDANG" || (shipment.status === "ARRIVED_AT_GUDANG" && shipment.destReceivedAt != null)) && <UndoShipmentArrival shipmentId={id} onChanged={refresh} />}
+            {can.cancel && !["CANCELLED", "DELIVERED", "RECEIVED_AT_GUDANG", "ARRIVED_AT_GUDANG"].includes(shipment.status) && (
               <Button variant="outline" className="text-destructive" onClick={() => setConfirmCancel(true)}>
                 <Ban className="h-4 w-4" /> Cancel
               </Button>
@@ -1779,9 +1781,8 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
         }
       />
 
-      <ShipmentPayments shipment={shipment} onChanged={refresh} />
+      <ShipmentPayments key={id} shipment={shipment} onChanged={refresh} />
       {shipment.customer?.type === "b2c" && <div className="min-w-0 rounded-2xl border bg-card p-4 sm:p-6"><h2 className="mb-3 text-base font-semibold">Harga & Pembayaran Customer</h2><CustomerPriceStatus shipment={shipment} detailed /></div>}
-      {hasPermission(user, "shipment.undo_arrival") && (shipment.status === "RECEIVED_AT_GUDANG" || (shipment.status === "ARRIVED_AT_GUDANG" && shipment.destReceivedAt != null)) && <UndoShipmentArrival shipmentId={id} onChanged={refresh} />}
 
       {/* Where is this shipment from? - origin gudang banner for shipments that
           reached the destination gudang. Admin Gudang of the destination branch

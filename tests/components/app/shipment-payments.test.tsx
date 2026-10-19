@@ -88,6 +88,13 @@ beforeEach(() => {
 });
 
 describe("Pembayaran option", () => {
+    it("lets finance inspect an optional stored proof before verifying", () => {
+        const proofUrl = "data:image/jpeg;base64,QUJD";
+        render(<ShipmentPayments shipment={shipment({ payments: [{ ...pending, proofUrl }] })} onChanged={m.changed} />);
+        fireEvent.click(screen.getByRole("button", { name: "Lihat bukti pembayaran" }));
+        expect(screen.getByRole("img", { name: "Bukti pembayaran customer" })).toHaveAttribute("src", proofUrl);
+        expect(m.post).not.toHaveBeenCalled();
+    });
     it("shows pending history without falsely marking the shipment paid", () => {
         render(
             <ShipmentPayments shipment={shipment()} onChanged={m.changed} />,
@@ -165,8 +172,8 @@ describe("Pembayaran option", () => {
             expect(m.changed).toHaveBeenCalledOnce();
         },
     );
-    it.each([{ customer: { type: "b2b" } }, { paymentTrackingEnabled: false }])(
-        "hides option for B2B and Marketing/legacy B2C: %j",
+    it.each([{ customer: { type: "b2b" } }])(
+        "keeps B2B payments in invoices: %j",
         (fields) => {
             const { container } = render(
                 <ShipmentPayments
@@ -177,6 +184,11 @@ describe("Pembayaran option", () => {
             expect(container).toBeEmptyDOMElement();
         },
     );
+    it("shows customer payment entry for legacy B2C shipments", () => {
+        render(<ShipmentPayments shipment={shipment({ paymentTrackingEnabled: false })} onChanged={m.changed} />);
+        expect(screen.getByRole("button", { name: "Catat Pembayaran" })).toBeInTheDocument();
+        expect(screen.getByLabelText("Bukti pembayaran (opsional)")).toBeInTheDocument();
+    });
     it("requires payment.view", () => {
         m.user.permissions = [];
         const { container } = render(
@@ -288,7 +300,7 @@ describe("actual master resi payment rendering", () => {
             screen.queryByLabelText("Pembayaran resi"),
         ).not.toBeInTheDocument();
     });
-    it("does not add payment details to Marketing/legacy B2C resi", () => {
+    it("prints payment details for legacy B2C receipts", () => {
         render(
             <ResiPrint
                 shipment={{
@@ -300,6 +312,6 @@ describe("actual master resi payment rendering", () => {
         );
         expect(
             screen.queryByLabelText("Pembayaran resi"),
-        ).not.toBeInTheDocument();
+        ).toBeInTheDocument();
     });
 });

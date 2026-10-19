@@ -312,7 +312,7 @@ export function TransportExpensesPanel({
                     </Button>
                   )}
                   {canApprove && r.status === "APPROVED" && <Button size="sm" variant="outline" onClick={() => { setReason(""); setReversal({ row: r, action: "cancel" }); }}>Batalkan approval</Button>}
-                  {canApprove && ["APPROVED", "CANCELLED"].includes(r.status) && <Button size="sm" variant="destructive" onClick={() => { setReason(""); setReversal({ row: r, action: "remove" }); }}>Hapus biaya</Button>}
+                  {canDelete && ["APPROVED", "CANCELLED"].includes(r.status) && <Button size="sm" variant="destructive" onClick={() => { setReason(""); setReversal({ row: r, action: "remove" }); }}>Hapus biaya</Button>}
                 </div>
               );
             })}

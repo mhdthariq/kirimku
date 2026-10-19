@@ -289,8 +289,10 @@
     box-sizing: border-box;
     width: 210mm;
     max-width: none;
+    height: 297mm;
     min-height: 297mm;
     padding: 12mm;
+    font-family: Arial, Helvetica, sans-serif;
     background: #fff;
     color: #171717;
     overflow-wrap: anywhere;
@@ -344,7 +346,7 @@
 @media print {
     @page {
         size: A4 portrait;
-        margin: 12mm 12mm 18mm;
+        margin: 0;
     }
     @page shipment-label {
         size: 100mm 100mm;
@@ -380,20 +382,21 @@
     [data-print-toolbar] {
         display: none !important;
     }
+    [data-paper-source] { display: none !important; }
     .a4-sheet {
-        width: auto !important;
+        width: 210mm !important;
+        height: 297mm !important;
+        min-height: 297mm !important;
         max-width: none !important;
-        min-height: 0 !important;
-        height: auto !important;
         margin: 0 !important;
-        padding: 0 !important;
-        /* Page margins reserve space on every page, including Safari. A full
-           paper-height box plus repeated padding can create a blank page. */
+        padding: 12mm !important;
         border: none !important;
         border-radius: 0 !important;
         box-shadow: none !important;
-        overflow: visible !important;
+        break-inside: avoid;
     }
+    .paper-preview-page { break-after: page; }
+    .paper-preview-page:last-child { break-after: auto; }
     .paper-preview,
     .paper-preview-page,
     .paper-preview-content {
@@ -403,19 +406,6 @@
         overflow: visible !important;
         padding: 0 !important;
         margin: 0 !important;
-    }
-    .invoice-sheet {
-        /* WebKit fragments normal block flow more reliably than flex pages. */
-        display: block;
-    }
-    .manifest-print-footer {
-        position: fixed;
-        bottom: -12mm;
-        left: 0;
-        right: 0;
-        margin: 0 !important;
-        padding: 0 !important;
-        color: #666;
     }
     .a4-sheet thead {
         display: table-header-group;
@@ -463,3 +453,17 @@
         image-rendering: pixelated;
     }
 }
+
+@media print {
+    .paper-preview,
+    .paper-preview-page { display: block !important; }
+}
+
+/* One document geometry for both the preview and the printed sheet. */
+.paper-preview-page { margin-bottom: 16px; }
+.paper-page-markup { display: contents; }
+.manifest-flow { display: flex; flex-direction: column; min-height: 100%; }
+.manifest-flow > * { flex-shrink: 0; }
+.manifest-flow > .manifest-print-footer { margin-top: auto; padding-top: 3mm; }
+.a4-sheet { margin: 0; }
+@media print { .paper-preview-page { margin: 0; } }

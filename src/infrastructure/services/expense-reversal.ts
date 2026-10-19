@@ -2,9 +2,10 @@ import { db } from "@/infrastructure/persistence/db";
 import { hasPermission, type AuthUser } from "@/infrastructure/auth/auth";
 import { HttpError } from "@/shared/http-error";
 
-/** A reason and approver permission are mandatory for reversing approved costs. */
+/** Cancellation and deletion are independent, assignable permissions. */
 export async function reverseExpense(user: AuthUser, expense: { id: number; status: string; expenseCode: string; amount: number }, action: "cancel" | "remove", input: unknown) {
-  if (!hasPermission(user, "transport.expense.approve")) throw new HttpError(403, "Missing permission: transport.expense.approve");
+  const permission = action === "remove" ? "transport.expense.delete" : "transport.expense.approve";
+  if (!hasPermission(user, permission)) throw new HttpError(403, `Missing permission: ${permission}`);
   const reason = typeof input === "string" ? input.trim() : "";
   if (!reason || reason.length > 1000) throw new HttpError(422, "Alasan wajib diisi (maksimal 1000 karakter).");
   if (action === "cancel" && expense.status !== "APPROVED") throw new HttpError(409, "Hanya biaya APPROVED yang dapat dibatalkan.");

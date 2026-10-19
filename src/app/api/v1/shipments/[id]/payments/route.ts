@@ -13,7 +13,7 @@ import {
 import { audit } from "@/infrastructure/services/audit";
 import { assertShipmentScope } from "@/infrastructure/services/gudang-scope";
 import { hasPermission } from "@/infrastructure/auth/auth";
-import { tracksShipmentPayments } from "@/domain/shipment-payment";
+import { parseOptionalPhoto } from "@/infrastructure/services/transport-ops-server";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -51,11 +51,13 @@ export async function POST(req: NextRequest, { params }: Params) {
         const masterId = Number(id);
         if (!Number.isSafeInteger(masterId) || masterId <= 0)
             return fail(422, "ID shipment tidak valid.");
-        const body = await req.json().catch(() => ({}));
+        const body = (await req.json().catch(() => ({}))) ?? {};
         if (!["CASH", "TRANSFER"].includes(body.method))
             return fail(422, "Metode pembayaran harus CASH atau TRANSFER.");
         const amount = requireNum(body.amount, "amount", 1);
         const reference = str(body.reference);
+        const proof = parseOptionalPhoto(body.proof);
+        if (proof.error) return fail(422, proof.error);
         try {
             const { payment, master } = await db.$transaction(
                 async (tx) => {
@@ -66,10 +68,10 @@ export async function POST(req: NextRequest, { params }: Params) {
                     if (!master)
                         throw new HttpError(404, "Shipment tidak ditemukan.");
                     await assertShipmentScope(user, master);
-                    if (!canRecord && !tracksShipmentPayments(master))
+                    if (!canRecord && master.customer.type !== "b2c")
                         throw new HttpError(
                             403,
-                            "Admin Gudang hanya dapat mencatat pembayaran B2C yang dibuat Admin Gudang.",
+                            "Admin Gudang hanya dapat mencatat pembayaran B2C.",
                         );
                     if (master.customer.type === "b2b")
                         throw new HttpError(
@@ -111,6 +113,7 @@ export async function POST(req: NextRequest, { params }: Params) {
                             amount,
                             status: "RECORDED",
                             reference,
+                            proofUrl: proof.photoUrl,
                             recordedById: user.id,
                         },
                     });
