@@ -5,6 +5,8 @@ import { audit } from "@/infrastructure/services/audit";
 import { nextCode } from "@/infrastructure/services/code-generator";
 import { summarizeExpenses, validateExpense, validateExpenseLocation } from "@/domain/transport-ops";
 import { assertTransportAccess, parseOptionalPhoto } from "@/infrastructure/services/transport-ops-server";
+import { parseExpensePhotos } from "@/infrastructure/services/expense-photos";
+import { expensePhotoUrls } from "@/domain/expense-photos";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -27,7 +29,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     const rows = await db.transportExpense.findMany({ where: { transportId: transport.id }, orderBy: [{ createdAt: "desc" }] });
     // The photo itself is a large data URL: list responses only say whether one exists.
     return ok(
-      rows.map(({ photoUrl, ...r }) => ({ ...r, hasPhoto: photoUrl != null })),
+      rows.map(({ photoUrl, photoUrls, ...r }) => ({ ...r, hasPhoto: expensePhotoUrls({ photoUrl, photoUrls }).length > 0, photoCount: expensePhotoUrls({ photoUrl, photoUrls }).length })),
       { summary: summarizeExpenses(rows) },
     );
   });
@@ -51,6 +53,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (locationProblem) return fail(422, locationProblem, { location: [locationProblem] });
     const photo = parseOptionalPhoto(body.photo);
     if (photo.error) return fail(422, photo.error, { photo: [photo.error] });
+    const proof = parseExpensePhotos(body);
+    if (proof.error) return fail(422, proof.error, { photos: [proof.error] });
 
     const expenseCode = await nextCode("transportExpense", "EXP-2026-", "expenseCode");
     const created = await db.transportExpense.create({
@@ -61,6 +65,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         amount: Number(body.amount),
         description: str(body.description),
         photoUrl: photo.photoUrl,
+        ...(proof.photos ? { photoUrls: proof.photos } : {}),
         createdById: user.id,
         latitude: body.latitude,
         longitude: body.longitude,
@@ -76,7 +81,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       actor: user,
       after: { type: created.type, amount: created.amount, hasPhoto: photo.photoUrl != null, status: created.status, latitude: created.latitude, longitude: created.longitude, locationAccuracy: created.locationAccuracy },
     });
-    const { photoUrl, ...rest } = created;
-    return ok({ ...rest, hasPhoto: photoUrl != null });
+    const { photoUrl, photoUrls, ...rest } = created;
+    const photoCount = expensePhotoUrls({ photoUrl, photoUrls }).length;
+    return ok({ ...rest, hasPhoto: photoCount > 0, photoCount });
   });
 }

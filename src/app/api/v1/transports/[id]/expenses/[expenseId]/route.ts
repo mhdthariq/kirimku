@@ -6,6 +6,8 @@ import { validateExpense, validateExpenseLocation } from "@/domain/transport-ops
 import { assertTransportAccess, parseOptionalPhoto } from "@/infrastructure/services/transport-ops-server";
 import { reverseExpense } from "@/infrastructure/services/expense-reversal";
 import { hasPermission } from "@/infrastructure/auth/auth";
+import { parseExpensePhotos } from "@/infrastructure/services/expense-photos";
+import { expensePhotoUrls } from "@/domain/expense-photos";
 
 type Params = { params: Promise<{ id: string; expenseId: string }> };
 
@@ -55,11 +57,16 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (body.amount !== undefined) data.amount = Number(body.amount);
     if (body.description !== undefined) data.description = str(body.description);
     if (body.removePhoto === true) data.photoUrl = null;
+    if (body.removePhoto === true) data.photoUrls = [];
     if (body.photo !== undefined && body.photo !== "") {
       const photo = parseOptionalPhoto(body.photo);
       if (photo.error) return fail(422, photo.error, { photo: [photo.error] });
       data.photoUrl = photo.photoUrl;
+      data.photoUrls = [];
     }
+    const proof = parseExpensePhotos(body, expense);
+    if (proof.error) return fail(422, proof.error, { photos: [proof.error] });
+    if (proof.photos) { data.photoUrls = proof.photos; data.photoUrl = null; }
 
     const result = await db.transportExpense.updateMany({ where: { id: expense.id, transportId: expense.transportId, status: "PENDING" }, data });
     if (result.count !== 1) return fail(409, "Biaya telah disetujui atau dihapus. Muat ulang data.");
@@ -74,8 +81,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
       before: { type: expense.type, amount: expense.amount, latitude: expense.latitude, longitude: expense.longitude, locationAccuracy: expense.locationAccuracy },
       after: { ...data },
     });
-    const { photoUrl, ...rest } = updated;
-    return ok({ ...rest, hasPhoto: photoUrl != null });
+    const { photoUrl, photoUrls, ...rest } = updated;
+    const photoCount = expensePhotoUrls({ photoUrl, photoUrls }).length;
+    return ok({ ...rest, hasPhoto: photoCount > 0, photoCount });
   });
 }
 

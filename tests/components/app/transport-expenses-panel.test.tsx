@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TransportExpensesPanel } from "@/components/app/transport-expenses-panel";
 
 const m = vi.hoisted(() => ({
+    compress: vi.fn(),
     post: vi.fn(),
     put: vi.fn(),
     remove: vi.fn(),
@@ -34,6 +35,7 @@ vi.mock("@/hooks/use-api-data", () => ({
         return true;
     },
 }));
+vi.mock("@/presentation/image-file", () => ({ fileToCompressedJpeg: m.compress }));
 vi.mock("sonner", () => ({ toast: { error: m.error } }));
 const pending = {
     id: 1,
@@ -76,6 +78,26 @@ async function submitExpense() {
     await act(async () => {});
 }
 describe("expense panel GPS and approval", () => {
+    it("submits several proof photos in one expense and notifies summary cards", async () => {
+        m.compress.mockImplementation(async (file: File) => `data:image/jpeg;base64,${file.name}`);
+        const changed = vi.fn();
+        render(<TransportExpensesPanel {...props} onChanged={changed} />);
+        fireEvent.click(screen.getByRole("button", { name: /Tambah Biaya/ }));
+        const input = screen.getByLabelText("Foto Bukti");
+        expect(input).toHaveAttribute("multiple");
+        fireEvent.change(input, { target: { files: [new File(["a"], "one"), new File(["b"], "two")] } });
+        await screen.findByAltText("Bukti biaya 2");
+        fireEvent.change(screen.getByLabelText("Nominal (Rp)"), { target: { value: "100" } });
+        fireEvent.click(screen.getByRole("button", { name: "Tambah" }));
+        await waitFor(() => expect(m.post).toHaveBeenCalledWith("/transports/10/expenses", expect.objectContaining({ photos: ["data:image/jpeg;base64,one", "data:image/jpeg;base64,two"] })));
+        expect(changed).toHaveBeenCalledOnce();
+    });
+    it("uses approved amounts in the category and identifies empty categories", () => {
+        m.rows = [{ ...pending, status: "APPROVED", amount: 700000 }];
+        render(<TransportExpensesPanel {...props} />);
+        expect(screen.getByText(/Disetujui Rp700.000/)).toBeInTheDocument();
+        expect(screen.getAllByText("Belum ada biaya aktif")).toHaveLength(5);
+    });
     it("lets a delegated deleter remove an approved cost only after confirming a reason", async () => {
         m.rows = [{ ...pending, status: "APPROVED" }];
         render(<TransportExpensesPanel {...props} canApprove={false} />);

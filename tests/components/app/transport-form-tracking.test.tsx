@@ -5,8 +5,8 @@ import { TransportFormDialog } from "@/components/app/transport-form-dialog";
 
 const m = vi.hoisted(() => ({ post: vi.fn(), put: vi.fn() }));
 vi.mock("@/infrastructure/http/client-api", () => ({
-  apiGet: async (url: string) => url === "/options" ? { routes: [{ id: 1, name: "Route", origin: "A", destination: "B" }], vehicles: [{ id: 2, vehicleNumber: "BK-1" }], employees: [] } : [],
-  apiPost: m.post, apiPut: m.put, employeesByPosition: () => [],
+  apiGet: async (url: string) => url === "/options" ? { routes: [{ id: 1, name: "Route", origin: "A", destination: "B" }], vehicles: [{ id: 2, vehicleNumber: "BK-1" }], employees: [{ id: 8, name: "Budi Gudang", position: "Gudang" }] } : url.startsWith("/shipments") ? [] : { shipments: [], driver: null, kenek: { id: 9 }, warehouseStaff: { id: 8 } },
+  apiPost: m.post, apiPut: m.put, employeesByPosition: () => [{ id: 8, name: "Budi Gudang" }],
 }));
 vi.mock("@/components/app/capacity-status-card", () => ({ TransportFormCapacityPreview: () => null }));
 vi.mock("@/components/app/form-parts", () => ({
@@ -26,6 +26,14 @@ async function fillPlan() {
 function submit() { fireEvent.submit(screen.getByLabelText("Rencana Tiba").closest("form")!); }
 
 describe("transport creation tracking modes", () => {
+  it("saves selected warehouse staff and allows transport without a Kenek", async () => {
+    render(<TransportFormDialog open editing={null} onOpenChange={vi.fn()} onSaved={vi.fn()} />);
+    await fillPlan();
+    fireEvent.change(screen.getByLabelText(/Petugas Gudang/), { target: { value: "8" } });
+    fireEvent.change(screen.getByLabelText(/Kenek/), { target: { value: "none" } });
+    submit();
+    await waitFor(() => expect(m.post).toHaveBeenCalledWith("/transports", expect.objectContaining({ warehouseStaffId: 8, kenekId: null })));
+  });
   it("creates activity mode independently from DIRECT transport mode", async () => {
     const saved = vi.fn();
     render(<TransportFormDialog open editing={null} onOpenChange={vi.fn()} onSaved={saved} />);

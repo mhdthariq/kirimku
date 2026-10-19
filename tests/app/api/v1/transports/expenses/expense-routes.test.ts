@@ -40,6 +40,27 @@ beforeEach(() => {
 });
 
 describe("expense API approval and GPS", () => {
+    it("stores multiple proofs, appends to legacy proof, and hides image data from lists", async () => {
+        const first = "data:image/jpeg;base64,YQ==";
+        const second = "data:image/png;base64,Yg==";
+        expect((await create(req({ ...body, photos: [first, second] }), params())).status).toBe(200);
+        expect(m.create).toHaveBeenCalledWith({ data: expect.objectContaining({ photoUrls: [first, second] }) });
+        m.find.mockResolvedValue({ ...expense, photoUrl: first, photoUrls: [] });
+        expect((await update(req({ ...body, photos: [second] }), params())).status).toBe(200);
+        expect(m.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ photoUrl: null, photoUrls: [first, second] }) }));
+        m.list.mockResolvedValue([{ ...expense, photoUrl: first, photoUrls: [second] }]);
+        const response = await list(req(), params());
+        const row = (await response.json()).data[0];
+        expect(row).toMatchObject({ hasPhoto: true, photoCount: 2 });
+        expect(row).not.toHaveProperty("photoUrl");
+        expect(row).not.toHaveProperty("photoUrls");
+    });
+    it("rejects invalid or excessive proof uploads before writing", async () => {
+        for (const photos of [["https://example.com/proof.jpg"], Array(9).fill("data:image/jpeg;base64,YQ==")]) {
+            expect((await create(req({ ...body, photos }), params())).status).toBe(422);
+        }
+        expect(m.create).not.toHaveBeenCalled();
+    });
     it("creates and updates toll expenses using the shared category", async () => {
         const toll = { ...expense, type: "TOL" };
         m.create.mockResolvedValue(toll);

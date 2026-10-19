@@ -120,23 +120,10 @@ export function ShipmentPayments({
                 <CardTitle className="text-base">Pembayaran Customer B2C</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-                <div className="flex flex-wrap gap-4 text-sm">
-                    <p>
-                        Status: <strong>{totals.label}</strong>
-                    </p>
-                    <p>
-                        Terverifikasi:{" "}
-                        <strong>{formatRupiah(totals.paid)}</strong>
-                    </p>
-                    <p>
-                        Sisa:{" "}
-                        <strong>
-                            {totals.total == null
-                                ? "-"
-                                : formatRupiah(totals.remaining)}
-                        </strong>
-                    </p>
-                </div>
+                <CustomerPriceStatus shipment={shipment} detailed />
+                <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                <section className="min-w-0 space-y-4 rounded-xl border bg-muted/15 p-4 sm:p-5" aria-label="Catat pembayaran customer">
+                <h3 className="text-sm font-semibold">Catat pembayaran</h3>
                 <p className="text-xs text-muted-foreground">
                     Hanya pembayaran terverifikasi yang dihitung sebagai lunas
                     dan ditampilkan pada resi. Pembayaran tercatat masih
@@ -152,7 +139,7 @@ export function ShipmentPayments({
                         totals.remaining > 0 && (
                             <form
                                 onSubmit={record}
-                                className="grid gap-3 sm:grid-cols-3"
+                                className="grid min-w-0 gap-4 sm:grid-cols-2"
                             >
                                 <Field label="Metode pembayaran">
                                     <FormSelect
@@ -201,7 +188,7 @@ export function ShipmentPayments({
                                     {proofError && <p role="alert" className="text-xs text-destructive">{proofError}</p>}
                                     {proof && <div className="flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" onClick={() => setViewProof(proof)}>Periksa bukti</Button><Button type="button" size="sm" variant="ghost" disabled={busy} onClick={() => setProof("")}>Hapus bukti</Button></div>}
                                 </Field>
-                                <div>
+                                <div className="flex justify-end border-t pt-4 sm:col-span-2">
                                     <SubmitButton busy={busy || proofBusy}>
                                         Catat Pembayaran
                                     </SubmitButton>
@@ -209,6 +196,9 @@ export function ShipmentPayments({
                             </form>
                         )
                     ))}
+                </section>
+                <section className="min-w-0 space-y-4 rounded-xl border p-4 sm:p-5" aria-label="Riwayat pembayaran customer"><div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-semibold">Riwayat pembayaran</h3><span className="text-xs text-muted-foreground">{shipment.payments?.length ?? 0} transaksi</span></div>
+                {!(shipment.payments?.length) && <p className="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">Belum ada pembayaran tercatat.</p>}
                 <ul className="space-y-2" aria-label="Riwayat pembayaran">
                     {(shipment.payments ?? []).map((payment) => (
                         <li
@@ -265,6 +255,8 @@ export function ShipmentPayments({
                         </li>
                     ))}
                 </ul>
+                </section>
+                </div>
                 <Dialog open={!!viewProof} onOpenChange={open => { if (!open) setViewProof(null); }}><DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg"><DialogHeader><DialogTitle>Bukti pembayaran</DialogTitle><DialogDescription>Foto bukti pembayaran customer. Verifikasi pembayaran dilakukan secara terpisah.</DialogDescription></DialogHeader>{viewProof && <img src={viewProof} alt="Bukti pembayaran customer" className="max-h-[65dvh] w-full rounded-lg object-contain" />}</DialogContent></Dialog>
             </CardContent>
         </Card>

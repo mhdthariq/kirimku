@@ -172,7 +172,7 @@ function ShipmentList() {
   );
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [invoiceFilter, setInvoiceFilter] = useState("all");
+  const [customerTypeFilter, setCustomerTypeFilter] = useState("all");
   const [tab, setTab] = useState("regular");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState<ShipmentForm>(EMPTY_SHIPMENT);
@@ -203,7 +203,7 @@ function ShipmentList() {
     return data.filter(
       (s) =>
         (statusFilter === "all" || s.status === statusFilter) &&
-        (invoiceFilter === "all" || (invoiceFilter === "on_invoice" ? (s.invoiceLines?.length ?? 0) > 0 : (s.invoiceLines?.length ?? 0) === 0)) &&
+        (customerTypeFilter === "all" || s.customer?.type === customerTypeFilter) &&
         // Revise round 8 — Fulfillment Mode filter:
         //  - "regular" tab → only STANDARD
         //  - "direct"  tab → only DIRECT
@@ -224,7 +224,7 @@ function ShipmentList() {
           s.destination.toLowerCase().includes(q) ||
           (s.penerimaName ?? "").toLowerCase().includes(q)),
     );
-  }, [data, search, statusFilter, invoiceFilter, activeGudangId, isRegularTab, isDirectTab]);
+  }, [data, search, statusFilter, customerTypeFilter, activeGudangId, isRegularTab, isDirectTab]);
 
   /** Auto-pick Gudang Asal & Gudang Tujuan from the selected rute (tariff):
    *  the warehouse whose city matches the tariff's origin/destination is
@@ -504,10 +504,10 @@ function ShipmentList() {
             toolbar={
               <div className="grid w-full grid-cols-1 gap-2 min-[400px]:grid-cols-2 sm:flex sm:w-auto sm:flex-wrap">
                 <div className="relative min-w-0">
-                  <select aria-label="Filter invoice" value={invoiceFilter} onChange={(e) => setInvoiceFilter(e.target.value)} className="h-10 w-full min-w-0 appearance-none rounded-lg border bg-background pl-3 pr-10 text-sm">
-                    <option value="all">All invoices</option>
-                    <option value="on_invoice">On invoice</option>
-                    <option value="not_invoice">Not on invoice</option>
+                  <select aria-label="Filter tipe customer" value={customerTypeFilter} onChange={(e) => setCustomerTypeFilter(e.target.value)} className="h-10 w-full min-w-0 appearance-none rounded-lg border bg-background pl-3 pr-10 text-sm">
+                    <option value="all">All</option>
+                    <option value="b2b">B2B</option>
+                    <option value="b2c">B2C</option>
                   </select>
                   <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 </div>
@@ -1781,8 +1781,6 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
         }
       />
 
-      <ShipmentPayments key={id} shipment={shipment} onChanged={refresh} />
-      {shipment.customer?.type === "b2c" && <div className="min-w-0 rounded-2xl border bg-card p-4 sm:p-6"><h2 className="mb-3 text-base font-semibold">Harga & Pembayaran Customer</h2><CustomerPriceStatus shipment={shipment} detailed /></div>}
 
       {/* Where is this shipment from? - origin gudang banner for shipments that
           reached the destination gudang. Admin Gudang of the destination branch
@@ -2219,6 +2217,8 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
           {documentError && <p className="mt-2 text-xs text-destructive">{documentError}</p>}
         </CardContent>
       </Card>
+
+      <ShipmentPayments key={id} shipment={shipment} onChanged={refresh} />
 
       {shipment.customer?.type === "b2b" && hasPermission(user, "transport.expense.view") && <ShipmentExpenses shipmentId={id} />}
 

@@ -21,6 +21,7 @@ interface TransportForm {
   vehicleId: string;
   driverId: string;
   kenekId: string;
+  warehouseStaffId: string;
   origin: string;
   destination: string;
   plannedDepartureAt: string; // datetime-local
@@ -32,7 +33,7 @@ interface TransportForm {
 }
 
 const EMPTY: TransportForm = {
-  routeId: "", vehicleId: "", driverId: "", kenekId: "",
+  routeId: "", vehicleId: "", driverId: "", kenekId: "", warehouseStaffId: "",
   origin: "", destination: "", plannedDepartureAt: "", plannedArrivalAt: "", transportMode: "DIRECT", trackingMode: "CHECKPOINT",
   shipmentIds: [],
 };
@@ -82,8 +83,9 @@ function TransportFormSession({
     return {
         routeId: editing.routeId ? String(editing.routeId) : "",
         vehicleId: String(editing.vehicleId),
-        driverId: "",
-        kenekId: "",
+        driverId: editing.driverId ? String(editing.driverId) : "",
+        kenekId: editing.kenekId ? String(editing.kenekId) : "",
+        warehouseStaffId: editing.warehouseStaffId ? String(editing.warehouseStaffId) : "",
         origin: editing.origin ?? "",
         destination: editing.destination ?? "",
         plannedDepartureAt: toLocalInput(editing.plannedDepartureAt ? new Date(editing.plannedDepartureAt) : null),
@@ -107,7 +109,7 @@ function TransportFormSession({
       // Capacity Round — fetch the transport's current shipments (with totals)
       // so the capacity preview can project against them in edit mode.
       apiGet<TransportDetail>(`/transports/${editingId}`)
-        .then((t) => setEditShipments(t.shipments ?? []))
+        .then((t) => { setEditShipments(t.shipments ?? []); setForm(f => ({ ...f, driverId: f.driverId || (t.driver?.id ? String(t.driver.id) : "none"), kenekId: f.kenekId || (t.kenek?.id ? String(t.kenek.id) : "none"), warehouseStaffId: f.warehouseStaffId || (t.warehouseStaff?.id ? String(t.warehouseStaff.id) : "none") })); })
         .catch(() => setEditShipments([]));
     } else {
       // Revise round 9 — fetch BOTH STANDARD (RECEIVED_AT_GUDANG) and DIRECT
@@ -208,8 +210,9 @@ function TransportFormSession({
       plannedDepartureAt: form.plannedDepartureAt ? new Date(form.plannedDepartureAt).toISOString() : null,
       plannedArrivalAt: form.plannedArrivalAt ? new Date(form.plannedArrivalAt).toISOString() : null,
     };
-    if (form.driverId) payload.driverId = Number(form.driverId);
-    if (form.kenekId) payload.kenekId = Number(form.kenekId);
+    if (form.driverId) payload.driverId = form.driverId === "none" ? null : Number(form.driverId);
+    if (form.kenekId) payload.kenekId = form.kenekId === "none" ? null : Number(form.kenekId);
+    if (form.warehouseStaffId) payload.warehouseStaffId = form.warehouseStaffId === "none" ? null : Number(form.warehouseStaffId);
     if (!editing && form.shipmentIds.length > 0) payload.shipmentIds = form.shipmentIds;
     if (!editing) {
       payload.transportMode = form.transportMode;
@@ -284,10 +287,13 @@ function TransportFormSession({
               </Field>
             )}
             <Field label="Driver" htmlFor="t-driver">
-              <FormSelect value={form.driverId} onValueChange={(v) => setForm({ ...form, driverId: v })} placeholder="Pilih driver" options={driverOptions} disabled={busy} />
+              <FormSelect value={form.driverId} onValueChange={(v) => setForm({ ...form, driverId: v })} placeholder="Pilih driver" options={[{ value: "none", label: "Tanpa driver" }, ...driverOptions]} disabled={busy} />
             </Field>
             <Field label="Kenek (opsional)" htmlFor="t-kenek">
-              <FormSelect value={form.kenekId} onValueChange={(v) => setForm({ ...form, kenekId: v })} placeholder="Pilih kenek" options={kenekOptions} disabled={busy} />
+              <FormSelect value={form.kenekId} onValueChange={(v) => setForm({ ...form, kenekId: v })} placeholder="Pilih kenek" options={[{ value: "none", label: "Tanpa kenek" }, ...kenekOptions]} disabled={busy} />
+            </Field>
+            <Field label="Petugas Gudang" hint="Opsional — ditampilkan pada manifest">
+              <FormSelect ariaLabel="Petugas Gudang" value={form.warehouseStaffId} onValueChange={value => setForm({ ...form, warehouseStaffId: value })} options={[{ value: "none", label: "Tanpa petugas gudang" }, ...employeesByPosition(options?.employees ?? [], "Gudang").map(employee => ({ value: String(employee.id), label: employee.name }))]} placeholder="Pilih petugas gudang" disabled={busy} />
             </Field>
             <Field label="Asal (Origin)" htmlFor="t-origin" hint="Otomatis dari rute - dapat diubah">
               <input

@@ -47,6 +47,13 @@ beforeEach(() => {
 });
 
 describe("TransportManifestPrint mode", () => {
+    it("omits an unassigned Kenek and prints the warehouse staff signature", async () => {
+        apiGet.mockImplementation(async (path: string) => path.endsWith("/drops") ? { transportMode: "DIRECT" } : { ...transport, warehouseStaff: { id: 9, name: "Budi Gudang" } });
+        render(<TransportManifestPrint transportId={1} onClose={vi.fn()} />);
+        expect(await screen.findByText("Budi Gudang")).toBeInTheDocument();
+        expect(screen.queryByText("Kenek")).not.toBeInTheDocument();
+        expect(screen.getByText("Petugas Gudang")).toBeInTheDocument();
+    });
     it("uses the drops API mode, even when transport detail has no checkpoints or mode", async () => {
         apiGet.mockImplementation(async (path: string) =>
             path.endsWith("/drops")

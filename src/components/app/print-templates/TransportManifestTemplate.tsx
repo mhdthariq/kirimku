@@ -348,7 +348,7 @@ export function TransportManifestTemplate({ transport, transportMode, displayCom
                                 </div>
 
                                 {/* Signatures */}
-                                <div className="mt-6 grid break-inside-avoid grid-cols-3 gap-6 pt-20 text-center text-[10px]">
+                                <div className={`mt-6 grid break-inside-avoid ${transport.kenek ? "grid-cols-3" : "grid-cols-2"} gap-6 pt-20 text-center text-[10px]`}>
                                     <div>
                                         <div className="border-t border-gray-500 pt-1">
                                             Driver
@@ -357,6 +357,7 @@ export function TransportManifestTemplate({ transport, transportMode, displayCom
                                             {transport.driver?.name ?? "-"}
                                         </p>
                                     </div>
+                                    {transport.kenek && (
                                     <div>
                                         <div className="border-t border-gray-500 pt-1">
                                             Kenek
@@ -365,10 +366,12 @@ export function TransportManifestTemplate({ transport, transportMode, displayCom
                                             {transport.kenek?.name ?? "-"}
                                         </p>
                                     </div>
+                                    )}
                                     <div>
                                         <div className="border-t border-gray-500 pt-1">
                                             Petugas Gudang
                                         </div>
+                                        {transport.warehouseStaff && <p className="text-[9px] text-gray-500">{transport.warehouseStaff.name}</p>}
                                     </div>
                                 </div>
                                 <footer className="manifest-print-footer pt-3 text-center text-[8px] text-gray-400">Dokumen ini dicetak dari sistem {displayCompanyName} — manifest transport {transport.transportCode}.</footer>

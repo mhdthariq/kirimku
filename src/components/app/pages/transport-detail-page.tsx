@@ -28,8 +28,9 @@ import {
   XCircle,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { apiDelete, apiGet, apiPost, hasPermission, type Transport, type TransportDetail, type TransportDropsBoard } from "@/infrastructure/http/client-api";
+import { apiDelete, apiGet, apiPost, hasPermission, type Transport, type TransportDetail, type TransportDropsBoard, type TransportExpenseRow } from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
+import { expenseProgress } from "@/domain/expense-progress";
 import { DashboardMetric } from "@/components/app/dashboard-ui";
 import { OperationalHeader } from "@/components/app/operational-ui";
 import { PageHeader } from "@/components/app/data-table";
@@ -101,6 +102,13 @@ export function TransportDetailPage({ transportId, initialTab }: { transportId: 
       : apiGet<TransportDropsBoard>(`/transports/${transportId}/drops`),
     [transportId, transport?.id, transport?.trackingMode],
   );
+  const canViewExpenses = hasPermission(user, "transport.expense.view");
+  const { data: expenses, loading: expensesLoading, error: expensesError, reload: reloadExpenses } = useApiData<TransportExpenseRow[]>(
+    () => canViewExpenses ? apiGet<TransportExpenseRow[]>(`/transports/${transportId}/expenses`) : Promise.resolve([]),
+    [transportId, canViewExpenses],
+  );
+  const expenseTotals = expenseProgress(Array.isArray(expenses) ? expenses : []);
+  const expenseValue = (amount: number) => expensesLoading ? "Memuat…" : expensesError ? "—" : formatRupiah(amount);
   const [checkinOpen, setCheckinOpen] = useState(false);
   const [lifecycleBusy, setLifecycleBusy] = useState(false);
   const [confirmArrive, setConfirmArrive] = useState(false);
@@ -307,11 +315,15 @@ export function TransportDetailPage({ transportId, initialTab }: { transportId: 
           <div className="grid min-w-0 gap-4 rounded-xl bg-white/5 p-4 sm:grid-cols-2"><div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-emerald-100/60">Kendaraan</p><p className="mt-1 break-words text-sm font-semibold">{transport.vehicle.vehicleNumber}</p>{transport.vehicle.name && <p className="mt-1 break-words text-xs text-emerald-100/75">{transport.vehicle.name}</p>}</div><div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-emerald-100/60">Driver</p><p className="mt-1 break-words text-sm font-semibold">{transport.driver?.name ?? "Belum ditugaskan"}</p>{transport.kenek?.name && <p className="mt-1 break-words text-xs text-emerald-100/75">Kenek: {transport.kenek.name}</p>}</div></div>
         </div>
       </section>
-      {!driverFocused && <div className="grid min-w-0 grid-cols-2 gap-3 xl:grid-cols-4">
+      {!driverFocused && <div className="grid min-w-0 grid-cols-2 gap-3 xl:grid-cols-3">
         <DashboardMetric label="Shipment" value={formatNumber(transport.shipmentCount, 0)} hint={`${formatNumber(transport.totalKoli ?? transport.shipments.reduce((sum, row) => sum + row.packages, 0), 0)} paket`} icon={<Boxes />} />
         <DashboardMetric label="Total Berat" value={`${formatNumber(transport.totalWeightKg, 1)} KG`} hint={transport.totalActualWeightKg != null ? `Aktual ${formatNumber(transport.totalActualWeightKg, 1)} KG` : undefined} icon={<Scale />} tone="blue" />
         <DashboardMetric label="Total Volume" value={`${formatNumber(transport.totalVolumeM3, 2)} M³`} icon={<PackageSearch />} tone="violet" />
         <DashboardMetric label="Total Price" value={formatRupiah(transport.totalPrice)} icon={<Coins />} tone="amber" />
+        {canViewExpenses && <>
+          <DashboardMetric label="Biaya Transport Disetujui" value={expenseValue(expenseTotals.approved)} icon={<CheckCircle2 />} />
+          <DashboardMetric label="Biaya Transport Menunggu" value={expenseValue(expenseTotals.submitted - expenseTotals.approved)} icon={<Clock />} tone="amber" />
+        </>}
       </div>}
 
       {transport.status === "ARRIVED" && (
@@ -500,7 +512,7 @@ export function TransportDetailPage({ transportId, initialTab }: { transportId: 
         </TabsContent>
         {canAccessExpenses && (
           <TabsContent value="expenses">
-            <TransportExpensesPanel transportId={transport.id} transportStatus={transport.status} canView={can.expenseView} canCreate={can.expenseCreate} canUpdate={can.expenseUpdate} canDelete={can.expenseDelete} />
+            <TransportExpensesPanel transportId={transport.id} transportStatus={transport.status} canView={can.expenseView} canCreate={can.expenseCreate} canUpdate={can.expenseUpdate} canDelete={can.expenseDelete} onChanged={() => { void reloadExpenses(); }} />
           </TabsContent>
         )}
       </Tabs>

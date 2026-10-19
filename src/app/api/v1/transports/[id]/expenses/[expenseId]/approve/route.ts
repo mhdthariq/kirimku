@@ -3,6 +3,7 @@ import { db } from "@/infrastructure/persistence/db";
 import { guard, ok, handle, fail } from "@/composition/api-helpers";
 import { audit } from "@/infrastructure/services/audit";
 import { assertTransportAccess } from "@/infrastructure/services/transport-ops-server";
+import { expensePhotoUrls } from "@/domain/expense-photos";
 
 type Params = { params: Promise<{ id: string; expenseId: string }> };
 
@@ -38,7 +39,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     });
     const updated = await db.transportExpense.findUnique({ where: { id: expense.id } });
     if (!updated) return fail(404, "Biaya tidak ditemukan.");
-    const { photoUrl, ...rest } = updated;
-    return ok({ ...rest, hasPhoto: photoUrl != null });
+    const { photoUrl, photoUrls, ...rest } = updated;
+    const photoCount = expensePhotoUrls({ photoUrl, photoUrls }).length;
+    return ok({ ...rest, hasPhoto: photoCount > 0, photoCount });
   });
 }

@@ -1,3 +1,4 @@
+import { resolveWarehouseStaff } from "@/infrastructure/services/transport-warehouse-staff";
 import { NextRequest } from "next/server";
 import { db } from "@/infrastructure/persistence/db";
 import { guard, ok, handle, fail, str, num, dateOrNull } from "@/composition/api-helpers";
@@ -121,6 +122,7 @@ export async function GET(req: NextRequest) {
                 finalizedAt: t.settlement.finalizedAt,
               }
             : null,
+          driverId: t.driverId, kenekId: t.kenekId, warehouseStaffId: t.warehouseStaffId,
           driverName: employeeName(t.driverId),
           kenekName: employeeName(t.kenekId),
           // Planning fields (Revision Part J)
@@ -187,6 +189,7 @@ export async function POST(req: NextRequest) {
     if (!vehicle) return fail(422, "Kendaraan tidak ditemukan.", { vehicleId: ["Kendaraan tidak ditemukan."] });
     if (vehicle.status !== "ACTIVE") return fail(422, `Kendaraan ${vehicle.vehicleNumber} tidak aktif (${vehicle.status}).`);
 
+    const warehouseStaffId = await resolveWarehouseStaff(body.warehouseStaffId, user);
     const driverId = num(body.driverId);
     const kenekId = num(body.kenekId);
     if (driverId != null && kenekId != null && driverId === kenekId) {
@@ -265,6 +268,7 @@ export async function POST(req: NextRequest) {
           vehicleId,
           driverId: driverId ?? null,
           kenekId: kenekId ?? null,
+          warehouseStaffId,
           origin,
           destination,
           plannedDepartureAt,

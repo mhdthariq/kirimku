@@ -568,6 +568,8 @@ export interface TransportActivityInput {
 }
 
 export interface TransportExpenseRow {
+  photoUrls?: string[];
+  photoCount?: number;
   id: number;
   expenseCode: string;
   transportId: number;
@@ -637,6 +639,9 @@ export interface ReturnTaskRow {
 }
 
 export interface Transport {
+  driverId?: number | null;
+  kenekId?: number | null;
+  warehouseStaffId?: number | null;
   trackingMode?: TrackingMode;
   id: number;
   transportCode: string;
@@ -695,6 +700,7 @@ export interface Transport {
 
 /** Transport detail (GET /transports/{id}) — Revision Part K. */
 export interface TransportDetail {
+  warehouseStaff?: { id: number; name: string } | null;
   trackingMode?: TrackingMode;
   transportMode?: "DIRECT" | "MULTI_DROP";
   id: number;

@@ -1,3 +1,4 @@
+import { resolveWarehouseStaff } from "@/infrastructure/services/transport-warehouse-staff";
 import { NextRequest } from "next/server";
 import { db } from "@/infrastructure/persistence/db";
 import { guard, ok, handle, fail, num, str, dateOrNull } from "@/composition/api-helpers";
@@ -41,6 +42,7 @@ export async function GET(req: NextRequest, { params }: Params) {
         vehicle: true,
         driver: true,
         kenek: true,
+        warehouseStaff: true,
         shipments: { include: { master: { include: { customer: { select: { name: true, companyName: true } } } } } },
         checkpointRecords: {
           orderBy: { recordedAt: "desc" },
@@ -136,6 +138,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       },
       driver: transport.driver ? { id: transport.driver.id, name: transport.driver.name } : null,
       kenek: transport.kenek ? { id: transport.kenek.id, name: transport.kenek.name } : null,
+      warehouseStaff: transport.warehouseStaff ? { id: transport.warehouseStaff.id, name: transport.warehouseStaff.name } : null,
       // last known position (Part K) — updated by checkpoint check-ins
       currentLatitude: transport.currentLatitude,
       currentLongitude: transport.currentLongitude,
@@ -237,6 +240,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (body.vehicleId !== undefined) data.vehicleId = num(body.vehicleId);
     if (body.driverId !== undefined) data.driverId = num(body.driverId);
     if (body.kenekId !== undefined) data.kenekId = num(body.kenekId);
+    if (body.warehouseStaffId !== undefined) data.warehouseStaffId = await resolveWarehouseStaff(body.warehouseStaffId, user);
     if (body.origin !== undefined) data.origin = str(body.origin);
     if (body.destination !== undefined) data.destination = str(body.destination);
     if (body.plannedDepartureAt !== undefined) data.plannedDepartureAt = dateOrNull(body.plannedDepartureAt);
@@ -282,8 +286,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
       existing.shipments.map((s) => s.master),
     );
 
-    const driverId = (data.driverId as number | null | undefined) ?? existing.driverId;
-    const kenekId = (data.kenekId as number | null | undefined) ?? existing.kenekId;
+    const driverId = body.driverId !== undefined ? data.driverId as number | null : existing.driverId;
+    const kenekId = body.kenekId !== undefined ? data.kenekId as number | null : existing.kenekId;
     if (driverId != null && kenekId != null && driverId === kenekId) {
       return fail(422, "Driver dan kenek tidak boleh orang yang sama.", { kenekId: ["Pilih kenek yang berbeda dari driver."] });
     }

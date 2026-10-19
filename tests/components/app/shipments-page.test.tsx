@@ -53,20 +53,21 @@ async function openGrouped() {
 }
 
 describe("ShipmentsPage requested UI changes", () => {
-  it("combines the compact status and invoice filters on the shipment list", async () => {
+  it("combines the status and customer-type filters with All as default on the shipment list", async () => {
     const originalGet = mocks.get.getMockImplementation()!;
     mocks.get.mockImplementation(async (path: string) => path === "/shipments" ? [
-      { ...shipment, id: 1, masterCode: "CREATED-ROW", invoiceLines: [] },
-      { ...shipment, id: 2, masterCode: "DELIVERED-ROW", status: "DELIVERED", invoiceLines: [{ invoice: { id: 4, invoiceNumber: "INV-4" } }] },
+      { ...shipment, id: 1, masterCode: "CREATED-ROW", customer: { id: 1, name: "Customer", type: "b2c" }, invoiceLines: [] },
+      { ...shipment, id: 2, masterCode: "DELIVERED-ROW", customer: { id: 2, name: "Company", type: "b2b" }, status: "DELIVERED", invoiceLines: [{ invoice: { id: 4, invoiceNumber: "INV-4" } }] },
     ] : originalGet(path));
     render(<ShipmentsPage shipmentId={null} />);
     const user = userEvent.setup();
     await screen.findAllByText("CREATED-ROW");
     expect(screen.getByLabelText("Ringkasan shipment")).toBeInTheDocument();
+    expect(screen.getByLabelText("Filter tipe customer")).toHaveValue("all");
     await user.selectOptions(screen.getByLabelText("Filter status shipment"), "DELIVERED");
     expect(screen.queryByText("CREATED-ROW")).not.toBeInTheDocument();
     expect(screen.getAllByText("DELIVERED-ROW").length).toBeGreaterThan(0);
-    await user.selectOptions(screen.getByLabelText("Filter invoice"), "not_invoice");
+    await user.selectOptions(screen.getByLabelText("Filter tipe customer"), "b2c");
     expect(screen.queryByText("DELIVERED-ROW")).not.toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText("Filter status shipment"), "all");
     expect(screen.getAllByText("CREATED-ROW").length).toBeGreaterThan(0);

@@ -10,6 +10,7 @@ datasource db {
 }
 
 model Employee {
+    warehouseTransports Transport[] @relation("TransportWarehouseStaff")
     id                Int                 @id @default(autoincrement())
     employeeNumber    String              @unique
     name              String
@@ -460,6 +461,8 @@ model Checkpoint {
 }
 
 model Transport {
+    warehouseStaffId     Int?
+    warehouseStaff       Employee? @relation("TransportWarehouseStaff", fields: [warehouseStaffId], references: [id], onDelete: SetNull)
     id                   Int                  @id @default(autoincrement())
     transportCode        String               @unique
     routeId              Int?
@@ -531,6 +534,7 @@ model TransportShipment {
 /// Operational cost of a transport. A transport can have many of each type
 /// (several BBM fill-ups, several parking receipts...). Photo proof is optional.
 model TransportExpense {
+    photoUrls          String[] @default([])
     id                 Int       @id @default(autoincrement())
     expenseCode        String    @unique
     transportId        Int?

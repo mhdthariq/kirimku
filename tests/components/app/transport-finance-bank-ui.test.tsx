@@ -109,6 +109,10 @@ describe("responsive transport finance and bank management", () => {
     expect(screen.getByRole("heading", { name: "TR-2026-000010" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cetak Manifest" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Biaya Operasional" })).toBeInTheDocument();
+    const approvedCard = screen.getByText("Biaya Transport Disetujui").parentElement!;
+    const pendingCard = screen.getByText("Biaya Transport Menunggu").parentElement!;
+    await waitFor(() => expect(approvedCard).toHaveTextContent("Rp500.000"));
+    expect(pendingCard).toHaveTextContent("Rp9.999.999.999");
     fixture("transport-detail");
   });
   it("can open the expense tab directly from a finance row", async () => {

@@ -4,6 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ComponentProps } from "react";
 import { ShipmentPayments } from "@/components/app/shipment-payments";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { ResiPrint } from "@/components/app/resi-print";
 
 const m = vi.hoisted(() => ({
@@ -108,6 +110,8 @@ describe("Pembayaran option", () => {
             screen.queryByRole("button", { name: "Verifikasi" }),
         ).not.toBeInTheDocument();
         expect(document.querySelector("script")).toBeNull();
+        const dir = process.env.TRANSPORT_QA_DIR;
+        if (dir) { mkdirSync(dir, { recursive: true }); writeFileSync(join(dir, "shipment-payments.html"), `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="styles.css"></head><body class="bg-background text-foreground"><main class="min-w-0 p-4 lg:ml-60 lg:p-7">${document.body.innerHTML}</main></body></html>`); }
     });
     it("records transfer amount/reference and refreshes shipment for subsequent printing", async () => {
         render(

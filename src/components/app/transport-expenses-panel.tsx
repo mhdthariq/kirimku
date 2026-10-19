@@ -6,7 +6,8 @@ import { toast } from "sonner";
 import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type TransportExpenseRow as BaseExpenseRow } from "@/infrastructure/http/client-api";
 import { useAuth } from "@/hooks/use-auth";
 import { runAction, useApiData } from "@/hooks/use-api-data";
-import { EXPENSE_LABEL, EXPENSE_TYPES, summarizeExpenses, validateExpense, validateExpenseLocation, type ExpenseLocation, type ExpenseType } from "@/domain/transport-ops";
+import { EXPENSE_LABEL, EXPENSE_TYPES, validateExpense, validateExpenseLocation, type ExpenseLocation, type ExpenseType } from "@/domain/transport-ops";
+import { MAX_EXPENSE_PHOTOS, expensePhotoUrls } from "@/domain/expense-photos";
 import { fileToCompressedJpeg } from "@/presentation/image-file";
 import { expenseProgress } from "@/domain/expense-progress";
 import { Field, FormSelect, Input, NumberInput, SubmitButton, formatDate, formatRupiah } from "@/components/app/form-parts";
@@ -59,10 +60,10 @@ interface FormState {
   amount: string;
   description: string;
   /** new photo (data URL); "" = unchanged/none */
-  photo: string;
+  photos: string[];
   removePhoto: boolean;
 }
-const EMPTY: FormState = { type: "BBM", amount: "", description: "", photo: "", removePhoto: false };
+const EMPTY: FormState = { type: "BBM", amount: "", description: "", photos: [], removePhoto: false };
 
 /**
  * "Biaya Operasional" of a transport. Every
@@ -76,6 +77,7 @@ export function TransportExpensesPanel({
   transportStatus,
   canDelete,
   canApprove: approvePermission,
+  onChanged,
 }: {
   transportId: number;
   transportStatus?: string;
@@ -84,18 +86,19 @@ export function TransportExpensesPanel({
   canUpdate: boolean;
   canDelete: boolean;
   canApprove?: boolean;
+  onChanged?: () => void;
 }) {
   const { user } = useAuth();
   const completed = transportStatus === "COMPLETED";
   const canCreate = createPermission && !completed;
   const canUpdate = updatePermission && !completed;
   const canApprove = approvePermission ?? hasPermission(user, "transport.expense.approve");
-  const { data, loading, reload } = useApiData<TransportExpenseRow[]>(
+  const { data, loading, reload: reloadRows } = useApiData<TransportExpenseRow[]>(
     () => canView ? apiGet<TransportExpenseRow[]>(`/transports/${transportId}/expenses`) : Promise.resolve([]),
     [transportId, canView],
   );
   const rows = useMemo(() => canView ? data ?? [] : [], [data, canView]);
-  const summary = useMemo(() => summarizeExpenses(rows), [rows]);
+  function reload() { void reloadRows(); onChanged?.(); }
   const progress = expenseProgress(rows);
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -108,7 +111,8 @@ export function TransportExpensesPanel({
   const [reversal, setReversal] = useState<{ row: TransportExpenseRow; action: "cancel" | "remove" } | null>(null);
   const [reason, setReason] = useState("");
   const [reversing, setReversing] = useState(false);
-  const [viewPhoto, setViewPhoto] = useState<{ title: string; src: string } | null>(null);
+  const [viewPhoto, setViewPhoto] = useState<{ title: string; sources: string[] } | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   function openCreate(type: ExpenseType = "BBM") {
@@ -118,18 +122,21 @@ export function TransportExpensesPanel({
   }
   function openEdit(row: TransportExpenseRow) {
     setEditing(row);
-    setForm({ type: row.type, amount: String(row.amount), description: row.description ?? "", photo: "", removePhoto: false });
+    setForm({ type: row.type, amount: String(row.amount), description: row.description ?? "", photos: [], removePhoto: false });
     setDialogOpen(true);
   }
 
-  async function onPickPhoto(file: File | undefined) {
-    if (!file) return;
+  async function onPickPhotos(files: FileList | null) {
+    if (!files?.length || photoBusy) return;
+    const selected = Array.from(files);
+    const storedCount = editing && !form.removePhoto ? editing.photoCount ?? (editing.hasPhoto ? 1 : 0) : 0;
+    if (storedCount + form.photos.length + selected.length > MAX_EXPENSE_PHOTOS) return toast.error(`Maksimal ${MAX_EXPENSE_PHOTOS} foto bukti per biaya.`);
+    setPhotoBusy(true);
     try {
-      const photo = await fileToCompressedJpeg(file);
-      setForm((f) => ({ ...f, photo, removePhoto: false }));
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Foto gagal dibaca.");
-    }
+      const photos = await Promise.all(selected.map(file => fileToCompressedJpeg(file)));
+      setForm(current => ({ ...current, photos: [...current.photos, ...photos] }));
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Foto gagal dibaca."); }
+    finally { setPhotoBusy(false); }
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -137,13 +144,13 @@ export function TransportExpensesPanel({
     if (completed) return toast.error("Transport sudah COMPLETED. Biaya operasional dan foto tidak dapat ditambahkan atau diubah.");
     const problem = validateExpense({ type: form.type, amount: form.amount });
     if (problem) return toast.error(problem);
-    if (submitting.current) return;
+    if (submitting.current || photoBusy) return;
     submitting.current = true;
     setBusy(true);
     try {
       const location = await captureLocation();
       const payload: Record<string, unknown> = { type: form.type, amount: Number(form.amount), description: form.description.trim() || null, ...location };
-      if (form.photo) payload.photo = form.photo;
+      if (form.photos.length) payload.photos = form.photos;
       if (editing && form.removePhoto) payload.removePhoto = true;
       const ok = await runAction(
         () => (editing ? apiPut(`/transports/${transportId}/expenses/${editing.id}`, payload) : apiPost(`/transports/${transportId}/expenses`, payload)),
@@ -181,13 +188,14 @@ export function TransportExpensesPanel({
   async function showPhoto(row: TransportExpenseRow) {
     try {
       const full = await apiGet<TransportExpenseRow & { photoUrl: string | null }>(`/transports/${transportId}/expenses/${row.id}`);
-      if (full.photoUrl) setViewPhoto({ title: `${row.expenseCode} · ${EXPENSE_LABEL[row.type]}`, src: full.photoUrl });
+      const sources = expensePhotoUrls(full);
+      if (sources.length) setViewPhoto({ title: `${row.expenseCode} · ${EXPENSE_LABEL[row.type]}`, sources });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Foto gagal dimuat.");
     }
   }
 
-  const hasExistingPhoto = !!editing?.hasPhoto && !form.removePhoto && !form.photo;
+  const hasExistingPhoto = !!editing?.hasPhoto && !form.removePhoto;
 
   return (
     <Card className="min-w-0 rounded-2xl shadow-sm">
@@ -212,18 +220,19 @@ export function TransportExpensesPanel({
             ? "Transport sudah COMPLETED. Penambahan biaya dan unggah foto ditutup; approval biaya tetap terpisah."
             : "Approval berlaku per biaya, bukan untuk seluruh transport. Biaya baru tetap dapat ditambahkan sampai transport COMPLETED."}
         </p>
-        {canView && <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2 xl:grid-cols-5">
+        {canView && <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           {EXPENSE_TYPES.map((t) => {
             const Icon = ICON[t];
-            const s = summary.byType[t];
-            const amounts = expenseProgress(rows.filter(row => row.type === t));
+            const categoryRows = rows.filter(row => row.type === t);
+            const approvedCount = categoryRows.filter(row => row.status === "APPROVED").length;
+            const amounts = expenseProgress(categoryRows);
             return (
               <div key={t} className="rounded-lg border bg-muted/30 p-3">
                 <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Icon className="h-3.5 w-3.5" /> {EXPENSE_LABEL[t]}
                 </p>
                 <p className="mt-1 break-all text-sm font-semibold">Biaya {formatRupiah(amounts.submitted)}</p>
-                <p className="break-words text-[11px] text-muted-foreground">Approve {formatRupiah(s.total)} ({amounts.percentage}%) · {s.count} disetujui</p>
+                <p className="break-words text-[11px] text-muted-foreground">{amounts.submitted > 0 ? `Disetujui ${formatRupiah(amounts.approved)} (${amounts.percentage}%) · ${approvedCount} transaksi` : "Belum ada biaya aktif"}</p>
               </div>
             );
           })}
@@ -297,7 +306,7 @@ export function TransportExpensesPanel({
                     </Button>
                   )}
                   {r.hasPhoto && (
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => showPhoto(r)} aria-label="Lihat foto bukti">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => showPhoto(r)} aria-label="Lihat foto bukti" title={`${r.photoCount ?? 1} foto bukti`}>
                       <Camera className="h-4 w-4" />
                     </Button>
                   )}
@@ -320,7 +329,7 @@ export function TransportExpensesPanel({
         )}
       </CardContent>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={dialogOpen} onOpenChange={open => { if (!busy && !photoBusy) setDialogOpen(open); }}>
         <DialogContent className="max-h-[90dvh] overflow-y-auto rounded-2xl sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{editing ? "Edit Biaya" : "Tambah Biaya"}</DialogTitle>
@@ -343,20 +352,13 @@ export function TransportExpensesPanel({
             </Field>
             <Field label="Foto Bukti" htmlFor="x-photo" hint="Opsional">
               <div className="space-y-2">
-                <input ref={fileRef} id="x-photo" type="file" accept="image/*" className="hidden" onChange={(e) => onPickPhoto(e.target.files?.[0])} />
-                {form.photo ? (
-                  <div className="relative w-fit">
-                    <img src={form.photo} alt="Bukti biaya" className="max-h-40 rounded-md border" />
-                    <Button type="button" size="icon" variant="secondary" className="absolute -right-2 -top-2 h-6 w-6 rounded-full" onClick={() => setForm({ ...form, photo: "" })} aria-label="Hapus foto">
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ) : hasExistingPhoto ? (
-                  <p className="text-xs text-muted-foreground">Sudah ada foto bukti tersimpan.</p>
-                ) : null}
+                <input ref={fileRef} id="x-photo" type="file" accept="image/*" multiple className="hidden" disabled={busy || photoBusy} onChange={event => { void onPickPhotos(event.target.files); event.target.value = ""; }} />
+                <p className="text-xs text-muted-foreground">Pilih beberapa foto sekaligus, maksimal {MAX_EXPENSE_PHOTOS} foto per biaya.</p>
+                {form.photos.length > 0 && <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{form.photos.map((photo, index) => <div key={index} className="relative min-w-0"><img src={photo} alt={`Bukti biaya ${index + 1}`} className="h-28 w-full rounded-md border object-contain" /><Button type="button" size="icon" variant="secondary" className="absolute right-1 top-1 h-6 w-6 rounded-full" disabled={busy || photoBusy} onClick={() => setForm(current => ({ ...current, photos: current.photos.filter((_, position) => position !== index) }))} aria-label={`Hapus foto ${index + 1}`}><X className="h-3 w-3" /></Button></div>)}</div>}
+                {hasExistingPhoto && <p className="text-xs text-muted-foreground">{editing?.photoCount ?? 1} foto bukti tersimpan. Foto baru akan ditambahkan.</p>}
                 <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={busy}>
-                    <Camera className="h-3.5 w-3.5" /> {form.photo || hasExistingPhoto ? "Ganti foto" : "Ambil / pilih foto"}
+                  <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={busy || photoBusy}>
+                    <Camera className="h-3.5 w-3.5" /> {photoBusy ? "Memproses foto…" : "Tambah foto bukti"}
                   </Button>
                   {hasExistingPhoto && (
                     <Button type="button" variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setForm({ ...form, removePhoto: true })} disabled={busy}>
@@ -367,10 +369,10 @@ export function TransportExpensesPanel({
               </div>
             </Field>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} disabled={busy}>
+              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} disabled={busy || photoBusy}>
                 Batal
               </Button>
-              <SubmitButton busy={busy}>{editing ? "Simpan" : "Tambah"}</SubmitButton>
+              <SubmitButton busy={busy || photoBusy}>{editing ? "Simpan" : "Tambah"}</SubmitButton>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -382,7 +384,7 @@ export function TransportExpensesPanel({
             <DialogTitle>{viewPhoto?.title}</DialogTitle>
             <DialogDescription>Foto bukti biaya</DialogDescription>
           </DialogHeader>
-          {viewPhoto && <img src={viewPhoto.src} alt={viewPhoto.title} className="max-h-[70vh] w-full rounded-md object-contain" />}
+          {viewPhoto && <div className="grid gap-4">{viewPhoto.sources.map((source, index) => <figure key={index} className="min-w-0"><img src={source} alt={`${viewPhoto.title} - foto ${index + 1}`} className="max-h-[60vh] w-full rounded-md object-contain" /><figcaption className="mt-1 text-center text-xs text-muted-foreground">Foto {index + 1} dari {viewPhoto.sources.length}</figcaption></figure>)}</div>}
         </DialogContent>
       </Dialog>
 
