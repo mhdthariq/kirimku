@@ -129,7 +129,7 @@ export async function apiGetWithMeta<T>(path: string): Promise<{ data: T; meta: 
 export const apiGet = <T>(path: string) => apiFetch<T>(path);
 export const apiPost = <T>(path: string, body?: unknown) => apiFetch<T>(path, { method: "POST", body });
 export const apiPut = <T>(path: string, body?: unknown) => apiFetch<T>(path, { method: "PUT", body });
-export const apiDelete = <T>(path: string, body?: unknown) => apiFetch<T>(path, { method: "DELETE", ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+export const apiDelete = <T>(path: string, body?: unknown) => apiFetch<T>(path, { method: "DELETE", body });
 
 // ---------------------------------------------------------------------------
 // Shared domain types
