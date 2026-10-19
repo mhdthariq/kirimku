@@ -144,7 +144,48 @@ describe("RBAC catalog sync", () => {
     expect(state.grants).toEqual(afterRevocation);
   });
 
-  it("bootstraps an empty database and remains idempotent", async () => {
+  it("introduces approved expense deletion only for Owner and preserves explicit grants and revocations", async () => {
+        const slug = "transport.expense.delete-approved";
+        const introduced = state.permissions.find(
+            (permission) => permission.slug === slug,
+        )!;
+        state.permissions = state.permissions.filter(
+            (permission) => permission.id !== introduced.id,
+        );
+        state.grants = state.grants.filter(
+            (entry) => entry.permissionId !== introduced.id,
+        );
+        grant("admin-finance", "transport.expense.delete");
+        revoke("admin-kantor", "transport.expense.approve");
+        const before = structuredClone(state.grants);
+
+        await rbac.ensureRbac();
+
+        const permissionId = state.permissions.find(
+            (permission) => permission.slug === slug,
+        )!.id;
+        expect(
+            state.grants.filter((entry) => entry.permissionId === permissionId),
+        ).toEqual([{ roleId: role("owner").id, permissionId }]);
+        expect(
+            state.grants.filter((entry) => entry.permissionId !== permissionId),
+        ).toEqual(before);
+
+        grant("driver", slug);
+        revoke("owner", slug);
+        const customized = structuredClone(state.grants);
+        await restart();
+        expect(state.grants).toEqual(customized);
+        expect(permissionsFor("driver")).toContain(slug);
+        expect(permissionsFor("driver")).not.toContain(
+            "transport.expense.delete",
+        );
+        expect(permissionsFor("driver")).not.toContain(
+            "transport.expense.approve",
+        );
+    });
+
+    it("bootstraps an empty database and remains idempotent", async () => {
     state.permissions = [];
     state.roles = [];
     state.grants = [];

@@ -19,6 +19,7 @@ const m = vi.hoisted(() => ({
     gps: vi.fn(),
     error: vi.fn(),
     rows: [] as unknown[],
+    permissions: [] as string[],
 }));
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: null }) }));
 vi.mock("@/infrastructure/http/client-api", () => ({
@@ -26,7 +27,7 @@ vi.mock("@/infrastructure/http/client-api", () => ({
     apiPost: m.post,
     apiPut: m.put,
     apiDelete: m.remove,
-    hasPermission: () => false,
+    hasPermission: (_user: unknown, permission: string) => m.permissions.includes(permission),
 }));
 vi.mock("@/hooks/use-api-data", () => ({
     useApiData: () => ({ data: m.rows, loading: false, reload: m.reload }),
@@ -61,6 +62,7 @@ const props = {
 beforeEach(() => {
     vi.resetAllMocks();
     m.rows = [];
+    m.permissions = ["transport.expense.delete-approved"];
     Object.defineProperty(navigator, "geolocation", {
         configurable: true,
         value: { getCurrentPosition: m.gps },
@@ -100,7 +102,7 @@ describe("expense panel GPS and approval", () => {
     });
     it("lets a delegated deleter remove an approved cost only after confirming a reason", async () => {
         m.rows = [{ ...pending, status: "APPROVED" }];
-        render(<TransportExpensesPanel {...props} canApprove={false} />);
+        render(<TransportExpensesPanel {...props} canApprove={false} canDelete={false} />);
         fireEvent.click(screen.getByRole("button", { name: "Hapus biaya" }));
         expect(m.remove).not.toHaveBeenCalled();
         const dialog = within(screen.getByRole("dialog"));
@@ -110,10 +112,27 @@ describe("expense panel GPS and approval", () => {
         await waitFor(() => expect(m.remove).toHaveBeenCalledWith("/transports/10/expenses/1", { reason: "Salah input" }));
     });
     it("does not imply delete permission from approval permission", () => {
+        m.permissions = [];
         m.rows = [{ ...pending, status: "APPROVED" }];
         render(<TransportExpensesPanel {...props} canDelete={false} />);
         expect(screen.queryByRole("button", { name: "Hapus biaya" })).not.toBeInTheDocument();
         expect(screen.getByRole("button", { name: "Batalkan approval" })).toBeInTheDocument();
+    });
+    it.each(["APPROVED", "CANCELLED"])("does not allow ordinary deletion of %s expenses", (status) => {
+        m.permissions = [];
+        m.rows = [{ ...pending, status }];
+        render(<TransportExpensesPanel {...props} />);
+        expect(screen.queryByRole("button", { name: "Hapus biaya" })).not.toBeInTheDocument();
+    });
+    it("keeps mobile actions separate from full-width expense details", () => {
+        m.rows = [{ ...pending, description: "A".repeat(200), hasPhoto: true }];
+        render(<TransportExpensesPanel {...props} />);
+        const actions = screen.getByRole("group", { name: "Tindakan EXP-1" });
+        expect(actions).toHaveClass("col-span-2", "flex-wrap", "lg:col-span-1");
+        expect(actions.parentElement).toHaveClass("grid", "grid-cols-[auto_minmax(0,1fr)]");
+        expect(within(actions).getByRole("button", { name: "Approve" })).toBeInTheDocument();
+        expect(within(actions).getByRole("button", { name: "Lihat foto bukti" })).toBeInTheDocument();
+        expect(actions).not.toHaveTextContent("A".repeat(200));
     });
     it("offers Biaya Tol and submits the TOL category with fresh GPS", async () => {
         Object.defineProperty(Element.prototype, "scrollIntoView", {

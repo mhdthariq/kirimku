@@ -6,9 +6,33 @@ vi.mock("@/infrastructure/persistence/tenant-context", () => ({
 import { PERMISSIONS, ROLE_TEMPLATES } from "@/infrastructure/auth/rbac";
 
 describe("expense approval default permissions", () => {
-    it("defaults deletion to Owner and lets other roles receive it independently", () => {
-        expect(ROLE_TEMPLATES.filter(role => role.permissions.includes("transport.expense.delete")).map(role => role.slug)).toEqual(["owner"]);
-        expect(PERMISSIONS.find(permission => permission.slug === "transport.expense.delete")?.description).toContain("assignable");
+    it.each(["transport.expense.delete", "transport.expense.delete-approved"])(
+        "defaults %s to Owner and keeps it independently assignable",
+        (slug) => {
+            expect(
+                ROLE_TEMPLATES.filter((role) =>
+                    role.permissions.includes(slug),
+                ).map((role) => role.slug),
+            ).toEqual(["owner"]);
+            const permissions = PERMISSIONS.filter(
+                (permission) => permission.slug === slug,
+            );
+            expect(permissions).toHaveLength(1);
+            expect(permissions[0].description).toContain("assignable");
+        },
+    );
+    it("describes separate pending and approved/cancelled deletion permissions", () => {
+        expect(
+            PERMISSIONS.find(
+                (permission) => permission.slug === "transport.expense.delete",
+            )?.description,
+        ).toContain("pending");
+        expect(
+            PERMISSIONS.find(
+                (permission) =>
+                    permission.slug === "transport.expense.delete-approved",
+            )?.description,
+        ).toContain("approved or cancelled");
     });
     it("registers the approval permission", () => {
         expect(

@@ -49,7 +49,7 @@ export function ShipmentExpenses({ shipmentId }: { shipmentId: number }) {
       <div className="flex flex-wrap gap-2">
         {approve && row.status === "PENDING" && <Button size="sm" disabled={busy} onClick={() => act(() => apiPost(`${path}/${row.id}`, { action: "approve" }), "Biaya disetujui.")}>Approve {formatRupiah(row.amount)}</Button>}
         {approve && row.status === "APPROVED" && <Button size="sm" variant="outline" disabled={busy} onClick={() => { setReason(""); setDialog({ row, action: "cancel" }); }}>Batalkan approval</Button>}
-        {hasPermission(user, "transport.expense.delete") && <Button size="sm" variant="destructive" disabled={busy} onClick={() => { setReason(""); setDialog({ row, action: "remove" }); }}>Hapus biaya</Button>}
+        {hasPermission(user, row.status === "PENDING" ? "transport.expense.delete" : "transport.expense.delete-approved") && <Button size="sm" variant="destructive" disabled={busy} onClick={() => { setReason(""); setDialog({ row, action: "remove" }); }}>Hapus biaya</Button>}
       </div>
     </div>)}
     <Dialog open={!!dialog} onOpenChange={open => { if (!open && !busy) setDialog(null); }}><DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-md">

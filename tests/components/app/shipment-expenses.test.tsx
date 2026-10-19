@@ -4,14 +4,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Shipment } from "@/infrastructure/http/client-api";
-const m = vi.hoisted(() => ({ post: vi.fn(), remove: vi.fn(), reload: vi.fn(), canCreate: true, rows: [] as unknown[] }));
+const m = vi.hoisted(() => ({ post: vi.fn(), remove: vi.fn(), reload: vi.fn(), canCreate: true, permissions: [] as string[], rows: [] as unknown[] }));
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: { isOwner: true } }) }));
-vi.mock("@/infrastructure/http/client-api", () => ({ apiPost: m.post, apiDelete: m.remove, apiGet: vi.fn(), hasPermission: () => true }));
+vi.mock("@/infrastructure/http/client-api", () => ({ apiPost: m.post, apiDelete: m.remove, apiGet: vi.fn(), hasPermission: (_user: unknown, permission: string) => m.permissions.includes(permission) }));
 vi.mock("@/hooks/use-api-data", () => ({ useApiData: () => ({ data: { rows: m.rows, canCreate: m.canCreate }, reload: m.reload }), runAction: async (fn: () => Promise<unknown>) => { await fn(); return true; } }));
 import { ShipmentExpenses, UndoShipmentArrival } from "@/components/app/shipment-expenses";
 import { CustomerPriceStatus } from "@/components/app/shipment-payments";
 const expense = { id: 1, expenseCode: "EXP-1", type: "BBM", amount: 100_000, status: "APPROVED", description: "Bensin perjalanan", createdAt: "2026-10-19T00:00:00Z", transport: null, shipment: { id: 12, masterCode: "B2B-12", origin: "Medan", destination: "Jakarta" }, approvedByUsername: "andi", approvedByRole: "Owner" };
-beforeEach(() => { vi.clearAllMocks(); m.rows = []; m.canCreate = true; m.post.mockResolvedValue({}); m.remove.mockResolvedValue({}); });
+beforeEach(() => { vi.clearAllMocks(); m.rows = []; m.canCreate = true; m.permissions = ["transport.expense.approve", "transport.expense.delete", "transport.expense.delete-approved"]; m.post.mockResolvedValue({}); m.remove.mockResolvedValue({}); });
 
 describe("shipment expense controls", () => {
   it("submits the warehouse expense without driver GPS requirements", async () => {
@@ -41,6 +41,19 @@ describe("shipment expense controls", () => {
     fireEvent.change(screen.getByLabelText("Alasan perubahan biaya"), { target: { value: "Salah input" } });
     fireEvent.click(screen.getByRole("button", { name: "Konfirmasi" }));
     await waitFor(() => expect(m.remove).toHaveBeenCalledWith("/shipments/12/operational-expenses/1", { reason: "Salah input" }));
+  });
+  it.each(["APPROVED", "CANCELLED"])("requires exceptional permission to remove %s shipment expenses", (status) => {
+    m.permissions = ["transport.expense.delete", "transport.expense.approve"];
+    m.rows = [{ ...expense, status }];
+    render(<ShipmentExpenses shipmentId={12} />);
+    expect(screen.queryByRole("button", { name: "Hapus biaya" })).not.toBeInTheDocument();
+  });
+  it("allows exceptional removal independently of ordinary deletion or approval", () => {
+    m.permissions = ["transport.expense.delete-approved"];
+    m.rows = [expense, { ...expense, id: 2, status: "PENDING" }];
+    render(<ShipmentExpenses shipmentId={12} />);
+    expect(screen.getAllByRole("button", { name: "Hapus biaya" })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Batalkan approval" })).not.toBeInTheDocument();
   });
   it("shows cancelled reasons without counting the expense or offering approval again", () => {
     m.rows = [{ ...expense, status: "CANCELLED", cancellationReason: "Duplikat" }]; render(<ShipmentExpenses shipmentId={12} />);

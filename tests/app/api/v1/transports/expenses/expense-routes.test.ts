@@ -2,8 +2,9 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const m = vi.hoisted(() => ({ auth: vi.fn(), permission: vi.fn(), scope: vi.fn(), transport: vi.fn(),
-  find: vi.fn(), findUnique: vi.fn(), list: vi.fn(), create: vi.fn(), updateMany: vi.fn(), deleteMany: vi.fn(), audit: vi.fn() }));
+  find: vi.fn(), findUnique: vi.fn(), list: vi.fn(), create: vi.fn(), updateMany: vi.fn(), deleteMany: vi.fn(), audit: vi.fn(), reversalAudit: vi.fn(), transaction: vi.fn() }));
 vi.mock("@/infrastructure/persistence/db", () => ({ db: {
+  $transaction: m.transaction,
   transport: { findUnique: m.transport }, transportExpense: { findFirst: m.find, findUnique: m.findUnique,
     findMany: m.list, create: m.create, updateMany: m.updateMany, deleteMany: m.deleteMany },
 } }));
@@ -22,6 +23,7 @@ import { HttpError } from "@/shared/http-error";
 import { GET as list, POST as create } from "@/app/api/v1/transports/[id]/expenses/route";
 import { PUT as update, DELETE as remove } from "@/app/api/v1/transports/[id]/expenses/[expenseId]/route";
 import { POST as approve } from "@/app/api/v1/transports/[id]/expenses/[expenseId]/approve/route";
+import { POST as cancel } from "@/app/api/v1/transports/[id]/expenses/[expenseId]/cancel/route";
 
 const actor = { id: 7, username: "finance.andi", isOwner: false, roles: [{ id: 2, slug: "admin-finance", name: "Admin Finance" }], permissions: [] };
 const transport = { id: 10, transportCode: "TR-10", status: "ARRIVED", route: null, shipments: [] };
@@ -37,6 +39,7 @@ beforeEach(() => {
   m.auth.mockResolvedValue(actor); m.permission.mockReturnValue(true); m.transport.mockResolvedValue(transport);
   m.find.mockResolvedValue(expense); m.findUnique.mockResolvedValue(expense); m.create.mockResolvedValue(expense);
   m.updateMany.mockResolvedValue({ count: 1 }); m.deleteMany.mockResolvedValue({ count: 1 });
+  m.transaction.mockImplementation(async fn => fn({ transportExpense: { updateMany: m.updateMany, deleteMany: m.deleteMany }, auditLog: { create: m.reversalAudit } }));
 });
 
 describe("expense API approval and GPS", () => {
@@ -179,6 +182,77 @@ describe("expense API approval and GPS", () => {
   it("updates only pending rows with GPS, ignoring client approval metadata", async () => {
     expect((await update(req({ ...body, amount: 200, status: "APPROVED", approvedByUsername: "forged" }), params())).status).toBe(200);
     expect(m.updateMany).toHaveBeenCalledWith({ where: { id: 12, transportId: 10, status: "PENDING" }, data: { ...gps, type: "BBM", amount: 200 } });
+  });
+  it.each(["APPROVED", "CANCELLED"])("allows %s removal with only the special permission and mandatory audit", async status => {
+    const snapshot = { ...expense, status };
+    m.find.mockResolvedValue(snapshot);
+    m.permission.mockImplementation((_user, permission) => permission === "transport.expense.delete-approved");
+    const response = await remove(req({ reason: "  duplicate  " }), params());
+    expect(response.status).toBe(200);
+    expect((await response.json()).data).toEqual({ status: "REMOVED" });
+    expect(m.deleteMany).toHaveBeenCalledWith({ where: { id: 12, status } });
+    expect(m.transaction).toHaveBeenCalledOnce();
+    expect(m.reversalAudit).toHaveBeenCalledWith({ data: expect.objectContaining({ action: "remove", actorId: actor.id, beforeData: JSON.stringify(snapshot), afterData: JSON.stringify({ reason: "duplicate", status: "REMOVED" }) }) });
+    expect(m.audit).not.toHaveBeenCalled();
+    expect((await approve(req(), params())).status).toBe(403);
+    expect((await cancel(req({ reason: "duplicate" }), params())).status).toBe(403);
+    expect(m.updateMany).not.toHaveBeenCalled();
+  });
+  it.each(["APPROVED", "CANCELLED"])("denies %s removal to regular delete and/or approve grants", async status => {
+    m.find.mockResolvedValue({ ...expense, status });
+    for (const permissions of [["transport.expense.delete"], ["transport.expense.approve"], ["transport.expense.delete", "transport.expense.approve"]]) {
+      m.permission.mockImplementation((_user, permission) => permissions.includes(permission));
+      const response = await remove(req({ reason: "duplicate" }), params());
+      expect(response.status).toBe(403);
+    }
+    expect(m.deleteMany).not.toHaveBeenCalled();
+    expect(m.transaction).not.toHaveBeenCalled();
+    expect(m.reversalAudit).not.toHaveBeenCalled();
+    expect(m.audit).not.toHaveBeenCalled();
+  });
+  it.each(["transport.expense.delete-approved", "transport.expense.approve"])("does not allow pending deletion with only %s", async permission => {
+    m.permission.mockImplementation((_user, requested) => requested === permission);
+    expect((await remove(req({ reason: "duplicate" }), params())).status).toBe(403);
+    expect(m.deleteMany).not.toHaveBeenCalled();
+    expect(m.audit).not.toHaveBeenCalled();
+  });
+  it("allows pending deletion with only the regular delete permission", async () => {
+    m.permission.mockImplementation((_user, permission) => permission === "transport.expense.delete");
+    expect((await remove(req(), params())).status).toBe(200);
+    expect(m.deleteMany).toHaveBeenCalledWith({ where: { id: 12, transportId: 10, status: "PENDING" } });
+    expect(m.transaction).not.toHaveBeenCalled();
+    expect(m.audit).toHaveBeenCalledWith(expect.objectContaining({ action: "delete" }));
+  });
+  it.each(["APPROVED", "CANCELLED"])("enforces reason validation before removing %s", async status => {
+    m.find.mockResolvedValue({ ...expense, status });
+    for (const reason of [undefined, null, "", "   ", "x".repeat(1001)]) {
+      expect((await remove(req({ reason }), params())).status).toBe(422);
+    }
+    expect(m.transaction).not.toHaveBeenCalled();
+    expect(m.deleteMany).not.toHaveBeenCalled();
+    expect(m.reversalAudit).not.toHaveBeenCalled();
+  });
+  it.each(["APPROVED", "CANCELLED"])("keeps scope and authentication enforced for %s removal", async status => {
+    m.find.mockResolvedValue({ ...expense, status });
+    m.auth.mockResolvedValue(null);
+    expect((await remove(req({ reason: "duplicate" }), params())).status).toBe(401);
+    m.auth.mockResolvedValue(actor);
+    m.scope.mockRejectedValue(new HttpError(403, "Outside scope"));
+    expect((await remove(req({ reason: "duplicate" }), params())).status).toBe(403);
+    expect(m.transaction).not.toHaveBeenCalled();
+    expect(m.deleteMany).not.toHaveBeenCalled();
+  });
+  it.each(["APPROVED", "CANCELLED"])("rejects concurrent %s removal without audit", async status => {
+    m.find.mockResolvedValue({ ...expense, status });
+    m.deleteMany.mockResolvedValue({ count: 0 });
+    expect((await remove(req({ reason: "duplicate" }), params())).status).toBe(409);
+    expect(m.reversalAudit).not.toHaveBeenCalled();
+  });
+  it("fails removal when its mandatory transactional audit fails", async () => {
+    m.find.mockResolvedValue({ ...expense, status: "APPROVED" });
+    m.reversalAudit.mockRejectedValue(new Error("audit unavailable"));
+    expect((await remove(req({ reason: "duplicate" }), params())).status).toBe(500);
+    expect(m.transaction).toHaveBeenCalledOnce();
   });
   it("requires a reason when removing an approved expense", async () => {
     m.find.mockResolvedValue({ ...expense, status: "APPROVED" });

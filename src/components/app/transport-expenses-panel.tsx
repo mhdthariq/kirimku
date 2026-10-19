@@ -93,6 +93,7 @@ export function TransportExpensesPanel({
   const canCreate = createPermission && !completed;
   const canUpdate = updatePermission && !completed;
   const canApprove = approvePermission ?? hasPermission(user, "transport.expense.approve");
+  const canDeleteApproved = hasPermission(user, "transport.expense.delete-approved");
   const { data, loading, reload: reloadRows } = useApiData<TransportExpenseRow[]>(
     () => canView ? apiGet<TransportExpenseRow[]>(`/transports/${transportId}/expenses`) : Promise.resolve([]),
     [transportId, canView],
@@ -249,9 +250,9 @@ export function TransportExpensesPanel({
             {rows.map((r) => {
               const Icon = ICON[r.type];
               return (
-                <div key={r.id} className="flex min-w-0 flex-wrap items-start gap-3 px-3 py-3 sm:items-center">
+                <div key={r.id} className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-3 px-3 py-3 lg:grid-cols-[auto_minmax(0,1fr)_auto]">
                   <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 [overflow-wrap:anywhere]">
                     <p className="break-words text-sm font-medium">
                       {EXPENSE_LABEL[r.type]} · {formatRupiah(r.amount)}
                     </p>
@@ -293,6 +294,7 @@ export function TransportExpensesPanel({
                         </a>
                       )}
                   </div>
+                  <div role="group" aria-label={`Tindakan ${r.expenseCode}`} className="col-span-2 flex min-w-0 flex-wrap items-center gap-2 lg:col-span-1 lg:max-w-xs lg:justify-end [&>button]:max-w-full [&>button]:shrink-0 [&>button]:whitespace-normal">
                   {canApprove && r.status === "PENDING" && (
                     <Button
                       size="sm"
@@ -321,7 +323,8 @@ export function TransportExpensesPanel({
                     </Button>
                   )}
                   {canApprove && r.status === "APPROVED" && <Button size="sm" variant="outline" onClick={() => { setReason(""); setReversal({ row: r, action: "cancel" }); }}>Batalkan approval</Button>}
-                  {canDelete && ["APPROVED", "CANCELLED"].includes(r.status) && <Button size="sm" variant="destructive" onClick={() => { setReason(""); setReversal({ row: r, action: "remove" }); }}>Hapus biaya</Button>}
+                  {canDeleteApproved && ["APPROVED", "CANCELLED"].includes(r.status) && <Button size="sm" variant="destructive" onClick={() => { setReason(""); setReversal({ row: r, action: "remove" }); }}>Hapus biaya</Button>}
+                  </div>
                 </div>
               );
             })}

@@ -61,7 +61,8 @@ export const PERMISSIONS: { slug: string; module: string; description: string }[
   { slug: "transport.expense.view", module: "Transports", description: "View transport operational expenses" },
   { slug: "transport.expense.create", module: "Transports", description: "Add transport operational expenses" },
   { slug: "transport.expense.update", module: "Transports", description: "Edit transport operational expenses" },
-  { slug: "transport.expense.delete", module: "Transports", description: "Delete pending, approved or cancelled expenses with confirmation (Owner by default; assignable to other roles)" },
+  { slug: "transport.expense.delete", module: "Transports", description: "Delete pending transport operational expenses (Owner by default; assignable to other roles)" },
+  { slug: "transport.expense.delete-approved", module: "Transports", description: "Remove approved or cancelled transport operational expenses with a mandatory reason (Owner by default; independently assignable to other roles)" },
   { slug: "transport.expense.approve", module: "Transports", description: "Approve pending transport operational expenses" },
   // Multi drop delivery approval (destination admin accepts the dropped resi)
   { slug: "transport.delivery.view", module: "Transports", description: "View dropped resi awaiting delivery approval" },
