@@ -13,11 +13,11 @@ export async function GET(req: NextRequest) {
     const page = Number(params.get("page") ?? 1);
     if (!Number.isSafeInteger(page) || page < 1 || page > 100000) return fail(422, "Halaman tidak valid.");
     if (type && !isExpenseType(type)) return fail(422, "Jenis biaya tidak valid.");
-    if (status && !["APPROVED", "PENDING"].includes(status)) return fail(422, "Status biaya tidak valid.");
+    if (status && !["APPROVED", "PENDING", "CANCELLED"].includes(status)) return fail(422, "Status biaya tidak valid.");
     if (search && search.length > 150) return fail(422, "Pencarian maksimal 150 karakter.");
     return ok(await operationalExpenseReport({
       ...(type ? { type } : {}), ...(status ? { status } : {}),
-      ...(search ? { OR: [{ expenseCode: { contains: search, mode: "insensitive" as const } }, { description: { contains: search, mode: "insensitive" as const } }, { transport: { transportCode: { contains: search, mode: "insensitive" as const } } }] } : {}),
+      ...(search ? { OR: [{ expenseCode: { contains: search, mode: "insensitive" as const } }, { description: { contains: search, mode: "insensitive" as const } }, { shipment: { masterCode: { contains: search, mode: "insensitive" as const } } }, { transport: { transportCode: { contains: search, mode: "insensitive" as const } } }] } : {}),
     }, page));
   });
 }

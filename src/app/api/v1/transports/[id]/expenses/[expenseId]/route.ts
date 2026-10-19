@@ -4,6 +4,8 @@ import { guard, ok, handle, fail, str } from "@/composition/api-helpers";
 import { audit } from "@/infrastructure/services/audit";
 import { validateExpense, validateExpenseLocation } from "@/domain/transport-ops";
 import { assertTransportAccess, parseOptionalPhoto } from "@/infrastructure/services/transport-ops-server";
+import { reverseExpense } from "@/infrastructure/services/expense-reversal";
+import { hasPermission } from "@/infrastructure/auth/auth";
 
 type Params = { params: Promise<{ id: string; expenseId: string }> };
 
@@ -21,7 +23,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     const user = await guard(req, "transport.expense.view");
     const { id, expenseId } = await params;
     const expense = await load(id, expenseId);
-    if (!expense) return fail(404, "Biaya tidak ditemukan.");
+    if (!expense?.transport) return fail(404, "Biaya tidak ditemukan.");
     await assertTransportAccess(user, expense.transport);
     const { transport: _t, ...rest } = expense;
     return ok(rest);
@@ -34,7 +36,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const user = await guard(req, "transport.expense.update");
     const { id, expenseId } = await params;
     const expense = await load(id, expenseId);
-    if (!expense) return fail(404, "Biaya tidak ditemukan.");
+    if (!expense?.transport) return fail(404, "Biaya tidak ditemukan.");
     await assertTransportAccess(user, expense.transport);
 
     if (expense.transport.status === "COMPLETED") return fail(409, "Transport sudah COMPLETED. Biaya operasional dan foto tidak dapat diubah.");
@@ -79,12 +81,16 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
 export async function DELETE(req: NextRequest, { params }: Params) {
   return handle(req, async () => {
-    const user = await guard(req, "transport.expense.delete");
+    const user = await guard(req);
     const { id, expenseId } = await params;
     const expense = await load(id, expenseId);
-    if (!expense) return fail(404, "Biaya tidak ditemukan.");
+    if (!expense?.transport) return fail(404, "Biaya tidak ditemukan.");
     await assertTransportAccess(user, expense.transport);
-    if (expense.status !== "PENDING") return fail(409, "Biaya yang sudah disetujui tidak dapat dihapus.");
+    if (expense.status !== "PENDING") {
+      const body = (await req.json().catch(() => ({}))) ?? {};
+      return ok(await reverseExpense(user, expense, "remove", body.reason));
+    }
+    if (!hasPermission(user, "transport.expense.delete")) return fail(403, "Missing permission: transport.expense.delete");
     const result = await db.transportExpense.deleteMany({ where: { id: expense.id, transportId: expense.transportId, status: "PENDING" } });
     if (result.count !== 1) return fail(409, "Biaya telah disetujui atau dihapus. Muat ulang data.");
     await audit({

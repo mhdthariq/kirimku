@@ -21,6 +21,8 @@ export const PERMISSIONS: { slug: string; module: string; description: string }[
   { slug: "shipment.delete_cancelled", module: "Shipments", description: "Delete cancelled master shipments (Owner by default)" },
   { slug: "shipment.view_tracking", module: "Shipments", description: "View tracking history" },
   { slug: "shipment.confirm_arrival", module: "Shipments", description: "Confirm package arrival at gudang (scan packages / walk-in / scan-all)" },
+  { slug: "shipment.undo_arrival", module: "Shipments", description: "Undo confirmed warehouse arrival (Owner by default)" },
+  { slug: "shipment.expense.create", module: "Shipments", description: "Enter B2B shipment expenses after confirmed warehouse arrival" },
   { slug: "shipment.notify_marketing", module: "Shipments", description: "Notify marketing about unpaid shipments at gudang" },
   // Cetak resi is deliberately permission-gated — not everyone may print the
   // Shipment Resi / Detail Resi stickers. Granted to Admin Gudang (and the
@@ -237,6 +239,7 @@ export const ROLE_TEMPLATES: { slug: string; name: string; description: string; 
       "transport.delivery.view", "transport.delivery.approve",
       "return-task.view", "return-task.create", "return-task.approve",
       "shipment.view", "shipment.view_tracking", "shipment.confirm_arrival", "shipment.notify_marketing",
+      "shipment.expense.create",
       "shipment.create", "shipment.create_direct", "shipment.direct.manage", "shipment.update", "shipment.cancel", "shipment_detail.view", "shipment_detail.create", "shipment_detail.update", "shipment_detail.delete",
       // Admin Gudang may print resi (Owner always may via the owner bypass)
       "shipment.print_resi",

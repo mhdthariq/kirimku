@@ -148,7 +148,7 @@ describe("expense panel GPS and approval", () => {
             expect.stringContaining("GPS gagal"),
         );
     });
-    it("renders approval snapshot, coordinates and pending-only actions", async () => {
+    it("renders approval snapshot, coordinates, pending edits and approver reversal actions", async () => {
         m.rows = [
             pending,
             {
@@ -174,7 +174,7 @@ describe("expense panel GPS and approval", () => {
         ).toHaveLength(1);
         expect(
             screen.getAllByRole("button", { name: "Hapus biaya" }),
-        ).toHaveLength(1);
+        ).toHaveLength(2);
         fireEvent.click(screen.getByRole("button", { name: "Approve" }));
         await waitFor(() =>
             expect(m.post).toHaveBeenCalledWith(
@@ -207,8 +207,8 @@ describe("expense panel GPS and approval", () => {
             screen.queryByRole("button", { name: "Edit biaya" }),
         ).not.toBeInTheDocument();
         expect(
-            screen.queryByRole("button", { name: "Hapus biaya" }),
-        ).not.toBeInTheDocument();
+            screen.getByRole("button", { name: "Hapus biaya" }),
+        ).toBeInTheDocument();
     });
     it("hides approval when permission is absent", () => {
         m.rows = [pending];

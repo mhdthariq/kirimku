@@ -23,8 +23,8 @@ import {
   Warehouse,
 } from "lucide-react";
 import { toast } from "sonner";
-import { ShipmentPayments } from "@/components/app/shipment-payments";
-import { ShipmentTransportExpenses } from "@/components/app/operational-expense-report";
+import { ShipmentPayments, CustomerPriceStatus } from "@/components/app/shipment-payments";
+import { ShipmentExpenses, UndoShipmentArrival } from "@/components/app/shipment-expenses";
 import { useAuth } from "@/hooks/use-auth";
 import {
   apiDelete,
@@ -610,6 +610,7 @@ function ShipmentList() {
                       <p className="text-sm font-medium text-muted-foreground">- belum dihitung</p>
                     )}
                     {s.chargeableWeightKg != null && <p className="text-[11px] text-muted-foreground">{formatNumber(s.chargeableWeightKg)} kg cw</p>}
+                    {s.customer?.type === "b2c" && <CustomerPriceStatus shipment={s} />}
                   </div>
                 ),
               },
@@ -1779,6 +1780,8 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
       />
 
       <ShipmentPayments shipment={shipment} onChanged={refresh} />
+      {shipment.customer?.type === "b2c" && <div className="min-w-0 rounded-2xl border bg-card p-4 sm:p-6"><h2 className="mb-3 text-base font-semibold">Harga & Pembayaran Customer</h2><CustomerPriceStatus shipment={shipment} detailed /></div>}
+      {hasPermission(user, "shipment.undo_arrival") && (shipment.status === "RECEIVED_AT_GUDANG" || (shipment.status === "ARRIVED_AT_GUDANG" && shipment.destReceivedAt != null)) && <UndoShipmentArrival shipmentId={id} onChanged={refresh} />}
 
       {/* Where is this shipment from? - origin gudang banner for shipments that
           reached the destination gudang. Admin Gudang of the destination branch
@@ -2216,7 +2219,7 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
         </CardContent>
       </Card>
 
-      {hasPermission(user, "transport.expense.view") && <ShipmentTransportExpenses shipmentId={id} />}
+      {shipment.customer?.type === "b2b" && hasPermission(user, "transport.expense.view") && <ShipmentExpenses shipmentId={id} />}
 
       {/* Log Aktivitas - only rendered for audit_log.view holders (hidden for
            Marketing & other roles that cannot read the audit trail). */}

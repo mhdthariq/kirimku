@@ -82,7 +82,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       const updated = await db.$transaction(async (tx) => {
         const result = await tx.masterShipment.update({
           where: { id: master.id },
-          data: { destReceivedAt: new Date(), status: "ARRIVED_AT_GUDANG" },
+          data: { destReceivedAt: new Date(), status: "ARRIVED_AT_GUDANG", arrivalPreviousStatus: "AT_DEST_GUDANG" },
         });
         await tx.trackingEvent.create({
           data: {
@@ -142,6 +142,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         where: { id: master.id },
         data: {
           status: "RECEIVED_AT_GUDANG",
+          arrivalPreviousStatus: master.status,
           arrivedWarehouseId: warehouse.id,
           originWarehouseId: master.originWarehouseId ?? warehouse.id,
         },

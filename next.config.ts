@@ -10,6 +10,7 @@ const nextConfig: NextConfig = {
     "gully-crummy-footnote.ngrok-free.dev",
     "100.83.151.31",
     "unclasp-zestfully-catnap.ngrok-free.dev",
+    "logistik.kaminova.id"
   ],
 };
 

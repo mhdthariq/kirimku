@@ -14,7 +14,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       where: { id: Number(expenseId), transportId: Number(id) },
       include: { transport: { include: { route: true, shipments: { include: { master: true } } } } },
     });
-    if (!expense) return fail(404, "Biaya tidak ditemukan.");
+    if (!expense?.transport) return fail(404, "Biaya tidak ditemukan.");
     await assertTransportAccess(user, expense.transport);
     if (expense.status !== "PENDING") return fail(409, "Biaya sudah disetujui.");
 

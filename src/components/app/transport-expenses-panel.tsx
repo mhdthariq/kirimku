@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { EXPENSE_LABEL, EXPENSE_TYPES, summarizeExpenses, validateExpense, validateExpenseLocation, type ExpenseLocation, type ExpenseType } from "@/domain/transport-ops";
 import { fileToCompressedJpeg } from "@/presentation/image-file";
+import { expenseProgress } from "@/domain/expense-progress";
 import { Field, FormSelect, Input, NumberInput, SubmitButton, formatDate, formatRupiah } from "@/components/app/form-parts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -95,6 +96,7 @@ export function TransportExpensesPanel({
   );
   const rows = useMemo(() => canView ? data ?? [] : [], [data, canView]);
   const summary = useMemo(() => summarizeExpenses(rows), [rows]);
+  const progress = expenseProgress(rows);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<TransportExpenseRow | null>(null);
@@ -103,6 +105,9 @@ export function TransportExpensesPanel({
   const [approvingId, setApprovingId] = useState<number | null>(null);
   const submitting = useRef(false);
   const [confirmDelete, setConfirmDelete] = useState<TransportExpenseRow | null>(null);
+  const [reversal, setReversal] = useState<{ row: TransportExpenseRow; action: "cancel" | "remove" } | null>(null);
+  const [reason, setReason] = useState("");
+  const [reversing, setReversing] = useState(false);
   const [viewPhoto, setViewPhoto] = useState<{ title: string; src: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -192,7 +197,7 @@ export function TransportExpensesPanel({
             <Wallet className="h-4 w-4 text-primary" /> Biaya Operasional
           </span>
           <span className="flex min-w-0 flex-wrap items-center gap-3">
-            {canView && <span className="text-sm font-semibold">{formatRupiah(summary.total)} (total biaya disetujui)</span>}
+            {canView && <span className="min-w-0 break-words text-sm font-semibold">Biaya {formatRupiah(progress.submitted)} · Approve {formatRupiah(progress.approved)} ({progress.percentage}%)</span>}
             {canCreate && (
               <Button size="sm" onClick={() => openCreate()}>
                 <Plus className="h-3.5 w-3.5" /> Tambah Biaya
@@ -211,13 +216,14 @@ export function TransportExpensesPanel({
           {EXPENSE_TYPES.map((t) => {
             const Icon = ICON[t];
             const s = summary.byType[t];
+            const amounts = expenseProgress(rows.filter(row => row.type === t));
             return (
               <div key={t} className="rounded-lg border bg-muted/30 p-3">
                 <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Icon className="h-3.5 w-3.5" /> {EXPENSE_LABEL[t]}
                 </p>
-                <p className="mt-1 break-all text-sm font-semibold">{formatRupiah(s.total)}</p>
-                <p className="text-[11px] text-muted-foreground">{s.count} transaksi</p>
+                <p className="mt-1 break-all text-sm font-semibold">Biaya {formatRupiah(amounts.submitted)}</p>
+                <p className="break-words text-[11px] text-muted-foreground">Approve {formatRupiah(s.total)} ({amounts.percentage}%) · {s.count} disetujui</p>
               </div>
             );
           })}
@@ -247,9 +253,10 @@ export function TransportExpensesPanel({
                     <span className="inline-block rounded border px-1.5 py-0.5 text-xs">
                       {r.status === "APPROVED"
                         ? "Approved"
-                        : "Pending"}
+                        : r.status === "CANCELLED" ? "Cancelled" : "Pending"}
                     </span>
-                    {r.status === "APPROVED" && (
+                    {r.cancellationReason && <p className="break-words text-xs text-muted-foreground">Alasan pembatalan: {r.cancellationReason}</p>}
+                    {["APPROVED", "CANCELLED"].includes(r.status) && (
                       <p className="text-xs text-muted-foreground">
                         {r.approvedByUsername
                           ? `Approve by ${r.approvedByUsername}(${r.approvedByRole ?? "—"})`
@@ -304,6 +311,8 @@ export function TransportExpensesPanel({
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   )}
+                  {canApprove && r.status === "APPROVED" && <Button size="sm" variant="outline" onClick={() => { setReason(""); setReversal({ row: r, action: "cancel" }); }}>Batalkan approval</Button>}
+                  {canApprove && ["APPROVED", "CANCELLED"].includes(r.status) && <Button size="sm" variant="destructive" onClick={() => { setReason(""); setReversal({ row: r, action: "remove" }); }}>Hapus biaya</Button>}
                 </div>
               );
             })}
@@ -345,7 +354,7 @@ export function TransportExpensesPanel({
                 ) : hasExistingPhoto ? (
                   <p className="text-xs text-muted-foreground">Sudah ada foto bukti tersimpan.</p>
                 ) : null}
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={busy}>
                     <Camera className="h-3.5 w-3.5" /> {form.photo || hasExistingPhoto ? "Ganti foto" : "Ambil / pilih foto"}
                   </Button>
@@ -393,6 +402,22 @@ export function TransportExpensesPanel({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <Dialog open={!!reversal} onOpenChange={open => { if (!open && !reversing) setReversal(null); }}>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-md">
+          <DialogHeader><DialogTitle>{reversal?.action === "cancel" ? "Batalkan approval biaya" : "Hapus biaya"}</DialogTitle><DialogDescription>{reversal?.row.expenseCode} · {reversal?.action === "cancel" ? "Biaya akan tetap terlihat dengan status Cancelled." : "Biaya akan dihapus. Alasan tetap tersimpan di log audit."}</DialogDescription></DialogHeader>
+          <form className="min-w-0 space-y-4" onSubmit={async event => {
+            event.preventDefault(); if (!reversal || !reason.trim() || reversing) return;
+            setReversing(true);
+            try {
+              const path = `/transports/${transportId}/expenses/${reversal.row.id}`;
+              if (await runAction(() => reversal.action === "cancel" ? apiPost(`${path}/cancel`, { reason }) : apiDelete(path, { reason }), { success: reversal.action === "cancel" ? "Biaya dibatalkan." : "Biaya dihapus." })) { setReversal(null); reload(); }
+            } finally { setReversing(false); }
+          }}>
+            <Field label="Alasan (wajib)" htmlFor="expense-reason"><Input id="expense-reason" value={reason} maxLength={1000} required onChange={event => setReason(event.target.value)} disabled={reversing} /></Field>
+            <DialogFooter><Button type="button" variant="outline" disabled={reversing} onClick={() => setReversal(null)}>Kembali</Button><SubmitButton busy={reversing} disabled={!reason.trim()}>{reversal?.action === "cancel" ? "Batalkan approval" : "Hapus biaya"}</SubmitButton></DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

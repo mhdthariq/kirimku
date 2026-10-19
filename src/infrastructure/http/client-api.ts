@@ -129,7 +129,7 @@ export async function apiGetWithMeta<T>(path: string): Promise<{ data: T; meta: 
 export const apiGet = <T>(path: string) => apiFetch<T>(path);
 export const apiPost = <T>(path: string, body?: unknown) => apiFetch<T>(path, { method: "POST", body });
 export const apiPut = <T>(path: string, body?: unknown) => apiFetch<T>(path, { method: "PUT", body });
-export const apiDelete = <T>(path: string) => apiFetch<T>(path, { method: "DELETE" });
+export const apiDelete = <T>(path: string, body?: unknown) => apiFetch<T>(path, { method: "DELETE", ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 
 // ---------------------------------------------------------------------------
 // Shared domain types
@@ -570,7 +570,8 @@ export interface TransportExpenseRow {
   id: number;
   expenseCode: string;
   transportId: number;
-  status?: "PENDING" | "APPROVED";
+  status?: "PENDING" | "APPROVED" | "CANCELLED";
+  cancellationReason?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   locationAccuracy?: number | null;
@@ -579,7 +580,7 @@ export interface TransportExpenseRow {
   approvedByUsername?: string | null;
   approvedByRole?: string | null;
   photoUrl?: string | null;
-  type: "BONGKAR" | "PARKIR" | "MAKAN" | "BBM" | "ANGKUT";
+  type: "BONGKAR" | "PARKIR" | "MAKAN" | "BBM" | "ANGKUT" | "TOL";
   amount: number;
   description: string | null;
   hasPhoto: boolean;
@@ -847,7 +848,12 @@ export interface OperationalExpenseRecord {
   description: string | null;
   status: string;
   createdAt: string;
-  transport: { id: number; transportCode: string; origin: string | null; destination: string | null };
+  transport: { id: number; transportCode: string; origin: string | null; destination: string | null } | null;
+  shipment?: { id: number; masterCode: string; origin: string; destination: string } | null;
+  approvedAt?: string | null;
+  approvedByUsername?: string | null;
+  approvedByRole?: string | null;
+  cancellationReason?: string | null;
 }
 export interface OperationalExpenseReport {
   approvedTotal: number;

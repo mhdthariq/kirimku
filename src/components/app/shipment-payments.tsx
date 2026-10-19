@@ -24,6 +24,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+export function CustomerPriceStatus({ shipment, detailed = false }: { shipment: Shipment; detailed?: boolean }) {
+    const price = shipment.finalPriceAmount ?? shipment.paymentSummary?.finalPriceAmount ?? shipment.priceAmount;
+    const paid = shipment.paymentSummary?.paidAmount ?? shipmentPaymentTotals(shipment).paid;
+    const remaining = price == null ? null : Math.max(0, price - paid);
+    const label = price == null ? "Belum dihitung" : remaining === 0 ? "Lunas" : paid > 0 ? "Sebagian" : "Belum Lunas";
+    return <div className="min-w-0 space-y-2">
+        <span className={`inline-flex max-w-full whitespace-normal rounded-full border px-2 py-1 text-xs font-semibold ${label === "Lunas" ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300"}`}>{label}</span>
+        {detailed && <dl className="grid min-w-0 gap-3 sm:grid-cols-3">{[["Harga customer", price], ["Sudah dibayar (terverifikasi)", paid], ["Sisa pembayaran", remaining]].map(([title, amount]) => <div key={String(title)} className="min-w-0 rounded-lg bg-muted/30 p-3"><dt className="text-xs text-muted-foreground">{title}</dt><dd className="mt-1 break-all text-base font-semibold">{typeof amount === "number" ? formatRupiah(amount) : "—"}</dd></div>)}</dl>}
+    </div>;
+}
+
 export function ShipmentPayments({
     shipment,
     onChanged,
@@ -185,7 +196,7 @@ export function ShipmentPayments({
                             key={payment.id}
                             className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm"
                         >
-                            <div>
+                            <div className="min-w-0 break-words">
                                 <p className="font-medium">
                                     {formatRupiah(payment.amount)} ·{" "}
                                     {payment.method === "TRANSFER"
@@ -207,7 +218,7 @@ export function ShipmentPayments({
                                 </p>
                             </div>
                             {canVerify && payment.status === "RECORDED" && (
-                                <div className="flex gap-2">
+                                <div className="flex flex-wrap gap-2">
                                     {active && (
                                         <Button
                                             size="sm"

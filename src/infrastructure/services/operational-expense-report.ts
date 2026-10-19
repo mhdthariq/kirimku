@@ -5,6 +5,8 @@ import type { Prisma } from "@prisma/client";
 export const expenseReportSelect = {
   id: true, expenseCode: true, type: true, amount: true, description: true, status: true, createdAt: true,
   transport: { select: { id: true, transportCode: true, origin: true, destination: true } },
+  shipment: { select: { id: true, masterCode: true, origin: true, destination: true } },
+  approvedAt: true, approvedByUsername: true, approvedByRole: true, cancellationReason: true,
 } satisfies Prisma.TransportExpenseSelect;
 
 /** Aggregate the expense table itself, never joins to shipments (which multiply shared costs). */

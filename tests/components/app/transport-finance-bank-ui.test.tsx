@@ -17,7 +17,7 @@ vi.mock("@/components/app/activity-log-panel", () => ({ ActivityLogPanel: () => 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 import { BankAccountsPage } from "@/components/app/pages/bank-accounts-page";
 import { OperationalExpensesPage } from "@/components/app/pages/operational-expenses-page";
-import { ShipmentTransportExpenses } from "@/components/app/operational-expense-report";
+import { ShipmentExpenses } from "@/components/app/shipment-expenses";
 import { TransportDetailPage } from "@/components/app/pages/transport-detail-page";
 import { InvoicesPage } from "@/components/app/pages/invoices-page";
 import { InvoicePrint } from "@/components/app/invoice-print";
@@ -88,10 +88,10 @@ describe("responsive transport finance and bank management", () => {
     expect(screen.queryByRole("button", { name: "Tambah Rekening" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Edit rekening/ })).not.toBeInTheDocument();
   });
-  it("shows ANGKUT and traces shared costs to their transport", async () => {
-    render(<ShipmentTransportExpenses shipmentId={1} />);
+  it("shows shipment expenses separately and traces existing transport references", async () => {
+    render(<ShipmentExpenses shipmentId={1} />);
     await screen.findByText("Biaya Angkut");
-    expect(screen.getByText(/Biaya bersama untuk seluruh muatan transport/)).toBeInTheDocument();
+    expect(screen.getByText(/Biaya khusus shipment, terpisah dari harga customer/)).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "TR-2026-000010" })[0]).toHaveAttribute("href", "/#/transports/10?tab=expenses");
     fixture("shipment-costs");
   });

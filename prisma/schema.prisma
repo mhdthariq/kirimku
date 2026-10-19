@@ -303,6 +303,7 @@ model MasterShipment {
     createdByPartnerId     Int?
     /// Server-owned creation snapshot: Admin Gudang B2C counter payments.
     paymentTrackingEnabled Boolean             @default(false)
+    arrivalPreviousStatus  String?
     createdAt              DateTime            @default(now())
     updatedAt              DateTime            @updatedAt
     deliveries             Delivery[]
@@ -316,6 +317,7 @@ model MasterShipment {
     documents              ShipmentDocument[]
     trackingEvents         TrackingEvent[]
     transportItems         TransportShipment[]
+    expenses               TransportExpense[]
 }
 
 model ShipmentDocument {
@@ -531,7 +533,8 @@ model TransportShipment {
 model TransportExpense {
     id                 Int       @id @default(autoincrement())
     expenseCode        String    @unique
-    transportId        Int
+    transportId        Int?
+    shipmentId         Int?
     /// BONGKAR | PARKIR | MAKAN | BBM | ANGKUT | TOL
     type               String
     amount             Float
@@ -546,12 +549,17 @@ model TransportExpense {
     approvedById       Int?
     approvedByUsername String?
     approvedByRole     String?
+    cancelledAt        DateTime?
+    cancelledById      Int?
+    cancellationReason String?
     createdAt          DateTime  @default(now())
     updatedAt          DateTime  @updatedAt
-    transport          Transport @relation(fields: [transportId], references: [id], onDelete: Cascade)
+    transport          Transport? @relation(fields: [transportId], references: [id], onDelete: Cascade)
+    shipment           MasterShipment? @relation(fields: [shipmentId], references: [id], onDelete: Restrict)
 
     @@index([transportId])
     @@index([transportId, type])
+    @@index([shipmentId])
 }
 
 model TransportActivity {

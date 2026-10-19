@@ -159,7 +159,12 @@ describe("expense API approval and GPS", () => {
     expect((await update(req({ ...body, amount: 200, status: "APPROVED", approvedByUsername: "forged" }), params())).status).toBe(200);
     expect(m.updateMany).toHaveBeenCalledWith({ where: { id: 12, transportId: 10, status: "PENDING" }, data: { ...gps, type: "BBM", amount: 200 } });
   });
-  it.each([update, remove, approve])("rejects already approved entries %#", async (route) => {
+  it("requires a reason when removing an approved expense", async () => {
+    m.find.mockResolvedValue({ ...expense, status: "APPROVED" });
+    expect((await remove(req(), params())).status).toBe(422);
+    expect(m.deleteMany).not.toHaveBeenCalled();
+  });
+  it.each([update, approve])("rejects already approved entries %#", async (route) => {
     m.find.mockResolvedValue({ ...expense, status: "APPROVED" });
     expect((await route(req(), params())).status).toBe(409);
     expect(m.updateMany).not.toHaveBeenCalled(); expect(m.deleteMany).not.toHaveBeenCalled(); expect(m.audit).not.toHaveBeenCalled();
