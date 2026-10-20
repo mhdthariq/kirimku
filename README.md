@@ -105,6 +105,29 @@ See [the testing guide](docs/testing.md) for test isolation, regression coverage
 
 ## Environment
 
+### Production port
+
+The generated standalone server defaults to port `3000`. Set `PORT` in your
+deployment environment or in the project-root `.env` / `.env.production`:
+
+```dotenv
+PORT=8080
+```
+
+Build with `bun run build`, then run `bun run start` (or `npm run start`).
+The startup launcher loads environment files before the standalone server reads
+the port. Restart after changing `PORT`; no rebuild is required. Environment
+variables supplied by your hosting platform or shell take precedence.
+
+When deploying only the contents of `.next/standalone`, run `node start.cjs`
+from that bundle and put runtime environment files beside `start.cjs`.
+Running the generated `server.js` directly requires `PORT` to be supplied by
+the hosting platform or shell. `bun run start:preview` uses the same port setting.
+
+For a shell override on Linux/macOS: `PORT=8080 bun run start`.
+On PowerShell: `$env:PORT = '8080'`, then `bun run start`.
+Development also accepts a shell `PORT` or `bun run dev --port 8080`.
+
 Configure `.env` with a PostgreSQL `DATABASE_URL`; there is no SQLite default in the current schema. Do not assume the current local URL is usable with PostgreSQL.
 
 Prisma and Prisma Client are pinned to 6.11.1. If an editor using a Prisma 7 language server reports that the datasource `url` is invalid, match the language server to Prisma 6 rather than deleting `url = env("DATABASE_URL")` from the schema.
