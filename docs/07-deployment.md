@@ -36,6 +36,9 @@ bun run start        # runs the standalone server (Node/Bun)
 ```
 
 - The build emits a **standalone server** (`.next/standalone/server.js`) with only the needed `node_modules` — ideal for containers.
+- Use `bun run build` (or `npm run build`) so the post-build step includes the runtime environment bootstrap and static assets.
+- For aaPanel, set `PORT=3001` in the process environment or `.env`, and point the proxy to port `3001`. Both `bun run start` and `node .next/standalone/server.js` support this after rebuilding. With a full checkout, `.env` belongs at the project root; with only the standalone bundle, place it beside `server.js`. The working directory does not affect this lookup.
+- An existing process `PORT` overrides env files. Production files take precedence in this order: `.env.production.local`, `.env.local`, `.env.production`, `.env`. Restart the managed process after changing its environment; the startup log prints the effective port and environment directory.
 - `DATABASE_URL` must be present in the runtime environment (it is read at runtime, not baked in).
 - For Supabase in production, use the **transaction pooler** URL (port 6543, `pgbouncer=true`) for serverless/short-lived connections, or the **session pooler** (5432) for a long-running server. Templates are in `.env.example`.
 

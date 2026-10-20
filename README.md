@@ -119,10 +119,20 @@ The startup launcher loads environment files before the standalone server reads
 the port. Restart after changing `PORT`; no rebuild is required. Environment
 variables supplied by your hosting platform or shell take precedence.
 
-When deploying only the contents of `.next/standalone`, run `node start.cjs`
-from that bundle and put runtime environment files beside `start.cjs`.
-Running the generated `server.js` directly requires `PORT` to be supplied by
-the hosting platform or shell. `bun run start:preview` uses the same port setting.
+Both `bun run start` and direct `node .next/standalone/server.js` load runtime
+environment files after building with `bun run build`. When deploying only the
+contents of `.next/standalone`, put runtime environment files beside `server.js`
+and run `node server.js` or `node start.cjs`. `bun run start:preview` uses the same
+port setting. Use `bun run build` rather than bare `next build` so the runtime
+bootstrap and static assets are included.
+
+For aaPanel, set the actual process environment variable `PORT=3001` and the
+proxy target port to `3001`. If using `.env`, place it at the project root for
+a full checkout, or beside `server.js` for a standalone-only deployment. Check
+that `.env.production.local`, `.env.local`, or `.env.production` do not override
+it. A process environment variable `PORT=3000` also overrides `.env`; update or
+remove it in the process manager and restart the process. The startup log shows
+the effective HTTP port and environment directory.
 
 For a shell override on Linux/macOS: `PORT=8080 bun run start`.
 On PowerShell: `$env:PORT = '8080'`, then `bun run start`.
