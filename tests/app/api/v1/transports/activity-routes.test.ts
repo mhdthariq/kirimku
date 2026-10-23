@@ -96,6 +96,7 @@ vi.mock("@/infrastructure/persistence/tenant-context", () => ({
 
 import { GET, POST } from "@/app/api/v1/transports/[id]/activities/route";
 import { POST as depart } from "@/app/api/v1/transports/[id]/depart/route";
+import { POST as undoArrival } from "@/app/api/v1/transports/[id]/undo-arrival/route";
 import { POST as arrive } from "@/app/api/v1/transports/[id]/arrive/route";
 import { POST as checkin } from "@/app/api/v1/transports/[id]/checkins/route";
 import { PUT as edit } from "@/app/api/v1/transports/[id]/route";
@@ -747,5 +748,85 @@ describe("planning mode and freshness boundaries", () => {
             "minimal 3 checkpoint",
         );
         expect(m.vehicle).not.toHaveBeenCalled();
+    });
+});
+
+
+describe("arrival evidence", () => {
+    it.each([{}, { ...payload(), photo: "" }, { ...payload(), capturedAt: "2020-01-01T00:00:00Z" }])("rejects missing or stale arrival evidence", async (body) => {
+        m.transport.mockResolvedValue({ ...transport, status: "DEPARTED" });
+        expect((await arrive(req(body), params())).status).toBe(422);
+        expect(m.create).not.toHaveBeenCalled();
+        expect(m.update).not.toHaveBeenCalled();
+    });
+    it("persists arrival photo, location and authenticated actor before arriving", async () => {
+        m.transport.mockResolvedValue({ ...transport, status: "DEPARTED" });
+        expect((await arrive(req(), params())).status).toBe(200);
+        expect(m.create).toHaveBeenCalledWith({ data: expect.objectContaining({ transportId: 10, photoUrl: photo, latitude: -6.2, recordedById: actor.id }) });
+        expect(m.update).toHaveBeenCalledWith({ where: { id: 10 }, data: { status: "ARRIVED", arrivedAt: expect.any(Date), statusBeforeArrival: "DEPARTED" } });
+    });
+    it("does not write arrival evidence if lifecycle changed concurrently", async () => {
+        m.transport.mockResolvedValue({ ...transport, status: "DEPARTED" });
+        m.updateMany.mockResolvedValueOnce({ count: 0 });
+        expect((await arrive(req(), params())).status).toBe(409);
+        expect(m.create).not.toHaveBeenCalled();
+    });
+    it("allows owner to read saved activity photos", async () => {
+        m.auth.mockResolvedValue({ ...actor, isOwner: true, employeeId: null, roles: [{ slug: "owner" }] });
+        const response = await GET(req(), params());
+        expect(response.status).toBe(200);
+        expect(JSON.stringify(await response.json())).toContain(photo);
+    });
+});
+
+
+describe("owner undo arrival", () => {
+    const arrived = { ...transport, status: "ARRIVED", statusBeforeArrival: "DEPARTED", arrivedAt: new Date(), updatedAt: new Date() };
+    it("denies a non-owner even with all permissions", async () => {
+        m.auth.mockResolvedValue({ ...actor, permissions: ["*"] });
+        expect((await undoArrival(req(), params())).status).toBe(403);
+        expect(m.updateMany).not.toHaveBeenCalled();
+    });
+    it.each(["PLANNED", "DEPARTED"])("restores saved %s status, clears arrival time, and audits", async (previous) => {
+        m.auth.mockResolvedValue({ ...actor, isOwner: true });
+        m.transport.mockResolvedValue({ ...arrived, statusBeforeArrival: previous });
+        expect((await undoArrival(req(), params())).status).toBe(200);
+        expect(m.updateMany).toHaveBeenCalledWith({
+            where: { id: 10, status: "ARRIVED", arrivedAt: arrived.arrivedAt, updatedAt: arrived.updatedAt },
+            data: { status: previous, arrivedAt: null, statusBeforeArrival: null },
+        });
+        expect(m.sync).toHaveBeenCalledWith(expect.anything(), 10, previous);
+        expect(m.audit).toHaveBeenCalledWith(expect.objectContaining({ action: "undo_arrival", after: { status: previous, arrivedAt: null } }));
+        expect(m.create).not.toHaveBeenCalled();
+        expect(m.shipmentUpdate).not.toHaveBeenCalled();
+    });
+    it.each(["PLANNED", "DEPARTED", "COMPLETED", "CANCELLED"])("rejects undo from %s", async (status) => {
+        m.auth.mockResolvedValue({ ...actor, isOwner: true });
+        m.transport.mockResolvedValue({ ...arrived, status });
+        expect((await undoArrival(req(), params())).status).toBe(422);
+        expect(m.updateMany).not.toHaveBeenCalled();
+    });
+    it("rejects concurrent lifecycle changes", async () => {
+        m.auth.mockResolvedValue({ ...actor, isOwner: true });
+        m.transport.mockResolvedValue(arrived);
+        m.updateMany.mockResolvedValueOnce({ count: 0 });
+        expect((await undoArrival(req(), params())).status).toBe(409);
+        expect(m.audit).not.toHaveBeenCalled();
+        expect(m.sync).not.toHaveBeenCalled();
+    });
+    it.each([
+        ["ACTIVITY", null, "DEPARTED"],
+        ["CHECKPOINT", null, "PLANNED"],
+        ["CHECKPOINT", new Date(), "DEPARTED"],
+    ])("restores legacy %s arrival with departedAt %s to %s", async (trackingMode, departedAt, expected) => {
+        m.auth.mockResolvedValue({ ...actor, isOwner: true });
+        m.transport.mockResolvedValue({ ...arrived, trackingMode, departedAt, statusBeforeArrival: null });
+        expect((await undoArrival(req(), params())).status).toBe(200);
+        expect(m.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { status: expected, arrivedAt: null, statusBeforeArrival: null } }));
+    });
+    it("returns 404 for missing transport", async () => {
+        m.auth.mockResolvedValue({ ...actor, isOwner: true });
+        m.transport.mockResolvedValue(null);
+        expect((await undoArrival(req(), params())).status).toBe(404);
     });
 });

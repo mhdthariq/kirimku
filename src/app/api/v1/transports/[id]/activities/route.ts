@@ -1,10 +1,9 @@
 import { NextRequest } from "next/server";
-import sharp from "sharp";
+import { parseActivityEvidence } from "@/infrastructure/services/activity-evidence";
 import { db } from "@/infrastructure/persistence/db";
 import { guard, ok, handle, fail, HttpError } from "@/composition/api-helpers";
 import { audit } from "@/infrastructure/services/audit";
-import { assertTransportAccess, isAssignedCrew, parseOptionalPhoto } from "@/infrastructure/services/transport-ops-server";
-import { activityCaptureError } from "@/shared/activity-tracking";
+import { assertTransportAccess, isAssignedCrew } from "@/infrastructure/services/transport-ops-server";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -45,30 +44,9 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (transport.trackingMode !== "ACTIVITY") return fail(422, "Transport ini tidak mendukung activity tracking.");
     if (!["PLANNED", "DEPARTED"].includes(transport.status)) return fail(422, "Aktivitas hanya untuk transport PLANNED atau DEPARTED.");
 
-    const parsed: unknown = await req.json().catch(() => null);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return fail(422, "Payload aktivitas tidak valid.");
-    const body = parsed as Record<string, unknown>;
-    const captureError = activityCaptureError(body);
-    if (captureError) return fail(422, captureError);
-    const photo = parseOptionalPhoto(body.photo);
-    if (photo.error) return fail(422, photo.error, { photo: [photo.error] });
-    if (!photo.photoUrl) return fail(422, "Foto aktivitas wajib disertakan.");
-    const base64 = photo.photoUrl.slice(photo.photoUrl.indexOf(",") + 1);
-    if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(base64) || !base64) return fail(422, "Data foto tidak valid.");
-    try {
-      const metadata = await sharp(Buffer.from(base64, "base64"), { limitInputPixels: 20_000_000 }).metadata();
-      const expectedFormat = photo.photoUrl.startsWith("data:image/png;") ? "png" : "jpeg";
-      if (metadata.format !== expectedFormat || !metadata.width || !metadata.height) return fail(422, "Data foto tidak sesuai format gambar.");
-    } catch {
-      return fail(422, "Data foto tidak valid.");
-    }
-
-    const capturedAt = new Date(body.capturedAt as string);
-    const location = {
-      latitude: body.latitude as number,
-      longitude: body.longitude as number,
-      locationAccuracy: (body.locationAccuracy as number | null | undefined) ?? null,
-    };
+    const evidence = await parseActivityEvidence(req);
+    const { capturedAt, latitude, longitude, locationAccuracy } = evidence;
+    const location = { latitude, longitude, locationAccuracy };
     const activity = await db.$transaction(async (tx) => {
       // Lock and recheck lifecycle/mode/assignment before writing evidence.
       const active = await tx.transport.updateMany({
@@ -78,7 +56,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       });
       if (!active.count) throw new HttpError(409, "Transport berubah; muat ulang sebelum mencatat aktivitas.");
       const created = await tx.transportActivity.create({ data: {
-        transportId: transport.id, photoUrl: photo.photoUrl!, ...location, capturedAt,
+        transportId: transport.id, photoUrl: evidence.photoUrl, ...location, capturedAt,
         recordedById: user.id, recordedByUsername: user.username,
       } });
       // A slightly older capture must not move the last known position backwards.

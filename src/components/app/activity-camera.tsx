@@ -12,6 +12,9 @@ export function ActivityCamera({ onCaptured, disabled = false }: {
   const video = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
   const mounted = useRef(false);
+  const [facing, setFacing] = useState<"environment" | "user">("environment");
+  const [opening, setOpening] = useState(true);
+  const [attempt, setAttempt] = useState(0);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -19,14 +22,16 @@ export function ActivityCamera({ onCaptured, disabled = false }: {
   useEffect(() => {
     mounted.current = true;
     let cancelled = false;
+    let ownedStream: MediaStream | null = null;
     async function start() {
       try {
         if (!navigator.mediaDevices?.getUserMedia) throw new Error("Kamera tidak tersedia. Gunakan HTTPS dan izinkan akses kamera.");
-        const media = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
+        const media = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing } }, audio: false });
         if (cancelled) {
           media.getTracks().forEach((track) => track.stop());
           return;
         }
+        ownedStream = media;
         stream.current = media;
         if (video.current) {
           video.current.srcObject = media;
@@ -34,16 +39,25 @@ export function ActivityCamera({ onCaptured, disabled = false }: {
         }
       } catch {
         if (!cancelled) setError("Kamera gagal dibuka. Gunakan HTTPS dan izinkan akses kamera, lalu buka ulang kamera.");
+      } finally {
+        if (!cancelled) setOpening(false);
       }
     }
     void start();
     return () => {
       cancelled = true;
       mounted.current = false;
-      stream.current?.getTracks().forEach((track) => track.stop());
-      stream.current = null;
+      ownedStream?.getTracks().forEach((track) => track.stop());
+      if (stream.current === ownedStream) stream.current = null;
+      if (video.current) video.current.srcObject = null;
     };
-  }, []);
+  }, [facing, attempt]);
+
+  function resetCamera() {
+    setReady(false);
+    setOpening(true);
+    setError(null);
+  }
 
   async function capture() {
     setBusy(true);
@@ -86,7 +100,9 @@ export function ActivityCamera({ onCaptured, disabled = false }: {
       <video ref={video} autoPlay muted playsInline aria-label="Pratinjau kamera aktivitas" onLoadedData={() => setReady(true)} className="max-h-80 w-full rounded-lg bg-black" />
       <p className="text-xs text-muted-foreground">Kamera dan GPS wajib diizinkan. Lokasi baru diambil setiap kali foto ditangkap.</p>
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-      <Button type="button" disabled={!ready || busy || disabled} onClick={() => void capture()}>
+      <Button type="button" variant="outline" disabled={opening || busy || disabled} onClick={() => { resetCamera(); setFacing((value) => value === "environment" ? "user" : "environment"); }}>Ganti Kamera</Button>
+      {error && <Button type="button" variant="outline" disabled={opening || busy || disabled} onClick={() => { resetCamera(); setAttempt((value) => value + 1); }}>Buka Ulang Kamera</Button>}
+      <Button type="button" disabled={!ready || opening || busy || disabled} onClick={() => void capture()}>
         {busy ? "Mengambil GPS & foto…" : "Ambil Foto dengan GPS"}
       </Button>
     </div>

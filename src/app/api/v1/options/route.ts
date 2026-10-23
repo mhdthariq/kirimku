@@ -92,6 +92,7 @@ export async function GET(req: NextRequest) {
         where: {
           customer: { type: "b2b" },
           status: { not: "CANCELLED" },
+          transportItems: { some: { transport: { status: { in: ["ARRIVED", "COMPLETED"] } } } },
           ...(user.partnerType === "MARKETING" ? { createdByPartnerId: marketingOwner ?? -1 } : {}),
         },
         orderBy: { createdAt: "desc" },

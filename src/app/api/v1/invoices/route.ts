@@ -132,6 +132,10 @@ export async function POST(req: NextRequest) {
         });
       }
       if (linkedShipmentIds.has(shipment.id)) return fail(422, `Shipment ${shipment.masterCode} hanya boleh muncul satu kali dalam invoice.`);
+      const arrivedTransport = await db.transportShipment.findFirst({
+        where: { shipmentId: shipment.id, transport: { status: { in: ["ARRIVED", "COMPLETED"] } } },
+      });
+      if (shipment.status === "CANCELLED" || !arrivedTransport) return fail(422, "Shipment hanya dapat ditagihkan setelah transport berstatus Tiba.");
       const alreadyInvoiced = await db.invoiceLine.findFirst({
         where: { shipmentId: shipment.id },
         include: { invoice: { select: { invoiceNumber: true } } },

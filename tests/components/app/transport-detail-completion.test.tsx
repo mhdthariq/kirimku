@@ -23,6 +23,7 @@ vi.mock("@/infrastructure/http/client-api", () => ({
   },
   apiPost: m.post, apiDelete: vi.fn(), hasPermission: (_user: unknown, permission: string) => m.permissions.includes(permission),
 }));
+vi.mock("@/components/app/activity-camera", () => ({ ActivityCamera: ({ onCaptured }: { onCaptured: (capture: object) => void }) => <button onClick={() => onCaptured({ photo: "data:image/jpeg;base64,YQ==", latitude: 0, longitude: 0, locationAccuracy: 5, capturedAt: new Date().toISOString() })}>Capture arrival</button> }));
 vi.mock("next/dynamic", () => ({ default: () => () => null }));
 vi.mock("@/components/app/transport-activities-panel", () => ({ TransportActivitiesPanel: () => null }));
 vi.mock("@/components/app/transport-drops-panel", () => ({ TransportDropsPanel: () => null }));
@@ -75,8 +76,10 @@ describe("transport audit completion", () => {
     render(<TransportDetailPage transportId={10} />);
     fireEvent.click(await screen.findByRole("button", { name: "Tandai Tiba" }));
     expect(screen.getByRole("alertdialog")).toHaveTextContent("ARRIVED dan menunggu audit, bukan COMPLETED");
+    expect(screen.getByRole("button", { name: "Ya, tandai tiba" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Capture arrival" }));
     fireEvent.click(screen.getByRole("button", { name: "Ya, tandai tiba" }));
-    await waitFor(() => expect(m.post).toHaveBeenCalledWith("/transports/10/arrive", {}));
+    await waitFor(() => expect(m.post).toHaveBeenCalledWith("/transports/10/arrive", expect.objectContaining({ photo: "data:image/jpeg;base64,YQ==" })));
     expect(await screen.findByRole("status")).toHaveTextContent("Status masih ARRIVED, belum COMPLETED.");
     expect(m.post).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("Transport COMPLETED — audit dikonfirmasi.")).not.toBeInTheDocument();

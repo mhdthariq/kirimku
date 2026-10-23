@@ -466,6 +466,7 @@ export interface DeliveryTask {
 }
 
 export interface Vehicle {
+  photoDataUrl?: string | null;
   id: number;
   vehicleNumber: string;
   name: string | null;

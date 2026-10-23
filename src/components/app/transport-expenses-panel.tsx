@@ -1,4 +1,5 @@
 "use client";
+import { PasteFileInput } from "@/components/ui/paste-file-input";
 
 import { useMemo, useRef, useState } from "react";
 import { Camera, Fuel, HandCoins, ParkingCircle, Pencil, Plus, Trash2, Utensils, Wallet, X } from "lucide-react";
@@ -355,7 +356,7 @@ export function TransportExpensesPanel({
             </Field>
             <Field label="Foto Bukti" htmlFor="x-photo" hint="Opsional">
               <div className="space-y-2">
-                <input ref={fileRef} id="x-photo" type="file" accept="image/*" multiple className="hidden" disabled={busy || photoBusy} onChange={event => { void onPickPhotos(event.target.files); event.target.value = ""; }} />
+                <PasteFileInput native ref={fileRef} id="x-photo" type="file" accept="image/*" multiple className="hidden" disabled={busy || photoBusy} onChange={event => { void onPickPhotos(event.target.files); event.target.value = ""; }} />
                 <p className="text-xs text-muted-foreground">Pilih beberapa foto sekaligus, maksimal {MAX_EXPENSE_PHOTOS} foto per biaya.</p>
                 {form.photos.length > 0 && <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{form.photos.map((photo, index) => <div key={index} className="relative min-w-0"><img src={photo} alt={`Bukti biaya ${index + 1}`} className="h-28 w-full rounded-md border object-contain" /><Button type="button" size="icon" variant="secondary" className="absolute right-1 top-1 h-6 w-6 rounded-full" disabled={busy || photoBusy} onClick={() => setForm(current => ({ ...current, photos: current.photos.filter((_, position) => position !== index) }))} aria-label={`Hapus foto ${index + 1}`}><X className="h-3 w-3" /></Button></div>)}</div>}
                 {hasExistingPhoto && <p className="text-xs text-muted-foreground">{editing?.photoCount ?? 1} foto bukti tersimpan. Foto baru akan ditambahkan.</p>}

@@ -9,10 +9,11 @@ import { formatDate } from "@/components/app/form-parts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export function TransportActivitiesPanel({ transportId, canCreate, onChanged }: {
+export function TransportActivitiesPanel({ transportId, canCreate, onChanged, onViewPhoto }: {
   transportId: number;
   canCreate: boolean;
   onChanged: () => void;
+  onViewPhoto?: (activity: TransportActivityRow) => void;
 }) {
   const { data, loading, error, reload } = useApiData<TransportActivityRow[]>(
     () => apiGet(`/transports/${transportId}/activities`), [transportId],
@@ -74,6 +75,7 @@ export function TransportActivitiesPanel({ transportId, canCreate, onChanged }: 
           {data?.map((activity) => (
             <article key={activity.id} className="space-y-2 rounded-lg border p-3">
               <Image unoptimized src={activity.photoUrl} alt={`Foto aktivitas ${activity.id}`} width={640} height={480} className="max-h-72 w-full rounded-md object-contain" />
+              {onViewPhoto && <Button variant="outline" size="sm" onClick={() => onViewPhoto(activity)}>Lihat Foto Aktivitas {activity.id}</Button>}
               <p className="text-sm">Diambil: {formatDate(activity.capturedAt, true)}</p>
               <p className="text-xs text-muted-foreground">Dicatat: {formatDate(activity.recordedAt, true)} · {activity.recordedByUsername ?? "-"}</p>
               <p className="text-xs">GPS: {activity.latitude}, {activity.longitude}{activity.locationAccuracy != null && ` · Akurasi ${activity.locationAccuracy} m`}</p>

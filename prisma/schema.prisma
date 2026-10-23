@@ -385,6 +385,7 @@ model Warehouse {
 }
 
 model Vehicle {
+    photoDataUrl String?
     id            Int                   @id @default(autoincrement())
     vehicleNumber String                @unique
     name          String?
@@ -483,6 +484,7 @@ model Transport {
     currentLongitude     Float?
     lastLocationAt       DateTime?
     departedAt           DateTime?
+    statusBeforeArrival  String?
     arrivedAt            DateTime?
     completedAt          DateTime?
     completedById        Int?

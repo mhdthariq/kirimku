@@ -1,5 +1,8 @@
 "use client";
 
+import { ActivityCamera } from "@/components/app/activity-camera";
+import type { TransportActivityInput } from "@/infrastructure/http/client-api";
+
 import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
@@ -112,6 +115,7 @@ export function TransportDetailPage({ transportId, initialTab }: { transportId: 
   const [checkinOpen, setCheckinOpen] = useState(false);
   const [lifecycleBusy, setLifecycleBusy] = useState(false);
   const [confirmArrive, setConfirmArrive] = useState(false);
+  const [confirmUndoArrival, setConfirmUndoArrival] = useState(false);
   const [confirmComplete, setConfirmComplete] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -191,14 +195,16 @@ export function TransportDetailPage({ transportId, initialTab }: { transportId: 
     );
   }, [transport, user]);
 
-  async function changeLifecycle(action: "depart" | "arrive" | "complete") {
-    if (lifecycleBusy) return;
+  const [arrivalEvidence, setArrivalEvidence] = useState<TransportActivityInput | null>(null);
+
+  async function changeLifecycle(action: "depart" | "arrive" | "complete" | "undo-arrival") {
+    if (lifecycleBusy || (action === "arrive" && transport?.trackingMode === "ACTIVITY" && !arrivalEvidence)) return;
     setLifecycleBusy(true);
-    const ok = await runAction(() => apiPost(`/transports/${transportId}/${action}`, {}), {
-      success: action === "depart" ? "Transport berangkat." : action === "complete" ? "Audit dikonfirmasi. Transport Completed." : "Transport tiba, menunggu audit.",
+    const ok = await runAction(() => apiPost(`/transports/${transportId}/${action}`, action === "arrive" ? arrivalEvidence ?? {} : {}), {
+      success: action === "undo-arrival" ? "Status tiba dibatalkan." : action === "depart" ? "Transport berangkat." : action === "complete" ? "Audit dikonfirmasi. Transport Completed." : "Transport tiba, menunggu audit.",
     });
     setLifecycleBusy(false);
-    if (ok) { setConfirmArrive(false); setConfirmComplete(false); void reload(); }
+    if (ok) { setConfirmUndoArrival(false); setConfirmArrive(false); setArrivalEvidence(null); setConfirmComplete(false); void reload(); }
   }
 
   // checkpoints with check-in state (latest record per checkpoint)
@@ -274,6 +280,7 @@ export function TransportDetailPage({ transportId, initialTab }: { transportId: 
         actions={
           <div className="transport-actions flex max-w-full flex-wrap items-center gap-2">
             <StatusBadge status={transport.status} />
+            {transport.status === "ARRIVED" && user?.isOwner && <Button size="sm" variant="outline" disabled={lifecycleBusy} onClick={() => setConfirmUndoArrival(true)}>Batalkan Tiba</Button>}
             {transport.status === "ARRIVED" && can.complete && (
               <Button size="sm" disabled={lifecycleBusy} onClick={() => setConfirmComplete(true)}>
                 Audit & Konfirmasi Completed
@@ -396,7 +403,7 @@ export function TransportDetailPage({ transportId, initialTab }: { transportId: 
         </TabsList>
         <TabsContent value={isActivity ? "activity" : "checkpoints"}>
       {isActivity ? (
-        <TransportActivitiesPanel key={transport.id} transportId={transport.id} canCreate={canAddActivity} onChanged={reload} />
+        <TransportActivitiesPanel key={transport.id} transportId={transport.id} canCreate={canAddActivity} onChanged={reload} onViewPhoto={canViewProofPhotos ? (activity) => setPhotoRecords([{ url: activity.photoUrl, label: `Foto aktivitas ${activity.id}`, recordedAt: activity.capturedAt, recordedBy: activity.recordedByUsername }]) : undefined} />
       ) : (
       <>
       {/* 3. Check-in information per checkpoint */}
@@ -641,18 +648,39 @@ export function TransportDetailPage({ transportId, initialTab }: { transportId: 
         onDone={reload}
       />}
 
-      <AlertDialog open={confirmArrive} onOpenChange={setConfirmArrive}>
-        <AlertDialogContent>
+      <AlertDialog open={confirmArrive} onOpenChange={(open) => { if (!lifecycleBusy) { setConfirmArrive(open); if (!open) setArrivalEvidence(null); } }}>
+        <AlertDialogContent className="max-h-[90dvh] overflow-y-auto">
           <AlertDialogHeader>
             <AlertDialogTitle>Tandai transport tiba?</AlertDialogTitle>
             <AlertDialogDescription>Transport akan ditandai ARRIVED dan menunggu audit, bukan COMPLETED. Setelah tiba, foto aktivitas baru tidak dapat ditambahkan.</AlertDialogDescription>
           </AlertDialogHeader>
+          {isActivity && confirmArrive && (arrivalEvidence ? (
+            <div className="space-y-2">
+              <img src={arrivalEvidence.photo} alt="Foto bukti tiba" className="max-h-60 w-full rounded-lg object-contain" />
+              <Button variant="outline" disabled={lifecycleBusy} onClick={() => setArrivalEvidence(null)}>Ambil Ulang</Button>
+            </div>
+          ) : <ActivityCamera disabled={lifecycleBusy} onCaptured={setArrivalEvidence} />)}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={lifecycleBusy}>Batal</AlertDialogCancel>
-            <Button disabled={lifecycleBusy} onClick={() => void changeLifecycle("arrive")}>{lifecycleBusy ? "Menyimpan…" : "Ya, tandai tiba"}</Button>
+            <Button disabled={lifecycleBusy || (isActivity && !arrivalEvidence)} onClick={() => void changeLifecycle("arrive")}>{lifecycleBusy ? "Menyimpan…" : "Ya, tandai tiba"}</Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {transport.status === "ARRIVED" && user?.isOwner && (
+        <AlertDialog open={confirmUndoArrival} onOpenChange={(open) => { if (!lifecycleBusy) setConfirmUndoArrival(open); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Batalkan status tiba?</AlertDialogTitle>
+              <AlertDialogDescription>Status transport dikembalikan ke status sebelum tiba dan waktu tiba dikosongkan. Foto, checkpoint, serta catatan penerimaan barang tetap tersimpan.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={lifecycleBusy}>Batal</AlertDialogCancel>
+              <Button disabled={lifecycleBusy} onClick={() => void changeLifecycle("undo-arrival")}>{lifecycleBusy ? "Menyimpan..." : "Ya, batalkan tiba"}</Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
 
       {transport.status === "ARRIVED" && can.complete && (
         <AlertDialog open={confirmComplete} onOpenChange={setConfirmComplete}>
@@ -705,8 +733,8 @@ export function TransportDetailPage({ transportId, initialTab }: { transportId: 
       <PhotoDetailDialog
         open={!!photoRecords}
         onOpenChange={(open) => !open && setPhotoRecords(null)}
-        title={`Foto Bukti Checkpoint - ${transport?.transportCode ?? ""}`}
-        description="Foto bukti check-in driver/kenek di setiap checkpoint sepanjang rute transport."
+        title={`Foto Bukti ${isActivity ? "Aktivitas" : "Checkpoint"} - ${transport?.transportCode ?? ""}`}
+        description={isActivity ? "Foto aktivitas driver/kenek sepanjang perjalanan transport." : "Foto bukti check-in driver/kenek di setiap checkpoint sepanjang rute transport."}
         photos={photoRecords ?? []}
       />
 

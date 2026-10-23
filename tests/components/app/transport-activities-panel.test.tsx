@@ -82,6 +82,30 @@ async function takePhoto() {
 }
 
 describe("camera-only activity evidence", () => {
+    it("releases the old stream and requests the front camera, then rear camera", async () => {
+        const view = render(<ActivityCamera onCaptured={vi.fn()} />);
+        await cameraReady();
+        fireEvent.click(screen.getByRole("button", { name: "Ganti Kamera" }));
+        await waitFor(() => expect(m.camera).toHaveBeenCalledTimes(2));
+        expect(m.stop).toHaveBeenCalledTimes(1);
+        expect(m.camera).toHaveBeenLastCalledWith({ video: { facingMode: { ideal: "user" } }, audio: false });
+        await cameraReady();
+        fireEvent.click(screen.getByRole("button", { name: "Ganti Kamera" }));
+        await waitFor(() => expect(m.camera).toHaveBeenCalledTimes(3));
+        expect(m.camera).toHaveBeenLastCalledWith({ video: { facingMode: { ideal: "environment" } }, audio: false });
+        view.unmount();
+        expect(m.stop).toHaveBeenCalledTimes(3);
+    });
+
+    it("opens saved evidence through the authorized photo viewer", async () => {
+        const activity = { id: 3, photoUrl: "data:image/jpeg;base64,YQ==", latitude: 0, longitude: 106.8 };
+        m.get.mockResolvedValue([activity]);
+        const viewPhoto = vi.fn();
+        render(<TransportActivitiesPanel transportId={10} canCreate={false} onChanged={vi.fn()} onViewPhoto={viewPhoto} />);
+        fireEvent.click(await screen.findByRole("button", { name: "Lihat Foto Aktivitas 3" }));
+        expect(viewPhoto).toHaveBeenCalledWith(activity);
+    });
+
     it("captures live video with fresh GPS, saves repeated entries, and stops the camera", async () => {
         const changed = vi.fn();
         const { container } = render(

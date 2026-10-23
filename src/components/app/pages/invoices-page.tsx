@@ -1,4 +1,5 @@
 "use client";
+import { PasteFileInput } from "@/components/ui/paste-file-input";
 
 import { useMemo, useState } from "react";
 import {
@@ -109,7 +110,7 @@ export function InvoicesPage() {
         () => apiGet<Invoice[]>("/invoices"),
         [],
     );
-    const { data: options } = useApiData<Options>(
+    const { data: options, reload: reloadOptions, loading: optionsLoading, error: optionsError } = useApiData<Options>(
         () => apiGet<Options>("/options"),
         [],
     );
@@ -178,6 +179,7 @@ export function InvoicesPage() {
     }
 
     function openCreate() {
+        void reloadOptions();
         setEditingInvoice(null);
         setForm({
             ...EMPTY,
@@ -262,6 +264,7 @@ export function InvoicesPage() {
         if (ok) {
             setCreateOpen(false);
             setEditingInvoice(null);
+            void reloadOptions();
             reload();
         }
     }
@@ -450,7 +453,7 @@ export function InvoicesPage() {
         value: String(c.id),
         label: c.companyName ?? "Nama perusahaan belum diisi",
     }));
-    const customerShipments = (options?.b2bShipments ?? []).filter(
+    const customerShipments = (optionsLoading || optionsError ? [] : options?.b2bShipments ?? []).filter(
         (s) =>
             (!form.customerId || s.customerId === Number(form.customerId)) &&
             s.invoiceLines.length === 0 &&
@@ -954,7 +957,7 @@ export function InvoicesPage() {
                                         variant="secondary"
                                         size="sm"
                                         onClick={() =>
-                                            setShipmentPickerOpen(true)
+                                            { void reloadOptions(); setShipmentPickerOpen(true); }
                                         }
                                         disabled={
                                             busy ||
@@ -1186,21 +1189,20 @@ export function InvoicesPage() {
 
             <Dialog
                 open={shipmentPickerOpen}
-                onOpenChange={setShipmentPickerOpen}
+                onOpenChange={(open) => { setShipmentPickerOpen(open); if (open) void reloadOptions(); }}
             >
                 <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
                         <DialogTitle>Add Shipment</DialogTitle>
                         <DialogDescription>
                             Pilih shipment milik customer ini untuk ditambahkan
-                            ke invoice. Shipment yang sudah pernah ditagihkan
-                            tidak ditampilkan.
+                            ke invoice setelah transport berstatus Tiba. Shipment yang sudah pernah ditagihkan tidak ditampilkan.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="max-h-80 space-y-2 overflow-y-auto">
                         {customerShipments.length === 0 ? (
                             <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
-                                Tidak ada shipment yang bisa ditambahkan.
+                                {optionsLoading ? "Memuat shipment…" : optionsError ? "Gagal memuat shipment. Tutup dan buka kembali untuk mencoba lagi." : "Tidak ada shipment yang bisa ditambahkan."}
                             </p>
                         ) : (
                             customerShipments.map((shipment) => (
@@ -1839,14 +1841,14 @@ export function InvoicesPage() {
                         >
                             <div className="space-y-2">
                                 <div className="flex items-center gap-2">
-                                    <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md border bg-background px-3 text-sm font-medium hover:bg-accent hover:text-accent-foreground">
+                                    <label className="inline-flex min-h-9 min-w-0 flex-wrap cursor-pointer items-center gap-1.5 py-2 rounded-md border bg-background px-3 text-sm font-medium hover:bg-accent hover:text-accent-foreground">
                                         <Paperclip className="h-4 w-4" />
                                         <span>
                                             {settleProof
                                                 ? settleProof.name
                                                 : "Pilih file…"}
                                         </span>
-                                        <input
+                                        <PasteFileInput native
                                             id="st-proof"
                                             type="file"
                                             accept="image/*,application/pdf"

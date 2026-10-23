@@ -65,7 +65,11 @@ export async function PUT(req: NextRequest, { params }: Params) {
         const shipment = await db.masterShipment.findUnique({ where: { id: line.shipmentId } });
         if (!shipment) return fail(404, `Shipment #${line.shipmentId} tidak ditemukan.`);
         if (shipment.customerId !== existing.customerId) return fail(422, "Shipment tidak cocok dengan customer invoice.");
-        const alreadyInvoiced = await db.invoiceLine.findFirst({ where: { shipmentId: line.shipmentId, invoiceId: { not: existing.id } } });
+        const arrivedTransport = await db.transportShipment.findFirst({
+        where: { shipmentId: shipment.id, transport: { status: { in: ["ARRIVED", "COMPLETED"] } } },
+      });
+      if (shipment.status === "CANCELLED" || !arrivedTransport) return fail(422, "Shipment hanya dapat ditagihkan setelah transport berstatus Tiba.");
+      const alreadyInvoiced = await db.invoiceLine.findFirst({ where: { shipmentId: line.shipmentId, invoiceId: { not: existing.id } } });
         if (alreadyInvoiced) return fail(422, "Shipment yang sudah ditagihkan tidak bisa dipakai lagi.");
         shipmentIds.add(line.shipmentId);
       }

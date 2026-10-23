@@ -1,3 +1,4 @@
+import { vehiclePhoto } from "@/shared/vehicle-photo";
 import { NextRequest } from "next/server";
 import { db } from "@/infrastructure/persistence/db";
 import { guard, ok, handle, fail, str, requireNum, num } from "@/composition/api-helpers";
@@ -23,6 +24,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (!existing) return fail(404, "Kendaraan tidak ditemukan.");
     const body = await req.json().catch(() => ({}));
     const data: Record<string, unknown> = {};
+    if (body.photoDataUrl !== undefined) data.photoDataUrl = vehiclePhoto(body.photoDataUrl);
     if (body.vehicleNumber !== undefined) data.vehicleNumber = str(body.vehicleNumber) ?? existing.vehicleNumber;
     if (body.name !== undefined) data.name = str(body.name);
     if (body.status !== undefined && VEHICLE_STATUSES.includes(body.status)) data.status = body.status;

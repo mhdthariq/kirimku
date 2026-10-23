@@ -1,4 +1,5 @@
 "use client";
+import { PasteFileInput } from "@/components/ui/paste-file-input";
 
 import { useMemo, useState } from "react";
 import {
@@ -467,7 +468,7 @@ function ProofField({
           <span className="block font-medium">{proof ? proof.name : "Pilih nota, invoice, atau foto"}</span>
           <span className="block text-xs text-muted-foreground">JPG, PNG, WEBP, atau PDF · maksimal 8 MB</span>
         </span>
-        <input type="file" accept="image/*,application/pdf" className="sr-only" onChange={(e) => onProofChange(e.target.files?.[0])} />
+        <PasteFileInput native type="file" accept="image/*,application/pdf" className="sr-only" onChange={(e) => onProofChange(e.target.files?.[0])} />
       </label>
       {proofError && <p className="text-xs text-destructive">{proofError}</p>}
       {proof?.type.startsWith("image/") && <img src={proof.dataUrl} alt="Preview bukti repair" className="max-h-40 w-full rounded-lg border object-contain" />}

@@ -5,3 +5,5 @@ scripts
 tsconfig.tsbuildinfo
 # Vitest coverage output
 coverage/
+.codex
+graphify-out

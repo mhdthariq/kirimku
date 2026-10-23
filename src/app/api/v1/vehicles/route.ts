@@ -1,3 +1,4 @@
+import { vehiclePhoto } from "@/shared/vehicle-photo";
 import { NextRequest } from "next/server";
 import { db } from "@/infrastructure/persistence/db";
 import { guard, ok, handle, fail, requireStr, str, num, requireNum } from "@/composition/api-helpers";
@@ -74,6 +75,7 @@ export async function POST(req: NextRequest) {
     const vehicle = await db.vehicle.create({
       data: {
         vehicleNumber,
+        photoDataUrl: vehiclePhoto(body.photoDataUrl),
         name: str(body.name),
         status,
         maxWeightKg: requireNum(body.maxWeightKg, "maxWeightKg", 1),

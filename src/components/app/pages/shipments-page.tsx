@@ -1,4 +1,5 @@
 "use client";
+import { PasteFileInput } from "@/components/ui/paste-file-input";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -2178,9 +2179,9 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
               <FileText className="h-4 w-4 text-primary" /> Dokumen Bukti ({documents.length})
             </CardTitle>
             {can.update && shipment.status !== "CANCELLED" && (
-              <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md border bg-background px-3 text-sm font-medium hover:bg-accent">
+              <label className="inline-flex min-h-9 min-w-0 flex-wrap cursor-pointer items-center gap-1.5 py-2 rounded-md border bg-background px-3 text-sm font-medium hover:bg-accent">
                 <Paperclip className="h-4 w-4" /> Upload PDF / Foto
-                <input
+                <PasteFileInput native
                   type="file"
                   accept="application/pdf,image/jpeg,image/png,image/webp"
                   className="hidden"

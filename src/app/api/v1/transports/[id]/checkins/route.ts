@@ -185,7 +185,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         autoArrived = true;
         await tx.transport.update({
           where: { id: transport.id },
-          data: { status: "ARRIVED", arrivedAt: new Date() },
+          data: { status: "ARRIVED", arrivedAt: new Date(), statusBeforeArrival: fresh.status },
         });
         const cityIdx = await cityIndex();
         // gudang names for the tracking description ("dari Gudang A ke Gudang B")

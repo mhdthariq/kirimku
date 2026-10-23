@@ -1,3 +1,4 @@
+import { parseActivityEvidence } from "@/infrastructure/services/activity-evidence";
 import { NextRequest } from "next/server";
 import { db } from "@/infrastructure/persistence/db";
 import { guard, ok, handle, fail, HttpError } from "@/composition/api-helpers";
@@ -19,6 +20,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (transport.status !== "PLANNED" && transport.status !== "DEPARTED") {
       return fail(422, `Transport berstatus ${transport.status}, hanya PLANNED atau DEPARTED yang bisa diselesaikan.`);
     }
+    const evidence = transport.trackingMode === "ACTIVITY" ? await parseActivityEvidence(req) : null;
     const bypassedStart = transport.status === "PLANNED";
 
     const cityIdx = await cityIndex();
@@ -38,7 +40,14 @@ export async function POST(req: NextRequest, { params }: Params) {
         data: { updatedAt: new Date() },
       });
       if (!active.count) throw new HttpError(409, "Transport berubah; muat ulang sebelum menyelesaikan.");
-      const result = await tx.transport.update({ where: { id: transport.id }, data: { status: "ARRIVED", arrivedAt: new Date() } });
+      if (evidence) {
+        await tx.transportActivity.create({ data: { transportId: transport.id, ...evidence, recordedById: user.id, recordedByUsername: user.username } });
+        await tx.transport.updateMany({
+          where: { id: transport.id, OR: [{ lastLocationAt: null }, { lastLocationAt: { lte: evidence.capturedAt } }] },
+          data: { currentLatitude: evidence.latitude, currentLongitude: evidence.longitude, lastLocationAt: evidence.capturedAt },
+        });
+      }
+      const result = await tx.transport.update({ where: { id: transport.id }, data: { status: "ARRIVED", arrivedAt: new Date(), statusBeforeArrival: transport.status } });
       for (const s of transport.shipments) {
         // Multi drop: resi already unloaded at an earlier checkpoint were handled by the drop step.
         if (s.dropStatus !== "LOADED" && s.dropStatus !== "AT_DROP_POINT") continue;

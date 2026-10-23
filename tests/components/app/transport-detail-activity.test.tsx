@@ -4,6 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TransportDetailPage } from "@/components/app/pages/transport-detail-page";
 
+const arrivalCapture = { photo: "data:image/jpeg;base64,YQ==", latitude: -6.2, longitude: 106.8, locationAccuracy: 5, capturedAt: "2026-10-23T07:00:00Z" };
+
 const m = vi.hoisted(() => ({
   post: vi.fn(), permissions: [] as string[], employeeId: 1 as number | null, owner: false,
   mode: "ACTIVITY", status: "PLANNED", role: "driver", transportMode: "DIRECT",
@@ -25,6 +27,7 @@ vi.mock("@/infrastructure/http/client-api", () => ({
   },
   apiPost: m.post, apiDelete: vi.fn(), hasPermission: (_user: unknown, permission: string) => m.permissions.includes(permission),
 }));
+vi.mock("@/components/app/activity-camera", () => ({ ActivityCamera: ({ onCaptured }: { onCaptured: (capture: typeof arrivalCapture) => void }) => <button onClick={() => onCaptured(arrivalCapture)}>Capture arrival evidence</button> }));
 vi.mock("next/dynamic", () => ({ default: () => () => null }));
 vi.mock("@/components/app/transport-activities-panel", () => ({ TransportActivitiesPanel: ({ canCreate }: { canCreate: boolean }) => <div data-testid="activities">Activity panel {canCreate ? "editable" : "readonly"}</div> }));
 vi.mock("@/components/app/transport-expenses-panel", () => ({ TransportExpensesPanel: () => <div>Expense approval panel</div> }));
@@ -39,6 +42,7 @@ beforeEach(() => {
   m.permissions = ["transport.checkin", "transport.depart", "transport.arrive", "transport.expense.view"];
   m.post.mockImplementation(async (url: string) => {
     if (url.endsWith("/depart")) m.status = "DEPARTED";
+    else if (url.endsWith("/undo-arrival")) m.status = "DEPARTED";
     else if (url.endsWith("/arrive")) m.status = "ARRIVED";
     else if (url.endsWith("/approve")) m.dropStatus = "DELIVERY_APPROVED";
     else if (url.endsWith("/delivery-approval")) m.deliveryApprovedAt = "2026-10-13T10:00:00Z";
@@ -47,6 +51,23 @@ beforeEach(() => {
 });
 
 describe("activity transport detail", () => {
+  it("lets only owner confirm undo arrival and reopens activity recording", async () => {
+    m.owner = true; m.role = "owner"; m.status = "ARRIVED";
+    render(<TransportDetailPage transportId={10} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Batalkan Tiba" }));
+    expect(screen.getByRole("alertdialog")).toHaveTextContent("Foto, checkpoint");
+    expect(m.post).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Ya, batalkan tiba" }));
+    await waitFor(() => expect(m.post).toHaveBeenCalledWith("/transports/10/undo-arrival", {}));
+    await waitFor(() => expect(screen.getByTestId("activities")).toHaveTextContent("editable"));
+  });
+  it("hides undo arrival from driver", async () => {
+    m.status = "ARRIVED";
+    render(<TransportDetailPage transportId={10} />);
+    await screen.findByTestId("activities");
+    expect(screen.queryByRole("button", { name: "Batalkan Tiba" })).not.toBeInTheDocument();
+  });
+
   it("focuses driver on Activity and expenses while preserving metadata and lifecycle actions", async () => {
     render(<TransportDetailPage transportId={10} />);
     expect(await screen.findByRole("tab", { name: "Activity" })).toHaveAttribute("aria-selected", "true");
@@ -63,8 +84,11 @@ describe("activity transport detail", () => {
     fireEvent.click(screen.getByRole("button", { name: "Berangkat" }));
     await waitFor(() => expect(m.post).toHaveBeenCalledWith("/transports/10/depart", {}));
     fireEvent.click(await screen.findByRole("button", { name: "Tandai Tiba" }));
+    expect(screen.getByRole("button", { name: "Ya, tandai tiba" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Capture arrival evidence" }));
+    expect(screen.getByAltText("Foto bukti tiba")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Ya, tandai tiba" }));
-    await waitFor(() => expect(m.post).toHaveBeenCalledWith("/transports/10/arrive", {}));
+    await waitFor(() => expect(m.post).toHaveBeenCalledWith("/transports/10/arrive", arrivalCapture));
     await waitFor(() => expect(screen.getByTestId("activities")).toHaveTextContent("readonly"));
   });
   it("shows checkpoint-free MultiDrop unloading to assigned activity crew", async () => {

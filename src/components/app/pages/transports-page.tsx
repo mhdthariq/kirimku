@@ -277,7 +277,7 @@ export function TransportsPage({
             <Button
               size="sm"
               variant="secondary"
-              onClick={() => setConfirmComplete(t)}
+              onClick={() => { if (t.trackingMode === "ACTIVITY") window.location.hash = `#/transports/${t.id}`; else setConfirmComplete(t); }}
             >
               <CheckCircle2 className="h-3.5 w-3.5" /> Tandai Tiba
             </Button>

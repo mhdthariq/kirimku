@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { toast } from "sonner";
+import { PasteFileInput } from "@/components/ui/paste-file-input";
+import { useMemo, useRef, useState } from "react";
 import { CarFront, Download, Gauge, History, Pencil, Plus, Trash2, Truck, Wand2, AlertTriangle, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type Options, type Vehicle, type FleetCapacityResponse } from "@/infrastructure/http/client-api";
@@ -17,6 +19,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface VehicleForm {
+  photoDataUrl: string;
   vehicleNumber: string;
   name: string;
   status: string;
@@ -33,7 +36,7 @@ interface VehicleForm {
   ownerId: string;
 }
 
-const EMPTY: VehicleForm = { vehicleNumber: "", name: "", status: "ACTIVE", maxWeightKg: "", maxVolumeM3: "", lengthM: "", widthM: "", heightM: "", maxKoli: "", notes: "", ownerId: "" };
+const EMPTY: VehicleForm = { photoDataUrl: "", vehicleNumber: "", name: "", status: "ACTIVE", maxWeightKg: "", maxVolumeM3: "", lengthM: "", widthM: "", heightM: "", maxKoli: "", notes: "", ownerId: "" };
 
 export function VehiclesPage() {
   const { user } = useAuth();
@@ -55,6 +58,8 @@ export function VehiclesPage() {
   const [editing, setEditing] = useState<Vehicle | null>(null);
   const [form, setForm] = useState<VehicleForm>(EMPTY);
   const [busy, setBusy] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const photoSequence = useRef(0);
   const [confirmDelete, setConfirmDelete] = useState<Vehicle | null>(null);
 
   const rows = useMemo(() => {
@@ -64,14 +69,19 @@ export function VehiclesPage() {
   }, [data, search]);
 
   function openCreate() {
+    photoSequence.current++;
+    setPhotoBusy(false);
     setEditing(null);
     setForm(EMPTY);
     setDialogOpen(true);
   }
 
   function openEdit(v: Vehicle) {
+    photoSequence.current++;
+    setPhotoBusy(false);
     setEditing(v);
     setForm({
+      photoDataUrl: v.photoDataUrl ?? "",
       vehicleNumber: v.vehicleNumber,
       name: v.name ?? "",
       status: v.status,
@@ -89,6 +99,7 @@ export function VehiclesPage() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (photoBusy) return;
     setBusy(true);
     // Revise round 9 — auto-compute maxVolumeM3 from L × W × H when all
     // three dimensions are entered. The form's maxVolumeM3 field becomes
@@ -99,6 +110,7 @@ export function VehiclesPage() {
     const dimsComplete = form.lengthM !== "" && form.widthM !== "" && form.heightM !== "" && L > 0 && W > 0 && H > 0;
     const computedVolume = dimsComplete ? Math.round(L * W * H * 1000) / 1000 : Number(form.maxVolumeM3);
     const payload = {
+      photoDataUrl: form.photoDataUrl || null,
       vehicleNumber: form.vehicleNumber,
       name: form.name || null,
       status: form.status,
@@ -193,6 +205,30 @@ export function VehiclesPage() {
         <TabsContent value="list" className="mt-3">
           <DataTable
             rows={rows}
+            desktopBreakpoint="xl"
+            renderCard={(vehicle) => (
+              <article className="min-w-0 overflow-hidden rounded-2xl border bg-card shadow-sm">
+                <div className="relative flex aspect-[16/9] items-center justify-center bg-muted">
+                  {vehicle.photoDataUrl ? <img src={vehicle.photoDataUrl} alt={vehicle.name || vehicle.vehicleNumber} className="h-full w-full object-cover" /> : <Truck className="h-16 w-16 text-muted-foreground/40" />}
+                  <div className="absolute right-3 top-3"><StatusBadge status={vehicle.status} /></div>
+                </div>
+                <div className="space-y-4 p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0"><p className="break-words font-mono text-lg font-bold">{vehicle.vehicleNumber}</p><p className="break-words text-sm text-muted-foreground">{vehicle.name || "Kendaraan armada"}</p></div>
+                    {can.update && <div className="flex shrink-0 gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => openEdit(vehicle)} aria-label={`Edit ${vehicle.vehicleNumber}`}><Pencil className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => setConfirmDelete(vehicle)} aria-label={`Hapus ${vehicle.vehicleNumber}`}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                    </div>}
+                  </div>
+                  <dl className="grid grid-cols-3 gap-2 rounded-xl bg-muted/50 p-3 text-center">
+                    <div><dt className="text-[11px] text-muted-foreground">Berat</dt><dd className="break-words text-sm font-semibold">{formatNumber(vehicle.maxWeightKg, 0)} kg</dd></div>
+                    <div><dt className="text-[11px] text-muted-foreground">Volume</dt><dd className="break-words text-sm font-semibold">{formatNumber(vehicle.maxVolumeM3, 2)} m³</dd></div>
+                    <div><dt className="text-[11px] text-muted-foreground">Koli</dt><dd className="text-sm font-semibold">{vehicle.maxKoli ?? "—"}</dd></div>
+                  </dl>
+                  <p className="break-words text-xs text-muted-foreground">{vehicle.owner?.user.name || "Milik perusahaan"} · {vehicle._count?.transports ?? 0} transport</p>
+                </div>
+              </article>
+            )}
             loading={loading}
             search={search}
             onSearchChange={setSearch}
@@ -204,9 +240,12 @@ export function VehiclesPage() {
                 header: "Nomor Polisi",
                 primary: true,
                 render: (v) => (
-                  <div>
-                    <p className="font-mono font-semibold text-foreground">{v.vehicleNumber}</p>
-                    {v.name && <p className="text-xs text-muted-foreground">{v.name}</p>}
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-20 w-28 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-muted">
+                      {v.photoDataUrl ? <img src={v.photoDataUrl} alt={v.name || v.vehicleNumber} className="h-full w-full object-cover" /> : <Truck className="h-8 w-8 text-muted-foreground" />}
+                    </div>
+                    <div className="min-w-0"><p className="break-words font-mono font-semibold text-foreground">{v.vehicleNumber}</p>
+                    {v.name && <p className="break-words text-xs text-muted-foreground">{v.name}</p>}</div>
                   </div>
                 ),
               },
@@ -408,12 +447,41 @@ export function VehiclesPage() {
       </Tabs>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editing ? `Edit Kendaraan - ${editing.vehicleNumber}` : "Tambah Kendaraan"}</DialogTitle>
             <DialogDescription>Armada baru bisa langsung dipakai membuat transport.</DialogDescription>
           </DialogHeader>
           <form onSubmit={onSubmit} className="space-y-4">
+            <Field label="Foto Kendaraan" hint="JPG, PNG, WEBP · maksimal 4 MB.">
+              <div className="grid gap-4 rounded-xl border bg-muted/30 p-3 sm:grid-cols-[180px_1fr]">
+                <div className="flex aspect-[4/3] items-center justify-center overflow-hidden rounded-lg bg-muted">
+                  {form.photoDataUrl ? <img src={form.photoDataUrl} alt="Preview kendaraan" className="h-full w-full object-cover" /> : <Truck className="h-12 w-12 text-muted-foreground" />}
+                </div>
+                <div className="flex min-w-0 flex-col justify-center gap-3">
+                  <PasteFileInput type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={event => {
+                    const file = event.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 4 * 1024 * 1024 || !["image/jpeg", "image/png", "image/webp"].includes(file.type)) { toast.error("Gunakan JPG, PNG, atau WEBP maksimal 4 MB."); return; }
+                    const sequence = ++photoSequence.current;
+                    setPhotoBusy(true);
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      if (sequence !== photoSequence.current) return;
+                      setForm(current => ({ ...current, photoDataUrl: String(reader.result) }));
+                      setPhotoBusy(false);
+                    };
+                    reader.onerror = () => {
+                      if (sequence !== photoSequence.current) return;
+                      toast.error("Foto gagal dibaca.");
+                      setPhotoBusy(false);
+                    };
+                    reader.readAsDataURL(file);
+                  }} />
+                  {form.photoDataUrl && <Button type="button" variant="outline" disabled={busy} onClick={() => { photoSequence.current++; setPhotoBusy(false); setForm(current => ({ ...current, photoDataUrl: "" })); }}>Hapus foto</Button>}
+                </div>
+              </div>
+            </Field>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Nomor Polisi" htmlFor="v-number">
                 <Input id="v-number" value={form.vehicleNumber} onChange={(e) => setForm({ ...form, vehicleNumber: e.target.value })} placeholder="B 9102 KTA" required disabled={busy} />
@@ -551,7 +619,7 @@ export function VehiclesPage() {
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} disabled={busy}>
                 Batal
               </Button>
-              <SubmitButton busy={busy}>{editing ? "Simpan Perubahan" : "Buat Kendaraan"}</SubmitButton>
+              <SubmitButton busy={busy || photoBusy}>{editing ? "Simpan Perubahan" : "Buat Kendaraan"}</SubmitButton>
             </DialogFooter>
           </form>
         </DialogContent>

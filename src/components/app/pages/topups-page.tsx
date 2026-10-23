@@ -1,4 +1,5 @@
 "use client";
+import { PasteFileInput } from "@/components/ui/paste-file-input";
 
 import { useRef, useState } from "react";
 import {
@@ -243,7 +244,7 @@ function CreateTopUpDialog({ partners, open, onOpenChange, onDone }: { partners:
             <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-primary/40 bg-primary/5 px-3 py-3 text-sm hover:bg-primary/10">
               <Upload className="h-4 w-4 text-primary" />
               <span className="min-w-0 flex-1"><span className="block font-medium">{proof ? proof.name : "Pilih bukti transfer (nota / mutasi)"}</span><span className="block text-xs text-muted-foreground">JPG, PNG, WEBP, atau PDF · maksimal 8 MB</span></span>
-              <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="sr-only" onChange={(e) => onProofChange(e.target.files?.[0])} disabled={busy} />
+              <PasteFileInput native ref={fileInputRef} type="file" accept="image/*,application/pdf" className="sr-only" onChange={(e) => onProofChange(e.target.files?.[0])} disabled={busy} />
             </label>
             {proofError && <p className="text-xs text-destructive">{proofError}</p>}
             {proof?.type.startsWith("image/") && <img src={proof.dataUrl} alt="Preview bukti transfer" className="max-h-40 w-full rounded-lg border object-contain" />}

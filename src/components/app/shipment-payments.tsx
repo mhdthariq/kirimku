@@ -1,4 +1,5 @@
 "use client";
+import { PasteFileInput } from "@/components/ui/paste-file-input";
 
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
@@ -177,7 +178,7 @@ export function ShipmentPayments({
                                     />
                                 </Field>
                                 <Field label="Bukti pembayaran (opsional)">
-                                    <Input aria-label="Bukti pembayaran (opsional)" type="file" accept="image/jpeg,image/png" disabled={busy || proofBusy} onChange={async event => {
+                                    <PasteFileInput aria-label="Bukti pembayaran (opsional)" type="file" accept="image/jpeg,image/png" disabled={busy || proofBusy} onChange={async event => {
                                         const file = event.target.files?.[0]; event.target.value = "";
                                         if (!file) return;
                                         setProofBusy(true); setProofError("");
