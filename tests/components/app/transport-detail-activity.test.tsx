@@ -51,6 +51,25 @@ beforeEach(() => {
 });
 
 describe("activity transport detail", () => {
+  it.each(["driver", "admin-gudang"])("lets a photo-exempt %s arrive using confirmation only", async (role) => {
+    m.role = role; m.status = "DEPARTED";
+    m.permissions.push("transport.arrive_without_photo");
+    render(<TransportDetailPage transportId={10} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Tandai Tiba" }));
+    expect(screen.queryByRole("button", { name: "Capture arrival evidence" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ya, tandai tiba" })).toBeEnabled();
+    expect(m.post).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Ya, tandai tiba" }));
+    await waitFor(() => expect(m.post).toHaveBeenCalledWith("/transports/10/arrive", {}));
+  });
+  it("allows cancellation without arrival for a photo-exempt user", async () => {
+    m.status = "DEPARTED"; m.permissions.push("transport.arrive_without_photo");
+    render(<TransportDetailPage transportId={10} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Tandai Tiba" }));
+    fireEvent.click(screen.getByRole("button", { name: "Batal" }));
+    expect(m.post).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
   it("lets only owner confirm undo arrival and reopens activity recording", async () => {
     m.owner = true; m.role = "owner"; m.status = "ARRIVED";
     render(<TransportDetailPage transportId={10} />);

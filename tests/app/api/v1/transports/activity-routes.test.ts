@@ -157,7 +157,7 @@ const req = (body: unknown = payload()) =>
 beforeEach(() => {
     vi.resetAllMocks();
     m.auth.mockResolvedValue(actor);
-    m.permission.mockReturnValue(true);
+    m.permission.mockImplementation((_user, permission) => permission !== "transport.arrive_without_photo");
     m.transport.mockResolvedValue(transport);
     m.updateMany.mockResolvedValue({ count: 1 });
     m.create.mockResolvedValue({ id: 30 });
@@ -753,6 +753,26 @@ describe("planning mode and freshness boundaries", () => {
 
 
 describe("arrival evidence", () => {
+    it("allows a separately authorized arrival without photo or GPS and audits it", async () => {
+        m.permission.mockReturnValue(true);
+        m.transport.mockResolvedValue({ ...transport, status: "DEPARTED" });
+        expect((await arrive(req({}), params())).status).toBe(200);
+        expect(m.create).not.toHaveBeenCalled();
+        expect(m.update).toHaveBeenCalledWith({ where: { id: 10 }, data: expect.objectContaining({ status: "ARRIVED" }) });
+        expect(m.audit).toHaveBeenCalledWith(expect.objectContaining({ after: { status: "ARRIVED", withoutPhoto: true } }));
+    });
+    it("still requires transport.arrive when the photo exemption is granted", async () => {
+        m.permission.mockImplementation((_user, permission) => permission === "transport.arrive_without_photo");
+        expect((await arrive(req({}), params())).status).toBe(403);
+        expect(m.update).not.toHaveBeenCalled();
+    });
+    it("keeps crew assignment restrictions for photo-exempt users", async () => {
+        m.permission.mockReturnValue(true);
+        m.auth.mockResolvedValue({ ...actor, employeeId: 999 });
+        m.transport.mockResolvedValue({ ...transport, status: "DEPARTED" });
+        expect((await arrive(req({}), params())).status).toBe(403);
+        expect(m.update).not.toHaveBeenCalled();
+    });
     it.each([{}, { ...payload(), photo: "" }, { ...payload(), capturedAt: "2020-01-01T00:00:00Z" }])("rejects missing or stale arrival evidence", async (body) => {
         m.transport.mockResolvedValue({ ...transport, status: "DEPARTED" });
         expect((await arrive(req(body), params())).status).toBe(422);

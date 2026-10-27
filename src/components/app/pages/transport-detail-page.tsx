@@ -95,6 +95,7 @@ export function TransportDetailPage({ transportId, initialTab }: { transportId: 
   // see a "foto terkunci" placeholder so they still know a photo exists but
   // cannot view the image itself.
   const canViewProofPhotos = hasPermission(user, "proof_photo.view");
+  const canArriveWithoutPhoto = hasPermission(user, "transport.arrive_without_photo");
   const { data: transport, loading, reload } = useApiData<TransportDetail>(
     () => apiGet<TransportDetail>(`/transports/${transportId}`),
     [transportId],
@@ -198,7 +199,7 @@ export function TransportDetailPage({ transportId, initialTab }: { transportId: 
   const [arrivalEvidence, setArrivalEvidence] = useState<TransportActivityInput | null>(null);
 
   async function changeLifecycle(action: "depart" | "arrive" | "complete" | "undo-arrival") {
-    if (lifecycleBusy || (action === "arrive" && transport?.trackingMode === "ACTIVITY" && !arrivalEvidence)) return;
+    if (lifecycleBusy || (action === "arrive" && transport?.trackingMode === "ACTIVITY" && !canArriveWithoutPhoto && !arrivalEvidence)) return;
     setLifecycleBusy(true);
     const ok = await runAction(() => apiPost(`/transports/${transportId}/${action}`, action === "arrive" ? arrivalEvidence ?? {} : {}), {
       success: action === "undo-arrival" ? "Status tiba dibatalkan." : action === "depart" ? "Transport berangkat." : action === "complete" ? "Audit dikonfirmasi. Transport Completed." : "Transport tiba, menunggu audit.",
@@ -291,7 +292,7 @@ export function TransportDetailPage({ transportId, initialTab }: { transportId: 
             {isActivity && isCrew && transport.status === "PLANNED" && hasPermission(user, "transport.depart") && (
               <Button size="sm" disabled={lifecycleBusy} onClick={() => void changeLifecycle("depart")}>Berangkat</Button>
             )}
-            {isActivity && isCrew && transport.status === "DEPARTED" && hasPermission(user, "transport.arrive") && (
+            {isActivity && (isCrew || canArriveWithoutPhoto) && transport.status === "DEPARTED" && hasPermission(user, "transport.arrive") && (
               <Button size="sm" disabled={lifecycleBusy} onClick={() => setConfirmArrive(true)}>Tandai Tiba</Button>
             )}
             {canCheckinNow && (
@@ -654,7 +655,7 @@ export function TransportDetailPage({ transportId, initialTab }: { transportId: 
             <AlertDialogTitle>Tandai transport tiba?</AlertDialogTitle>
             <AlertDialogDescription>Transport akan ditandai ARRIVED dan menunggu audit, bukan COMPLETED. Setelah tiba, foto aktivitas baru tidak dapat ditambahkan.</AlertDialogDescription>
           </AlertDialogHeader>
-          {isActivity && confirmArrive && (arrivalEvidence ? (
+          {isActivity && !canArriveWithoutPhoto && confirmArrive && (arrivalEvidence ? (
             <div className="space-y-2">
               <img src={arrivalEvidence.photo} alt="Foto bukti tiba" className="max-h-60 w-full rounded-lg object-contain" />
               <Button variant="outline" disabled={lifecycleBusy} onClick={() => setArrivalEvidence(null)}>Ambil Ulang</Button>
@@ -662,7 +663,7 @@ export function TransportDetailPage({ transportId, initialTab }: { transportId: 
           ) : <ActivityCamera disabled={lifecycleBusy} onCaptured={setArrivalEvidence} />)}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={lifecycleBusy}>Batal</AlertDialogCancel>
-            <Button disabled={lifecycleBusy || (isActivity && !arrivalEvidence)} onClick={() => void changeLifecycle("arrive")}>{lifecycleBusy ? "Menyimpan…" : "Ya, tandai tiba"}</Button>
+            <Button disabled={lifecycleBusy || (isActivity && !canArriveWithoutPhoto && !arrivalEvidence)} onClick={() => void changeLifecycle("arrive")}>{lifecycleBusy ? "Menyimpan…" : "Ya, tandai tiba"}</Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -36,6 +36,19 @@ beforeEach(() => {
 });
 
 describe("transport list completion actions", () => {
+  it("opens only confirmation for a photo-exempt activity arrival from the list", async () => {
+    m.permissions.push("transport.arrive_without_photo");
+    m.get.mockImplementation(async (url: string) => url === "/options" ? { warehouses: [] } : [{
+      id: 1, transportCode: "TRP-1", status: "DEPARTED", trackingMode: "ACTIVITY", vehicleNumber: "BK-1",
+      shipments: [], settlement: null, routeCheckpoints: [],
+    }]);
+    render(<TransportsPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Tandai Tiba" }));
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    expect(m.post).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Ya, Tandai Tiba" }));
+    await waitFor(() => expect(m.post).toHaveBeenCalledWith("/transports/1/arrive"));
+  });
   it("separates arrival from auditor completion and never reopens completed rows", async () => {
     render(<TransportsPage />);
     const departed = within(await screen.findByTestId("trip-1"));

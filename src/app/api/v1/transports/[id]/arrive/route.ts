@@ -1,4 +1,5 @@
 import { parseActivityEvidence } from "@/infrastructure/services/activity-evidence";
+import { hasPermission } from "@/infrastructure/auth/auth";
 import { NextRequest } from "next/server";
 import { db } from "@/infrastructure/persistence/db";
 import { guard, ok, handle, fail, HttpError } from "@/composition/api-helpers";
@@ -20,7 +21,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (transport.status !== "PLANNED" && transport.status !== "DEPARTED") {
       return fail(422, `Transport berstatus ${transport.status}, hanya PLANNED atau DEPARTED yang bisa diselesaikan.`);
     }
-    const evidence = transport.trackingMode === "ACTIVITY" ? await parseActivityEvidence(req) : null;
+    const withoutPhoto = transport.trackingMode === "ACTIVITY" && hasPermission(user, "transport.arrive_without_photo");
+    const evidence = transport.trackingMode === "ACTIVITY" && !withoutPhoto ? await parseActivityEvidence(req) : null;
     const bypassedStart = transport.status === "PLANNED";
 
     const cityIdx = await cityIndex();
@@ -122,7 +124,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       await syncReturnTaskForTransport(tx, transport.id, "ARRIVED");
       return result;
     });
-    await audit({ action: bypassedStart ? "status_change_bypass" : "status_change", entityType: "transport", entityId: transport.id, entityLabel: `${transport.transportCode} → ARRIVED${bypassedStart ? " (bypass belum berangkat)" : ""}`, actor: user });
+    await audit({ action: bypassedStart ? "status_change_bypass" : "status_change", entityType: "transport", entityId: transport.id, entityLabel: `${transport.transportCode} → ARRIVED${bypassedStart ? " (bypass belum berangkat)" : ""}`, after: { status: "ARRIVED", withoutPhoto }, actor: user });
     return ok(updated);
   });
 }

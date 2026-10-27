@@ -83,6 +83,7 @@ export function TransportsPage({
     create: hasPermission(user, "transport.create"),
     depart: hasPermission(user, "transport.depart"),
     arrive: hasPermission(user, "transport.arrive"),
+    arriveWithoutPhoto: hasPermission(user, "transport.arrive_without_photo"),
     complete: hasPermission(user, "transport.complete"),
     // Revise.md §14 — finalize partner transport settlements
     settle: hasPermission(user, "transport.settle"),
@@ -277,7 +278,7 @@ export function TransportsPage({
             <Button
               size="sm"
               variant="secondary"
-              onClick={() => { if (t.trackingMode === "ACTIVITY") window.location.hash = `#/transports/${t.id}`; else setConfirmComplete(t); }}
+              onClick={() => { if (t.trackingMode === "ACTIVITY" && !can.arriveWithoutPhoto) window.location.hash = `#/transports/${t.id}`; else setConfirmComplete(t); }}
             >
               <CheckCircle2 className="h-3.5 w-3.5" /> Tandai Tiba
             </Button>

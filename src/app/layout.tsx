@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/app/theme-provider";
 import { PwaProvider } from "@/components/app/pwa";
 import { AuthProvider } from "@/hooks/use-auth";
+import { siteUrl } from "@/shared/seo";
 
 const geistSans = Geist({
     variable: "--font-geist-sans",
@@ -17,6 +18,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+    metadataBase: siteUrl(),
+    robots: { index: false, follow: false },
+    verification: {
+        google: process.env.GOOGLE_SITE_VERIFICATION,
+        other: process.env.BING_SITE_VERIFICATION ? { "msvalidate.01": process.env.BING_SITE_VERIFICATION } : undefined,
+    },
     title: "NovaLogistik - Shipment Management",
     description:
         "Platform manajemen pengiriman end-to-end: customers, shipments, pickup, gudang, transport, delivery, tarif, invoice, dan audit trail.",
