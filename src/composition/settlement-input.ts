@@ -4,7 +4,9 @@ import type { SettlementInput } from "@/infrastructure/services/invoice-settleme
 
 export function settlementInput(body: Record<string, unknown>): SettlementInput {
   if (!body || typeof body !== "object" || Array.isArray(body)) throw new HttpError(422, "Data settlement tidak valid.");
-  const amount = requireNum(body.amount, "amount", 0.01);
+  // Whether zero is allowed depends on the invoice total, checked in the transaction.
+  const amount = requireNum(body.amount, "amount", 0);
+  if (amount > 0 && amount < 0.01) throw new HttpError(422, "Jumlah pembayaran minimal 0.01.");
   const pph = body.pph == null || body.pph === "" ? 0 : requireNum(body.pph, "pph", 0);
   if (pph > amount) throw new HttpError(422, "PPh tidak boleh melebihi jumlah pembayaran.");
   if (body.method !== "TRANSFER" && body.method !== "CASH") throw new HttpError(422, "Metode pembayaran tidak valid.");

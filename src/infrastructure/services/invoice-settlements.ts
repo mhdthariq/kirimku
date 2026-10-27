@@ -26,6 +26,12 @@ export async function mutateInvoiceSettlement(
       if (mutation.type !== "create" && !previous) throw new HttpError(404, "Settlement tidak ditemukan pada invoice ini.");
       const others = invoice.settlements.filter((s) => s.id !== previous?.id);
       const total = invoice.lines.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0) - invoice.discount + invoice.rounding;
+      if (mutation.type !== "delete") {
+        const amount = mutation.input.amount;
+        if (!Number.isFinite(amount) || amount < 0 || (amount === 0 && total !== 0)) throw new HttpError(422, "Jumlah settlement harus lebih dari 0 kecuali total invoice Rp0.");
+        if (total === 0 && amount > 0) throw new HttpError(422, "Invoice dengan total Rp0 hanya dapat di-settle dengan jumlah Rp0.");
+        if (mutation.type === "create" && total === 0 && others.length > 0) throw new HttpError(422, "Invoice sudah dilunasi.");
+      }
       // PPh is an annotation within the transfer amount, never a deduction.
       const settled = others.reduce((sum, s) => sum + s.amount, 0) + (mutation.type === "delete" ? 0 : mutation.input.amount);
       if (mutation.type !== "delete" && settled > total + 0.01) throw new HttpError(422, "Pembayaran melebihi sisa tagihan.");

@@ -304,8 +304,12 @@ export function InvoicesPage() {
         }
         const amount = Number(settleAmount);
         const pph = Number(settlePph || 0);
-        if (!Number.isFinite(amount) || amount <= 0) {
-            toast.error("Jumlah settlement harus lebih dari 0.");
+        if (!Number.isFinite(amount) || settleAmount.trim() === "" || amount < 0 || (amount === 0 && target.totalAmount !== 0)) {
+            toast.error("Jumlah settlement harus lebih dari 0 kecuali total invoice Rp0.");
+            return;
+        }
+        if (target.totalAmount === 0 && amount > 0) {
+            toast.error("Invoice dengan total Rp0 hanya dapat di-settle dengan jumlah Rp0.");
             return;
         }
         if (!Number.isFinite(pph) || pph < 0 || pph > amount) {
@@ -1776,6 +1780,8 @@ export function InvoicesPage() {
                         >
                             <NumberInput
                                 id="st-amount"
+                                min={(settleTarget ?? detail)?.totalAmount === 0 ? 0 : 0.01}
+                                max={(settleTarget ?? detail)?.totalAmount === 0 ? 0 : undefined}
                                 value={settleAmount}
                                 onChange={(e) =>
                                     setSettleAmount(e.target.value)

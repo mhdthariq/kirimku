@@ -35,6 +35,28 @@ beforeEach(() => {
 });
 
 describe("invoice settlements with informational PPh", () => {
+  it("settles a fully discounted zero-total invoice and records the zero settlement", async () => {
+    m.invoiceFind.mockResolvedValue(invoice({ discount: 500_000, commission }));
+    const zeroInput = { ...input, amount: 0, pph: 0 };
+    const result = await mutateInvoiceSettlement(1, 2, { type: "create", input: zeroInput });
+    expect(result.invoice.status).toBe("SETTLED");
+    expect(m.create).toHaveBeenCalledWith({ data: { ...zeroInput, invoiceId: 1, recordedById: 2 } });
+    expect(result.commissionReleased).toBe(true);
+  });
+  it("rejects a zero settlement for a positive-total invoice", async () => {
+    await expect(mutateInvoiceSettlement(1, 2, { type: "create", input: { ...input, amount: 0, pph: 0 } })).rejects.toMatchObject({ status: 422 });
+    expect(m.create).not.toHaveBeenCalled();
+  });
+  it("rejects duplicate settlement of an already settled zero-total invoice", async () => {
+    m.invoiceFind.mockResolvedValue(invoice({ discount: 500_000, status: "SETTLED", settlements: [{ ...payment, amount: 0, pph: 0 }] }));
+    await expect(mutateInvoiceSettlement(1, 2, { type: "create", input: { ...input, amount: 0, pph: 0 } })).rejects.toMatchObject({ status: 422 });
+    expect(m.create).not.toHaveBeenCalled();
+  });
+  it("allows editing and deleting a zero settlement", async () => {
+    m.invoiceFind.mockResolvedValue(invoice({ discount: 500_000, status: "SETTLED", settlements: [{ ...payment, amount: 0, pph: 0 }] }));
+    expect((await mutateInvoiceSettlement(1, 2, { type: "update", settlementId: 10, input: { ...input, amount: 0, pph: 0, reference: "Updated" } })).invoice.status).toBe("SETTLED");
+    expect((await mutateInvoiceSettlement(1, 2, { type: "delete", settlementId: 10 })).invoice.status).toBe("SENT");
+  });
   it("settles a 500,000 invoice with transfer 500,000 and PPh 5,000", async () => {
     const result = await mutateInvoiceSettlement(1, 2, { type: "create", input });
     expect(result.invoice.status).toBe("SETTLED");

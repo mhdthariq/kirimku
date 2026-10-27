@@ -12,6 +12,7 @@ import type { Invoice, InvoiceLine } from "@/infrastructure/http/client-api";
 
 const m = vi.hoisted(() => ({
     get: vi.fn(),
+    post: vi.fn(),
     put: vi.fn(),
     remove: vi.fn(),
     permissions: [] as string[],
@@ -22,6 +23,7 @@ vi.mock("@/hooks/use-auth", () => ({
 vi.mock("@/infrastructure/http/client-api", async (original) => ({
     ...(await original<typeof import("@/infrastructure/http/client-api")>()),
     apiGet: m.get,
+    apiPost: m.post,
     apiPut: m.put,
     apiDelete: m.remove,
     hasPermission: (_user: unknown, permission: string) =>
@@ -102,10 +104,22 @@ beforeEach(() => {
                 : {},
     );
     m.put.mockResolvedValue({});
+    m.post.mockResolvedValue({});
     m.remove.mockResolvedValue({});
 });
 
 describe("invoice history and print", () => {
+    it("submits a zero settlement for a sent zero-total invoice", async () => {
+        m.permissions = ["invoice.view", "payment.verify"];
+        const zeroInvoice = { ...invoice, status: "SENT", discount: 500_000, totalAmount: 0, settledAmount: 0, remainingAmount: 0, pphAmount: 0, settlements: [] };
+        m.get.mockImplementation(async (path: string) => path === "/invoices" ? [zeroInvoice] : path === "/invoices/1" ? zeroInvoice : []);
+        const user = userEvent.setup();
+        render(<InvoicesPage />);
+        await user.click(await screen.findByRole("button", { name: /^Settle$/ }));
+        expect(screen.getByLabelText("Jumlah Transfer / Cash (Rp)")).toHaveValue(0);
+        await user.click(screen.getByRole("button", { name: "Catat Settlement" }));
+        await waitFor(() => expect(m.post).toHaveBeenCalledWith("/invoices/1/settlements", expect.objectContaining({ amount: 0, pph: 0 })));
+    });
     it("shows PPh on print while preserving the full paid amount and zero remaining", () => {
         render(<InvoicePrint invoice={invoice} onClose={() => {}} />);
         const sheet = screen.getByRole("article");

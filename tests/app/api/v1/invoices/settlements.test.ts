@@ -23,6 +23,10 @@ beforeEach(() => {
 });
 
 describe("settlement API", () => {
+  it("accepts an explicit zero settlement for invoice-aware validation", async () => {
+    expect((await POST(request("POST", { ...payload, amount: 0, pph: 0 }), params())).status).toBe(200);
+    expect(m.mutate).toHaveBeenCalledWith(1, 2, { type: "create", input: expect.objectContaining({ amount: 0, pph: 0 }) });
+  });
   it("passes the full transfer and informational PPh without subtraction", async () => {
     expect((await POST(request("POST"), params())).status).toBe(200);
     expect(m.mutate).toHaveBeenCalledWith(1, 2, { type: "create", input: expect.objectContaining({ amount: 500_000, pph: 5_000 }) });
