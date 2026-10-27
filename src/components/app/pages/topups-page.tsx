@@ -17,7 +17,7 @@ import { apiGet, apiPost, hasPermission, type PartnerRow, type TopUpRequest, typ
 import { runAction, useApiData } from "@/hooks/use-api-data";
 import { PageHeader, DataTable } from "@/components/app/data-table";
 import { StatusBadge } from "@/components/app/status-badge";
-import { Field, Input, NumberInput, SubmitButton, formatRupiah, formatDate } from "@/components/app/form-parts";
+import { Field, FormSelect, Input, NumberInput, SubmitButton, formatRupiah, formatDate } from "@/components/app/form-parts";
 import { ItemAuditDialog } from "@/components/app/item-audit-dialog";
 import { Button } from "@/components/ui/button";
 import { openDataUrlInNewTab } from "@/presentation/open-data-url";
@@ -228,10 +228,15 @@ function CreateTopUpDialog({ partners, open, onOpenChange, onDone }: { partners:
         </DialogHeader>
         <form onSubmit={onSubmit} className="space-y-4">
           <Field label="Partner Marketing" htmlFor="topup-partner">
-            <select id="topup-partner" className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={partnerId} onChange={(e) => setPartnerId(e.target.value)} required disabled={busy}>
-              <option value="">Pilih partner…</option>
-              {partners.filter((p) => p.isActive).map((p) => <option key={p.id} value={p.id}>{p.name} (@{p.username})</option>)}
-            </select>
+            <FormSelect
+              id="topup-partner"
+              value={partnerId}
+              onValueChange={setPartnerId}
+              placeholder="Pilih partner…"
+              options={partners.filter((p) => p.isActive).map((p) => ({ value: String(p.id), label: `${p.name} (@${p.username})` }))}
+              required
+              disabled={busy}
+            />
           </Field>
           <Field label="Jumlah Top Up (Rupiah)" htmlFor="topup-amount">
             <NumberInput id="topup-amount" value={amount} onChange={(e) => setAmount(e.target.value)} min={10000} step={1000} required disabled={busy} />

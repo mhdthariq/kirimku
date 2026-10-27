@@ -20,8 +20,8 @@ vi.mock("@/components/app/arrival-scan-dialog", () => ({ ArrivalScanDialog: () =
 // Native selects keep these page tests focused on form behavior, not Radix interaction.
 vi.mock("@/components/app/form-parts", async (original) => ({
   ...await original<typeof import("../../../src/components/app/form-parts")>(),
-  FormSelect: ({ value, onValueChange, options, placeholder }: { value: string; onValueChange: (value: string) => void; options: { value: string; label: string }[]; placeholder?: string }) => (
-    <select aria-label={placeholder ?? "Select"} value={value} onChange={(e) => onValueChange(e.target.value)}>
+  FormSelect: ({ value, onValueChange, options, placeholder, ariaLabel }: { value: string; onValueChange: (value: string) => void; options: { value: string; label: string }[]; placeholder?: string; ariaLabel?: string }) => (
+    <select aria-label={ariaLabel ?? placeholder ?? "Select"} value={value} onChange={(e) => onValueChange(e.target.value)}>
       <option value="">{placeholder}</option>
       {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
     </select>

@@ -6,7 +6,6 @@ import {
   ArrowLeft,
   Ban,
   Calculator,
-  ChevronDown,
   Package,
   Pencil,
   Plus,
@@ -505,16 +504,14 @@ function ShipmentList() {
             toolbar={
               <div className="grid w-full grid-cols-1 gap-2 min-[400px]:grid-cols-2 sm:flex sm:w-auto sm:flex-wrap">
                 <div className="relative min-w-0">
-                  <select aria-label="Filter tipe customer" value={customerTypeFilter} onChange={(e) => setCustomerTypeFilter(e.target.value)} className="h-10 w-full min-w-0 appearance-none rounded-lg border bg-background pl-3 pr-10 text-sm">
-                    <option value="all">All</option>
-                    <option value="b2b">B2B</option>
-                    <option value="b2c">B2C</option>
-                  </select>
-                  <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <FormSelect ariaLabel="Filter tipe customer" value={customerTypeFilter} onValueChange={setCustomerTypeFilter} className="h-10 rounded-lg" options={[
+                    { value: "all", label: "All" },
+                    { value: "b2b", label: "B2B" },
+                    { value: "b2c", label: "B2C" },
+                  ]} />
                 </div>
                 <div className="relative min-w-0">
-                  <select aria-label="Filter status shipment" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-10 w-full min-w-0 appearance-none rounded-lg border bg-background pl-3 pr-10 text-sm">
-                    {[
+                  <FormSelect ariaLabel="Filter status shipment" value={statusFilter} onValueChange={setStatusFilter} className="h-10 rounded-lg" options={[
                       { key: "all", label: "All statuses" },
                       { key: "CREATED", label: "Created" },
                       { key: "READY_FOR_PICKUP", label: "Ready for Pickup" },
@@ -525,11 +522,7 @@ function ShipmentList() {
                       { key: "ARRIVED_AT_GUDANG", label: "Arrived at Gudang" },
                       { key: "DELIVERED", label: "Delivered" },
                       { key: "CANCELLED", label: "Cancelled" },
-                    ].map((item) => (
-                      <option key={item.key} value={item.key}>{item.label}</option>
-                    ))}
-                  </select>
-                  <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    ].map((item) => ({ value: item.key, label: item.label }))} />
                 </div>
               </div>
             }
@@ -867,16 +860,13 @@ function ShipmentList() {
               {canAddDiscount && (
                 <div className="sm:col-span-2 grid gap-4 sm:grid-cols-2">
                   <Field label="Jenis Discount" htmlFor="s-discount-type">
-                    <select
+                    <FormSelect
                       id="s-discount-type"
                       value={form.discountType}
-                      onChange={(e) => setForm({ ...form, discountType: e.target.value as ShipmentForm["discountType"] })}
+                      onValueChange={(value) => setForm({ ...form, discountType: value as ShipmentForm["discountType"] })}
                       disabled={busy}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    >
-                      <option value="AMOUNT">Nominal Rupiah</option>
-                      <option value="PERCENTAGE">Persentase (%)</option>
-                    </select>
+                      options={[{ value: "AMOUNT", label: "Nominal Rupiah" }, { value: "PERCENTAGE", label: "Persentase (%)" }]}
+                    />
                   </Field>
                   <Field
                     label={form.discountType === "PERCENTAGE" ? "Discount (%)" : discountIsMarketingFunded ? "Discount Marketing (Rupiah)" : "Discount Perusahaan (Rupiah)"}
@@ -2431,16 +2421,13 @@ function ShipmentDetail({ id, autoPrint }: { id: number; autoPrint?: boolean }) 
           </DialogHeader>
           <form onSubmit={onPricingSubmit} className="space-y-4">
             <Field label="Jenis Discount" htmlFor="pe-discount-type">
-              <select
+              <FormSelect
                 id="pe-discount-type"
                 value={pricingForm.discountType}
-                onChange={(event) => setPricingForm({ ...pricingForm, discountType: event.target.value as "AMOUNT" | "PERCENTAGE" })}
+                onValueChange={(value) => setPricingForm({ ...pricingForm, discountType: value as "AMOUNT" | "PERCENTAGE" })}
                 disabled={busy}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              >
-                <option value="AMOUNT">Nominal Rupiah</option>
-                <option value="PERCENTAGE">Persentase (%)</option>
-              </select>
+                options={[{ value: "AMOUNT", label: "Nominal Rupiah" }, { value: "PERCENTAGE", label: "Persentase (%)" }]}
+              />
             </Field>
             <Field
               label={pricingForm.discountType === "PERCENTAGE" ? "Discount (%)" : shipment.discountFundedBy === "MARKETING" ? "Discount Marketing (Rupiah)" : "Discount Perusahaan (Rupiah)"}
