@@ -70,7 +70,7 @@ function Router() {
   }, [segments, router]);
 
   return (
-    <AuthGate showIntroduction>
+    <AuthGate>
       <RouterInner segments={segments} query={query} />
     </AuthGate>
   );

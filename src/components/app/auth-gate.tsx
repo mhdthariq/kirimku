@@ -3,7 +3,6 @@
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { LoginScreen } from "@/components/app/login-screen";
-import { PublicIntroduction } from "@/components/app/public-introduction";
 
 /**
  * Shared "wait for session, then show login or content" guard.
@@ -15,24 +14,21 @@ import { PublicIntroduction } from "@/components/app/public-introduction";
  * `AuthProvider` (mounted in the root layout), so a session started on one
  * carries over to the other with no extra fetch.
  */
-export function AuthGate({ children, showIntroduction = false }: { children: React.ReactNode; showIntroduction?: boolean }) {
+export function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
   if (loading) {
     return (
-      <>
-        {showIntroduction && <PublicIntroduction />}
-        <div className="flex min-h-screen items-center justify-center bg-background">
-          <div className="flex flex-col items-center gap-3">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground">Memuat sesi…</p>
-          </div>
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Memuat sesi…</p>
         </div>
-      </>
+      </div>
     );
   }
 
-  if (!user) return <>{showIntroduction && <PublicIntroduction />}<LoginScreen /></>;
+  if (!user) return <LoginScreen />;
 
   return <>{children}</>;
 }
