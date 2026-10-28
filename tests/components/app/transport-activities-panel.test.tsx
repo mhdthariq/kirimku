@@ -17,6 +17,12 @@ const m = vi.hoisted(() => ({
     camera: vi.fn(),
     stop: vi.fn(),
     draw: vi.fn(),
+    share: vi.fn(),
+    download: vi.fn(),
+}));
+vi.mock("@/presentation/activity-photo-sharing", () => ({
+    shareActivityPhotos: m.share,
+    downloadActivityPhotos: m.download,
 }));
 vi.mock("@/infrastructure/http/client-api", () => ({
     apiGet: m.get,
@@ -36,6 +42,8 @@ beforeEach(() => {
     vi.resetAllMocks();
     m.get.mockResolvedValue([]);
     m.post.mockResolvedValue({ id: 1 });
+    m.share.mockResolvedValue("shared");
+    m.download.mockResolvedValue(undefined);
     m.camera.mockResolvedValue({
         getTracks: () => [{ stop: m.stop }],
         getVideoTracks: () => [{ readyState: "live" }],
@@ -82,6 +90,45 @@ async function takePhoto() {
 }
 
 describe("camera-only activity evidence", () => {
+    const savedPhotos = [2, 3].map((id) => ({
+        id, transportId: 10, photoUrl: "data:image/jpeg;base64,YQ==", latitude: -6.2, longitude: 106.8,
+        locationAccuracy: 5, capturedAt: "2026-10-28T03:00:00Z", recordedAt: "2026-10-28T03:00:00Z", recordedByUsername: "driver.andi",
+    }));
+
+    it("shares all report photos together, or a single selected photo", async () => {
+        m.get.mockResolvedValue(savedPhotos);
+        render(<TransportActivitiesPanel transportId={10} canCreate={false} onChanged={vi.fn()} />);
+        fireEvent.click(await screen.findByRole("button", { name: "Bagikan semua (2)" }));
+        await waitFor(() => expect(m.share).toHaveBeenCalledWith(savedPhotos, 10));
+        await waitFor(() => expect(screen.getByRole("button", { name: "Bagikan foto aktivitas 3" })).toBeEnabled());
+        fireEvent.click(screen.getByRole("button", { name: "Bagikan foto aktivitas 3" }));
+        await waitFor(() => expect(m.share).toHaveBeenLastCalledWith([savedPhotos[1]], 10));
+    });
+
+    it("provides a ZIP download when sharing is unsupported", async () => {
+        m.get.mockResolvedValue(savedPhotos);
+        m.share.mockResolvedValue("unsupported");
+        render(<TransportActivitiesPanel transportId={10} canCreate={false} onChanged={vi.fn()} />);
+        fireEvent.click(await screen.findByRole("button", { name: "Bagikan semua (2)" }));
+        await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Browser ini belum mendukung"));
+        fireEvent.click(screen.getByRole("button", { name: "Unduh semua (ZIP)" }));
+        await waitFor(() => expect(m.download).toHaveBeenCalledWith(savedPhotos, 10));
+    });
+
+    it("shows actionable sharing errors and permits retry", async () => {
+        m.get.mockResolvedValue(savedPhotos);
+        m.share.mockRejectedValueOnce(new Error("Coba unduh ZIP"));
+        render(<TransportActivitiesPanel transportId={10} canCreate={false} onChanged={vi.fn()} />);
+        fireEvent.click(await screen.findByRole("button", { name: "Bagikan semua (2)" }));
+        expect(await screen.findByRole("alert")).toHaveTextContent("Coba unduh ZIP");
+        expect(screen.getByRole("button", { name: "Bagikan semua (2)" })).toBeEnabled();
+    });
+
+    it("does not offer exports for an empty report", async () => {
+        render(<TransportActivitiesPanel transportId={10} canCreate={false} onChanged={vi.fn()} />);
+        await screen.findByText("Belum ada foto aktivitas.");
+        expect(screen.queryByRole("button", { name: /Bagikan semua/ })).not.toBeInTheDocument();
+    });
     it("releases the old stream and requests the front camera, then rear camera", async () => {
         const view = render(<ActivityCamera onCaptured={vi.fn()} />);
         await cameraReady();

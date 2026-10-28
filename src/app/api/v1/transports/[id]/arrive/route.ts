@@ -22,7 +22,9 @@ export async function POST(req: NextRequest, { params }: Params) {
       return fail(422, `Transport berstatus ${transport.status}, hanya PLANNED atau DEPARTED yang bisa diselesaikan.`);
     }
     const withoutPhoto = transport.trackingMode === "ACTIVITY" && hasPermission(user, "transport.arrive_without_photo");
-    const evidence = transport.trackingMode === "ACTIVITY" && !withoutPhoto ? await parseActivityEvidence(req) : null;
+    const evidence = transport.trackingMode === "ACTIVITY" && !withoutPhoto ? await parseActivityEvidence(req, {
+      transportCode: transport.transportCode, recordedBy: user.username, label: "Bukti tiba di tujuan",
+    }) : null;
     const bypassedStart = transport.status === "PLANNED";
 
     const cityIdx = await cityIndex();

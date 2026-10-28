@@ -2,8 +2,9 @@ import sharp from "sharp";
 import { HttpError } from "@/shared/http-error";
 import { parseOptionalPhoto } from "@/infrastructure/services/transport-ops-server";
 import { activityCaptureError } from "@/shared/activity-tracking";
+import { watermarkActivityPhoto, type ActivityWatermark } from "@/infrastructure/services/activity-watermark";
 
-export async function parseActivityEvidence(req: { json(): Promise<unknown> }) {
+export async function parseActivityEvidence(req: { json(): Promise<unknown> }, watermark: Pick<ActivityWatermark, "transportCode" | "recordedBy" | "label"> = {}) {
     const parsed: unknown = await req.json().catch(() => null);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new HttpError(422, "Payload aktivitas tidak valid.");
     const body = parsed as Record<string, unknown>;
@@ -28,5 +29,11 @@ export async function parseActivityEvidence(req: { json(): Promise<unknown> }) {
       longitude: body.longitude as number,
       locationAccuracy: (body.locationAccuracy as number | null | undefined) ?? null,
     };
-    return { photoUrl: photo.photoUrl!, ...location, capturedAt };
+    let photoUrl: string;
+    try {
+      photoUrl = await watermarkActivityPhoto(photo.photoUrl, { ...location, capturedAt, ...watermark });
+    } catch {
+      throw new HttpError(422, "Watermark foto gagal dibuat. Ambil ulang foto dan coba lagi.");
+    }
+    return { photoUrl, ...location, capturedAt };
 }

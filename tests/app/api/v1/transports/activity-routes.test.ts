@@ -183,7 +183,7 @@ describe("activity evidence API", () => {
         expect(m.create).toHaveBeenCalledWith({
             data: {
                 transportId: 10,
-                photoUrl: photo,
+                photoUrl: expect.stringMatching(/^data:image\/jpeg;base64,/),
                 latitude: -6.2,
                 longitude: 106.8,
                 locationAccuracy: 5,
@@ -782,7 +782,7 @@ describe("arrival evidence", () => {
     it("persists arrival photo, location and authenticated actor before arriving", async () => {
         m.transport.mockResolvedValue({ ...transport, status: "DEPARTED" });
         expect((await arrive(req(), params())).status).toBe(200);
-        expect(m.create).toHaveBeenCalledWith({ data: expect.objectContaining({ transportId: 10, photoUrl: photo, latitude: -6.2, recordedById: actor.id }) });
+        expect(m.create).toHaveBeenCalledWith({ data: expect.objectContaining({ transportId: 10, photoUrl: expect.stringMatching(/^data:image\/jpeg;base64,/), latitude: -6.2, recordedById: actor.id }) });
         expect(m.update).toHaveBeenCalledWith({ where: { id: 10 }, data: { status: "ARRIVED", arrivedAt: expect.any(Date), statusBeforeArrival: "DEPARTED" } });
     });
     it("does not write arrival evidence if lifecycle changed concurrently", async () => {

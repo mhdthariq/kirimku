@@ -44,7 +44,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (transport.trackingMode !== "ACTIVITY") return fail(422, "Transport ini tidak mendukung activity tracking.");
     if (!["PLANNED", "DEPARTED"].includes(transport.status)) return fail(422, "Aktivitas hanya untuk transport PLANNED atau DEPARTED.");
 
-    const evidence = await parseActivityEvidence(req);
+    const evidence = await parseActivityEvidence(req, { transportCode: transport.transportCode, recordedBy: user.username });
     const { capturedAt, latitude, longitude, locationAccuracy } = evidence;
     const location = { latitude, longitude, locationAccuracy };
     const activity = await db.$transaction(async (tx) => {

@@ -100,11 +100,13 @@ export function ActivityCamera({ onCaptured, disabled = false }: {
       <video ref={video} autoPlay muted playsInline aria-label="Pratinjau kamera aktivitas" onLoadedData={() => setReady(true)} className="max-h-80 w-full rounded-lg bg-black" />
       <p className="text-xs text-muted-foreground">Kamera dan GPS wajib diizinkan. Lokasi baru diambil setiap kali foto ditangkap.</p>
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
       <Button type="button" variant="outline" disabled={opening || busy || disabled} onClick={() => { resetCamera(); setFacing((value) => value === "environment" ? "user" : "environment"); }}>Ganti Kamera</Button>
       {error && <Button type="button" variant="outline" disabled={opening || busy || disabled} onClick={() => { resetCamera(); setAttempt((value) => value + 1); }}>Buka Ulang Kamera</Button>}
       <Button type="button" disabled={!ready || opening || busy || disabled} onClick={() => void capture()}>
         {busy ? "Mengambil GPS & foto…" : "Ambil Foto dengan GPS"}
       </Button>
+      </div>
     </div>
   );
 }

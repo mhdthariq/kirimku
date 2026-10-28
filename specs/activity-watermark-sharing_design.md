@@ -1,0 +1,7 @@
+# Activity photo watermark and sharing
+
+Activity evidence continues to require the live camera and fresh GPS. After existing server validation and authorization, Sharp rotates and normalizes the image and appends a branded emerald footer. The footer preserves the entire photo and embeds capture time (explicit WIB), coordinates, GPS accuracy, transport code and authenticated uploader. User strings are XML escaped and length bounded. This records submitted capture metadata, not independent authenticity certification. No external map or geocoding request is needed. Arrival activity evidence uses the same watermark.
+
+The responsive activity gallery offers per-photo sharing and sharing all loaded report photos as actual image files through the native device share sheet, including WhatsApp when installed and supported. Conversion of saved data URLs is synchronous to retain click activation. Cancellation is quiet; unsupported sharing and transmission failures give actionable feedback. A separate ZIP download preserves every image for browsers or targets without multi-file sharing. Downloads use temporary object URLs and release them. No images are sent until the user chooses a target.
+
+Existing transport access, crew assignment, lifecycle checks, input size/pixel limits and audit behavior remain enforced. No schema changes or new packages. Tests cover embedded output, hostile text, API persistence, multiple-file sharing, cancellation, errors, fallback archive integrity and responsive control structure.
