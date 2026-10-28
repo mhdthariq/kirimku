@@ -6,43 +6,41 @@ import { ensureSeed } from "@/infrastructure/services/seed";
 import { isDefaultTenant } from "@/infrastructure/persistence/tenant-context";
 import { computeTotals } from "@/infrastructure/services/shipment-totals";
 import { STATUS_LABELS } from "@/domain/shipment-flow";
+import { maskResiValue, normalizeResiPhone } from "@/shared/resi-privacy";
+import { allowTrackingAttempt } from "@/infrastructure/services/tracking-attempts";
 
 type Params = { params: Promise<{ resi: string }> };
 
-/**
- * GET /api/v1/public/track/[resi] — PUBLIC tracking endpoint (no auth).
- *
- * Looks up a shipment by its `masterCode` OR `resi` (both are unique) and
- * returns the public-facing tracking view: shipment status, origin /
- * destination, sender / recipient (sender name only — phone & email redacted
- * for privacy), the list of packages tied to this Master Resi (description,
- * dimensions, weight — NOT the secret detailCode scan values), and the full
- * tracking timeline.
- *
- * The endpoint is intended for the customer-facing `/tracking-paket` page —
- * customers don't need to log in. Internal/financial fields (price,
- * paymentSummary, invoice, audit actor ids) are intentionally NOT returned.
- */
-export async function GET(req: NextRequest, { params }: Params) {
-  return handle(req, async () => {
-    // Boot RBAC + (default tenant only) demo seed so the endpoint works on a
-    // fresh database the same way the authed API does.
+/** Tracking details are returned only after full sender/recipient phone verification. */
+export async function GET() {
+  return fail(405, "Scan QR pada resi dan verifikasi nomor telepon untuk melacak paket.");
+}
+
+export async function POST(req: NextRequest, { params }: Params) {
+  if (!req.headers.get("x-corp-id")?.trim() || req.headers.get("x-corp-id")!.length > 128) {
+    return fail(422, "Scan QR pada resi untuk membuka pelacakan.");
+  }
+  const response = await handle(req, async () => {
+    const body = await req.json().catch(() => null);
+    const phone = normalizeResiPhone(body?.phone);
+    const { resi } = await params;
+    const code = str(resi);
+    if (!code || code.length > 128 || !phone) return fail(422, "Masukkan nomor telepon lengkap pengirim atau penerima.");
+    if (!allowTrackingAttempt(JSON.stringify([req.headers.get("x-corp-id")?.trim(), code]))) {
+      return fail(429, "Terlalu banyak percobaan. Coba lagi dalam 15 menit.");
+    }
+    // Match the authenticated API's opt-in seed behavior.
     await ensureRbac();
     if (isDefaultTenant() && process.env.AUTO_SEED_ON_BOOT === "true") {
       await ensureSeed();
     }
-
-    const { resi } = await params;
-    const code = str(resi);
-    if (!code) return fail(422, "Nomor resi tidak boleh kosong.");
-
     const shipment = await db.masterShipment.findFirst({
       where: {
-        OR: [{ masterCode: code }, { resi: code }],
+        OR: [{ masterCode: code }, { resi: code }, { details: { some: { detailCode: code } } }],
         status: { not: "CANCELLED" },
       },
       include: {
-        customer: { select: { name: true, companyName: true, type: true } },
+        customer: { select: { name: true, companyName: true, type: true, phone: true } },
         tariff: { select: { origin: true, destination: true } },
         details: {
           orderBy: { id: "asc" },
@@ -70,8 +68,10 @@ export async function GET(req: NextRequest, { params }: Params) {
       },
     });
 
-    if (!shipment) {
-      return fail(404, `Resi "${code}" tidak ditemukan. Periksa kembali nomor Master Resi Anda.`);
+    const senderPhone = normalizeResiPhone(shipment?.pengirimPhone ?? shipment?.customer.phone);
+    const recipientPhone = normalizeResiPhone(shipment?.penerimaContact);
+    if (!shipment || (phone !== senderPhone && phone !== recipientPhone)) {
+      return fail(403, "Resi atau nomor telepon tidak sesuai. Gunakan nomor lengkap pengirim atau penerima.");
     }
 
     const totals = computeTotals(shipment.details);
@@ -97,16 +97,15 @@ export async function GET(req: NextRequest, { params }: Params) {
         ? { name: destinationWarehouse.name, city: destinationWarehouse.city, customerSupportContact: destinationWarehouse.customerSupportContact }
         : null,
       arrivedWarehouse: arrivedWarehouse ? { name: arrivedWarehouse.name, city: arrivedWarehouse.city } : null,
-      // Sender / recipient — public tracking shows names + addresses so the
-      // customer can confirm the shipment is theirs. Phone is masked.
+      // Keep personal contact details masked even after phone verification.
       sender: {
         name: shipment.pengirimName ?? shipment.customer.companyName ?? shipment.customer.name,
-        phone: maskPhone(shipment.pengirimPhone),
+        phone: maskResiValue(shipment.pengirimPhone ?? shipment.customer.phone),
       },
       recipient: {
         name: shipment.penerimaName,
-        address: shipment.penerimaAddress,
-        phone: maskPhone(shipment.penerimaContact),
+        address: maskResiValue(shipment.penerimaAddress),
+        phone: maskResiValue(shipment.penerimaContact),
       },
       customerType: shipment.customer.type,
       // Pricing & invoice details are NOT exposed publicly — customers see
@@ -137,15 +136,6 @@ export async function GET(req: NextRequest, { params }: Params) {
       })),
     });
   });
-}
-
-/** Mask phone number for public display: keep the first 4 + last 2 digits. */
-function maskPhone(phone: string | null | undefined): string | null {
-  if (!phone) return null;
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length < 6) return "****";
-  const head = digits.slice(0, 4);
-  const tail = digits.slice(-2);
-  const masked = "*".repeat(Math.max(0, digits.length - 6));
-  return `${head}${masked}${tail}`;
+  response.headers.set("Cache-Control", "no-store, private");
+  return response;
 }

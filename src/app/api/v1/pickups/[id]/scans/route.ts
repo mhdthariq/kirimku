@@ -4,6 +4,8 @@ import { guard, ok, handle, fail, requireStr } from "@/composition/api-helpers";
 import { audit } from "@/infrastructure/services/audit";
 import { assertKurirAssignment, normalizeMethod, scanProgress } from "@/infrastructure/services/scan-flow";
 
+import { normalizeResiScan } from "@/infrastructure/services/resi-scan";
+
 type Params = { params: Promise<{ id: string }> };
 
 /**
@@ -27,7 +29,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (denied) return fail(403, denied);
 
     const body = await req.json().catch(() => ({}));
-    const payload = requireStr(body.payload, "payload").trim();
+    const payload = normalizeResiScan(requireStr(body.payload, "payload"), req.headers.get("x-corp-id"));
     const method = normalizeMethod(body.method);
 
     const isB2B = pickup.master.customer?.type === "b2b";
@@ -36,7 +38,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     // (single Master Resi scan covers all packages in the consignment). For
     // B2C the master scan is recorded but per-package scanning is still
     // required.
-    if (payload === pickup.master.masterCode || payload === pickup.pickupCode) {
+    if (payload === pickup.master.masterCode || payload === pickup.master.resi || payload === pickup.pickupCode) {
       const scan = await db.handoverScan.create({
         data: { pickupId: pickup.id, context: "pickup", scanLevel: "master", detailId: null, payload, result: "ok", method, scannedById: user.id },
       });

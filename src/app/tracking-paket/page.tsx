@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import {
   AlertCircle,
   ArrowRight,
@@ -15,11 +15,12 @@ import {
   Package,
   PackageCheck,
   Phone,
-  Search,
+  QrCode,
   Truck,
   User,
   Warehouse,
 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,22 +28,6 @@ import { Badge } from "@/components/ui/badge";
 import { formatDate, formatNumber } from "@/components/app/form-parts";
 import { LogoMark } from "@/components/app/logo";
 import { cn } from "@/shared/utils";
-
-/**
- * Public tracking page at /tracking-paket.
- *
- * Customers enter their Master Resi number (the `masterCode` printed on the
- * receipt — e.g. MKT-000001) and immediately see:
- *   1. The shipment's current status (with a friendly label)
- *   2. Origin → destination, sender / recipient (phone masked for privacy)
- *   3. The full list of packages tied to that Master Resi (description,
- *      dimensions, weight — but NOT the secret detailCode scan values)
- *   4. The tracking timeline (newest first)
- *
- * No login required — the page talks to the public /api/v1/public/track
- * endpoint. Financial details (price, payment, invoice) are intentionally NOT
- * shown — customers see shipment status + packages only.
- */
 
 interface TrackingPackage {
   id: number;
@@ -126,26 +111,38 @@ function eventIcon(event: string) {
 }
 
 export default function TrackingPaketPage() {
-  const [query, setQuery] = useState("");
+  return <Suspense fallback={<p className="p-8 text-center">Memuat pelacakan…</p>}><TrackingVerification /></Suspense>;
+}
+
+function TrackingVerification() {
+  const params = useSearchParams();
+  const corporateId = params.get("corporateId")?.trim() ?? "";
+  const code = params.get("resi")?.trim() ?? "";
+  return <TrackingSession key={JSON.stringify([corporateId, code])} corporateId={corporateId} code={code} />;
+}
+
+function TrackingSession({ corporateId, code }: { corporateId: string; code: string }) {
+  const qrPresent = Boolean(corporateId && corporateId.length <= 128 && code && code.length <= 128);
+  const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<TrackingResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function onSearch(e: React.FormEvent) {
+  async function onVerify(e: React.FormEvent) {
     e.preventDefault();
-    const code = query.trim();
-    if (!code) return;
+    if (!qrPresent || !phone.trim()) return;
     setLoading(true);
     setError(null);
     setData(null);
     try {
-      const response = await fetch(`/api/v1/public/track/${encodeURIComponent(code)}`, { cache: "no-store" });
+      const response = await fetch(`/api/v1/public/track/${encodeURIComponent(code)}`, { method: "POST", headers: { "Content-Type": "application/json", "x-corp-id": corporateId }, body: JSON.stringify({ phone }), cache: "no-store" });
       const payload = (await response.json().catch(() => null)) as { data?: TrackingResponse; message?: string } | null;
       if (!response.ok) {
         setError(payload?.message ?? `Resi tidak ditemukan (${response.status}).`);
         return;
       }
       setData(payload?.data ?? null);
+      setPhone("");
     } catch {
       setError("Terjadi kesalahan jaringan. Coba lagi.");
     } finally {
@@ -173,42 +170,24 @@ export default function TrackingPaketPage() {
         </div>
       </header>
 
-      {/* Search hero */}
       <section className="mx-auto max-w-4xl px-4 py-8 sm:py-12">
         <div className="text-center">
+          <QrCode className="mx-auto mb-3 h-10 w-10 text-primary" />
           <h1 className="text-2xl font-bold tracking-tight sm:text-4xl">Lacak Paket Anda</h1>
           <p className="mt-2 text-sm text-muted-foreground sm:text-base">
-            Masukkan <b>No. Master Resi</b> pada bukti pengiriman Anda.
+            {qrPresent ? "Verifikasi nomor telepon lengkap pengirim atau penerima pada resi ini." : "Scan kode QR pada Master Resi atau label paket untuk membuka pelacakan."}
           </p>
         </div>
-
-        <form onSubmit={onSearch} className="mt-6 flex flex-col gap-2 sm:flex-row">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Contoh: MKT-000001"
-              className="h-12 pl-10 text-base"
-              autoFocus
-              autoCapitalize="characters"
-              autoCorrect="off"
-              spellCheck={false}
-            />
-          </div>
-          <Button type="submit" size="lg" className="h-12 px-8" disabled={loading || !query.trim()}>
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-            Lacak
-          </Button>
-        </form>
-
-        {/* Helper chip row */}
-        {!data && !error && (
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-xs text-muted-foreground">
-            <span className="rounded-full border bg-card px-3 py-1">Tanpa login</span>
-            <span className="rounded-full border bg-card px-3 py-1">Status pengiriman</span>
-            <span className="rounded-full border bg-card px-3 py-1">Lihat semua paket</span>
-          </div>
+        {qrPresent && !data && (
+          <form onSubmit={onVerify} className="mx-auto mt-6 max-w-lg space-y-3">
+            <label htmlFor="tracking-phone" className="text-sm font-medium">Nomor telepon lengkap pengirim / penerima</label>
+            <Input id="tracking-phone" type="tel" autoComplete="tel" required maxLength={40}
+              value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Contoh: 081234567890" className="h-12 text-base" />
+            <Button type="submit" size="lg" className="h-12 w-full" disabled={loading || !phone.trim()}>
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Phone className="h-4 w-4" />}
+              Verifikasi & Lacak
+            </Button>
+          </form>
         )}
       </section>
 
@@ -219,11 +198,8 @@ export default function TrackingPaketPage() {
             <CardContent className="flex items-start gap-3 py-6">
               <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
               <div>
-                <p className="text-sm font-semibold text-destructive">Resi tidak ditemukan</p>
+                <p className="text-sm font-semibold text-destructive">Verifikasi belum berhasil</p>
                 <p className="mt-1 text-sm text-muted-foreground">{error}</p>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Periksa Master Resi pada bukti pengiriman, biasanya <span className="font-mono">MKT-XXXXXX</span>.
-                </p>
               </div>
             </CardContent>
           </Card>
@@ -429,12 +405,6 @@ export default function TrackingPaketPage() {
             </CardContent>
           </Card>
 
-          {/* Back to search */}
-          <div className="flex justify-center pt-2">
-            <Button variant="outline" onClick={() => { setData(null); setError(null); setQuery(""); }} className="gap-2">
-              <Search className="h-4 w-4" /> Lacak resi lain
-            </Button>
-          </div>
         </section>
       )}
 

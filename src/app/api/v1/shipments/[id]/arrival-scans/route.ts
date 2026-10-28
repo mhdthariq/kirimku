@@ -5,6 +5,8 @@ import { audit } from "@/infrastructure/services/audit";
 import { arrivalScanContext, normalizeMethod, scanProgress } from "@/infrastructure/services/scan-flow";
 import { assertShipmentScope } from "@/infrastructure/services/gudang-scope";
 
+import { normalizeResiScan } from "@/infrastructure/services/resi-scan";
+
 type Params = { params: Promise<{ id: string }> };
 
 /** Arrival scan progress for a shipment.
@@ -54,7 +56,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const payload = requireStr(body.payload, "payload").trim();
+    const payload = normalizeResiScan(requireStr(body.payload, "payload"), req.headers.get("x-corp-id"));
     const method = normalizeMethod(body.method);
 
     const isB2B = master.customer?.type === "b2b";
@@ -63,7 +65,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     // (single Master Resi scan covers all packages in the consignment). For
     // B2C the master scan is recorded but per-package scanning is still
     // required.
-    if (payload === master.masterCode) {
+    if (payload === master.masterCode || payload === master.resi) {
       const scan = await db.handoverScan.create({
         data: {
           masterId: master.id,

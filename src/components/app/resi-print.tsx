@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import QRCode from "qrcode";
 import { Printer, X } from "lucide-react";
-import { apiGet, apiPost, type Options } from "@/infrastructure/http/client-api";
+import { buildResiQrUrl } from "@/shared/resi-qr";
+import { NEXT_PUBLIC_RUNTIME_MODE } from "@/shared/runtime-mode";
+import { apiGet, apiPost, getCorpId, type Options } from "@/infrastructure/http/client-api";
 import { ResiTemplate, type ResiShipment } from "@/components/app/print-templates/ResiTemplate";
 import { printPaperDocument } from "@/presentation/print-document";
 import { useAuth } from "@/hooks/use-auth";
@@ -92,9 +94,11 @@ export function ResiPrint({ shipment, onClose }: ResiPrintProps) {
 
         Promise.all(
             codes.map(async (code) => {
+                const corporateId = getCorpId() ?? (NEXT_PUBLIC_RUNTIME_MODE === "development" ? "LOCAL" : "");
+                const qrContent = buildResiQrUrl(window.location.origin, corporateId, code);
                 // Higher width + margin: gives the QR more quiet zone so a
                 // thermal-printed copy scans even if the surrounding ink bleeds.
-                const url = await QRCode.toDataURL(code, {
+                const url = await QRCode.toDataURL(qrContent, {
                     margin: 2,
                     width: 480,
                     errorCorrectionLevel: "M",

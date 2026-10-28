@@ -1,3 +1,4 @@
+import { maskResiValue } from "@/shared/resi-privacy";
 import { COMPANY_NAME } from "@/shared/company";
 import type { DetailShipment, Customer, Options, Shipment, ShipmentTotals, PricingMethod } from "@/infrastructure/http/client-api";
 import { formatNumber, formatRupiah } from "@/components/app/form-parts";
@@ -70,8 +71,8 @@ export function ResiTemplate({ shipment, options, qrMap, printByLabel, printedAt
 
     const penerima = {
         name: shipment.penerimaName ?? "-",
-        address: shipment.penerimaAddress ?? "-",
-        contact: shipment.penerimaContact ?? "-",
+        address: maskResiValue(shipment.penerimaAddress) ?? "-",
+        contact: maskResiValue(shipment.penerimaContact) ?? "-",
     };
 
     // Pengirim (sender) — auto-filled from the Customer record at shipment
@@ -81,9 +82,9 @@ export function ResiTemplate({ shipment, options, qrMap, printByLabel, printedAt
         name:
             shipment.pengirimName ??
             (shipment.customer ? customerPrimaryName(shipment.customer) : "-"),
-        phone: shipment.pengirimPhone ?? shipment.customer?.phone ?? "-",
+        phone: maskResiValue(shipment.pengirimPhone ?? shipment.customer?.phone) ?? "-",
         email: shipment.pengirimEmail ?? shipment.customer?.email ?? null,
-        address: shipment.pengirimAddress ?? shipment.customer?.address ?? null,
+        address: maskResiValue(shipment.pengirimAddress ?? shipment.customer?.address),
     };
 
     const originName = shipment.origin;
@@ -221,7 +222,7 @@ export function ResiTemplate({ shipment, options, qrMap, printByLabel, printedAt
                             </p>
 
                             <p className="mt-1.5 truncate text-[7px] font-semibold uppercase tracking-[0.06em] text-black">
-                                Scan QR untuk identifikasi shipment
+                                Scan QR untuk lacak & verifikasi telepon
                             </p>
 
                             <p className="mt-0.5 truncate text-[7px] font-normal text-black">

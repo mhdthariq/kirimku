@@ -10,7 +10,6 @@ import {
     LogIn,
     MapPin,
     Package,
-    Search,
     ShieldCheck,
     Truck,
     User,
@@ -24,7 +23,6 @@ import { ThemeToggle } from "@/components/app/theme-toggle";
 import {
     NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS,
     NEXT_PUBLIC_SHOW_CORP_ID,
-    NEXT_PUBLIC_SHOW_TRACKING_LINK,
     NEXT_PUBLIC_MODE_LABEL,
     NEXT_PUBLIC_IS_PREVIEW,
     NEXT_PUBLIC_IS_DEV,
@@ -46,13 +44,10 @@ import {
  *       The Corporate ID field is shown, the Demo Account panel is HIDDEN
  *       (demo users don't exist in a real tenant's database).
  *
- * The "Lacak Paket" / Track-a-Package link below the form is shown in Dev
- * and Preview only — production users reach the public tracking page via
- * the standalone `/tracking-paket` URL.
+ * Public tracking is opened from the QR printed on a resi.
  */
 const SHOW_DEMO_ACCOUNTS = NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS;
 const SHOW_CORP_ID = NEXT_PUBLIC_SHOW_CORP_ID;
-const SHOW_TRACKING_LINK = NEXT_PUBLIC_SHOW_TRACKING_LINK;
 const MODE_LABEL = NEXT_PUBLIC_MODE_LABEL;
 
 const DEMO_ACCOUNTS = [
@@ -470,31 +465,6 @@ export function LoginScreen() {
                             </div>
                         )}
 
-                        {/* "Lacak Paket" / Track a Package link - Dev + Preview only.
-                In production the public tracking page is reachable only via
-                the standalone /tracking-paket URL (no link inside the app),
-                so end customers don't see this button when the app is in
-                production mode. */}
-                        {SHOW_TRACKING_LINK && (
-                            <div className="mt-6 border-t pt-5">
-                                <a
-                                    href="/tracking-paket"
-                                    className="flex items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3.5 py-2.5 text-xs font-semibold text-primary transition hover:border-primary/60 hover:bg-primary/10"
-                                >
-                                    <Search className="h-3.5 w-3.5" />
-                                    Lacak Paket - pelacakan kiriman untuk
-                                    customer
-                                </a>
-                                <p className="mt-1.5 text-center text-[10px] text-foreground/55">
-                                    Tautan ini hanya tampil di {MODE_LABEL}. Di
-                                    production, customer membuka
-                                    <code className="mx-1 rounded bg-muted px-1 py-0.5 font-mono">
-                                        /tracking-paket
-                                    </code>
-                                    secara langsung.
-                                </p>
-                            </div>
-                        )}
                     </motion.div>
                 </div>
             </div>
