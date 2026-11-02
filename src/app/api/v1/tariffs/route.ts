@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
           : {}),
       },
       orderBy: [{ origin: "asc" }, { destination: "asc" }, { customerType: "asc" }],
-      include: { customer: { select: { id: true, code: true, name: true, companyName: true } } },
+      include: { customer: { select: { id: true, code: true, name: true, companyName: true } }, _count: { select: { shipments: true } } },
     });
     return ok(tariffs);
   });

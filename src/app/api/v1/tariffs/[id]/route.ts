@@ -105,7 +105,13 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     const { id } = await params;
     const existing = await db.tariff.findUnique({ where: { id: Number(id) } });
     if (!existing) return fail(404, "Tariff tidak ditemukan.");
-    await db.tariff.delete({ where: { id: existing.id } });
+    // Check the actual shipment relation in the delete itself so a stale list
+    // cannot authorize deleting a tariff that has since been attached.
+    const deleted = await db.tariff.delete({ where: { id: existing.id, shipments: { none: {} } } }).catch((error: unknown) => {
+      if (typeof error === "object" && error !== null && "code" in error && error.code === "P2025") return null;
+      throw error;
+    });
+    if (!deleted) return fail(409, "Tarif terhubung ke shipment dan tidak dapat dihapus. Nonaktifkan tarif ini melalui checkbox Aktif.");
     await audit({ action: "deleted", entityType: "tariff", entityId: existing.id, entityLabel: `${existing.origin} → ${existing.destination}`, actor: user, before: existing });
     return ok({ deleted: true });
   });

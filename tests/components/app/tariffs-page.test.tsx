@@ -9,7 +9,7 @@ vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: { permissions: m.pe
 vi.mock("@/infrastructure/http/client-api", async (original) => ({
   ...await original<typeof import("@/infrastructure/http/client-api")>(), apiGet: m.get, apiPut: m.put, apiDelete: m.remove,
 }));
-const base = { origin: "Medan", destination: "Banda Aceh", customerType: "b2c", ratePerKg: 1000, minChargeableKg: 1, effectiveFrom: "2026-01-01", effectiveTo: null };
+const base = { origin: "Medan", destination: "Banda Aceh", customerType: "b2c", ratePerKg: 1000, minChargeableKg: 1, effectiveFrom: "2026-01-01", effectiveTo: null, _count: { shipments: 0 } };
 beforeEach(() => {
   m.permissions = ["tariff.view"];
   m.put.mockReset().mockResolvedValue({});
@@ -27,11 +27,13 @@ it.each(["Card", "Table"])("provides separate deactivate, reactivate, and perman
   const user = userEvent.setup();
   await screen.findByRole("article", { name: /Tarif Baru/ });
   await user.click(screen.getByRole("button", { name: view }));
-  await user.click(screen.getByRole("button", { name: "Nonaktifkan tarif Tarif Baru" }));
+  expect(screen.getByRole("checkbox", { name: "Tarif aktif Tarif Baru" })).toBeChecked();
+  await user.click(screen.getByRole("checkbox", { name: "Tarif aktif Tarif Baru" }));
   await waitFor(() => expect(m.put).toHaveBeenCalledWith("/tariffs/1", { isActive: false }));
   expect(m.remove).not.toHaveBeenCalled();
   await user.click(screen.getByRole("button", { name: "Nonaktif" }));
-  await user.click(await screen.findByRole("button", { name: "Aktifkan kembali tarif Tarif Lama" }));
+  expect(screen.getByRole("checkbox", { name: "Tarif aktif Tarif Lama" })).not.toBeChecked();
+  await user.click(await screen.findByRole("checkbox", { name: "Tarif aktif Tarif Lama" }));
   await waitFor(() => expect(m.put).toHaveBeenCalledWith("/tariffs/2", { isActive: true }));
   await user.click(await screen.findByRole("button", { name: "Hapus permanen tarif Tarif Lama" }));
   const dialog = screen.getByRole("alertdialog");
@@ -40,6 +42,25 @@ it.each(["Card", "Table"])("provides separate deactivate, reactivate, and perman
   await user.click(within(dialog).getByRole("button", { name: "Ya, hapus permanen" }));
   await waitFor(() => expect(m.remove).toHaveBeenCalledWith("/tariffs/2"));
   await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+});
+
+it.each(["Card", "Table"])("prevents deleting linked tariffs but permits unchecking Aktif in %s view", async (view) => {
+  m.permissions = ["tariff.view", "tariff.update"];
+  m.get.mockImplementation(async (path: string) => path === "/options" ? { customers: [] } : [
+    { ...base, id: 1, name: "Tarif Terpakai", isActive: true, _count: { shipments: 2 } },
+  ]);
+  render(<TariffsPage />);
+  const user = userEvent.setup();
+  await screen.findByRole("article", { name: /Tarif Terpakai/ });
+  await user.click(screen.getByRole("button", { name: view }));
+  const remove = screen.getByRole("button", { name: "Hapus permanen tarif Tarif Terpakai" });
+  expect(remove).toBeDisabled();
+  await user.click(remove);
+  expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  expect(screen.getByText(/Terhubung ke shipment/)).toBeInTheDocument();
+  await user.click(screen.getByRole("checkbox", { name: "Tarif aktif Tarif Terpakai" }));
+  await waitFor(() => expect(m.put).toHaveBeenCalledWith("/tariffs/1", { isActive: false }));
+  expect(m.remove).not.toHaveBeenCalled();
 });
 
 it("retains the confirmation when permanent deletion fails", async () => {

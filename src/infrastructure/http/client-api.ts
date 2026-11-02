@@ -803,6 +803,7 @@ export type PricingMethod = "PER_KG" | "PER_KG_SIMPLE" | "PER_KOLI" | "PER_CUBIC
 
 export interface Tariff {
   id: number;
+  _count?: { shipments: number };
   /** Tariff name — several tariffs may share a corridor if names differ. Null on legacy rows. */
   name?: string | null;
   /** B2B tariffs are tied to one B2B customer; null for B2C. */

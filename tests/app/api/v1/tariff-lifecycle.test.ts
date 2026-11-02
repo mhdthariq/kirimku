@@ -31,6 +31,7 @@ beforeEach(() => {
   m.duplicate.mockResolvedValue(null);
   m.create.mockImplementation(async ({ data }) => ({ id: 2, ...data }));
   m.update.mockImplementation(async ({ data }) => ({ ...old, ...data }));
+  m.remove.mockResolvedValue(old);
 });
 afterEach(() => vi.useRealTimers());
 
@@ -39,6 +40,7 @@ describe("tariff lifecycle", () => {
     expect((await GET(req("GET"))).status).toBe(200);
     expect(m.expire).toHaveBeenCalledWith({ where: { isActive: true, effectiveTo: { lt: new Date() } }, data: { isActive: false } });
     expect(m.expire.mock.invocationCallOrder[0]).toBeLessThan(m.list.mock.invocationCallOrder[0]);
+    expect(m.list).toHaveBeenCalledWith(expect.objectContaining({ include: expect.objectContaining({ _count: { select: { shipments: true } } }) }));
   });
   it("creates the replacement with a distinct primary ID after expiring the old rate", async () => {
     const response = await POST(req("POST", payload));
@@ -85,9 +87,18 @@ describe("tariff lifecycle", () => {
     const response = await DELETE(req("DELETE"), params);
     expect(response.status).toBe(200);
     expect((await response.json()).data).toEqual({ deleted: true });
-    expect(m.remove).toHaveBeenCalledWith({ where: { id: 1 } });
+    expect(m.remove).toHaveBeenCalledWith({ where: { id: 1, shipments: { none: {} } } });
     expect(m.update).not.toHaveBeenCalled();
     expect(m.audit).toHaveBeenCalledWith(expect.objectContaining({ action: "deleted", entityId: 1 }));
+  });
+  it.each([true, false])("blocks deletion of a linked tariff with active status %s", async (isActive) => {
+    m.find.mockResolvedValue({ ...old, isActive });
+    m.remove.mockRejectedValue({ code: "P2025" });
+    const response = await DELETE(req("DELETE"), params);
+    expect(response.status).toBe(409);
+    expect(m.remove).toHaveBeenCalledWith({ where: { id: 1, shipments: { none: {} } } });
+    expect(m.update).not.toHaveBeenCalled();
+    expect(m.audit).not.toHaveBeenCalled();
   });
   it("requires update permission for permanent deletion", async () => {
     m.auth.mockResolvedValue({ id: 1, permissions: ["tariff.view"] });
