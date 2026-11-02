@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 
-const m = vi.hoisted(() => ({ auth: vi.fn(), expire: vi.fn(), list: vi.fn(), find: vi.fn(), duplicate: vi.fn(), create: vi.fn(), update: vi.fn(), audit: vi.fn() }));
+const m = vi.hoisted(() => ({ auth: vi.fn(), expire: vi.fn(), list: vi.fn(), find: vi.fn(), duplicate: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), audit: vi.fn() }));
 vi.mock("@/infrastructure/persistence/db", () => ({ db: {
-  tariff: { updateMany: m.expire, findMany: m.list, findUnique: m.find, findFirst: m.duplicate, create: m.create, update: m.update },
+  tariff: { updateMany: m.expire, findMany: m.list, findUnique: m.find, findFirst: m.duplicate, create: m.create, update: m.update, delete: m.remove },
   customer: { findUnique: async () => ({ id: 8, type: "b2b" }) },
 } }));
 vi.mock("@/infrastructure/auth/auth", () => ({ getAuthUser: m.auth, hasPermission: (user: { permissions: string[] }, permission: string) => user.permissions.includes(permission) }));
@@ -12,7 +12,7 @@ vi.mock("@/infrastructure/services/seed", () => ({ ensureSeed: vi.fn() }));
 vi.mock("@/infrastructure/persistence/tenant-context", () => ({ resolveTenantContext: vi.fn(), runWithTenant: (_: unknown, fn: () => unknown) => fn(), isDefaultTenant: () => false }));
 vi.mock("@/infrastructure/services/audit", () => ({ audit: m.audit, diffFields: vi.fn() }));
 import { GET, POST } from "@/app/api/v1/tariffs/route";
-import { PUT } from "@/app/api/v1/tariffs/[id]/route";
+import { PUT, DELETE } from "@/app/api/v1/tariffs/[id]/route";
 import { tariffEndDate } from "@/infrastructure/services/tariff-lifecycle";
 
 const payload = { name: "UD Sumatra Jaya Banda Aceh", origin: "Medan", destination: "Banda Aceh", customerType: "b2b", customerId: 8, pricingMethod: "PER_CUBIC", ratePerCubic: 185000, effectiveFrom: "2026-10-17" };
@@ -63,9 +63,45 @@ describe("tariff lifecycle", () => {
     expect((await PUT(req("PUT", { effectiveTo: null, isActive: true }), params)).status).toBe(422);
     expect(m.update).not.toHaveBeenCalled();
   });
-  it("keeps expired tariffs inactive even when activation is requested", async () => {
-    expect((await PUT(req("PUT", { isActive: true }), params)).status).toBe(200);
+  it("explains why an expired tariff cannot be reactivated", async () => {
+    expect((await PUT(req("PUT", { isActive: true }), params)).status).toBe(422);
+    expect(m.update).not.toHaveBeenCalled();
+  });
+  it("reactivates an inactive tariff with valid dates using its original ID", async () => {
+    const response = await PUT(req("PUT", { isActive: true, effectiveTo: null }), params);
+    expect(response.status).toBe(200);
+    expect((await response.json()).data).toMatchObject({ id: 1, isActive: true, effectiveTo: null });
+    expect(m.update).toHaveBeenCalledWith({ where: { id: 1 }, data: expect.objectContaining({ isActive: true }) });
+    expect(m.create).not.toHaveBeenCalled();
+  });
+  it("deactivates a tariff without deleting it", async () => {
+    m.find.mockResolvedValue({ ...old, isActive: true, effectiveTo: null });
+    expect((await PUT(req("PUT", { isActive: false }), params)).status).toBe(200);
     expect(m.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ isActive: false }) }));
+    expect(m.remove).not.toHaveBeenCalled();
+  });
+  it.each([true, false])("permanently deletes a tariff with active status %s", async (isActive) => {
+    m.find.mockResolvedValue({ ...old, isActive });
+    const response = await DELETE(req("DELETE"), params);
+    expect(response.status).toBe(200);
+    expect((await response.json()).data).toEqual({ deleted: true });
+    expect(m.remove).toHaveBeenCalledWith({ where: { id: 1 } });
+    expect(m.update).not.toHaveBeenCalled();
+    expect(m.audit).toHaveBeenCalledWith(expect.objectContaining({ action: "deleted", entityId: 1 }));
+  });
+  it("requires update permission for permanent deletion", async () => {
+    m.auth.mockResolvedValue({ id: 1, permissions: ["tariff.view"] });
+    expect((await DELETE(req("DELETE"), params)).status).toBe(403);
+    expect(m.remove).not.toHaveBeenCalled();
+  });
+  it("returns not found when deleting a missing tariff", async () => {
+    m.find.mockResolvedValue(null);
+    expect((await DELETE(req("DELETE"), params)).status).toBe(404);
+    expect(m.remove).not.toHaveBeenCalled();
+  });
+  it("rejects non-boolean status values", async () => {
+    expect((await PUT(req("PUT", { isActive: "false" }), params)).status).toBe(422);
+    expect(m.update).not.toHaveBeenCalled();
   });
   it("handles concurrent database uniqueness conflicts", async () => {
     m.create.mockRejectedValue({ code: "P2002" });

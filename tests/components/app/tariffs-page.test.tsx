@@ -4,18 +4,54 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 import { TariffsPage } from "@/components/app/pages/tariffs-page";
 
-const m = vi.hoisted(() => ({ get: vi.fn() }));
-vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: { permissions: ["tariff.view"], isOwner: false } }) }));
+const m = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn(), remove: vi.fn(), permissions: ["tariff.view"] }));
+vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: { permissions: m.permissions, isOwner: false } }) }));
 vi.mock("@/infrastructure/http/client-api", async (original) => ({
-  ...await original<typeof import("@/infrastructure/http/client-api")>(), apiGet: m.get,
+  ...await original<typeof import("@/infrastructure/http/client-api")>(), apiGet: m.get, apiPut: m.put, apiDelete: m.remove,
 }));
 const base = { origin: "Medan", destination: "Banda Aceh", customerType: "b2c", ratePerKg: 1000, minChargeableKg: 1, effectiveFrom: "2026-01-01", effectiveTo: null };
 beforeEach(() => {
+  m.permissions = ["tariff.view"];
+  m.put.mockReset().mockResolvedValue({});
+  m.remove.mockReset().mockResolvedValue({ deleted: true });
   m.get.mockImplementation(async (path: string) => path === "/options" ? { customers: [] } : [
     { ...base, id: 1, name: "Tarif Baru", isActive: true },
     { ...base, id: 2, name: "Tarif Lama", isActive: false },
     { ...base, id: 3, name: "Tarif Bisnis", customerType: "b2b", isActive: true, customer: { id: 8, name: "PIC", companyName: "Sumatra Jaya" }, pricingMethod: "PER_CUBIC", ratePerCubic: 185000 },
   ]);
+});
+
+it.each(["Card", "Table"])("provides separate deactivate, reactivate, and permanent delete actions in %s view", async (view) => {
+  m.permissions = ["tariff.view", "tariff.update"];
+  render(<TariffsPage />);
+  const user = userEvent.setup();
+  await screen.findByRole("article", { name: /Tarif Baru/ });
+  await user.click(screen.getByRole("button", { name: view }));
+  await user.click(screen.getByRole("button", { name: "Nonaktifkan tarif Tarif Baru" }));
+  await waitFor(() => expect(m.put).toHaveBeenCalledWith("/tariffs/1", { isActive: false }));
+  expect(m.remove).not.toHaveBeenCalled();
+  await user.click(screen.getByRole("button", { name: "Nonaktif" }));
+  await user.click(await screen.findByRole("button", { name: "Aktifkan kembali tarif Tarif Lama" }));
+  await waitFor(() => expect(m.put).toHaveBeenCalledWith("/tariffs/2", { isActive: true }));
+  await user.click(await screen.findByRole("button", { name: "Hapus permanen tarif Tarif Lama" }));
+  const dialog = screen.getByRole("alertdialog");
+  expect(within(dialog).getByText(/tidak dapat dipulihkan/)).toBeInTheDocument();
+  expect(m.remove).not.toHaveBeenCalled();
+  await user.click(within(dialog).getByRole("button", { name: "Ya, hapus permanen" }));
+  await waitFor(() => expect(m.remove).toHaveBeenCalledWith("/tariffs/2"));
+  await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+});
+
+it("retains the confirmation when permanent deletion fails", async () => {
+  m.permissions = ["tariff.view", "tariff.update"];
+  m.remove.mockRejectedValue(new Error("Deletion failed"));
+  render(<TariffsPage />);
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "Hapus permanen tarif Tarif Baru" }));
+  await user.click(screen.getByRole("button", { name: "Ya, hapus permanen" }));
+  await waitFor(() => expect(m.remove).toHaveBeenCalled());
+  expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Ya, hapus permanen" })).toBeEnabled();
 });
 
 it("switches between table and cards without losing search or status filters", async () => {

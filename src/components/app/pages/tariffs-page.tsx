@@ -58,6 +58,7 @@ export function TariffsPage() {
   const [form, setForm] = useState<TariffFormState>(emptyTariffForm());
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<Tariff | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
 
   const rowsByTab = useMemo(() => {
     const q = search.toLowerCase();
@@ -116,10 +117,24 @@ export function TariffsPage() {
   }
 
   async function onDelete() {
-    if (!confirmDelete) return;
+    if (!confirmDelete || actionBusy) return;
     const target = confirmDelete;
-    setConfirmDelete(null);
-    const ok = await runAction(() => apiDelete(`/tariffs/${target.id}`), { success: "Tarif diproses." });
+    setActionBusy(true);
+    const ok = await runAction(() => apiDelete(`/tariffs/${target.id}`), { success: "Tarif dihapus permanen." });
+    setActionBusy(false);
+    if (ok) {
+      setConfirmDelete(null);
+      reload();
+    }
+  }
+
+  async function onToggleActive(tariff: Tariff) {
+    if (actionBusy) return;
+    setActionBusy(true);
+    const ok = await runAction(() => apiPut(`/tariffs/${tariff.id}`, { isActive: !tariff.isActive }), {
+      success: tariff.isActive ? "Tarif dinonaktifkan." : "Tarif diaktifkan kembali.",
+    });
+    setActionBusy(false);
     if (ok) reload();
   }
 
@@ -210,10 +225,10 @@ export function TariffsPage() {
                 {(search || statusFilter !== "active") && <Button variant="outline" className="mt-5 rounded-xl" onClick={() => { setSearch(""); setStatusFilter("active"); }}>Reset Filter</Button>}
               </div>
             ) : viewMode === "table" ? (
-              <TariffTable rows={rowsByTab[tab]} tab={tab} canUpdate={can.update} onEdit={openEdit} onDelete={setConfirmDelete} />
+              <TariffTable rows={rowsByTab[tab]} tab={tab} canUpdate={can.update} onEdit={openEdit} onDelete={setConfirmDelete} onToggleActive={onToggleActive} busy={actionBusy} />
             ) : (
               <div className="grid items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {rowsByTab[tab].map((tariff) => <TariffCard key={tariff.id} tariff={tariff} canUpdate={can.update} onEdit={openEdit} onDelete={setConfirmDelete} />)}
+                {rowsByTab[tab].map((tariff) => <TariffCard key={tariff.id} tariff={tariff} canUpdate={can.update} onEdit={openEdit} onDelete={setConfirmDelete} onToggleActive={onToggleActive} busy={actionBusy} />)}
               </div>
             )}
           </TabsContent>
@@ -224,8 +239,8 @@ export function TariffsPage() {
       </Tabs>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
-          <DialogHeader>
+        <DialogContent className="max-h-[calc(100dvh-2rem)] gap-0 overflow-hidden p-0 sm:max-w-2xl">
+          <DialogHeader className="shrink-0 px-4 pt-5 pb-4 pr-10 text-left sm:px-6 sm:pr-12">
             <DialogTitle>
               {editing ? "Edit Tarif" : "Tambah Tarif"} {dialogTab.toUpperCase()}
             </DialogTitle>
@@ -235,30 +250,32 @@ export function TariffsPage() {
                 : "Tarif B2C bisa memakai kg volumetrik, kg aktual, koli, atau volume. Koridor yang sama boleh punya beberapa tarif selama namanya berbeda."}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={onSubmit} className="space-y-5">
-            <div className="rounded-xl border bg-muted/20 p-4">
-              <TariffFormFields tab={dialogTab} form={form} setForm={setForm} busy={busy} customerOptions={b2bCustomerOptions} />
+          <form onSubmit={onSubmit} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            <div className="min-h-0 overflow-y-auto overscroll-contain px-4 pb-4 sm:px-6">
+              <div className="min-w-0 rounded-xl border bg-muted/20 p-3 sm:p-4">
+                <TariffFormFields tab={dialogTab} form={form} setForm={setForm} busy={busy} customerOptions={b2bCustomerOptions} />
+              </div>
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} disabled={busy}>
+            <DialogFooter className="m-0 shrink-0 border-t bg-background p-4 sm:m-0 sm:px-6">
+              <Button type="button" variant="outline" className="min-h-11" onClick={() => setDialogOpen(false)} disabled={busy}>
                 Batal
               </Button>
-              <SubmitButton busy={busy}>{editing ? "Simpan Perubahan" : "Buat Tarif"}</SubmitButton>
+              <SubmitButton busy={busy} className="min-h-11">{editing ? "Simpan Perubahan" : "Buat Tarif"}</SubmitButton>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!confirmDelete} onOpenChange={(open) => !open && setConfirmDelete(null)}>
+      <AlertDialog open={!!confirmDelete} onOpenChange={(open) => !open && !actionBusy && setConfirmDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Hapus tarif {confirmDelete ? tariffLabel(confirmDelete) : ""}?</AlertDialogTitle>
-            <AlertDialogDescription>Tarif yang sudah dipakai menghitung harga akan dinonaktifkan, bukan dihapus.</AlertDialogDescription>
+            <AlertDialogTitle>Hapus permanen tarif {confirmDelete ? tariffLabel(confirmDelete) : ""}?</AlertDialogTitle>
+            <AlertDialogDescription>Tarif akan dihapus permanen dan tidak dapat dipulihkan. Harga shipment yang sudah tersimpan tetap dipertahankan. Untuk menyimpan tarif agar bisa diaktifkan kembali, pilih Nonaktifkan.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={onDelete}>
-              Ya, hapus
+            <AlertDialogCancel disabled={actionBusy}>Batal</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" disabled={actionBusy} onClick={(event) => { event.preventDefault(); void onDelete(); }}>
+              {actionBusy ? "Menghapus…" : "Ya, hapus permanen"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -280,12 +297,14 @@ function tariffRate(tariff: Tariff): number {
   return method === "PER_KOLI" ? tariff.ratePerKoli ?? 0 : method === "PER_CUBIC" ? tariff.ratePerCubic ?? 0 : tariff.ratePerKg;
 }
 
-function TariffTable({ rows, tab, canUpdate, onEdit, onDelete }: {
+function TariffTable({ rows, tab, canUpdate, onEdit, onDelete, onToggleActive, busy }: {
   rows: Tariff[];
   tab: TariffTab;
   canUpdate: boolean;
   onEdit: (tariff: Tariff) => void;
   onDelete: (tariff: Tariff) => void;
+  onToggleActive: (tariff: Tariff) => void;
+  busy: boolean;
 }) {
   const headingClass = "whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-muted-foreground";
   return (
@@ -320,8 +339,9 @@ function TariffTable({ rows, tab, canUpdate, onEdit, onDelete }: {
               </td>
               {canUpdate && <td className="px-4 py-3 align-top">
                 <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" className="h-10 w-10" onClick={() => onEdit(tariff)} aria-label={`Edit tarif ${tariff.name || tariffLabel(tariff)}`}><Pencil className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="icon" className="h-10 w-10 text-destructive hover:text-destructive" onClick={() => onDelete(tariff)} aria-label={`Hapus tarif ${tariff.name || tariffLabel(tariff)}`}><Trash2 className="h-4 w-4" /></Button>
+                  <Button disabled={busy} variant="ghost" size="icon" className="h-10 w-10" onClick={() => onEdit(tariff)} aria-label={`Edit tarif ${tariff.name || tariffLabel(tariff)}`}><Pencil className="h-4 w-4" /></Button>
+                  <Button disabled={busy} variant="outline" className="min-h-10" onClick={() => onToggleActive(tariff)} aria-label={`${tariff.isActive ? "Nonaktifkan" : "Aktifkan kembali"} tarif ${tariff.name || tariffLabel(tariff)}`}>{tariff.isActive ? "Nonaktifkan" : "Aktifkan kembali"}</Button>
+                  <Button disabled={busy} variant="ghost" size="icon" className="h-10 w-10 text-destructive hover:text-destructive" onClick={() => onDelete(tariff)} aria-label={`Hapus permanen tarif ${tariff.name || tariffLabel(tariff)}`}><Trash2 className="h-4 w-4" /></Button>
                 </div>
               </td>}
             </tr>
@@ -332,11 +352,13 @@ function TariffTable({ rows, tab, canUpdate, onEdit, onDelete }: {
   );
 }
 
-function TariffCard({ tariff, canUpdate, onEdit, onDelete }: {
+function TariffCard({ tariff, canUpdate, onEdit, onDelete, onToggleActive, busy }: {
   tariff: Tariff;
   canUpdate: boolean;
   onEdit: (tariff: Tariff) => void;
   onDelete: (tariff: Tariff) => void;
+  onToggleActive: (tariff: Tariff) => void;
+  busy: boolean;
 }) {
   const method = tariff.pricingMethod ?? "PER_KG";
   const rate = tariffRate(tariff);
@@ -375,9 +397,10 @@ function TariffCard({ tariff, canUpdate, onEdit, onDelete }: {
         </div>
       </div>
       {canUpdate && (
-        <div className="flex items-center justify-between gap-2 border-t bg-muted/20 px-4 py-3 sm:px-5">
-          <Button variant="outline" className="min-h-10 rounded-lg" onClick={() => onEdit(tariff)} aria-label={`Edit tarif ${tariff.name || tariffLabel(tariff)}`}><Pencil className="h-3.5 w-3.5" /> Edit Tarif</Button>
-          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-lg text-destructive hover:text-destructive" onClick={() => onDelete(tariff)} aria-label={`Hapus tarif ${tariff.name || tariffLabel(tariff)}`}><Trash2 className="h-4 w-4" /></Button>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t bg-muted/20 px-4 py-3 sm:px-5">
+          <Button disabled={busy} variant="outline" className="min-h-10 rounded-lg" onClick={() => onEdit(tariff)} aria-label={`Edit tarif ${tariff.name || tariffLabel(tariff)}`}><Pencil className="h-3.5 w-3.5" /> Edit Tarif</Button>
+          <Button disabled={busy} variant="outline" className="min-h-10 rounded-lg" onClick={() => onToggleActive(tariff)} aria-label={`${tariff.isActive ? "Nonaktifkan" : "Aktifkan kembali"} tarif ${tariff.name || tariffLabel(tariff)}`}>{tariff.isActive ? "Nonaktifkan" : "Aktifkan kembali"}</Button>
+          <Button disabled={busy} variant="ghost" size="icon" className="h-10 w-10 rounded-lg text-destructive hover:text-destructive" onClick={() => onDelete(tariff)} aria-label={`Hapus permanen tarif ${tariff.name || tariffLabel(tariff)}`}><Trash2 className="h-4 w-4" /></Button>
         </div>
       )}
     </article>

@@ -43,7 +43,7 @@ export function TariffFormFields({
   const set = (patch: Partial<TariffFormState>) => setForm({ ...form, ...patch });
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 [&>div]:min-w-0 [&_input]:max-w-full [&_input]:min-h-11 [&_[role=combobox]]:min-h-11">
       <Field label="Nama Tarif" htmlFor={`${idPrefix}-name`} hint="Beda nama = boleh koridor yang sama. Contoh: Reguler, Express." className="sm:col-span-2">
         <Input id={`${idPrefix}-name`} value={form.name} onChange={(e) => set({ name: e.target.value })} placeholder="Reguler" disabled={busy} />
       </Field>
@@ -51,6 +51,7 @@ export function TariffFormFields({
       {v.showCustomer && !hideCustomer && (
         <Field label="Customer B2B" htmlFor={`${idPrefix}-customer`} hint="Tarif ini hanya muncul untuk customer ini saat membuat shipment." className="sm:col-span-2">
           <FormSelect
+            id={`${idPrefix}-customer`}
             value={form.customerId}
             onValueChange={(value) => set({ customerId: value })}
             placeholder="Pilih customer B2B…"
@@ -69,7 +70,7 @@ export function TariffFormFields({
 
       {v.showMethodChoice && !hideMethodChoice && (
         <Field label="Metode Harga" htmlFor={`${idPrefix}-method`} hint="Pilih satu: /kg, /koli, atau /cubic." className="sm:col-span-2">
-          <FormSelect value={form.pricingMethod} onValueChange={(value) => set({ pricingMethod: value as PricingMethod })} options={methodOptions} disabled={busy} />
+          <FormSelect id={`${idPrefix}-method`} value={form.pricingMethod} onValueChange={(value) => set({ pricingMethod: value as PricingMethod })} options={methodOptions} disabled={busy} />
         </Field>
       )}
 
@@ -117,6 +118,7 @@ export function TariffFormFields({
           </Field>
           <Field label="Pembulatan" htmlFor={`${idPrefix}-rounding`}>
             <FormSelect
+              id={`${idPrefix}-rounding`}
               value={form.roundingMode}
               onValueChange={(value) => set({ roundingMode: value })}
               options={[{ value: "UP", label: "Round up" }, { value: "NEAREST", label: "Nearest" }]}

@@ -64,11 +64,17 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (body.roundingUnitKg !== undefined) data.roundingUnitKg = num(body.roundingUnitKg) ?? existing.roundingUnitKg;
     if (body.effectiveFrom !== undefined) data.effectiveFrom = dateOrNull(body.effectiveFrom) ?? existing.effectiveFrom;
     if (body.effectiveTo !== undefined) data.effectiveTo = tariffEndDate(body.effectiveTo);
+    if (body.isActive !== undefined && typeof body.isActive !== "boolean") {
+      return fail(422, "Status aktif tarif harus berupa boolean.");
+    }
     if (body.isActive !== undefined) data.isActive = Boolean(body.isActive);
     const effectiveFrom = (data.effectiveFrom as Date | undefined) ?? existing.effectiveFrom;
     const effectiveTo = data.effectiveTo !== undefined ? data.effectiveTo as Date | null : existing.effectiveTo;
     if ((body.effectiveFrom && !dateOrNull(body.effectiveFrom)) || (body.effectiveTo && !effectiveTo) || (effectiveTo && effectiveTo < effectiveFrom)) {
       return fail(422, "Masa berlaku tarif tidak valid.");
+    }
+    if (body.isActive === true && effectiveTo && effectiveTo < new Date()) {
+      return fail(422, "Masa berlaku tarif sudah berakhir. Perbarui tanggal akhir sebelum mengaktifkan kembali.");
     }
     const isActive = effectiveTo && effectiveTo < new Date() ? false : (data.isActive as boolean | undefined) ?? existing.isActive;
     data.isActive = isActive;
@@ -99,12 +105,6 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     const { id } = await params;
     const existing = await db.tariff.findUnique({ where: { id: Number(id) } });
     if (!existing) return fail(404, "Tariff tidak ditemukan.");
-    const priced = await db.masterShipment.count({ where: { ratePerKg: existing.ratePerKg, pricedAt: { not: null } } });
-    if (priced > 0) {
-      const tariff = await db.tariff.update({ where: { id: existing.id }, data: { isActive: false } });
-      await audit({ action: "deactivated", entityType: "tariff", entityId: tariff.id, entityLabel: `${tariff.origin} → ${tariff.destination}`, actor: user });
-      return ok({ deactivated: true, tariff });
-    }
     await db.tariff.delete({ where: { id: existing.id } });
     await audit({ action: "deleted", entityType: "tariff", entityId: existing.id, entityLabel: `${existing.origin} → ${existing.destination}`, actor: user, before: existing });
     return ok({ deleted: true });
