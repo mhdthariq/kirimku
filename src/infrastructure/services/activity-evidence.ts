@@ -1,15 +1,19 @@
 import sharp from "sharp";
+import { parseEvidenceMetadata } from "./evidence-photo";
 import { HttpError } from "@/shared/http-error";
 import { parseOptionalPhoto } from "@/infrastructure/services/transport-ops-server";
 import { activityCaptureError } from "@/shared/activity-tracking";
 import { watermarkActivityPhoto, type ActivityWatermark } from "@/infrastructure/services/activity-watermark";
 
-export async function parseActivityEvidence(req: { json(): Promise<unknown> }, watermark: Pick<ActivityWatermark, "transportCode" | "recordedBy" | "label"> = {}) {
+export async function parseActivityEvidence(req: { json(): Promise<unknown> }, watermark: Omit<ActivityWatermark, "capturedAt" | "latitude" | "longitude" | "locationAccuracy"> = {}) {
     const parsed: unknown = await req.json().catch(() => null);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new HttpError(422, "Payload aktivitas tidak valid.");
     const body = parsed as Record<string, unknown>;
     const captureError = activityCaptureError(body);
     if (captureError) throw new HttpError(422, captureError);
+    const parsedMetadata = parseEvidenceMetadata(body);
+    if ("error" in parsedMetadata) throw new HttpError(422, parsedMetadata.error!);
+    const { metadata: evidenceMetadata } = parsedMetadata;
     const photo = parseOptionalPhoto(body.photo);
     if (photo.error) throw new HttpError(422, photo.error);
     if (!photo.photoUrl) throw new HttpError(422, "Foto aktivitas wajib disertakan.");
@@ -31,9 +35,9 @@ export async function parseActivityEvidence(req: { json(): Promise<unknown> }, w
     };
     let photoUrl: string;
     try {
-      photoUrl = await watermarkActivityPhoto(photo.photoUrl, { ...location, capturedAt, ...watermark });
+      photoUrl = await watermarkActivityPhoto(photo.photoUrl, { ...location, ...evidenceMetadata, ...watermark, capturedAt });
     } catch {
       throw new HttpError(422, "Watermark foto gagal dibuat. Ambil ulang foto dan coba lagi.");
     }
-    return { photoUrl, ...location, capturedAt };
+    return { photoUrl, ...location, ...evidenceMetadata, capturedAt };
 }

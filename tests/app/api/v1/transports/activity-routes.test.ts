@@ -172,6 +172,16 @@ beforeEach(() => {
 });
 
 describe("activity evidence API", () => {
+    it("persists WITA capture metadata without accepting client trip identity", async () => {
+        const body = { ...payload(), timeZone: "Asia/Makassar", locationLabel: "Pelabuhan Balikpapan", mockLocation: true,
+            origin: "Forged origin", vehiclePlate: "Forged plate", driverName: "Forged driver" };
+        expect((await POST(req(body), params())).status).toBe(200);
+        expect(m.create).toHaveBeenCalledWith({ data: expect.objectContaining({
+            timeZone: "Asia/Makassar", locationLabel: "Pelabuhan Balikpapan", mockLocation: true,
+            recordedByUsername: actor.username,
+        }) });
+        expect(m.create.mock.calls[0][0].data).not.toHaveProperty("vehiclePlate");
+    });
     it("stores trusted actor snapshots, GPS and capture time without changing lifecycle", async () => {
         const body = {
             ...payload(),
@@ -187,6 +197,9 @@ describe("activity evidence API", () => {
                 latitude: -6.2,
                 longitude: 106.8,
                 locationAccuracy: 5,
+                locationLabel: null,
+                timeZone: "Asia/Jakarta",
+                mockLocation: null,
                 capturedAt: new Date(body.capturedAt),
                 recordedById: 7,
                 recordedByUsername: actor.username,

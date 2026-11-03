@@ -1,4 +1,7 @@
 import { NextRequest } from "next/server";
+import sharp from "sharp";
+import { parseEvidenceMetadata } from "@/infrastructure/services/evidence-photo";
+import { watermarkActivityPhoto } from "@/infrastructure/services/activity-watermark";
 import { db } from "@/infrastructure/persistence/db";
 import { guard, ok, handle, fail, requireStr, str } from "@/composition/api-helpers";
 import { audit } from "@/infrastructure/services/audit";
@@ -38,15 +41,24 @@ export async function POST(req: NextRequest, { params }: Params) {
       return fail(422, `Belum semua paket discan (${progress.scanned}/${progress.total}). Sisa: ${remaining.join(", ")}`);
     }
 
-    const body = await req.json().catch(() => ({}));
+    const parsed = await req.json().catch(() => null);
+    const body = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+    const evidence = parseEvidenceMetadata(body);
+    if ("error" in evidence) return fail(422, evidence.error);
+    const { metadata } = evidence;
+    const hasLocation = body.latitude !== undefined || body.longitude !== undefined;
+    if (hasLocation && (typeof body.latitude !== "number" || !Number.isFinite(body.latitude) || Math.abs(body.latitude) > 90 ||
+      typeof body.longitude !== "number" || !Number.isFinite(body.longitude) || Math.abs(body.longitude) > 180)) {
+      return fail(422, "Koordinat GPS tidak valid.");
+    }
     const proof = requireStr(body.proofOfDelivery, "proofOfDelivery");
     const notes = str(body.notes) ?? delivery.notes;
     // Step 5 — proof photo (REQUIRED). Same validation as the pickup confirm
-    // route: non-empty JPEG / PNG data URL under 2.5MB. Stored verbatim on
+    // route: non-empty JPEG / PNG data URL under 2.5MB. Stored on
     // `Delivery.photoUrl` and surfaced in the deliveries list / detail
     // dialog gated by `proof_photo.view` (Admin Gudang + Owner).
     const MAX_PHOTO_BYTES = 2_500_000;
-    const photoUrl = typeof body.photoUrl === "string" ? body.photoUrl : "";
+    let photoUrl = typeof body.photoUrl === "string" ? body.photoUrl : "";
     if (!photoUrl) {
       return fail(422, "Foto bukti serah terima wajib disertakan sebelum konfirmasi.");
     }
@@ -87,11 +99,31 @@ export async function POST(req: NextRequest, { params }: Params) {
       }
     }
 
+    try {
+      if (hasLocation) {
+        photoUrl = await watermarkActivityPhoto(photoUrl, {
+          ...metadata, latitude: body.latitude, longitude: body.longitude, locationAccuracy: body.locationAccuracy ?? null,
+          recordedBy: user.name, label: `Delivery ${delivery.deliveryCode}`,
+          origin: delivery.master.origin, destination: delivery.master.destination,
+          shipmentCount: 1, driverName: kurirName,
+        });
+      } else {
+        // Task/map coordinates are not evidence of the device's capture location.
+        await sharp(Buffer.from(photoUrl.slice(photoUrl.indexOf(",") + 1), "base64"), { limitInputPixels: 20_000_000 }).resize({ width: 1, height: 1, fit: "inside" }).toBuffer();
+      }
+    } catch {
+      return fail(422, "Foto bukti tidak dapat diproses. Ambil ulang foto.");
+    }
+
     const { updated } = await db.$transaction(async (tx) => {
       const result = await tx.delivery.update({
         where: { id: delivery.id },
         // Step 5 — persist the proof photo URL on the delivery row.
-        data: { status: "COMPLETED", completedAt: new Date(), proofOfDelivery: proof, notes, photoUrl },
+        data: { status: "COMPLETED", completedAt: new Date(), proofOfDelivery: proof, notes, photoUrl, ...metadata,
+          captureLatitude: hasLocation ? body.latitude : null,
+          captureLongitude: hasLocation ? body.longitude : null,
+          captureAccuracy: body.locationAccuracy ?? null,
+        },
       });
       if (delivery.master.status !== "DELIVERED") {
         await tx.masterShipment.update({ where: { id: delivery.masterId }, data: { status: "DELIVERED" } });

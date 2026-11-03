@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { db } from "@/infrastructure/persistence/db";
 import { guard, ok, handle, fail, requireStr, str, num } from "@/composition/api-helpers";
 import { audit } from "@/infrastructure/services/audit";
+import { withProofVisibility } from "@/infrastructure/services/proof-visibility";
 import { nextCode } from "@/infrastructure/services/code-generator";
 import { cityIndex, inScope, pickupGudangIds, scopeForUser } from "@/infrastructure/services/gudang-scope";
 
@@ -113,7 +114,7 @@ export async function GET(req: NextRequest) {
     const visible = withGudang.filter(({ gudangIds }) => inScope(gudangIds, scope));
 
     return ok(
-      visible.map(({ p, gudangIds }) => ({
+      visible.map(({ p, gudangIds }) => withProofVisibility(user, {
         id: p.id,
         pickupCode: p.pickupCode,
         status: p.status,
@@ -123,8 +124,7 @@ export async function GET(req: NextRequest) {
         // pickup with the transport carrying the master (for the
         // "picked up from checkpoint 1" badge).
         masterId: p.masterId,
-        // Revise round 8 — pickup photo (proof of pickup). Display is gated
-        // by proof_photo.view on the client.
+
         photoUrl: p.photoUrl ?? null,
         // Pickup point coordinates — plotted RED on the kurir task map.
         latitude: p.latitude,

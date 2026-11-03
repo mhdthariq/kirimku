@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { db } from "@/infrastructure/persistence/db";
 import { guard, ok, handle, fail, str, num } from "@/composition/api-helpers";
 import { audit, diffFields } from "@/infrastructure/services/audit";
+import { withProofVisibility } from "@/infrastructure/services/proof-visibility";
 import { scanProgress } from "@/infrastructure/services/scan-flow";
 import { assertShipmentScope } from "@/infrastructure/services/gudang-scope";
 
@@ -21,7 +22,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     if (!delivery) return fail(404, "Delivery tidak ditemukan.");
     await assertShipmentScope(user, delivery.master);
     const progress = await scanProgress({ deliveryId: delivery.id });
-    return ok({ ...delivery, progress });
+    return ok(withProofVisibility(user, { ...delivery, progress }));
   });
 }
 
@@ -43,7 +44,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (body.longitude !== undefined) data.longitude = num(body.longitude);
     const delivery = await db.delivery.update({ where: { id: existing.id }, data });
     await audit({ action: "updated", entityType: "delivery", entityId: delivery.id, entityLabel: delivery.deliveryCode, actor: user, before: diffFields(existing, delivery as unknown as Record<string, unknown>) });
-    return ok(delivery);
+    return ok(withProofVisibility(user, delivery));
   });
 }
 

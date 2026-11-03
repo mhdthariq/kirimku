@@ -1,4 +1,7 @@
 import { NextRequest } from "next/server";
+import sharp from "sharp";
+import { parseEvidenceMetadata } from "@/infrastructure/services/evidence-photo";
+import { watermarkActivityPhoto } from "@/infrastructure/services/activity-watermark";
 import { db } from "@/infrastructure/persistence/db";
 import { guard, ok, handle, fail, str } from "@/composition/api-helpers";
 import { audit } from "@/infrastructure/services/audit";
@@ -65,17 +68,26 @@ export async function POST(req: NextRequest, { params }: Params) {
       }
     }
 
-    const body = await req.json().catch(() => ({}));
+    const parsed = await req.json().catch(() => null);
+    const body = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+    const evidence = parseEvidenceMetadata(body);
+    if ("error" in evidence) return fail(422, evidence.error);
+    const { metadata } = evidence;
+    const hasLocation = body.latitude !== undefined || body.longitude !== undefined;
+    if (hasLocation && (typeof body.latitude !== "number" || !Number.isFinite(body.latitude) || Math.abs(body.latitude) > 90 ||
+      typeof body.longitude !== "number" || !Number.isFinite(body.longitude) || Math.abs(body.longitude) > 180)) {
+      return fail(422, "Koordinat GPS tidak valid.");
+    }
     const notes = str(body.notes) ?? pickup.notes;
     // Step 5 — proof photo (REQUIRED). Captured in the QR scan dialog as a
     // JPEG data URL (downscaled to ~720px, ~0.72 quality — same cap the
-    // checkpoint check-in uses). Stored verbatim on `Pickup.photoUrl` and
+    // checkpoint check-in uses). Stored on `Pickup.photoUrl` and
     // surfaced in the pickups list / detail dialog gated by
     // `proof_photo.view` (Admin Gudang + Owner). Validation mirrors the
     // checkpoint check-in route: must be a non-empty JPEG / PNG data URL
     // under 2.5MB.
     const MAX_PHOTO_BYTES = 2_500_000;
-    const photoUrl = typeof body.photoUrl === "string" ? body.photoUrl : "";
+    let photoUrl = typeof body.photoUrl === "string" ? body.photoUrl : "";
     if (!photoUrl) {
       return fail(422, "Foto bukti pickup wajib disertakan sebelum konfirmasi.");
     }
@@ -95,13 +107,33 @@ export async function POST(req: NextRequest, { params }: Params) {
       ? (await db.employee.findUnique({ where: { id: pickup.kurirId } }))?.name ?? user.name
       : user.name;
 
+    try {
+      if (hasLocation) {
+        photoUrl = await watermarkActivityPhoto(photoUrl, {
+          ...metadata, latitude: body.latitude, longitude: body.longitude, locationAccuracy: body.locationAccuracy ?? null,
+          recordedBy: user.name, label: `Pickup ${pickup.pickupCode}`,
+          origin: pickup.master.origin, destination: pickup.master.destination,
+          shipmentCount: 1, driverName: kurirName,
+        });
+      } else {
+        // Task/map coordinates are not evidence of the device's capture location.
+        await sharp(Buffer.from(photoUrl.slice(photoUrl.indexOf(",") + 1), "base64"), { limitInputPixels: 20_000_000 }).resize({ width: 1, height: 1, fit: "inside" }).toBuffer();
+      }
+    } catch {
+      return fail(422, "Foto bukti tidak dapat diproses. Ambil ulang foto.");
+    }
+
     const updated = await db.pickup.update({
       where: { id: pickup.id },
       // Revision Part A: the kurir picking up the package moves the task to
       // PICKED_UP — NOT COMPLETED. Completion happens later, when Admin
       // Gudang confirms the package arrived at the gudang (arrival workflow).
       // Step 5 — also persist the proof photo URL on the pickup row.
-      data: { status: "PICKED_UP", notes, photoUrl },
+      data: { status: "PICKED_UP", notes, photoUrl, ...metadata,
+        captureLatitude: hasLocation ? body.latitude : null,
+        captureLongitude: hasLocation ? body.longitude : null,
+        captureAccuracy: body.locationAccuracy ?? null,
+      },
     });
     if (pickup.master.status === "READY_FOR_PICKUP") {
       await db.masterShipment.update({ where: { id: pickup.masterId }, data: { status: "PICKED_UP" } });

@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { db } from "@/infrastructure/persistence/db";
 import { guard, ok, handle, fail, requireStr, str, num } from "@/composition/api-helpers";
 import { audit } from "@/infrastructure/services/audit";
+import { withProofVisibility } from "@/infrastructure/services/proof-visibility";
 import { nextCode } from "@/infrastructure/services/code-generator";
 import { cityIndex, deliveryGudangIds, inScope, scopeForUser } from "@/infrastructure/services/gudang-scope";
 
@@ -110,7 +111,7 @@ export async function GET(req: NextRequest) {
     return ok(
       visible.map(({ d, gudangIds }) => {
         const scannedIds = new Set(d.scans.filter((s) => s.detailId != null).map((s) => s.detailId));
-        return {
+        return withProofVisibility(user, {
           id: d.id,
           deliveryCode: d.deliveryCode,
           status: d.status,
@@ -121,9 +122,7 @@ export async function GET(req: NextRequest) {
           // delivery with the transport carrying the master (for the
           // "picked up from checkpoint 1" badge).
           masterId: d.masterId,
-          // Revise round 8 — optional delivery photo (proof of delivery image).
-          // Display is gated by proof_photo.view on the client (Admin Gudang +
-          // Owner by default). Other roles see the metadata but not the image.
+
           photoUrl: d.photoUrl ?? null,
           // Delivery point coordinates — plotted GREEN on the kurir task map.
           latitude: d.latitude,
@@ -161,7 +160,7 @@ export async function GET(req: NextRequest) {
             scanned: scannedIds.has(x.id),
           })),
           gudangIds,
-        };
+        });
       }),
     );
   });

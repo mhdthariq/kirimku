@@ -1,4 +1,6 @@
 import { NextRequest } from "next/server";
+import { parseEvidenceMetadata } from "@/infrastructure/services/evidence-photo";
+import { watermarkActivityPhoto } from "@/infrastructure/services/activity-watermark";
 import { db } from "@/infrastructure/persistence/db";
 import { guard, ok, handle, fail } from "@/composition/api-helpers";
 import { audit } from "@/infrastructure/services/audit";
@@ -24,7 +26,7 @@ const MAX_PHOTO_BYTES = 2_500_000; // ~2.5 MB after client-side compression
  * - the server independently recomputes the distance to the checkpoint and
  *   REJECTS the check-in when the user is outside the configured radius —
  *   frontend-supplied locations are never trusted as-is (Part Z);
- * - the recorded timestamp is SERVER time (client timestamps are ignored);
+ * - recordedAt remains SERVER time; optional capturedAt is validated separately;
  * - checking in at the FINAL checkpoint inside its radius automatically
  *   completes the transport's arrival (Part N — no manual Arrived button).
  */
@@ -36,6 +38,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       where: { id: Number(id) },
       include: {
         route: { include: { checkpoints: { orderBy: { sequence: "asc" } } } },
+        vehicle: true,
         driver: true,
         kenek: true,
         shipments: { include: { master: true } },
@@ -62,7 +65,11 @@ export async function POST(req: NextRequest, { params }: Params) {
       return fail(422, `Check-in hanya untuk transport PLANNED atau DEPARTED (saat ini: ${transport.status}).`);
     }
 
-    const body = await req.json().catch(() => ({}));
+    const parsed = await req.json().catch(() => null);
+    const body = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+    const evidence = parseEvidenceMetadata(body);
+    if ("error" in evidence) return fail(422, evidence.error);
+    const { metadata } = evidence;
     const checkpointId = Number(body.checkpointId);
     const latitude = Number(body.latitude);
     const longitude = Number(body.longitude);
@@ -116,6 +123,23 @@ export async function POST(req: NextRequest, { params }: Params) {
       checkpoint.sequence === Math.min(...transport.route.checkpoints.map((c) => c.sequence));
     const autoDeparted = transport.status === "PLANNED" && isFirstCheckpoint;
 
+    let photoUrl: string;
+    try {
+      photoUrl = await watermarkActivityPhoto(photo, {
+        ...metadata, latitude, longitude, locationAccuracy: body.locationAccuracy ?? null,
+        transportCode: transport.transportCode, recordedBy: user.name,
+        label: `Check-in ${checkpoint.name}`,
+        origin: transport.origin ?? transport.route?.origin ?? undefined,
+        destination: transport.destination ?? transport.route?.destination ?? undefined,
+        shipmentCount: transport.shipments.length,
+        vehiclePlate: transport.vehicle?.vehicleNumber,
+        vehicleDescription: transport.vehicle?.name ?? undefined,
+        driverName: transport.driver?.name,
+      });
+    } catch {
+      return fail(422, "Foto bukti tidak dapat diproses. Ambil ulang foto.");
+    }
+
     const record = await db.$transaction(async (tx) => {
       const created = await tx.checkpointRecord.create({
         data: {
@@ -124,7 +148,9 @@ export async function POST(req: NextRequest, { params }: Params) {
           latitude,
           longitude,
           withinRadius: true,
-          photoUrl: photo,
+          locationAccuracy: body.locationAccuracy ?? null,
+          photoUrl,
+          ...metadata,
           distanceMeters: distance,
           recordedById: user.id,
           recordedAt: new Date(),

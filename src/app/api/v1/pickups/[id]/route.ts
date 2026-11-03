@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { db } from "@/infrastructure/persistence/db";
 import { guard, ok, handle, fail, str, num } from "@/composition/api-helpers";
 import { audit, diffFields } from "@/infrastructure/services/audit";
+import { withProofVisibility } from "@/infrastructure/services/proof-visibility";
 import { scanProgress, paymentSummary } from "@/infrastructure/services/scan-flow";
 import { assertShipmentScope } from "@/infrastructure/services/gudang-scope";
 
@@ -19,7 +20,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     await assertShipmentScope(user, pickup.master);
     const progress = await scanProgress({ pickupId: pickup.id });
     const payment = await paymentSummary(pickup.masterId);
-    return ok({ ...pickup, progress, paymentSummary: payment });
+    return ok(withProofVisibility(user, { ...pickup, progress, paymentSummary: payment }));
   });
 }
 
@@ -43,7 +44,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
     const pickup = await db.pickup.update({ where: { id: existing.id }, data });
     await audit({ action: "updated", entityType: "pickup", entityId: pickup.id, entityLabel: pickup.pickupCode, actor: user, before: diffFields(existing, pickup as unknown as Record<string, unknown>) });
-    return ok(pickup);
+    return ok(withProofVisibility(user, pickup));
   });
 }
 

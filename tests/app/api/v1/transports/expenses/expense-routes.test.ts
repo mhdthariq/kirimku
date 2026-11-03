@@ -1,4 +1,11 @@
 import { NextRequest } from "next/server";
+import sharp from "sharp";
+
+vi.mock("@/infrastructure/services/evidence-photo", () => ({ parseEvidenceMetadata: () => ({ metadata: {
+  locationLabel: null, timeZone: "Asia/Jakarta", capturedAt: new Date(), mockLocation: null,
+} }) }));
+vi.mock("@/infrastructure/services/activity-watermark", () => ({ watermarkActivityPhoto: async (photo: string) => photo }));
+const proofPhoto = `data:image/png;base64,${(await sharp({ create: { width: 2, height: 2, channels: 3, background: "white" } }).png().toBuffer()).toString("base64")}`;
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const m = vi.hoisted(() => ({ auth: vi.fn(), permission: vi.fn(), scope: vi.fn(), transport: vi.fn(),
@@ -43,9 +50,33 @@ beforeEach(() => {
 });
 
 describe("expense API approval and GPS", () => {
+    it("clears capture metadata when replacing/appending proof or changing GPS", async () => {
+        m.find.mockResolvedValue({ ...expense, locationLabel: "Old location", timeZone: "Asia/Jakarta", capturedAt: new Date(), mockLocation: false });
+        for (const payload of [
+            { photo: proofPhoto }, { photos: [proofPhoto] }, { removePhoto: true },
+            { ...gps, latitude: -7 },
+        ]) {
+            expect((await update(req(payload), params())).status).toBe(200);
+            expect(m.updateMany).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({
+                locationLabel: null, timeZone: null, capturedAt: null, mockLocation: null,
+            }) }));
+        }
+    });
+    it("retains the update contract without relabeling historical photos", async () => {
+        expect((await update(req({ amount: 200, locationLabel: "New label", timeZone: "Asia/Jayapura", capturedAt: new Date().toISOString(), mockLocation: true }), params())).status).toBe(200);
+        const data = m.updateMany.mock.calls[0][0].data;
+        expect(data).toMatchObject({ amount: 200 });
+        for (const key of ["locationLabel", "timeZone", "capturedAt", "mockLocation"]) expect(data).not.toHaveProperty(key);
+    });
+    it("rejects corrupt new proof uploads on update without changing evidence", async () => {
+        for (const payload of [{ photo: "data:image/png;base64,YQ==" }, { photos: ["data:image/jpeg;base64,Yg=="] }]) {
+            expect((await update(req(payload), params())).status).toBe(422);
+        }
+        expect(m.updateMany).not.toHaveBeenCalled();
+    });
     it("stores multiple proofs, appends to legacy proof, and hides image data from lists", async () => {
-        const first = "data:image/jpeg;base64,YQ==";
-        const second = "data:image/png;base64,Yg==";
+        const first = proofPhoto;
+        const second = `data:image/png;base64,${(await sharp({ create: { width: 3, height: 3, channels: 3, background: "black" } }).png().toBuffer()).toString("base64")}`;
         expect((await create(req({ ...body, photos: [first, second] }), params())).status).toBe(200);
         expect(m.create).toHaveBeenCalledWith({ data: expect.objectContaining({ photoUrls: [first, second] }) });
         m.find.mockResolvedValue({ ...expense, photoUrl: first, photoUrls: [] });
@@ -118,11 +149,14 @@ describe("expense API approval and GPS", () => {
             expect(m.updateMany).not.toHaveBeenCalled();
         },
     );
-  it.each([create, update])("requires fresh GPS for writes %#", async (route) => {
-    for (const payload of [{ type: "BBM", amount: 100 }, { ...body, latitude: null }, { ...body, locationAccuracy: -1 }, null]) {
+  it.each([create, update])("validates supplied GPS for writes %#", async (route) => {
+    for (const payload of [{ ...body, latitude: null }, { ...body, locationAccuracy: -1 }]) {
       expect((await route(req(payload), params())).status).toBe(422);
     }
     expect(m.create).not.toHaveBeenCalled(); expect(m.updateMany).not.toHaveBeenCalled();
+  });
+  it.each([create, update])("accepts legacy writes without GPS %#", async (route) => {
+    expect((await route(req({ type: "BBM", amount: 100 }), params())).status).toBe(200);
   });
   it("creates PENDING expenses with GPS and optional receipt", async () => {
     const response = await create(req({ ...body, status: "APPROVED", approvedById: 999 }), params());

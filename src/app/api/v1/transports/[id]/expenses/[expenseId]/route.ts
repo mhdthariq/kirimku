@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import sharp from "sharp";
 import { db } from "@/infrastructure/persistence/db";
 import { guard, ok, handle, fail, str } from "@/composition/api-helpers";
 import { audit } from "@/infrastructure/services/audit";
@@ -48,7 +49,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const problem = validateExpense({ type: body.type ?? expense.type, amount: body.amount ?? expense.amount });
     if (problem) return fail(422, problem, { type: [problem] });
 
-    const locationProblem = validateExpenseLocation(body);
+    // Keep the update contract: never re-stamp historical photos with a new capture time.
+    const hasLocation = [body.latitude, body.longitude, body.locationAccuracy].some(value => value !== undefined);
+    const locationProblem = hasLocation ? validateExpenseLocation(body) : null;
     if (locationProblem) return fail(422, locationProblem, { location: [locationProblem] });
     const data: Record<string, unknown> = {
       latitude: body.latitude, longitude: body.longitude, locationAccuracy: body.locationAccuracy,
@@ -67,6 +70,22 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const proof = parseExpensePhotos(body, expense);
     if (proof.error) return fail(422, proof.error, { photos: [proof.error] });
     if (proof.photos) { data.photoUrls = proof.photos; data.photoUrl = null; }
+
+    try {
+      const uploads = [...(Array.isArray(body.photos) ? body.photos : []),
+        ...(typeof body.photo === "string" && body.photo ? [body.photo] : [])];
+      for (const url of uploads) {
+        await sharp(Buffer.from(url.slice(url.indexOf(",") + 1), "base64"), { limitInputPixels: 20_000_000 }).resize({ width: 1, height: 1, fit: "inside" }).toBuffer();
+      }
+    } catch {
+      return fail(422, "Foto bukti tidak dapat diproses. Ambil ulang foto.");
+    }
+    const photosChanged = data.photoUrl !== undefined || data.photoUrls !== undefined;
+    const locationChanged = hasLocation && (body.latitude !== expense.latitude || body.longitude !== expense.longitude || body.locationAccuracy !== expense.locationAccuracy);
+    if (photosChanged || locationChanged) {
+      // One row cannot truthfully describe capture metadata for mixed old/new evidence.
+      Object.assign(data, { locationLabel: null, timeZone: null, capturedAt: null, mockLocation: null });
+    }
 
     const result = await db.transportExpense.updateMany({ where: { id: expense.id, transportId: expense.transportId, status: "PENDING" }, data });
     if (result.count !== 1) return fail(409, "Biaya telah disetujui atau dihapus. Muat ulang data.");

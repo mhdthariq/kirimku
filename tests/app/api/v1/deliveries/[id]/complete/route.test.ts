@@ -1,5 +1,10 @@
 import { NextRequest } from "next/server";
+import sharp from "sharp";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/infrastructure/services/evidence-photo", () => ({ parseEvidenceMetadata: () => ({ metadata: {
+  locationLabel: null, timeZone: "Asia/Jakarta", capturedAt: new Date(), mockLocation: null,
+} }) }));
 
 const mocks = vi.hoisted(() => ({
   getAuthUser: vi.fn(), hasPermission: vi.fn(), find: vi.fn(), employee: vi.fn(), transport: vi.fn(),
@@ -25,7 +30,7 @@ import { POST } from "../../../../../../../src/app/api/v1/deliveries/[id]/comple
 const actor = { id: 7, name: "Courier", permissions: ["delivery.confirm"], isOwner: false };
 const delivery = { id: 12, deliveryCode: "DLV-12", masterId: 20, kurirId: 9, status: "IN_PROGRESS", notes: "Existing note",
   master: { id: 20, status: "IN_TRANSIT", fulfillmentMode: "STANDARD", customer: { name: "Customer" }, details: [{ detailCode: "PKG-1" }] } };
-const photo = "data:image/jpeg;base64,YQ==";
+const photo = `data:image/png;base64,${(await sharp({ create: { width: 2, height: 2, channels: 3, background: "white" } }).png().toBuffer()).toString("base64")}`;
 const validBody = { proofOfDelivery: " Receiver ", photoUrl: photo };
 const params = () => ({ params: Promise.resolve({ id: "12" }) });
 const request = (body: unknown = validBody) => new NextRequest("http://localhost/api/v1/deliveries/12/complete", {
@@ -126,6 +131,8 @@ describe("POST /api/v1/deliveries/[id]/complete", () => {
     expect(mocks.transaction).toHaveBeenCalledTimes(1);
     expect(mocks.updateDelivery).toHaveBeenCalledWith({ where: { id: 12 }, data: {
       status: "COMPLETED", completedAt: expect.any(Date), proofOfDelivery: "Receiver", notes: "Existing note", photoUrl: photo,
+      locationLabel: null, timeZone: "Asia/Jakarta", capturedAt: expect.any(Date), mockLocation: null,
+      captureLatitude: null, captureLongitude: null, captureAccuracy: null,
     } });
     expect(mocks.updateShipment).toHaveBeenCalledWith({ where: { id: 20 }, data: { status: "DELIVERED" } });
     expect(mocks.tracking).toHaveBeenCalledWith({ data: { masterId: 20, event: "DELIVERED", description: tracking, actorId: 7 } });
@@ -135,12 +142,12 @@ describe("POST /api/v1/deliveries/[id]/complete", () => {
   });
   it("does not rewrite an already-delivered shipment and falls back to the actor name", async () => {
     mocks.find.mockResolvedValue({ ...delivery, kurirId: null, master: { ...delivery.master, status: "DELIVERED" } });
-    const response = await POST(request({ ...validBody, notes: " New note ", photoUrl: "data:image/png;base64,YQ==" }), params());
+    const response = await POST(request({ ...validBody, notes: " New note ", photoUrl: photo }), params());
     expect(response.status).toBe(200);
     expect((await response.json()).data.tracking).toBe("Delivered to Customer by Courier - received by: Receiver");
     expect(mocks.updateShipment).not.toHaveBeenCalled();
     expect(mocks.employee).not.toHaveBeenCalled();
-    expect(mocks.updateDelivery).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ notes: "New note", photoUrl: "data:image/png;base64,YQ==" }) }));
+    expect(mocks.updateDelivery).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ notes: "New note", photoUrl: photo }) }));
   });
   it.each([true, false])("uses the latest DIRECT checkpoint when available (%s), otherwise standard tracking", async (hasCheckpoint) => {
     mocks.find.mockResolvedValue({ ...delivery, master: { ...delivery.master, fulfillmentMode: "DIRECT" } });

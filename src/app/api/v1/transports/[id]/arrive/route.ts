@@ -14,7 +14,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   return handle(req, async () => {
     const user = await guard(req, "transport.arrive");
     const { id } = await params;
-    const transport = await db.transport.findUnique({ where: { id: Number(id) }, include: { route: true, shipments: { include: { master: true } } } });
+    const transport = await db.transport.findUnique({ where: { id: Number(id) }, include: { route: true, vehicle: true, driver: true, shipments: { include: { master: true } } } });
     if (!transport) return fail(404, "Transport tidak ditemukan.");
     await assertTransportAccess(user, transport);
     if (transport.trackingMode === "ACTIVITY" && transport.status !== "DEPARTED") return fail(422, "Transport ACTIVITY harus berangkat sebelum diselesaikan.");
@@ -24,6 +24,9 @@ export async function POST(req: NextRequest, { params }: Params) {
     const withoutPhoto = transport.trackingMode === "ACTIVITY" && hasPermission(user, "transport.arrive_without_photo");
     const evidence = transport.trackingMode === "ACTIVITY" && !withoutPhoto ? await parseActivityEvidence(req, {
       transportCode: transport.transportCode, recordedBy: user.username, label: "Bukti tiba di tujuan",
+            origin: transport.origin ?? transport.route?.origin, destination: transport.destination ?? transport.route?.destination,
+            shipmentCount: transport.shipments.length, vehiclePlate: transport.vehicle?.vehicleNumber,
+            vehicleDescription: transport.vehicle?.name, driverName: transport.driver?.name,
     }) : null;
     const bypassedStart = transport.status === "PLANNED";
 

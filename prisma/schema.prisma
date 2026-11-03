@@ -537,6 +537,10 @@ model TransportShipment {
 /// Operational cost of a transport. A transport can have many of each type
 /// (several BBM fill-ups, several parking receipts...). Photo proof is optional.
 model TransportExpense {
+    locationLabel      String?
+    timeZone           String?
+    capturedAt         DateTime?
+    mockLocation       Boolean?
     photoUrls          String[] @default([])
     id                 Int       @id @default(autoincrement())
     expenseCode        String    @unique
@@ -570,6 +574,9 @@ model TransportExpense {
 }
 
 model TransportActivity {
+    locationLabel      String?
+    timeZone           String?
+    mockLocation       Boolean?
     id                 Int       @id @default(autoincrement())
     transportId        Int
     photoUrl           String
@@ -611,6 +618,11 @@ model ReturnTask {
 }
 
 model CheckpointRecord {
+    locationLabel    String?
+    timeZone         String?
+    capturedAt       DateTime?
+    mockLocation     Boolean?
+    locationAccuracy Float?
     id             Int        @id @default(autoincrement())
     transportId    Int
     checkpointId   Int
@@ -630,6 +642,13 @@ model CheckpointRecord {
 }
 
 model Pickup {
+    locationLabel    String?
+    timeZone         String?
+    capturedAt       DateTime?
+    mockLocation     Boolean?
+    captureLatitude  Float?
+    captureLongitude Float?
+    captureAccuracy  Float?
     id          Int            @id @default(autoincrement())
     pickupCode  String         @unique
     masterId    Int
@@ -684,6 +703,13 @@ model Discrepancy {
 }
 
 model Delivery {
+    locationLabel    String?
+    timeZone         String?
+    capturedAt       DateTime?
+    mockLocation     Boolean?
+    captureLatitude  Float?
+    captureLongitude Float?
+    captureAccuracy  Float?
     id              Int            @id @default(autoincrement())
     deliveryCode    String         @unique
     masterId        Int

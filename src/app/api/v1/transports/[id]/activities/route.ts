@@ -10,7 +10,7 @@ type Params = { params: Promise<{ id: string }> };
 async function loadTransport(id: string) {
   return db.transport.findUnique({
     where: { id: Number(id) },
-    include: { route: true, shipments: { include: { master: true } } },
+    include: { route: true, vehicle: true, driver: true, shipments: { include: { master: true } } },
   });
 }
 
@@ -44,7 +44,12 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (transport.trackingMode !== "ACTIVITY") return fail(422, "Transport ini tidak mendukung activity tracking.");
     if (!["PLANNED", "DEPARTED"].includes(transport.status)) return fail(422, "Aktivitas hanya untuk transport PLANNED atau DEPARTED.");
 
-    const evidence = await parseActivityEvidence(req, { transportCode: transport.transportCode, recordedBy: user.username });
+    const evidence = await parseActivityEvidence(req, {
+          transportCode: transport.transportCode, recordedBy: user.username,
+          origin: transport.origin ?? transport.route?.origin, destination: transport.destination ?? transport.route?.destination,
+          shipmentCount: transport.shipments.length, vehiclePlate: transport.vehicle?.vehicleNumber,
+          vehicleDescription: transport.vehicle?.name, driverName: transport.driver?.name,
+        });
     const { capturedAt, latitude, longitude, locationAccuracy } = evidence;
     const location = { latitude, longitude, locationAccuracy };
     const activity = await db.$transaction(async (tx) => {
@@ -56,7 +61,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       });
       if (!active.count) throw new HttpError(409, "Transport berubah; muat ulang sebelum mencatat aktivitas.");
       const created = await tx.transportActivity.create({ data: {
-        transportId: transport.id, photoUrl: evidence.photoUrl, ...location, capturedAt,
+        transportId: transport.id, ...evidence,
         recordedById: user.id, recordedByUsername: user.username,
       } });
       // A slightly older capture must not move the last known position backwards.
@@ -68,7 +73,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     });
     await audit({ action: "activity", entityType: "transport", entityId: transport.id,
       entityLabel: `${transport.transportCode} · aktivitas`, actor: user,
-      after: { activityId: activity.id, ...location, capturedAt, hasPhoto: true } });
+      after: { activityId: activity.id, ...location, capturedAt, locationLabel: evidence.locationLabel, timeZone: evidence.timeZone, mockLocation: evidence.mockLocation, hasPhoto: true } });
     return ok(activity);
   });
 }
