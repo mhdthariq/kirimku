@@ -16,7 +16,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       },
     });
     if (!task) return fail(404, "Resi tugas balik tidak ditemukan.");
-    const outbound = task.originalTransport.route?.checkpoints ?? [];
+    const outbound = task.originalTransport.trackingMode === "ACTIVITY" ? [] : task.originalTransport.route?.checkpoints ?? [];
     return ok({
       ...task,
       // preview of the return leg: outbound checkpoints reversed

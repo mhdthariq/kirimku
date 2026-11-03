@@ -332,6 +332,11 @@ export async function DELETE(req: NextRequest, { params }: Params) {
           await tx.masterShipment.update({ where: { id: s.shipmentId }, data: { status: "RECEIVED_AT_GUDANG" } });
         }
       }
+      // Keep the approval so the deleted return leg can be planned again.
+      await tx.returnTask.updateMany({
+        where: { returnTransportId: existing.id },
+        data: { returnTransportId: null, status: "APPROVED" },
+      });
       await tx.transport.delete({ where: { id: existing.id } });
     });
     await audit({ action: "deleted", entityType: "transport", entityId: existing.id, entityLabel: existing.transportCode, actor: user, before: existing });

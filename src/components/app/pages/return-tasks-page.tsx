@@ -191,7 +191,7 @@ export function ReturnTasksPage() {
           <DialogHeader>
             <DialogTitle>Buat Transport Balik</DialogTitle>
             <DialogDescription>
-              {transportFor?.returnTaskCode}: {transportFor?.origin} → {transportFor?.destination}. Rute balik = checkpoint rute asal dibalik, kendaraan & driver sama, tanpa resi.
+              {transportFor?.returnTaskCode}: {transportFor?.origin} → {transportFor?.destination}. Mode tracking mengikuti transport asal (Activity atau checkpoint terbalik), kendaraan & driver sama, tanpa resi.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={createTransport} className="space-y-4">

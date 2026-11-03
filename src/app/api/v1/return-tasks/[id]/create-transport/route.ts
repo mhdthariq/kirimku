@@ -9,8 +9,8 @@ type Params = { params: Promise<{ id: string }> };
 
 /**
  * POST /return-tasks/:id/create-transport — { plannedDepartureAt?, plannedArrivalAt? }
- * Builds the return Transport: a new Route with the outbound checkpoints in
- * reverse order, same vehicle and driver, no resi (empty run), status PLANNED.
+ * Builds an empty return Transport with the same tracking mode, vehicle and
+ * driver. Checkpoint tracking reverses the outbound checkpoints.
  */
 export async function POST(req: NextRequest, { params }: Params) {
   return handle(req, async () => {
@@ -24,8 +24,9 @@ export async function POST(req: NextRequest, { params }: Params) {
     const problem = canCreateReturnTransport(task.status, task.returnTransportId != null);
     if (problem) return fail(422, problem);
 
-    const outbound = task.originalTransport.route?.checkpoints ?? [];
-    if (outbound.length < 3) return fail(422, "Rute asal punya kurang dari 3 checkpoint - rute balik tidak bisa dibuat.");
+    const trackingMode = task.originalTransport.trackingMode;
+    const outbound = trackingMode === "ACTIVITY" ? [] : task.originalTransport.route?.checkpoints ?? [];
+    if (trackingMode !== "ACTIVITY" && outbound.length < 3) return fail(422, "Rute asal punya kurang dari 3 checkpoint - rute balik tidak bisa dibuat.");
     const body = await req.json().catch(() => ({}));
     const plannedDepartureAt = dateOrNull(body.plannedDepartureAt) ?? new Date();
     const plannedArrivalAt = dateOrNull(body.plannedArrivalAt) ?? new Date(plannedDepartureAt.getTime() + 6 * 3600 * 1000);
@@ -54,6 +55,7 @@ export async function POST(req: NextRequest, { params }: Params) {
           plannedArrivalAt,
           status: "PLANNED",
           transportMode: "DIRECT",
+          trackingMode,
         },
       });
       const updated = await tx.returnTask.update({ where: { id: task.id }, data: { returnTransportId: transport.id, status: "PLANNED" } });
