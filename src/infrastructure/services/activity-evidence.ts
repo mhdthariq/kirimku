@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import { reverseEvidenceAddress } from "./evidence-address";
 import { parseEvidenceMetadata } from "./evidence-photo";
 import { HttpError } from "@/shared/http-error";
 import { parseOptionalPhoto } from "@/infrastructure/services/transport-ops-server";
@@ -33,6 +34,7 @@ export async function parseActivityEvidence(req: { json(): Promise<unknown> }, w
       longitude: body.longitude as number,
       locationAccuracy: (body.locationAccuracy as number | null | undefined) ?? null,
     };
+    evidenceMetadata.locationLabel ||= await reverseEvidenceAddress(location.latitude, location.longitude);
     let photoUrl: string;
     try {
       photoUrl = await watermarkActivityPhoto(photo.photoUrl, { ...location, ...evidenceMetadata, ...watermark, capturedAt });

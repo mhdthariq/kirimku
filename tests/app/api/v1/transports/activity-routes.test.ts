@@ -89,10 +89,12 @@ vi.mock("@/infrastructure/http/license", () => ({
     LicenseError: class extends Error {},
 }));
 vi.mock("@/infrastructure/persistence/tenant-context", () => ({
+    currentCompanyName: () => "PT Customer Logistics",
     resolveTenantContext: vi.fn(),
     runWithTenant: (_tenant: unknown, fn: () => unknown) => fn(),
     isDefaultTenant: () => false,
 }));
+vi.mock("@/infrastructure/services/evidence-address", () => ({ reverseEvidenceAddress: vi.fn(async () => null) }));
 
 import { GET, POST } from "@/app/api/v1/transports/[id]/activities/route";
 import { POST as depart } from "@/app/api/v1/transports/[id]/depart/route";
@@ -103,6 +105,7 @@ import { PUT as edit } from "@/app/api/v1/transports/[id]/route";
 import { POST as drop } from "@/app/api/v1/transports/[id]/drops/[shipmentId]/route";
 import { POST as plan } from "@/app/api/v1/transports/route";
 import { HttpError } from "@/shared/http-error";
+import { reverseEvidenceAddress } from "@/infrastructure/services/evidence-address";
 import {
     activityCaptureError,
     parseTrackingMode,
@@ -172,6 +175,11 @@ beforeEach(() => {
 });
 
 describe("activity evidence API", () => {
+    it("stores the web fallback address alongside the stamped photo", async () => {
+        vi.mocked(reverseEvidenceAddress).mockResolvedValueOnce("Jl. Pulau Palu, Medan");
+        expect((await POST(req(payload()), params())).status).toBe(200);
+        expect(m.create).toHaveBeenCalledWith({ data: expect.objectContaining({ locationLabel: "Jl. Pulau Palu, Medan" }) });
+    });
     it("persists WITA capture metadata without accepting client trip identity", async () => {
         const body = { ...payload(), timeZone: "Asia/Makassar", locationLabel: "Pelabuhan Balikpapan", mockLocation: true,
             origin: "Forged origin", vehiclePlate: "Forged plate", driverName: "Forged driver" };
