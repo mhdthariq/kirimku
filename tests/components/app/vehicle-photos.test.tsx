@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 
@@ -19,6 +19,37 @@ beforeEach(() => {
   m.get.mockImplementation(async (path: string) => path === "/vehicles" ? [vehicle] : path === "/options" ? { vehicleOwners: [] } : null);
   m.post.mockResolvedValue({ id: 2 });
   m.put.mockResolvedValue(vehicle);
+});
+
+it("switches between Card and Table while preserving search and vehicle actions", async () => {
+  const user = userEvent.setup();
+  render(<VehiclesPage />);
+  const card = await screen.findByRole("article", { name: "Kendaraan B 1234 XX" });
+  expect(within(card).getByText("3.500 kg")).toBeInTheDocument();
+  expect(within(card).getByRole("button", { name: "Edit B 1234 XX" })).toBeInTheDocument();
+  const views = within(screen.getByRole("group", { name: "Tampilan kendaraan" }));
+  expect(views.getByRole("button", { name: "Card" })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  await user.type(screen.getByPlaceholderText("Cari nopol / nama…"), "1234");
+  await user.click(views.getByRole("button", { name: "Table" }));
+  expect(within(screen.getByRole("table")).getByText("B 1234 XX")).toBeInTheDocument();
+  expect(screen.queryByRole("article")).not.toBeInTheDocument();
+  expect(screen.getByPlaceholderText("Cari nopol / nama…")).toHaveValue("1234");
+  await user.click(views.getByRole("button", { name: "Card" }));
+  await user.click(screen.getByRole("button", { name: "Edit B 1234 XX" }));
+  expect(screen.getByRole("dialog")).toBeInTheDocument();
+});
+
+it("keeps search and view controls available with no matching vehicles", async () => {
+  const user = userEvent.setup();
+  render(<VehiclesPage />);
+  await screen.findByRole("article", { name: "Kendaraan B 1234 XX" });
+  await user.type(screen.getByPlaceholderText("Cari nopol / nama…"), "missing");
+  await user.click(screen.getByRole("button", { name: "Table" }));
+  expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  expect(screen.getByPlaceholderText("Cari nopol / nama…")).toHaveValue("missing");
+  await user.clear(screen.getByPlaceholderText("Cari nopol / nama…"));
+  expect(screen.getByRole("table")).toBeInTheDocument();
 });
 
 it("previews an uploaded photo and submits it with the new vehicle", async () => {

@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { PasteFileInput } from "@/components/ui/paste-file-input";
 import { OpenableImage } from "@/components/ui/openable-image";
 import { useMemo, useRef, useState } from "react";
-import { CarFront, Download, Gauge, History, Pencil, Plus, Trash2, Truck, Wand2, AlertTriangle, ShieldCheck } from "lucide-react";
+import { CarFront, Download, Gauge, History, LayoutGrid, Pencil, Plus, Table2, Trash2, Truck, Wand2, AlertTriangle, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { apiDelete, apiGet, apiPost, apiPut, hasPermission, type Options, type Vehicle, type FleetCapacityResponse } from "@/infrastructure/http/client-api";
 import { runAction, useApiData } from "@/hooks/use-api-data";
@@ -52,6 +52,7 @@ export function VehiclesPage() {
   // Fleet capacity data (for the combined "Kapasitas Armada" tab).
   const { data: fleetData, loading: fleetLoading, reload: reloadFleet } = useApiData<FleetCapacityResponse>(() => apiGet<FleetCapacityResponse>("/fleet-capacity"), []);
   const [search, setSearch] = useState("");
+  const [viewMode, setViewMode] = useState<"card" | "table">("card");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [historyVehicle, setHistoryVehicle] = useState<{ id: number; vehicleNumber: string } | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -178,7 +179,7 @@ export function VehiclesPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       <PageHeader
         title="Kendaraan"
         subtitle="Armada pengangkut beserta kapasitas dan kru default."
@@ -197,18 +198,32 @@ export function VehiclesPage() {
         }
       />
 
-      <Tabs defaultValue="list">
-        <TabsList>
-          <TabsTrigger value="list">Daftar</TabsTrigger>
-          <TabsTrigger value="capacity">Kapasitas Armada</TabsTrigger>
-          <TabsTrigger value="activity">Log Aktivitas</TabsTrigger>
+      <Tabs defaultValue="list" className="min-w-0">
+        <TabsList className="h-auto max-w-full flex-wrap justify-start gap-1 rounded-xl p-1.5">
+          <TabsTrigger value="list" className="min-h-10 rounded-lg">Daftar</TabsTrigger>
+          <TabsTrigger value="capacity" className="min-h-10 rounded-lg">Kapasitas Armada</TabsTrigger>
+          <TabsTrigger value="activity" className="min-h-10 rounded-lg">Log Aktivitas</TabsTrigger>
         </TabsList>
-        <TabsContent value="list" className="mt-3">
+        <TabsContent value="list" className="mt-3 min-w-0 space-y-4">
+          <section className="flex flex-col gap-3 rounded-2xl border bg-card p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5" aria-label="Pengaturan daftar kendaraan">
+            <div className="min-w-0">
+              <h2 className="text-base font-semibold">Daftar Kendaraan</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Foto, kapasitas, dan kru armada dalam satu tempat.</p>
+            </div>
+            <div role="group" aria-label="Tampilan kendaraan" className="flex w-full shrink-0 gap-1 rounded-xl border bg-muted/40 p-1 sm:w-auto">
+              <Button size="sm" variant={viewMode === "table" ? "default" : "ghost"} aria-pressed={viewMode === "table"} className="min-h-10 flex-1 rounded-lg px-3 sm:flex-none" onClick={() => setViewMode("table")}>
+                <Table2 aria-hidden="true" className="h-4 w-4" /> Table
+              </Button>
+              <Button size="sm" variant={viewMode === "card" ? "default" : "ghost"} aria-pressed={viewMode === "card"} className="min-h-10 flex-1 rounded-lg px-3 sm:flex-none" onClick={() => setViewMode("card")}>
+                <LayoutGrid aria-hidden="true" className="h-4 w-4" /> Card
+              </Button>
+            </div>
+          </section>
           <DataTable
             rows={rows}
-            desktopBreakpoint="xl"
+            viewMode={viewMode}
             renderCard={(vehicle) => (
-              <article className="min-w-0 overflow-hidden rounded-2xl border bg-card shadow-sm">
+              <article aria-label={`Kendaraan ${vehicle.vehicleNumber}`} className="h-full min-w-0 overflow-hidden rounded-2xl border bg-card shadow-sm">
                 <div className="relative flex aspect-[16/9] items-center justify-center bg-muted">
                   {vehicle.photoDataUrl ? <OpenableImage src={vehicle.photoDataUrl} alt={vehicle.name || vehicle.vehicleNumber} className="h-full w-full object-cover" /> : <Truck className="h-16 w-16 text-muted-foreground/40" />}
                   <div className="absolute right-3 top-3"><StatusBadge status={vehicle.status} /></div>
@@ -225,6 +240,10 @@ export function VehiclesPage() {
                     <div><dt className="text-[11px] text-muted-foreground">Berat</dt><dd className="break-words text-sm font-semibold">{formatNumber(vehicle.maxWeightKg, 0)} kg</dd></div>
                     <div><dt className="text-[11px] text-muted-foreground">Volume</dt><dd className="break-words text-sm font-semibold">{formatNumber(vehicle.maxVolumeM3, 2)} m³</dd></div>
                     <div><dt className="text-[11px] text-muted-foreground">Koli</dt><dd className="text-sm font-semibold">{vehicle.maxKoli ?? "—"}</dd></div>
+                  </dl>
+                  <dl className="space-y-2 text-xs">
+                    <div className="flex items-start justify-between gap-3"><dt className="shrink-0 text-muted-foreground">Ukuran (P × L × T)</dt><dd className="min-w-0 break-words text-right">{vehicle.lengthM != null && vehicle.widthM != null && vehicle.heightM != null ? `${formatNumber(vehicle.lengthM, 2)} × ${formatNumber(vehicle.widthM, 2)} × ${formatNumber(vehicle.heightM, 2)} m` : "Belum diatur"}</dd></div>
+                    <div className="flex items-start justify-between gap-3"><dt className="shrink-0 text-muted-foreground">Kru Default</dt><dd className="min-w-0 break-words text-right">{vehicle.assignments?.[0] ? [vehicle.assignments[0].driver?.name, vehicle.assignments[0].kenek?.name].filter(Boolean).join(" · ") || "Belum ditugaskan" : "Belum ditugaskan"}</dd></div>
                   </dl>
                   <p className="break-words text-xs text-muted-foreground">{vehicle.owner?.user.name || "Milik perusahaan"} · {vehicle._count?.transports ?? 0} transport</p>
                 </div>

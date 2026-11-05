@@ -270,7 +270,7 @@ export function TariffsPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Hapus permanen tarif {confirmDelete ? tariffLabel(confirmDelete) : ""}?</AlertDialogTitle>
-            <AlertDialogDescription>Tarif akan dihapus permanen dan tidak dapat dipulihkan. Hanya tarif yang tidak terhubung ke shipment yang dapat dihapus. Untuk menonaktifkan tarif, hapus centang pada checkbox Aktif.</AlertDialogDescription>
+            <AlertDialogDescription>Tarif akan dihapus permanen dan tidak dapat dipulihkan. Hanya tarif yang tidak terhubung ke shipment yang dapat dihapus. Untuk menonaktifkan tarif, ubah status tarif menjadi Nonaktif.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={actionBusy}>Batal</AlertDialogCancel>
@@ -303,11 +303,12 @@ function TariffStatusCheckbox({ tariff, busy, onToggleActive }: {
   onToggleActive: (tariff: Tariff) => void;
 }) {
   return (
-    <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-2 text-sm has-disabled:cursor-not-allowed has-disabled:opacity-50">
+    <label className="flex min-h-11 shrink-0 cursor-pointer items-center gap-2.5 rounded-full px-2 text-xs font-medium has-disabled:cursor-not-allowed has-disabled:opacity-50">
       <input type="checkbox" checked={tariff.isActive} disabled={busy}
         onChange={() => onToggleActive(tariff)} aria-label={`Tarif aktif ${tariff.name || tariffLabel(tariff)}`}
-        className="size-5 shrink-0 accent-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" />
-      {tariff.isActive ? "Aktif" : "Nonaktif"}
+        className="peer sr-only" />
+      <span aria-hidden="true" className="relative h-6 w-10 shrink-0 rounded-full bg-muted-foreground/30 transition-colors after:absolute after:top-1 after:left-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:shadow-sm after:transition-transform peer-checked:bg-primary peer-checked:after:translate-x-4 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ring" />
+      <span className={tariff.isActive ? "text-primary" : "text-muted-foreground"}>{tariff.isActive ? "Aktif" : "Nonaktif"}</span>
     </label>
   );
 }
@@ -411,11 +412,14 @@ function TariffCard({ tariff, canUpdate, onEdit, onDelete, onToggleActive, busy 
           <p className="flex items-start gap-2"><CalendarDays aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground" /><span className="min-w-0 break-words">{formatDate(tariff.effectiveFrom)} – {tariff.effectiveTo ? formatDate(tariff.effectiveTo) : "Tanpa batas"}</span></p>
           <p className="leading-relaxed text-muted-foreground">{tariffRules(tariff)}</p>
         </div>
+        {canUpdate && <div className="flex items-center justify-between gap-3 rounded-xl border bg-muted/30 px-3 py-1">
+          <span className="text-xs font-medium text-muted-foreground">Status tarif</span>
+          <TariffStatusCheckbox tariff={tariff} busy={busy} onToggleActive={onToggleActive} />
+        </div>}
       </div>
       {canUpdate && (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t bg-muted/20 px-4 py-3 sm:px-5">
-          <Button disabled={busy} variant="outline" className="min-h-10 rounded-lg" onClick={() => onEdit(tariff)} aria-label={`Edit tarif ${tariff.name || tariffLabel(tariff)}`}><Pencil className="h-3.5 w-3.5" /> Edit Tarif</Button>
-          <TariffStatusCheckbox tariff={tariff} busy={busy} onToggleActive={onToggleActive} />
+        <div className="flex flex-wrap items-center gap-2 border-t bg-muted/20 px-4 py-3 sm:px-5">
+          <Button disabled={busy} variant="outline" className="min-h-10 flex-1 rounded-lg" onClick={() => onEdit(tariff)} aria-label={`Edit tarif ${tariff.name || tariffLabel(tariff)}`}><Pencil className="h-3.5 w-3.5" /> Edit Tarif</Button>
           <Button disabled={busy || (tariff._count?.shipments ?? 0) > 0} variant="ghost" size="icon" className="h-10 w-10 rounded-lg text-destructive hover:text-destructive" onClick={() => onDelete(tariff)} aria-label={`Hapus permanen tarif ${tariff.name || tariffLabel(tariff)}`}><Trash2 className="h-4 w-4" /></Button>
           {(tariff._count?.shipments ?? 0) > 0 && <p className="w-full text-xs text-muted-foreground">Terhubung ke shipment. Hanya dapat dinonaktifkan.</p>}
         </div>

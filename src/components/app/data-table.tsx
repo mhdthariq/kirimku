@@ -66,6 +66,7 @@ export function DataTable<T extends { id: number | string }>({
   toolbar,
   renderCard,
   desktopBreakpoint = "md",
+  viewMode = "responsive",
 }: {
   columns: Column<T>[];
   rows: T[];
@@ -79,9 +80,11 @@ export function DataTable<T extends { id: number | string }>({
   /** Optional purpose-built card layout for information-rich records. */
   renderCard?: (row: T) => React.ReactNode;
   desktopBreakpoint?: "md" | "xl";
+  /** Override the automatic layout when the page offers a Table / Card switch. */
+  viewMode?: "responsive" | "table" | "card";
 }) {
   return (
-    <div className="space-y-3">
+    <div className="min-w-0 space-y-3">
       {(onSearchChange || toolbar) && (
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           {onSearchChange ? (
@@ -115,7 +118,7 @@ export function DataTable<T extends { id: number | string }>({
       ) : (
         <>
           {/* Desktop: table */}
-          <div className={cn("hidden min-w-0 overflow-x-auto rounded-xl border bg-card", desktopBreakpoint === "xl" ? "xl:block" : "md:block")}>
+          {viewMode !== "card" && <div className={cn("min-w-0 max-w-full overflow-x-auto rounded-xl border bg-card", viewMode === "responsive" && (desktopBreakpoint === "xl" ? "hidden xl:block" : "hidden md:block"))}>
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/50 text-left">
@@ -144,10 +147,10 @@ export function DataTable<T extends { id: number | string }>({
                 ))}
               </tbody>
             </table>
-          </div>
+          </div>}
 
           {/* Mobile: cards */}
-          <div className={cn(renderCard ? "grid min-w-0 gap-4 md:grid-cols-2" : "space-y-2.5", desktopBreakpoint === "xl" ? "xl:hidden" : "md:hidden")}>
+          {viewMode !== "table" && <div className={cn(renderCard ? "grid min-w-0 gap-4 md:grid-cols-2" : "space-y-2.5", viewMode === "card" ? "xl:grid-cols-3" : desktopBreakpoint === "xl" ? "xl:hidden" : "md:hidden")}>
             {rows.map((row) => {
               if (renderCard) return <div key={row.id} className="min-w-0">{renderCard(row)}</div>;
               const primary = columns.find((c) => c.primary);
@@ -170,7 +173,7 @@ export function DataTable<T extends { id: number | string }>({
                 </div>
               );
             })}
-          </div>
+          </div>}
         </>
       )}
     </div>

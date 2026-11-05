@@ -54,6 +54,16 @@ function renderCard(row: Row) {
 }
 
 describe("DataTable responsive cards", () => {
+    it("switches between explicit card and table layouts without duplicate content", () => {
+        const { rerender } = render(<DataTable columns={columns} rows={rows} renderCard={renderCard} viewMode="card" />);
+        expect(screen.queryByRole("table")).not.toBeInTheDocument();
+        expect(screen.getAllByRole("article")).toHaveLength(2);
+        rerender(<DataTable columns={columns} rows={rows} renderCard={renderCard} viewMode="table" />);
+        expect(screen.getByRole("table").parentElement).not.toHaveClass("hidden");
+        expect(screen.queryByRole("article")).not.toBeInTheDocument();
+        expect(within(screen.getByRole("table")).getAllByRole("row")).toHaveLength(3);
+    });
+
     it("keeps the default md table and stacked column-based cards", () => {
         render(<DataTable columns={columns} rows={rows} />);
 
