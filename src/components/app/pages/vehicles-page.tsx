@@ -2,6 +2,7 @@
 
 import { toast } from "sonner";
 import { PasteFileInput } from "@/components/ui/paste-file-input";
+import { OpenableImage } from "@/components/ui/openable-image";
 import { useMemo, useRef, useState } from "react";
 import { CarFront, Download, Gauge, History, Pencil, Plus, Trash2, Truck, Wand2, AlertTriangle, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
@@ -209,7 +210,7 @@ export function VehiclesPage() {
             renderCard={(vehicle) => (
               <article className="min-w-0 overflow-hidden rounded-2xl border bg-card shadow-sm">
                 <div className="relative flex aspect-[16/9] items-center justify-center bg-muted">
-                  {vehicle.photoDataUrl ? <img src={vehicle.photoDataUrl} alt={vehicle.name || vehicle.vehicleNumber} className="h-full w-full object-cover" /> : <Truck className="h-16 w-16 text-muted-foreground/40" />}
+                  {vehicle.photoDataUrl ? <OpenableImage src={vehicle.photoDataUrl} alt={vehicle.name || vehicle.vehicleNumber} className="h-full w-full object-cover" /> : <Truck className="h-16 w-16 text-muted-foreground/40" />}
                   <div className="absolute right-3 top-3"><StatusBadge status={vehicle.status} /></div>
                 </div>
                 <div className="space-y-4 p-4">
@@ -242,7 +243,7 @@ export function VehiclesPage() {
                 render: (v) => (
                   <div className="flex min-w-0 items-center gap-3">
                     <div className="flex h-20 w-28 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-muted">
-                      {v.photoDataUrl ? <img src={v.photoDataUrl} alt={v.name || v.vehicleNumber} className="h-full w-full object-cover" /> : <Truck className="h-8 w-8 text-muted-foreground" />}
+                      {v.photoDataUrl ? <OpenableImage src={v.photoDataUrl} alt={v.name || v.vehicleNumber} className="h-full w-full object-cover" /> : <Truck className="h-8 w-8 text-muted-foreground" />}
                     </div>
                     <div className="min-w-0"><p className="break-words font-mono font-semibold text-foreground">{v.vehicleNumber}</p>
                     {v.name && <p className="break-words text-xs text-muted-foreground">{v.name}</p>}</div>
@@ -456,7 +457,7 @@ export function VehiclesPage() {
             <Field label="Foto Kendaraan" hint="JPG, PNG, WEBP · maksimal 4 MB.">
               <div className="grid gap-4 rounded-xl border bg-muted/30 p-3 sm:grid-cols-[180px_1fr]">
                 <div className="flex aspect-[4/3] items-center justify-center overflow-hidden rounded-lg bg-muted">
-                  {form.photoDataUrl ? <img src={form.photoDataUrl} alt="Preview kendaraan" className="h-full w-full object-cover" /> : <Truck className="h-12 w-12 text-muted-foreground" />}
+                  {form.photoDataUrl ? <OpenableImage src={form.photoDataUrl} alt="Preview kendaraan" className="h-full w-full object-cover" /> : <Truck className="h-12 w-12 text-muted-foreground" />}
                 </div>
                 <div className="flex min-w-0 flex-col justify-center gap-3">
                   <PasteFileInput type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={event => {

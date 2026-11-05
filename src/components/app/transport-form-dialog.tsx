@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { routePlanKey } from "@/domain/transport-ops";
 import { toast } from "sonner";
 import {
   apiGet,
@@ -150,7 +151,12 @@ function TransportFormSession({
   // employee has a position set.
   const driverOptions = employeesByPosition(options?.employees ?? [], "Driver").map((e) => ({ value: String(e.id), label: e.name }));
   const kenekOptions = employeesByPosition(options?.employees ?? [], "Kenek").map((e) => ({ value: String(e.id), label: e.name }));
-  const routeOptions = (options?.routes ?? []).map((r) => ({ value: String(r.id), label: r.name }));
+  const uniqueRoutes = new Map<string, Options["routes"][number]>();
+  for (const route of options?.routes ?? []) {
+    const key = route.name.endsWith(" (Balik)") ? routePlanKey(route) : String(route.id);
+    if (!uniqueRoutes.has(key) || String(route.id) === form.routeId) uniqueRoutes.set(key, route);
+  }
+  const routeOptions = [...uniqueRoutes.values()].map((r) => ({ value: String(r.id), label: r.name }));
   const selectedRouteMeta = options?.routes?.find((r) => String(r.id) === form.routeId);
   // Capacity Round — the selected vehicle, for the live capacity preview.
   const selectedVehicle = options?.vehicles?.find((v) => String(v.id) === form.vehicleId) ?? null;

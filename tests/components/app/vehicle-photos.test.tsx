@@ -15,6 +15,7 @@ const photo = "data:image/png;base64,AAAA";
 const vehicle = { id: 1, vehicleNumber: "B 1234 XX", name: "Truck", status: "ACTIVE", maxWeightKg: 3500, maxVolumeM3: 14, photoDataUrl: photo };
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: vi.fn(() => "blob:vehicle-photo"), revokeObjectURL: vi.fn() }));
   m.get.mockImplementation(async (path: string) => path === "/vehicles" ? [vehicle] : path === "/options" ? { vehicleOwners: [] } : null);
   m.post.mockResolvedValue({ id: 2 });
   m.put.mockResolvedValue(vehicle);
@@ -30,14 +31,15 @@ it("previews an uploaded photo and submits it with the new vehicle", async () =>
   await user.type(screen.getByLabelText("Max Berat (kg)"), "3500");
   await user.type(screen.getByLabelText("Max Volume (m³)"), "14");
   await user.click(screen.getByRole("button", { name: "Buat Kendaraan" }));
-  await waitFor(() => expect(m.post).toHaveBeenCalledWith("/vehicles", expect.objectContaining({ vehicleNumber: "B 5678 YY", photoDataUrl: preview.getAttribute("src") })));
+  expect(preview).toHaveAttribute("src", "blob:vehicle-photo");
+  await waitFor(() => expect(m.post).toHaveBeenCalledWith("/vehicles", expect.objectContaining({ vehicleNumber: "B 5678 YY", photoDataUrl: "data:image/png;base64,cGhvdG8=" })));
 });
 
 it("preserves an existing photo on edit and supports explicit removal", async () => {
   const user = userEvent.setup();
   render(<VehiclesPage />);
   await user.click((await screen.findAllByRole("button", { name: "Edit B 1234 XX" }))[0]);
-  expect(screen.getByRole("img", { name: "Preview kendaraan" })).toHaveAttribute("src", photo);
+  expect(screen.getByRole("img", { name: "Preview kendaraan" })).toHaveAttribute("src", "blob:vehicle-photo");
   await user.click(screen.getByRole("button", { name: "Hapus foto" }));
   expect(screen.queryByRole("img", { name: "Preview kendaraan" })).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Simpan Perubahan" }));
@@ -49,7 +51,7 @@ it("rejects oversized photos without replacing the saved preview", async () => {
   render(<VehiclesPage />);
   await user.click((await screen.findAllByRole("button", { name: "Edit B 1234 XX" }))[0]);
   fireEvent.change(screen.getByRole("group", { name: "Upload atau tempel foto" }).querySelector("input")!, { target: { files: [new File([new Uint8Array(4 * 1024 * 1024 + 1)], "large.png", { type: "image/png" })] } });
-  expect(screen.getByRole("img", { name: "Preview kendaraan" })).toHaveAttribute("src", photo);
+  expect(screen.getByRole("img", { name: "Preview kendaraan" })).toHaveAttribute("src", "blob:vehicle-photo");
   await user.click(screen.getByRole("button", { name: "Simpan Perubahan" }));
   await waitFor(() => expect(m.put).toHaveBeenCalledWith("/vehicles/1", expect.objectContaining({ photoDataUrl: photo })));
 });

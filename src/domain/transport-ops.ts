@@ -193,6 +193,18 @@ export function buildReturnCheckpoints<T extends { name: string; sequence: numbe
   return ordered.map((c, i) => ({ ...c, sequence: i + 1 }));
 }
 
+/** Compare route plans without database IDs so identical return routes can be reused. */
+export function routePlanKey(route: {
+  name: string; origin: string | null; destination: string | null;
+  checkpoints?: { name: string; sequence: number; latitude: number; longitude: number; radiusMeters: number }[];
+}): string {
+  return JSON.stringify([
+    route.name, route.origin, route.destination,
+    [...(route.checkpoints ?? [])].sort((a, b) => a.sequence - b.sequence)
+      .map((c) => [c.name, c.sequence, c.latitude, c.longitude, c.radiusMeters]),
+  ]);
+}
+
 /** Return leg swaps the endpoints of the outbound transport. */
 export function returnEndpoints(t: { origin: string | null; destination: string | null }): { origin: string; destination: string } {
   return { origin: t.destination ?? "", destination: t.origin ?? "" };

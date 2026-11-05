@@ -3,7 +3,7 @@ import { db } from "@/infrastructure/persistence/db";
 import { guard, ok, handle, fail, dateOrNull } from "@/composition/api-helpers";
 import { audit } from "@/infrastructure/services/audit";
 import { nextCode } from "@/infrastructure/services/code-generator";
-import { buildReturnCheckpoints, canCreateReturnTransport } from "@/domain/transport-ops";
+import { buildReturnCheckpoints, canCreateReturnTransport, routePlanKey } from "@/domain/transport-ops";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -34,13 +34,21 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     const transportCode = await nextCode("transport", "TRP-2026-", "transportCode");
     const result = await db.$transaction(async (tx) => {
-      const route = await tx.route.create({
-        data: { name: `${task.originalTransport.route?.name ?? "Rute"} (Balik)`, origin: task.origin, destination: task.destination, isActive: true },
+      const routeData = { name: `${task.originalTransport.route?.name ?? "Rute"} (Balik)`, origin: task.origin, destination: task.destination, isActive: true };
+      const checkpoints = buildReturnCheckpoints(outbound);
+      const candidates = await tx.route.findMany({
+        where: routeData,
+        include: { checkpoints: { where: { isActive: true }, orderBy: { sequence: "asc" } } },
+        orderBy: { id: "asc" },
       });
-      for (const c of buildReturnCheckpoints(outbound)) {
-        await tx.checkpoint.create({
-          data: { routeId: route.id, name: c.name, sequence: c.sequence, latitude: c.latitude, longitude: c.longitude, radiusMeters: c.radiusMeters, isActive: true },
-        });
+      const existing = candidates.find((r) => routePlanKey(r) === routePlanKey({ ...routeData, checkpoints }));
+      const route = existing ?? await tx.route.create({ data: routeData });
+      if (!existing) {
+        for (const c of checkpoints) {
+          await tx.checkpoint.create({
+            data: { routeId: route.id, name: c.name, sequence: c.sequence, latitude: c.latitude, longitude: c.longitude, radiusMeters: c.radiusMeters, isActive: true },
+          });
+        }
       }
       const transport = await tx.transport.create({
         data: {

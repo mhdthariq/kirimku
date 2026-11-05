@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const m = vi.hoisted(() => ({
   taskFind: vi.fn(), taskUpdate: vi.fn(), taskReset: vi.fn(),
   transportFind: vi.fn(), transportCreate: vi.fn(), transportDelete: vi.fn(),
-  routeCreate: vi.fn(), checkpointCreate: vi.fn(), shipmentUpdate: vi.fn(),
+  routeCreate: vi.fn(), routeFind: vi.fn(), checkpointCreate: vi.fn(), shipmentUpdate: vi.fn(),
 }));
 vi.mock("@/composition/api-helpers", () => ({
   guard: vi.fn().mockResolvedValue({ id: 7 }),
@@ -17,7 +17,7 @@ vi.mock("@/infrastructure/persistence/db", () => {
   const tx = {
     returnTask: { findUnique: m.taskFind, update: m.taskUpdate, updateMany: m.taskReset },
     transport: { findUnique: m.transportFind, create: m.transportCreate, delete: m.transportDelete },
-    route: { create: m.routeCreate },
+    route: { create: m.routeCreate, findMany: m.routeFind },
     checkpoint: { create: m.checkpointCreate },
     masterShipment: { update: m.shipmentUpdate },
   };
@@ -59,12 +59,32 @@ beforeEach(() => {
   vi.resetAllMocks();
   m.taskFind.mockResolvedValue(task());
   m.routeCreate.mockResolvedValue({ id: 3 });
+  m.routeFind.mockResolvedValue([]);
   m.transportCreate.mockImplementation(async ({ data }) => ({ id: 20, ...data }));
   m.taskUpdate.mockImplementation(async ({ data }) => ({ ...task(), ...data }));
   m.transportFind.mockResolvedValue({ id: 20, status: "PLANNED", transportCode: "TRP-1", route: null, shipments: [] });
 });
 
 describe("Tugas Balik return transport lifecycle", () => {
+  it.each(["ACTIVITY", "CHECKPOINT"])("reuses an identical %s return route", async (mode) => {
+    m.taskFind.mockResolvedValue(task(mode));
+    m.routeFind.mockResolvedValue([{
+      id: 30, name: "A-B (Balik)", origin: "B", destination: "A",
+      checkpoints: mode === "ACTIVITY" ? [] : [...checkpoints].reverse().map((c, i) => ({ ...c, sequence: i + 1 })),
+    }]);
+    expect((await create()).status).toBe(200);
+    expect(m.routeCreate).not.toHaveBeenCalled();
+    expect(m.checkpointCreate).not.toHaveBeenCalled();
+    expect(m.transportCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ routeId: 30 }) });
+  });
+
+  it("creates a new route when the return checkpoints differ", async () => {
+    m.routeFind.mockResolvedValue([{ id: 30, name: "A-B (Balik)", origin: "B", destination: "A", checkpoints }]);
+    expect((await create()).status).toBe(200);
+    expect(m.routeCreate).toHaveBeenCalledOnce();
+    expect(m.checkpointCreate).toHaveBeenCalledTimes(3);
+  });
+
   it("inherits ACTIVITY tracking without requiring or creating checkpoints", async () => {
     m.taskFind.mockResolvedValue(task("ACTIVITY", []));
     expect((await create()).status).toBe(200);

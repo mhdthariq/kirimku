@@ -989,7 +989,7 @@ export interface Options {
   company: { name: string };
   employees: { id: number; name: string; position: string | null; warehouseId: number | null }[];
   vehicles: { id: number; vehicleNumber: string; name: string | null; maxWeightKg: number; maxVolumeM3?: number; maxKoli?: number | null; lengthM?: number | null; widthM?: number | null; heightM?: number | null }[];
-  routes: { id: number; name: string; origin: string | null; destination: string | null }[];
+  routes: { id: number; name: string; origin: string | null; destination: string | null; checkpoints?: Pick<Checkpoint, "name" | "sequence" | "latitude" | "longitude" | "radiusMeters">[] }[];
   warehouses: { id: number; code: string; name: string; city: string | null; customerSupportContact?: string | null }[];
   customers: { id: number; code: string; name: string; type: string; companyName?: string | null; phone: string | null; email: string | null; address: string | null; marketingPartnerId?: number | null; warehouseId?: number | null; warehouseName?: string | null }[];
   tariffs: {
