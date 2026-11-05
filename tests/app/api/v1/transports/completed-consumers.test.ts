@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const m = vi.hoisted(() => ({
   guard: vi.fn(), count: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), findFirst: vi.fn(),
   settlementFind: vi.fn(), settlementCreate: vi.fn(), ledgerFind: vi.fn(),
-  ledgerCreate: vi.fn(), walletFind: vi.fn(), walletUpdate: vi.fn(), audit: vi.fn(),
+  ledgerCreate: vi.fn(), walletFind: vi.fn(), walletUpdate: vi.fn(), audit: vi.fn(), executorOnly: vi.fn(),
 }));
 vi.mock("@/composition/api-helpers", () => ({
   guard: m.guard,
@@ -36,7 +36,7 @@ vi.mock("@/infrastructure/services/gudang-scope", () => ({
   transportGudangIds: () => [],
 }));
 vi.mock("@/infrastructure/services/transport-totals", () => ({
-  isExecutorOnly: () => false,
+  isExecutorOnly: m.executorOnly,
   detailAggregates: async () => ({ volumeByMaster: new Map(), actualKgByMaster: new Map(), packagesByMaster: new Map() }),
 }));
 
@@ -49,6 +49,7 @@ import { findActiveCrewAssignment } from "@/infrastructure/services/transport-cr
 
 beforeEach(() => {
   vi.clearAllMocks();
+  m.executorOnly.mockReturnValue(false);
   m.guard.mockResolvedValue({ id: 1, employeeId: 7 });
   m.findMany.mockResolvedValue([]);
   m.count.mockResolvedValue(2);
@@ -69,6 +70,34 @@ function trip(status: string, id = 1) {
 }
 
 describe("COMPLETED transport consumers", () => {
+  it("preserves driver and kenek assignment scope while searching", async () => {
+    m.executorOnly.mockReturnValue(true);
+    await list(new NextRequest("http://localhost/api/v1/transports?search=TRP"));
+    expect(m.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: {
+      OR: [{ driverId: 7 }, { kenekId: 7 }],
+      AND: [{ OR: [
+        { transportCode: { contains: "TRP", mode: "insensitive" } },
+        { route: { name: { contains: "TRP", mode: "insensitive" } } },
+        { vehicle: { vehicleNumber: { contains: "TRP", mode: "insensitive" } } },
+      ] }],
+    } }));
+  });
+
+  it("preserves explicit mine scope while searching history", async () => {
+    await list(new NextRequest("http://localhost/api/v1/transports?history=true&mine=true&search=TRP"));
+    const { where } = m.findMany.mock.calls[0][0];
+    expect(where.OR).toEqual([{ driverId: 7 }, { kenekId: 7 }]);
+    expect(where.status).toEqual({ in: ["ARRIVED", "COMPLETED", "CANCELLED"] });
+    expect(where.AND).toHaveLength(1);
+  });
+
+  it("returns no assignments for an unbound executor even when searching", async () => {
+    m.executorOnly.mockReturnValue(true);
+    m.guard.mockResolvedValue({ id: 1, employeeId: null });
+    await list(new NextRequest("http://localhost/api/v1/transports?search=TRP"));
+    expect(m.findMany.mock.calls[0][0].where).toMatchObject({ id: -1, AND: expect.any(Array) });
+  });
+
   it("includes completed transports in executor history without broadening employee scope", async () => {
     await list(new NextRequest("http://localhost/api/v1/transports?history=true&mine=true"));
     expect(m.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: {

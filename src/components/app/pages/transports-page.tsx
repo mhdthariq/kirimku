@@ -89,12 +89,15 @@ export function TransportsPage({
     settle: hasPermission(user, "transport.settle"),
   };
 
+  const mineOnly = !user?.isOwner && !!user?.roles?.some(
+    (role) => role.slug === "driver" || role.slug === "kenek",
+  );
   const { data, loading, reload } = useApiData<Transport[]>(
     () =>
       apiGet<Transport[]>(
-        `/transports${historyMode ? "?history=true&mine=true" : ""}`,
+        `/transports${historyMode ? "?history=true&mine=true" : mineOnly ? "?mine=true" : ""}`,
       ),
-    [historyMode],
+    [historyMode, mineOnly, user?.id],
   );
   const { data: options } = useApiData<Options>(
     () => apiGet<Options>("/options"),

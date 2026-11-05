@@ -3,8 +3,8 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 
-const m = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), permissions: [] as string[] }));
-vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: { isOwner: false } }) }));
+const m = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), permissions: [] as string[], user: { id: 1, isOwner: false, roles: [] as { slug: string }[] } }));
+vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: m.user }) }));
 vi.mock("@/infrastructure/http/client-api", () => ({
   apiGet: m.get, apiPost: m.post, apiDelete: vi.fn(),
   hasPermission: (_user: unknown, permission: string) => m.permissions.includes(permission),
@@ -26,6 +26,7 @@ import { TransportsPage } from "@/components/app/pages/transports-page";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  m.user = { id: 1, isOwner: false, roles: [] };
   m.permissions = ["transport.view", "transport.create", "transport.arrive", "transport.complete", "transport.settle"];
   m.post.mockResolvedValue({});
   const rows = ["DEPARTED", "ARRIVED", "COMPLETED"].map((status, i) => ({
@@ -36,6 +37,19 @@ beforeEach(() => {
 });
 
 describe("transport list completion actions", () => {
+  it.each(["driver", "kenek"])("requests only assigned transports for %s", async (slug) => {
+    m.user.roles = [{ slug }];
+    render(<TransportsPage />);
+    await waitFor(() => expect(m.get).toHaveBeenCalledWith("/transports?mine=true"));
+  });
+
+  it("keeps the owner's full transport list", async () => {
+    m.user.isOwner = true;
+    m.user.roles = [{ slug: "driver" }];
+    render(<TransportsPage />);
+    await waitFor(() => expect(m.get).toHaveBeenCalledWith("/transports"));
+  });
+
   it("opens only confirmation for a photo-exempt activity arrival from the list", async () => {
     m.permissions.push("transport.arrive_without_photo");
     m.get.mockImplementation(async (url: string) => url === "/options" ? { warehouses: [] } : [{

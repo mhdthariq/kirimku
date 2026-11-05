@@ -26,6 +26,7 @@ const m = vi.hoisted(() => ({
     checkpointCount: vi.fn(),
     shipmentFind: vi.fn(),
     transportCreate: vi.fn(),
+    returnTaskCount: vi.fn(),
 }));
 vi.mock("@/infrastructure/persistence/db", () => {
     const db = {
@@ -41,6 +42,7 @@ vi.mock("@/infrastructure/persistence/db", () => {
             count: m.activityCount,
         },
         checkpointRecord: { count: m.checkpointCount },
+        returnTask: { count: m.returnTaskCount },
         route: { findUnique: m.route },
         vehicle: { findUnique: m.vehicle },
         warehouse: { findMany: m.warehouses },
@@ -167,6 +169,7 @@ beforeEach(() => {
     m.update.mockResolvedValue({ id: 10 });
     m.activityCount.mockResolvedValue(0);
     m.checkpointCount.mockResolvedValue(0);
+    m.returnTaskCount.mockResolvedValue(0);
     m.shipmentFind.mockResolvedValue([]);
     m.transportCreate.mockResolvedValue({ id: 10 });
     m.list.mockResolvedValue([{ id: 30, photoUrl: photo }]);
@@ -385,6 +388,39 @@ describe("activity evidence API", () => {
 });
 
 describe("checkpoint-free lifecycle", () => {
+    it.each(["ACTIVITY", "CHECKPOINT"])("departs an empty %s return transport", async (trackingMode) => {
+        m.returnTaskCount.mockResolvedValue(1);
+        m.transport.mockResolvedValue({
+            ...transport, trackingMode, shipments: [],
+            route: { ...transport.route, checkpoints: [{ id: 1, sequence: 1 }] },
+            checkpointRecords: [{ checkpointId: 1 }],
+        });
+        expect((await depart(req(), params())).status).toBe(200);
+        expect(m.returnTaskCount).toHaveBeenCalledWith({ where: { returnTransportId: 10 } });
+        expect(m.sync).toHaveBeenCalledWith(expect.anything(), 10, "DEPARTED");
+        expect(m.shipmentUpdate).not.toHaveBeenCalled();
+        expect(m.event).not.toHaveBeenCalled();
+    });
+
+    it("still rejects empty outbound transports", async () => {
+        m.transport.mockResolvedValue({ ...transport, shipments: [] });
+        expect((await depart(req(), params())).status).toBe(422);
+        expect(m.update).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        { routeId: null },
+        { plannedDepartureAt: null },
+        { plannedArrivalAt: null },
+        { trackingMode: "CHECKPOINT", checkpointRecords: [] },
+    ])("retains departure prerequisites for empty return transports %#", async (overrides) => {
+        m.returnTaskCount.mockResolvedValue(1);
+        m.transport.mockResolvedValue({ ...transport, shipments: [], ...overrides });
+        expect((await depart(req(), params())).status).toBe(422);
+        expect(m.update).not.toHaveBeenCalled();
+        expect(m.sync).not.toHaveBeenCalled();
+    });
+
     it.each([depart, arrive])(
         "rejects concurrent lifecycle changes %#",
         async (route) => {

@@ -38,11 +38,11 @@ export async function GET(req: NextRequest) {
             : {}),
         ...(search
           ? {
-              OR: [
+              AND: [{ OR: [
                 { transportCode: { contains: search, mode: "insensitive" } },
                 { route: { name: { contains: search, mode: "insensitive" } } },
                 { vehicle: { vehicleNumber: { contains: search, mode: "insensitive" } } },
-              ],
+              ] }],
             }
           : {}),
       },

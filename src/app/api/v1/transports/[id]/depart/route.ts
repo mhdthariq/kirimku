@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { db } from "@/infrastructure/persistence/db";
 import { guard, ok, handle, fail, HttpError } from "@/composition/api-helpers";
 import { audit } from "@/infrastructure/services/audit";
-import { assertTransportAccess, syncReturnTaskForTransport } from "@/infrastructure/services/transport-ops-server";
+import { assertTransportAccess, isReturnTransport, syncReturnTaskForTransport } from "@/infrastructure/services/transport-ops-server";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -21,7 +21,9 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (!transport) return fail(404, "Transport tidak ditemukan.");
     await assertTransportAccess(user, transport);
     if (transport.status !== "PLANNED") return fail(422, `Transport berstatus ${transport.status}, hanya PLANNED yang bisa depart.`);
-    if (transport.shipments.length === 0) return fail(422, "Transport belum memiliki shipment.");
+    if (transport.shipments.length === 0 && !(await isReturnTransport(transport.id))) {
+      return fail(422, "Transport belum memiliki shipment.");
+    }
     // Complete plan required before departure: Rute + Rencana Berangkat +
     // Rencana Tiba must all be filled ("before we can confirm").
     if (transport.routeId == null) {
