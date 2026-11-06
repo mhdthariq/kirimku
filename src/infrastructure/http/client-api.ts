@@ -1370,7 +1370,7 @@ export interface TopUpRequest {
 
 export interface TopUpsResponse {
   topUps: TopUpRequest[];
-  bankInfo: { bankName: string; accountNumber: string; accountName: string };
+  bankAccounts: Pick<BankAccount, "id" | "bankName" | "accountNumber" | "accountName">[];
 }
 
 export interface WithdrawalRequest {

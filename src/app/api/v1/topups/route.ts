@@ -3,7 +3,6 @@ import { db } from "@/infrastructure/persistence/db";
 import { guard, ok, handle, fail, requireNum, str } from "@/composition/api-helpers";
 import { financeAudit } from "@/infrastructure/services/wallet";
 import { nextCode } from "@/infrastructure/services/code-generator";
-import { COMPANY_BANK } from "@/shared/company";
 
 const MIN_TOP_UP_AMOUNT = 10_000;
 // data URL image/PDF proof — keep in sync with the repair proof limits
@@ -34,7 +33,7 @@ export async function GET(req: NextRequest) {
         orderBy: { createdAt: "desc" },
         include: { verifiedBy: { select: { name: true } } },
       });
-      return ok({ topUps: rows, bankInfo: COMPANY_BANK });
+      return ok({ topUps: rows, bankAccounts: await topupBankAccounts() });
     }
 
     // Company-side management requires wallet.topup.view (Admin Kantor / Owner).
@@ -53,7 +52,7 @@ export async function GET(req: NextRequest) {
         verifiedBy: { select: { name: true } },
       },
     });
-    return ok({ topUps: rows, bankInfo: COMPANY_BANK });
+    return ok({ topUps: rows, bankAccounts: await topupBankAccounts() });
   });
 }
 
@@ -75,6 +74,7 @@ export async function POST(req: NextRequest) {
       return fail(422, "Ukuran bukti terlalu besar (maksimal 8 MB).", { proofUrl: ["Ukuran file maksimal 8 MB."] });
     }
 
+    const bankAccounts = await topupBankAccounts();
     const requestCode = await nextCode("topUpRequest", "TOP-", "requestCode");
     const topUp = await db.topUpRequest.create({
       data: {
@@ -89,6 +89,14 @@ export async function POST(req: NextRequest) {
       },
     });
     await financeAudit(user, "created", "topup", topUp.id, requestCode, { amount, status: "PENDING_VERIFICATION", proofAttached: true });
-    return ok({ topUp, bankInfo: COMPANY_BANK });
+    return ok({ topUp, bankAccounts });
+  });
+}
+
+function topupBankAccounts() {
+  return db.bankAccount.findMany({
+    where: { isActive: true },
+    orderBy: [{ bankName: "asc" }, { id: "asc" }],
+    select: { id: true, bankName: true, accountNumber: true, accountName: true },
   });
 }

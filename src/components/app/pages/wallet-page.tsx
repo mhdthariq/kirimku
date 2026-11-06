@@ -185,9 +185,15 @@ export function WalletPage() {
             {topUpsData && (
               <div className="mb-3 rounded-xl border bg-primary/5 p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-primary">Rekening perusahaan (tujuan transfer top up)</p>
-                <p className="mt-1 text-sm font-semibold">{topUpsData.bankInfo.accountName}</p>
-                <p className="font-mono text-sm">{topUpsData.bankInfo.accountNumber}</p>
-                <p className="text-xs text-muted-foreground">{topUpsData.bankInfo.bankName}</p>
+                {topUpsData.bankAccounts.length > 0 ? topUpsData.bankAccounts.map((account) => (
+                  <div key={account.id} className="mt-3">
+                    <p className="text-sm font-semibold">{account.accountName}</p>
+                    <p className="font-mono text-sm">{account.accountNumber}</p>
+                    <p className="text-xs text-muted-foreground">{account.bankName}</p>
+                  </div>
+                )) : (
+                  <p className="mt-1 text-sm text-muted-foreground">Belum ada rekening perusahaan aktif. Hubungi Admin Kantor.</p>
+                )}
               </div>
             )}
             <DataTable
